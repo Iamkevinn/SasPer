@@ -7,3 +7,4 @@ urllib3==2.4.0
 gunicorn
 fastapi
 uvicorn
+httpx
