@@ -8,6 +8,8 @@ import 'settings_screen.dart';
 import 'dashboard_screen.dart';
 import 'add_transaction_screen.dart';
 import 'add_account_screen.dart';
+import 'analysis_screen.dart'; 
+
 
 // --- PANTALLA DE CUENTAS (Estable y funcional) ---
 class AccountsScreen extends StatefulWidget {
@@ -116,6 +118,7 @@ class _MainScreenState extends State<MainScreen> {
   static const List<Widget> _widgetOptions = <Widget>[
     DashboardScreen(),
     AccountsScreen(),
+    AnalysisScreen(), // <-- Nueva pantalla de análisis
     SettingsScreen(),
   ];
 
@@ -191,7 +194,8 @@ class _MainScreenState extends State<MainScreen> {
             children: [
               _buildNavItem(index: 0, selectedIcon: Iconsax.home_15, regularIcon: Iconsax.home),
               _buildNavItem(index: 1, selectedIcon: Iconsax.wallet_money, regularIcon: Iconsax.wallet_3),
-              _buildNavItem(index: 2, selectedIcon: Iconsax.setting_4, regularIcon: Iconsax.setting_2),
+              _buildNavItem(index: 2, selectedIcon: Iconsax.chart_215, regularIcon: Iconsax.chart_21),
+              _buildNavItem(index: 3, selectedIcon: Iconsax.setting_4, regularIcon: Iconsax.setting_2),
             ],
           ),
         ),

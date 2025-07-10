@@ -5,8 +5,9 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AiAnalysisService {
-  // ¡¡IMPORTANTE!! Reemplaza esta IP con la IP de tu ordenador
-  static const String _baseUrl = "http://192.168.1.105:8000/api/analisis-financiero";
+  // --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
+  // La URL base debe apuntar al endpoint específico que queremos usar.
+  static const String _baseUrl = "https://sasper.onrender.com/api/analisis-financiero";
 
   Future<String> getFinancialAnalysis() async {
     try {
@@ -18,6 +19,7 @@ class AiAnalysisService {
       final userId = user.id;
 
       // 2. Construir la URL completa con el user_id
+      // Ahora la URL se construirá correctamente
       final url = Uri.parse('$_baseUrl?user_id=$userId');
 
       print('Llamando a la API de análisis: $url');
@@ -27,9 +29,15 @@ class AiAnalysisService {
 
       // 4. Procesar la respuesta
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        // Decodificamos el cuerpo de la respuesta, que debería ser UTF-8 por defecto
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        
         // El backend devuelve un JSON como {"analisis": "texto..."}
-        return data['analisis'] as String;
+        final analysis = data['analisis'];
+        if (analysis == null) {
+          throw Exception("La respuesta del servidor no contiene la clave 'analisis'.");
+        }
+        return analysis as String;
       } else {
         // Manejar errores del servidor
         print('Error del servidor: ${response.statusCode}');
@@ -39,7 +47,7 @@ class AiAnalysisService {
     } catch (e) {
       // Manejar errores de red o cualquier otra excepción
       print('Error en AiAnalysisService: $e');
-      throw Exception('No se pudo conectar con el servicio de análisis. Revisa tu conexión y que el servidor Python esté funcionando.');
+      throw Exception('No se pudo conectar con el servicio de análisis. Revisa tu conexión.');
     }
   }
 }
