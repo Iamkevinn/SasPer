@@ -1,108 +1,19 @@
 import 'dart:ui';
-import 'budgets_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:intl/intl.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'settings_screen.dart'; 
-import 'dashboard_screen.dart';
+
+import 'accounts_screen.dart';
 import 'add_transaction_screen.dart';
-import 'add_account_screen.dart';
-import 'analysis_screen.dart'; 
-
-
-// --- PANTALLA DE CUENTAS (Estable y funcional) ---
-class AccountsScreen extends StatefulWidget {
-  const AccountsScreen({super.key});
-  @override
-  State<AccountsScreen> createState() => _AccountsScreenState();
-}
-
-class _AccountsScreenState extends State<AccountsScreen> {
-  late Future<List<Map<String, dynamic>>> _accountsFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _accountsFuture = _fetchAccounts();
-  }
-
-  Future<List<Map<String, dynamic>>> _fetchAccounts() async {
-    final data = await Supabase.instance.client.rpc('get_accounts_with_balance');
-    return List<Map<String, dynamic>>.from(data);
-  }
-
-  final Map<String, IconData> _accountIcons = {
-    'Efectivo': Iconsax.money,
-    'Cuenta Bancaria': Iconsax.building,
-    'Tarjeta de Crédito': Iconsax.card,
-    'Ahorros': Iconsax.safe_home,
-    'Inversión': Iconsax.chart_1,
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final mediaQuery = MediaQuery.of(context);
-    return Padding(
-      padding: EdgeInsets.only(top: mediaQuery.padding.top),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Mis Cuentas', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
-                IconButton(
-                  icon: const Icon(Iconsax.add_square),
-                  onPressed: () async {
-                    await Navigator.of(context).push(MaterialPageRoute(builder: (context) => const AddAccountScreen()));
-                    setState(() { _accountsFuture = _fetchAccounts(); });
-                  },
-                )
-              ],
-            ),
-          ),
-          Expanded(
-            child: FutureBuilder<List<Map<String, dynamic>>>(
-              future: _accountsFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-                if (snapshot.hasError) return Center(child: Text('Error al cargar cuentas: ${snapshot.error}'));
-                final accounts = snapshot.data!;
-                if (accounts.isEmpty) return const Center(child: Text('Aún no tienes cuentas. ¡Añade una!'));
-                return ListView.builder(
-                  padding: const EdgeInsets.only(bottom: 150, left: 16, right: 16),
-                  itemCount: accounts.length,
-                  itemBuilder: (context, index) => _buildAccountTile(accounts[index]),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAccountTile(Map<String, dynamic> account) {
-    final balance = (account['current_balance'] as num).toDouble();
-    final type = account['account_type'] as String;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 0,
-      color: Theme.of(context).colorScheme.surfaceContainer.withAlpha(150),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        leading: Icon(_accountIcons[type] ?? Iconsax.wallet, size: 30),
-        title: Text(account['account_name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(type),
-        trailing: Text(NumberFormat.currency(locale: 'es_MX', symbol: '\$').format(balance), style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: balance < 0 ? Colors.redAccent : Theme.of(context).colorScheme.onSurface)),
-      ),
-    );
-  }
-}
+import 'analysis_screen.dart';
+import 'budgets_screen.dart';
+import 'dashboard_screen.dart';
+import 'settings_screen.dart';
+import '../utils/custom_page_route.dart';
+// ELIMINADO: Ya no necesitamos el EventService para este flujo.
+// import '../services/event_service.dart';
+// ELIMINADO: No se está usando en este archivo.
+// import 'dart:developer' as developer; 
 
 // --- PANTALLA PRINCIPAL (CONTROLADOR DE NAVEGACIÓN) ---
 class MainScreen extends StatefulWidget {
@@ -113,19 +24,39 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
-  late final Future<FragmentProgram> _shaderProgram;
+  
+  // ELIMINADO: Las GlobalKeys ya no son necesarias porque no vamos a
+  // llamar a métodos de refresco manuales desde aquí.
+  // final GlobalKey<DashboardScreenState> _dashboardKey = GlobalKey<DashboardScreenState>();
+  // ... (y las otras keys) ...
 
+  // La lista de widgets es ahora más simple. Son solo las pantallas.
   static const List<Widget> _widgetOptions = <Widget>[
     DashboardScreen(),
-    AccountsScreen(),
-    AnalysisScreen(), // <-- Nueva pantalla de análisis
+    AccountsScreen(), // El estado de esta pantalla también debería ser reactivo.
+    AnalysisScreen(),
     SettingsScreen(),
   ];
 
-  @override
-  void initState() {
-    super.initState();
-    _shaderProgram = FragmentProgram.fromAsset('shaders/noise.frag');
+  // ELIMINADO: Este método es completamente obsoleto con la arquitectura de Streams.
+  // void _refreshDataForCurrentTab() { ... }
+
+  // CAMBIO: El método para añadir transacción ahora es mucho más simple.
+  void _navigateToAddTransaction() {
+    HapticFeedback.heavyImpact();
+    // Simplemente navegamos a la pantalla de añadir transacción.
+    Navigator.of(context).push(
+      FadePageRoute(child: const AddTransactionScreen()),
+    );
+    // ELIMINADO: El bloque .then() es innecesario. Cuando esta pantalla
+    // guarde la transacción en Supabase, los streams se activarán
+    // y actualizarán el Dashboard automáticamente. ¡No hay que hacer nada más!
+  }
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
   }
 
   @override
@@ -135,12 +66,18 @@ class _MainScreenState extends State<MainScreen> {
       backgroundColor: Theme.of(context).colorScheme.surface,
       body: Stack(
         children: [
-          _widgetOptions.elementAt(_selectedIndex),
+          // IndexedStack sigue siendo la mejor opción para mantener el estado de las pantallas.
+          IndexedStack(
+            index: _selectedIndex,
+            children: _widgetOptions,
+          ),
+          
           Align(
             alignment: Alignment.bottomCenter,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // La animación del FAB ya no necesita lógica extra, solo _navigateToAddTransaction.
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
                   height: _selectedIndex == 0 ? 56.0 : 0,
@@ -148,19 +85,13 @@ class _MainScreenState extends State<MainScreen> {
                     duration: const Duration(milliseconds: 300),
                     scale: _selectedIndex == 0 ? 1.0 : 0.0,
                     child: FloatingActionButton(
-                      onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const AddTransactionScreen())),
+                      onPressed: _navigateToAddTransaction,
                       child: const Icon(Iconsax.add),
                     ),
                   ),
                 ),
                 SizedBox(height: _selectedIndex == 0 ? 12 : 0),
-                FutureBuilder<FragmentProgram>(
-                  future: _shaderProgram,
-                  builder: (context, snapshot) {
-                    if (!snapshot.hasData) return const SizedBox(height: 60);
-                    return _buildLiquidGlassNavBar(context, snapshot.data!);
-                  },
-                ),
+                _buildLiquidGlassNavBar(context), 
                 SizedBox(height: mediaQuery.padding.bottom + 8),
               ],
             ),
@@ -170,25 +101,24 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  // --- El Widget de la barra de navegación, REFINADO Y PERFECCIONADO ---
-  Widget _buildLiquidGlassNavBar(BuildContext context, FragmentProgram noiseShader) {
+  // --- El resto de tu UI está perfecto y no necesita cambios ---
+  Widget _buildLiquidGlassNavBar(BuildContext context) {
+    // ... tu código de la barra de navegación aquí ...
     return ClipRRect(
       borderRadius: BorderRadius.circular(50.0),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 25.0, sigmaY: 25.0),
         child: Container(
-          // La decoración crea el efecto de cristal con resplandor, sin borde ni sombra.
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                Colors.white.withAlpha(25), // Reflejo superior
-                Colors.white.withAlpha(10), // Tono general del cristal
+                Colors.white.withAlpha(25),
+                Colors.white.withAlpha(10),
               ],
             ),
           ),
-          // Usamos una Row que se encoge para ajustarse al contenido.
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -203,15 +133,18 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  // El componente de cada ícono, ahora con tamaño fijo para controlar la proporción.
   Widget _buildNavItem({required int index, required IconData selectedIcon, required IconData regularIcon}) {
-    final colorScheme = Theme.of(context).colorScheme;
+    // ... tu código del item de navegación aquí ...
+        final colorScheme = Theme.of(context).colorScheme;
     final isSelected = _selectedIndex == index;
     return SizedBox(
       width: 68,
       height: 60,
       child: GestureDetector(
-        onTap: () => setState(() => _selectedIndex = index),
+        onTap: () {
+          HapticFeedback.mediumImpact();
+          _onItemTapped(index);
+        },
         behavior: HitTestBehavior.opaque,
         child: Stack(
           alignment: Alignment.center,
@@ -237,7 +170,8 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
-// Clase helper para el shader de ruido (sin cambios)
+// La clase helper NoisePainter no se usa en el build, pero la dejamos por si se usa en otro lado.
+// Si no la usas, puedes eliminarla también.
 class NoisePainter extends CustomPainter {
   final FragmentProgram shaderProgram;
   NoisePainter(this.shaderProgram);

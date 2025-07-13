@@ -22,11 +22,13 @@ class _AddAccountScreenState extends State<AddAccountScreen> {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
       try {
+        final initialBalance = double.parse(_balanceController.text.trim());
         await Supabase.instance.client.from('accounts').insert({
           'user_id': Supabase.instance.client.auth.currentUser!.id,
           'name': _nameController.text.trim(),
           'type': _selectedType,
-          'initial_balance': double.parse(_balanceController.text.trim()),
+          'initial_balance':initialBalance,
+          'balance': initialBalance,  
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('¡Cuenta creada!'), backgroundColor: Colors.green));

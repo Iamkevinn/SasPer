@@ -41,7 +41,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('¡Transacción guardada!'), backgroundColor: Colors.green));
-          Navigator.of(context).pop();
+          Navigator.of(context).pop(true);
         }
       } catch (e) {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al guardar: $e'), backgroundColor: Colors.red));

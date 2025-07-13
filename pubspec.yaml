@@ -46,7 +46,9 @@ dependencies:
   flutter_markdown: ^0.7.1 # Para mostrar texto enriquecido
   google_fonts: ^4.0.3 # Para usar fuentes de Google
   shimmer: ^3.0.0
-  
+  flutter_staggered_animations: ^1.1.1 
+  flutter_heatmap_calendar: ^1.0.5
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
