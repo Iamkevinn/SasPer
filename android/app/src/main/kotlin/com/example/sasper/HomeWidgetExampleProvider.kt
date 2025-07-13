@@ -1,4 +1,4 @@
-package com.example.finanzas_app
+package com.example.sasper
 
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
@@ -21,7 +21,7 @@ class HomeWidgetExampleProvider : HomeWidgetProvider() {
                 // Se crea un Intent que apunta DIRECTAMENTE a la actividad principal de Flutter
                 
                 // Intent para "Añadir Transacción"
-                val addTransactionIntent = Intent(context, Class.forName("com.example.finanzas_app.MainActivity")).apply {
+                val addTransactionIntent = Intent(context, Class.forName("com.example.sasper.MainActivity")).apply {
                     action = "WIDGET_CLICK" // Una acción personalizada para identificar que viene de un widget
                     putExtra("widget_action", "add_transaction") // Acción estándar para ver contenido
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -38,7 +38,7 @@ class HomeWidgetExampleProvider : HomeWidgetProvider() {
                 setOnClickPendingIntent(R.id.btn_add_transaction, addTransactionPendingIntent)
 
                 // Intent para abrir el Dashboard
-                val openDashboardIntent = Intent(context, Class.forName("com.example.finanzas_app.MainActivity")).apply {
+                val openDashboardIntent = Intent(context, Class.forName("com.example.sasper.MainActivity")).apply {
                     // Ponemos la acción específica en los extras
                     putExtra("widget_action", "open_dashboard")
                     action = "WIDGET_CLICK"

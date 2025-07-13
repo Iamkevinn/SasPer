@@ -2,4 +2,5 @@
 <resources>
     <!-- Color similar al de los widgets de Google -->
     <color name="widget_background_color">#2E3133</color>
+	<color name="ic_launcher_background">#FFFFFF</color>
 </resources>

@@ -1,4 +1,4 @@
-import 'package:finanzas_app/widgets/dashboard/ai_analysis_section.dart';
+import 'package:sas_per/widgets/dashboard/ai_analysis_section.dart';
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';

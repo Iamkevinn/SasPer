@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class WidgetService {
-  static const String appGroupId = 'group.com.example.finanzas_app'; // Necesario para iOS
+  static const String appGroupId = 'group.com.example.sasper'; // Necesario para iOS
 
   static Future<void> updateBalanceWidget() async {
     try {
