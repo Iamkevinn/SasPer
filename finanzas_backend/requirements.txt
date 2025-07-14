@@ -11,3 +11,4 @@ httpx
 google-generativeai>=0.4.1
 supabase
 python-dotenv>=1.0.0
+firebase-admin>=6.0.0

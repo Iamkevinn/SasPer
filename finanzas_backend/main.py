@@ -8,6 +8,9 @@ from fastapi import FastAPI, HTTPException, Query
 from supabase import create_client, Client
 from supabase.lib.client_options import ClientOptions
 import google.generativeai as genai
+import firebase_admin
+from firebase_admin import credentials, messaging
+
 
 # --- 1. CONFIGURACIÓN INICIAL Y CLIENTES ---
 # Carga las variables de entorno del archivo .env (para desarrollo local)
@@ -25,6 +28,13 @@ if not supabase_url or not supabase_key:
 options = ClientOptions(httpx_client=httpx.Client(verify=False))
 supabase: Client = create_client(supabase_url, supabase_key, options=options)
 print("✅ Cliente de Supabase inicializado.")
+
+try:
+    cred = credentials.Certificate("serviceAccountKey.json") # Asumimos que el archivo estará ahí
+    firebase_admin.initialize_app(cred)
+    print("Firebase Admin SDK inicializado correctamente.")
+except Exception as e:
+    print(f"Error al inicializar Firebase Admin SDK: {e}")
 
 # --- Configuración del cliente de Google Gemini ---
 gemini_api_key = os.getenv("GEMINI_API_KEY")
@@ -102,3 +112,46 @@ async def generar_analisis_financiero(
     except Exception as e:
         print(f"--- ¡ERROR! Ocurrió un error inesperado: {e} ---")
         raise HTTPException(status_code=500, detail=f"No se pudo completar el análisis. Error: {str(e)}")
+
+# --- AÑADE EL NUEVO ENDPOINT DE NOTIFICACIONES ---
+    # Endpoint para enviar una notificación de prueba
+@app.route('/send-test-notification', methods=['POST'])
+def send_test_notification():
+    # Obtener el user_id del cuerpo de la solicitud JSON
+    data = request.get_json()
+    user_id = data.get('user_id')
+
+    if not user_id:
+        return jsonify({"error": "user_id es requerido"}), 400
+
+    try:
+        # 1. Buscar el fcm_token del usuario en Supabase
+        response = supabase.table('profiles').select('fcm_token').eq('id', user_id).single().execute()
+        
+        if not response.data or not response.data.get('fcm_token'):
+            return jsonify({"error": "No se encontró el token FCM para este usuario"}), 404
+
+        fcm_token = response.data['fcm_token']
+        
+        # 2. Crear el mensaje de la notificación
+        message = messaging.Message(
+            notification=messaging.Notification(
+                title="🚀 ¡Prueba desde el Backend!",
+                body="Si ves esto, tu servidor Python está enviando notificaciones."
+            ),
+            token=fcm_token,
+            # También puedes añadir datos personalizados para que la app reaccione
+            data={
+                'screen': 'settings', # Por ejemplo, para abrir la pantalla de ajustes
+            }
+        )
+
+        # 3. Enviar el mensaje
+        messaging.send(message)
+        
+        print(f"Notificación de prueba enviada exitosamente al usuario {user_id}")
+        return jsonify({"success": True, "message": "Notificación enviada"}), 200
+
+    except Exception as e:
+        print(f"Error al enviar notificación: {e}")
+        return jsonify({"error": str(e)}), 500

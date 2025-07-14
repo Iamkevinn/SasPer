@@ -110,8 +110,7 @@ class SettingsScreen extends StatelessWidget {
 
               const String yourLocalIp = '92.168.0.26';
               final url =
-                  Uri.parse('https://b11904930dcd.ngrok-free.app/send-test-notification');
-                //Uri.parse('https://b11904930dcd.ngrok-free.app/send-test-notification');
+                  Uri.parse('https://sasper.onrender.com/send-test-notification');
               // 4. Obtén el ID del usuario actual
               final user = Supabase.instance.client.auth.currentUser;
               if (user == null) {
