@@ -83,7 +83,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'user_id': userId,
-          'category_name': categoryName,
+          'category': categoryName,
         }),
       );
       print('Respuesta del backend (chequeo de presupuesto): ${response.statusCode} - ${response.body}');

@@ -178,7 +178,7 @@ async def check_budget_on_transaction(request: Request):
     try:
         data = await request.json()
         user_id = data.get('user_id')
-        category_name = data.get('category_name')
+        category_name = data.get('category')
         
         if not all([user_id, category_name]):
             return JSONResponse(status_code=400, content={"error": "user_id y category_name son requeridos"})
@@ -187,7 +187,7 @@ async def check_budget_on_transaction(request: Request):
 
     try:
         # 1. Encontrar el presupuesto del usuario para esa categoría
-        budget_response = supabase.table('budgets').select('amount').eq('user_id', user_id).eq('category_name', category_name).single().execute()
+        budget_response = supabase.table('budgets').select('amount').eq('user_id', user_id).eq('category', category_name).single().execute()
 
         if not budget_response.data:
             print(f"No se encontró presupuesto para el usuario {user_id} y categoría {category_name}.")
