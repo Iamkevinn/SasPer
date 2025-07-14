@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:sas_per/services/checkBudgetStatusAfterTransaction.dart';
@@ -24,28 +27,39 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   final Map<String, IconData> _incomeCategories = { 'Sueldo': Iconsax.money_recive, 'Inversión': Iconsax.chart, 'Freelance': Iconsax.briefcase, 'Regalo': Iconsax.gift, 'Otro': Iconsax.category, };
   Map<String, IconData> get _currentCategories => _transactionType == 'Gasto' ? _expenseCategories : _incomeCategories;
 
+  // En add_transaction_screen.dart
+
   Future<void> _saveTransaction() async {
-    // Validamos que todos los campos obligatorios estén completos
     if (_formKey.currentState!.validate() && _selectedCategory != null && _selectedAccountId != null) {
       setState(() => _isLoading = true);
+      
+      // --- CORRECCIÓN: Definimos las variables aquí ---
+      final String userId = supabase.auth.currentUser!.id;
+      final String categoryName = _selectedCategory!;
+      final String transactionType = _transactionType;
+      // --- FIN DE LA CORRECCIÓN ---
+
       try {
         await supabase.from('transactions').insert({
-          'user_id': supabase.auth.currentUser!.id,
-          'account_id': _selectedAccountId, // Guardamos el ID de la cuenta
+          'user_id': userId,
+          'account_id': _selectedAccountId,
           'amount': double.parse(_amountController.text),
-          'type': _transactionType,
-          'category': _selectedCategory,
+          'type': transactionType,
+          'category': categoryName,
           'description': _descriptionController.text.trim(),
           'transaction_date': DateTime.now().toIso8601String(),
         });
         
+        // Ahora usamos las variables que definimos antes, que sí son accesibles aquí.
+        if (transactionType == 'Gasto') {
+          _checkBudgetOnBackend(
+            userId: userId,
+            categoryName: categoryName,
+          );
+        }
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('¡Transacción guardada!'), backgroundColor: Colors.green));
-          // --- NUEVO CÓDIGO DE VERIFICACIÓN ---
-          await checkBudgetStatusAfterTransaction(
-            categoryName: _selectedCategory!, // ID de la categoría de la nueva transacción
-            userId: Supabase.instance.client.auth.currentUser!.id,
-          );
           Navigator.of(context).pop(true);
         }
       } catch (e) {
@@ -57,6 +71,24 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Por favor, selecciona una cuenta'), backgroundColor: Colors.orange));
     } else if (_selectedCategory == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Por favor, selecciona una categoría'), backgroundColor: Colors.orange));
+    }
+  }
+
+  // La función _checkBudgetOnBackend no necesita cambios.
+  Future<void> _checkBudgetOnBackend({required String userId, required String categoryName}) async {
+    final url = Uri.parse('https://sasper.onrender.com/check-budget-on-transaction');
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'user_id': userId,
+          'category_name': categoryName,
+        }),
+      );
+      print('Respuesta del backend (chequeo de presupuesto): ${response.statusCode} - ${response.body}');
+    } catch (e) {
+      print('Error al llamar al backend para chequear presupuesto: $e');
     }
   }
 

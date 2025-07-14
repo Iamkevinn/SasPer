@@ -115,7 +115,7 @@ async def generar_analisis_financiero(
         raise HTTPException(status_code=500, detail=f"No se pudo completar el análisis. Error: {str(e)}")
 
 # --- AÑADE EL NUEVO ENDPOINT DE NOTIFICACIONES ---
-@app.post("/send-test-notification")
+'''@app.post("/send-test-notification")
 async def send_test_notification(request: Request):
     try:
         data = await request.json()
@@ -172,4 +172,81 @@ async def send_test_notification(request: Request):
         return JSONResponse(
             status_code=500,
             content={"error": str(e)}
-        )
+        )'''
+@app.post("/check-budget-on-transaction")
+async def check_budget_on_transaction(request: Request):
+    try:
+        data = await request.json()
+        user_id = data.get('user_id')
+        category_name = data.get('category_name')
+        
+        if not all([user_id, category_name]):
+            return JSONResponse(status_code=400, content={"error": "user_id y category_name son requeridos"})
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": "Cuerpo de la solicitud inválido"})
+
+    try:
+        # 1. Encontrar el presupuesto del usuario para esa categoría
+        budget_response = supabase.table('budgets').select('amount').eq('user_id', user_id).eq('category_name', category_name).single().execute()
+
+        if not budget_response.data:
+            print(f"No se encontró presupuesto para el usuario {user_id} y categoría {category_name}.")
+            return JSONResponse(status_code=200, content={"message": "No hay presupuesto para esta categoría, no se hace nada."})
+
+        budget_amount = float(budget_response.data['amount'])
+        
+        # 2. Calcular el total gastado en esa categoría este mes
+        from datetime import datetime, date
+        today = date.today()
+        first_day_of_month = today.replace(day=1).isoformat()
+        
+        # Para el último día, necesitamos manejar el fin de mes correctamente
+        import calendar
+        _, last_day = calendar.monthrange(today.year, today.month)
+        last_day_of_month = today.replace(day=last_day).isoformat()
+
+        transactions_response = supabase.table('transactions').select('amount', count='exact').eq('user_id', user_id).eq('type', 'Gasto').eq('category', category_name).gte('transaction_date', first_day_of_month).lte('transaction_date', last_day_of_month).execute()
+        
+        total_spent = sum(float(t['amount']) for t in transactions_response.data)
+
+        # 3. Verificar umbrales
+        if budget_amount == 0:
+            percentage_spent = 0
+        else:
+            percentage_spent = (total_spent / budget_amount) * 100
+        
+        print(f"Usuario: {user_id}, Cat: {category_name}, Gastado: {total_spent}/{budget_amount} ({percentage_spent:.2f}%)")
+
+        notification_title = None
+        notification_body = None
+
+        # Aquí podríamos añadir lógica para no notificar varias veces (ej. guardar último umbral notificado)
+        if 100 <= percentage_spent:
+            notification_title = 'Presupuesto Excedido'
+            notification_body = f'¡Cuidado! Has superado tu presupuesto para "{category_name}".'
+        elif 80 <= percentage_spent < 100:
+            notification_title = 'Alerta de Presupuesto'
+            notification_body = f'Ya has utilizado el {int(percentage_spent)}% de tu presupuesto para "{category_name}".'
+
+        # 4. Si hay que notificar, buscar token y enviar
+        if notification_title:
+            token_response = supabase.table('profiles').select('fcm_token').eq('id', user_id).single().execute()
+            if token_response.data and token_response.data.get('fcm_token'):
+                fcm_token = token_response.data['fcm_token']
+                message = messaging.Message(
+                    notification=messaging.Notification(
+                        title=notification_title,
+                        body=notification_body
+                    ),
+                    token=fcm_token,
+                    data={'screen': 'budgets'} # Llevar al usuario a la pantalla de presupuestos
+                )
+                messaging.send(message)
+                print(f"Notificación de presupuesto enviada a {user_id}")
+                return JSONResponse(status_code=200, content={"success": True, "message": "Notificación enviada."})
+        
+        return JSONResponse(status_code=200, content={"success": True, "message": "Umbral no alcanzado, no se envió notificación."})
+
+    except Exception as e:
+        print(f"Error procesando el chequeo de presupuesto: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
