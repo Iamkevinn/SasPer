@@ -10,6 +10,7 @@ from supabase.lib.client_options import ClientOptions
 import google.generativeai as genai
 import firebase_admin
 from firebase_admin import credentials, messaging
+from fastapi.responses import JSONResponse # Opcional, para control avanzado
 
 
 # --- 1. CONFIGURACIÓN INICIAL Y CLIENTES ---
@@ -122,15 +123,14 @@ async def send_test_notification(request: Request):
     user_id = data.get('user_id')
 
     if not user_id:
-        return jsonify({"error": "user_id es requerido"}), 400
+        return JSONResponse(status_code=400, content={"error": "user_id es requerido"}) 
 
     try:
         # 1. Buscar el fcm_token del usuario en Supabase
         response = supabase.table('profiles').select('fcm_token').eq('id', user_id).single().execute()
         
         if not response.data or not response.data.get('fcm_token'):
-            return jsonify({"error": "No se encontró el token FCM para este usuario"}), 404
-
+            return JSONResponse(status_code=404, content={"error No se encontró el token FCM para este usuario + ": str(e)})
         fcm_token = response.data['fcm_token']
         
         # 2. Crear el mensaje de la notificación
@@ -150,8 +150,8 @@ async def send_test_notification(request: Request):
         messaging.send(message)
         
         print(f"Notificación de prueba enviada exitosamente al usuario {user_id}")
-        return jsonify({"success": True, "message": "Notificación enviada"}), 200
+        return {"success": True, "message": "Notificación enviada"} 
 
     except Exception as e:
         print(f"Error al enviar notificación: {e}")
-        return jsonify({"error": str(e)}), 500
+        return JSONResponse(status_code=500, content={"error": str(e)})
