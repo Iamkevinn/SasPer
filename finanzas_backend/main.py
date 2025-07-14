@@ -115,64 +115,6 @@ async def generar_analisis_financiero(
         raise HTTPException(status_code=500, detail=f"No se pudo completar el análisis. Error: {str(e)}")
 
 # --- AÑADE EL NUEVO ENDPOINT DE NOTIFICACIONES ---
-'''@app.post("/send-test-notification")
-async def send_test_notification(request: Request):
-    try:
-        data = await request.json()
-    except Exception:
-        # Si el cuerpo no es JSON, devolvemos un error 400
-        return JSONResponse(
-            status_code=400,
-            content={"error": "Cuerpo de la solicitud inválido o no es JSON"}
-        )
-        
-    user_id = data.get('user_id')
-
-    if not user_id:
-        return JSONResponse(
-            status_code=400,
-            content={"error": "user_id es requerido"}
-        )
-
-    try:
-        # 1. Buscar el fcm_token del usuario en Supabase
-        response = supabase.table('profiles').select('fcm_token').eq('id', user_id).single().execute()
-        
-        if not response.data or not response.data.get('fcm_token'):
-            return JSONResponse(
-                status_code=404, # 404 Not Found es más apropiado aquí
-                content={"error": "No se encontró el token FCM para este usuario"}
-            )
-
-        fcm_token = response.data['fcm_token']
-        
-        # 2. Crear y enviar el mensaje
-        message = messaging.Message(
-            notification=messaging.Notification(
-                title="🚀 ¡Prueba desde el Backend!",
-                body="Si ves esto, tu servidor Python está enviando notificaciones."
-            ),
-            token=fcm_token,
-            data={'screen': 'settings'}
-        )
-        messaging.send(message)
-        
-        print(f"Notificación de prueba enviada exitosamente al usuario {user_id}")
-        
-        # Para el caso de éxito, devolver un diccionario está bien, 
-        # pero usar JSONResponse es más consistente.
-        return JSONResponse(
-            status_code=200,
-            content={"success": True, "message": "Notificación enviada"}
-        )
-
-    except Exception as e:
-        print(f"Error al enviar notificación: {e}")
-        # Devolvemos un error 500 para cualquier otra excepción
-        return JSONResponse(
-            status_code=500,
-            content={"error": str(e)}
-        )'''
 @app.post("/check-budget-on-transaction")
 async def check_budget_on_transaction(request: Request):
     try:
