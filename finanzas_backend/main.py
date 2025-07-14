@@ -123,30 +123,45 @@ async def check_budget_on_transaction(request: Request):
         category_name = data.get('category')
         
         if not all([user_id, category_name]):
-            return JSONResponse(status_code=400, content={"error": "user_id y category_name son requeridos"})
+            return JSONResponse(status_code=400, content={"error": "user_id y category son requeridos"})
     except Exception:
         return JSONResponse(status_code=400, content={"error": "Cuerpo de la solicitud inválido"})
 
+    # --- INICIO DE LA DEPURACIÓN PRECISA ---
+    print("--- INICIANDO BÚSQUEDA DE PRESUPUESTO ---")
+    print(f"Buscando para user_id: '{user_id}'")
+    print(f"Buscando para category: '{category_name}'")
+    # --- FIN DE LA DEPURACIÓN PRECISA ---
+
     try:
-        # 1. Encontrar el presupuesto del usuario para esa categoría
-        budget_response = supabase.table('budgets').select('amount').eq('user_id', user_id).eq('category', category_name).maybeSingle().execute()
+        # --- CÓDIGO CORREGIDO PARA v1.x DE SUPABASE-PY ---
+        # 1. Ejecutamos la consulta sin .single() o .maybeSingle()
+        budget_response = supabase.table('budgets').select('amount').eq('user_id', user_id).eq('category', category_name).execute()
 
-        if not budget_response.data:
-            print(f"No se encontró presupuesto para el usuario {user_id} y categoría {category_name}.")
+        # Print para ver la respuesta cruda de la base de datos
+        print(f"Respuesta cruda de la tabla 'budgets': {budget_response}")
+
+        # 2. Verificamos el resultado manualmente
+        if not budget_response.data: # Si la lista 'data' está vacía
+            print(f"RESULTADO: No se encontró presupuesto para el usuario '{user_id}' y categoría '{category_name}'.")
             return JSONResponse(status_code=200, content={"message": "No hay presupuesto para esta categoría, no se hace nada."})
-
-        budget_amount = float(budget_response.data['amount'])
+        
+        # Si llegamos aquí, se encontró al menos una fila. Tomamos la primera.
+        budget_data = budget_response.data[0]
+        budget_amount = float(budget_data['amount'])
+        print(f"RESULTADO: Presupuesto encontrado. Límite: {budget_amount}")
+        # --- FIN DEL CÓDIGO CORREGIDO ---
         
         # 2. Calcular el total gastado en esa categoría este mes
-        from datetime import datetime, date
+        from datetime import date
+        import calendar
+
         today = date.today()
         first_day_of_month = today.replace(day=1).isoformat()
-        
-        # Para el último día, necesitamos manejar el fin de mes correctamente
-        import calendar
         _, last_day = calendar.monthrange(today.year, today.month)
         last_day_of_month = today.replace(day=last_day).isoformat()
 
+        print(f"Buscando transacciones entre {first_day_of_month} y {last_day_of_month}")
         transactions_response = supabase.table('transactions').select('amount', count='exact').eq('user_id', user_id).eq('type', 'Gasto').eq('category', category_name).gte('transaction_date', first_day_of_month).lte('transaction_date', last_day_of_month).execute()
         
         total_spent = sum(float(t['amount']) for t in transactions_response.data)
@@ -157,12 +172,11 @@ async def check_budget_on_transaction(request: Request):
         else:
             percentage_spent = (total_spent / budget_amount) * 100
         
-        print(f"Usuario: {user_id}, Cat: {category_name}, Gastado: {total_spent}/{budget_amount} ({percentage_spent:.2f}%)")
+        print(f"CÁLCULO FINAL: Usuario: {user_id}, Cat: {category_name}, Gastado: {total_spent}/{budget_amount} ({percentage_spent:.2f}%)")
 
         notification_title = None
         notification_body = None
 
-        # Aquí podríamos añadir lógica para no notificar varias veces (ej. guardar último umbral notificado)
         if 100 <= percentage_spent:
             notification_title = 'Presupuesto Excedido'
             notification_body = f'¡Cuidado! Has superado tu presupuesto para "{category_name}".'
@@ -172,23 +186,30 @@ async def check_budget_on_transaction(request: Request):
 
         # 4. Si hay que notificar, buscar token y enviar
         if notification_title:
-            token_response = supabase.table('profiles').select('fcm_token').eq('id', user_id).single().execute()
-            if token_response.data and token_response.data.get('fcm_token'):
-                fcm_token = token_response.data['fcm_token']
+            print("DECISIÓN: Se debe enviar notificación. Buscando token FCM...")
+            token_response = supabase.table('profiles').select('fcm_token').eq('id', user_id).execute()
+            if token_response.data and token_response.data[0].get('fcm_token'):
+                fcm_token = token_response.data[0]['fcm_token']
                 message = messaging.Message(
                     notification=messaging.Notification(
                         title=notification_title,
                         body=notification_body
                     ),
                     token=fcm_token,
-                    data={'screen': 'budgets'} # Llevar al usuario a la pantalla de presupuestos
+                    data={'screen': 'budgets'}
                 )
                 messaging.send(message)
-                print(f"Notificación de presupuesto enviada a {user_id}")
+                print(f"ÉXITO: Notificación de presupuesto enviada a {user_id}")
                 return JSONResponse(status_code=200, content={"success": True, "message": "Notificación enviada."})
+            else:
+                print("ADVERTENCIA: No se pudo encontrar el token FCM para el usuario. No se envió notificación.")
         
+        print("DECISIÓN: Umbral no alcanzado, no se envió notificación.")
         return JSONResponse(status_code=200, content={"success": True, "message": "Umbral no alcanzado, no se envió notificación."})
 
     except Exception as e:
-        print(f"Error procesando el chequeo de presupuesto: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        print(f"ERROR INESPERADO: Error procesando el chequeo de presupuesto: {e}")
+        # Importante: añadir el traceback para ver la línea exacta del error si ocurre algo más
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"error": "Ocurrió un error interno en el servidor."})
