@@ -129,7 +129,7 @@ async def check_budget_on_transaction(request: Request):
 
     try:
         # 1. Encontrar el presupuesto del usuario para esa categoría
-        budget_response = supabase.table('budgets').select('amount').eq('user_id', user_id).eq('category', category_name).single().execute()
+        budget_response = supabase.table('budgets').select('amount').eq('user_id', user_id).eq('category', category_name).maybeSingle().execute()
 
         if not budget_response.data:
             print(f"No se encontró presupuesto para el usuario {user_id} y categoría {category_name}.")
