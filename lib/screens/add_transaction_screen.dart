@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:iconsax/iconsax.dart';
-
+import 'package:sas_per/services/checkBudgetStatusAfterTransaction.dart';
 class AddTransactionScreen extends StatefulWidget {
   const AddTransactionScreen({super.key});
 
@@ -41,6 +41,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('¡Transacción guardada!'), backgroundColor: Colors.green));
+          // --- NUEVO CÓDIGO DE VERIFICACIÓN ---
+          await checkBudgetStatusAfterTransaction(
+            categoryName: _selectedCategory!, // ID de la categoría de la nueva transacción
+            userId: Supabase.instance.client.auth.currentUser!.id,
+          );
           Navigator.of(context).pop(true);
         }
       } catch (e) {

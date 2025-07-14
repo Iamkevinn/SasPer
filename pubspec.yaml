@@ -46,6 +46,7 @@ dependencies:
   # Dependencias para Notificaciones Push (listos para el siguiente paso)
   firebase_core: ^2.32.0 
   firebase_messaging: ^14.9.3
+  connectivity_plus: ^6.0.3
 
 # Dependencias que solo se usan durante el desarrollo.
 dev_dependencies:
@@ -85,7 +86,7 @@ flutter_launcher_icons:
   
   # --- CONFIGURACIÓN PARA ÍCONOS ADAPTATIVOS (Android 8.0+) ---
   # Color que se usará como capa de fondo.
-  adaptive_icon_background: "#FFFFFF" 
+  adaptive_icon_background: "#2a2a2a" 
   
   # Ruta a tu ícono de primer plano (sin fondo, solo el logo).
   adaptive_icon_foreground: "assets/icons/SasPer_foreground.png"

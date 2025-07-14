@@ -9,6 +9,8 @@ import '../widgets/dashboard/balance_card.dart';
 import '../widgets/dashboard/budgets_section.dart';
 import '../widgets/dashboard/dashboard_header.dart';
 import '../widgets/dashboard/recent_transactions_section.dart';
+import 'package:sas_per/services/notification_service.dart'; // ¡Importa el servicio!
+
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -25,6 +27,7 @@ class DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    _setupNotifications();
     _repository = DashboardRepository(Supabase.instance.client);
     // CAMBIO: Nos suscribimos al stream.
     _dashboardDataStream = _repository.getDashboardDataStream();
@@ -32,6 +35,11 @@ class DashboardScreenState extends State<DashboardScreen> {
 
   // ELIMINADO: La función refreshDashboard() y la _futureBuilderKey ya no son necesarias.
 
+  Future<void> _setupNotifications() async {
+    // Creamos una instancia y llamamos al método de inicialización
+    await NotificationService().initializeNotifications();
+  }
+  
   @override
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);

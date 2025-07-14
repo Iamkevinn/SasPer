@@ -1,6 +1,9 @@
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -37,7 +40,9 @@ class SettingsScreen extends StatelessWidget {
       } catch (e) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error al cerrar sesión: $e'), backgroundColor: Colors.red),
+            SnackBar(
+                content: Text('Error al cerrar sesión: $e'),
+                backgroundColor: Colors.red),
           );
         }
       }
@@ -59,7 +64,10 @@ class SettingsScreen extends StatelessWidget {
           // Título de la pantalla
           Text(
             'Ajustes',
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+            style: Theme.of(context)
+                .textTheme
+                .headlineMedium
+                ?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 24),
 
@@ -69,12 +77,95 @@ class SettingsScreen extends StatelessWidget {
             color: colorScheme.surfaceContainer,
             child: ListTile(
               leading: const Icon(Iconsax.user, size: 30),
-              title: const Text('Sesión Iniciada como', style: TextStyle(fontSize: 14)),
+              title: const Text('Sesión Iniciada como',
+                  style: TextStyle(fontSize: 14)),
               subtitle: Text(
                 user?.email ?? 'No autenticado',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),
+          ),
+
+          const Divider(), // Un separador visual
+          ElevatedButton.icon(
+            icon: const Icon(Icons.send_to_mobile),
+            label: const Text('Enviar Notificación de Prueba'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.deepPurple,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              // 3. Define la URL del servidor local
+              // ¡¡¡REEMPLAZA 'TU_IP_LOCAL' CON LA IP REAL DE TU PC!!!
+
+              final connectivityResult = await (Connectivity().checkConnectivity());
+              if (connectivityResult.contains(ConnectivityResult.none)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('No hay conexión a internet')),
+                  );
+                  return;
+              }
+              print("Connectivity check passed: ${connectivityResult.toString()}");
+
+              const String yourLocalIp = '92.168.0.26';
+              final url =
+                  Uri.parse('https://b11904930dcd.ngrok-free.app/send-test-notification');
+                //Uri.parse('https://b11904930dcd.ngrok-free.app/send-test-notification');
+              // 4. Obtén el ID del usuario actual
+              final user = Supabase.instance.client.auth.currentUser;
+              if (user == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content: Text('Error: No se ha iniciado sesión')),
+                );
+                return;
+              }
+
+              try {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content: Text('Enviando solicitud al servidor...')),
+                );
+
+                // 5. Realiza la solicitud POST al servidor
+                final response = await http.post(
+                  url,
+                  headers: {'Content-Type': 'application/json'},
+                  body: jsonEncode({'user_id': user.id}),
+                );
+
+                // 6. Muestra la respuesta del servidor
+                if (response.statusCode == 200) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content:
+                          Text('✅ Servidor respondió: ¡Notificación enviada!'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                } else {
+                  final errorBody = jsonDecode(response.body);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content:
+                          Text('❌ Error del servidor: ${errorBody['error']}'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              } catch (e) {
+                // Este error suele ocurrir si el teléfono no puede conectarse a la IP
+                print('Error de conexión: $e');
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                        'Error de conexión. ¿Están en la misma red Wi-Fi?'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
           ),
           const SizedBox(height: 16),
 
@@ -87,7 +178,8 @@ class SettingsScreen extends StatelessWidget {
                 // Aquí podríamos añadir más opciones en el futuro (Ej: Apariencia, Notificaciones)
                 ListTile(
                   leading: Icon(Iconsax.logout, color: colorScheme.error),
-                  title: Text('Cerrar Sesión', style: TextStyle(color: colorScheme.error)),
+                  title: Text('Cerrar Sesión',
+                      style: TextStyle(color: colorScheme.error)),
                   onTap: () => _showLogoutConfirmationDialog(context),
                 ),
               ],
