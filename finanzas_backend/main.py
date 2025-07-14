@@ -4,7 +4,7 @@ import os
 import json
 import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query,Request
 from supabase import create_client, Client
 from supabase.lib.client_options import ClientOptions
 import google.generativeai as genai
@@ -114,11 +114,11 @@ async def generar_analisis_financiero(
         raise HTTPException(status_code=500, detail=f"No se pudo completar el análisis. Error: {str(e)}")
 
 # --- AÑADE EL NUEVO ENDPOINT DE NOTIFICACIONES ---
-    # Endpoint para enviar una notificación de prueba
+# Endpoint para enviar una notificación de prueba
 @app.route('/send-test-notification', methods=['POST'])
-def send_test_notification():
+async def send_test_notification(request: Request):
     # Obtener el user_id del cuerpo de la solicitud JSON
-    data = request.get_json()
+    data = await request.json()
     user_id = data.get('user_id')
 
     if not user_id:
