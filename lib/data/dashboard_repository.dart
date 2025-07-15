@@ -11,6 +11,12 @@ class DashboardRepository {
   // Guardamos las suscripciones para poder cancelarlas después.
   final List<RealtimeChannel> _subscriptions = [];
 
+  Future<void> forceRefresh() async {
+    // Simplemente vuelve a buscar los datos y los emite.
+    // Útil para el gesto de "pull-to-refresh".
+    await _fetchAndEmitData();
+  }
+  
   DashboardRepository(this._client) {
     _controller.onListen = () {
       developer.log('Stream is being listened to. Subscribing to DB changes...', name: 'DashboardRepository');
@@ -82,8 +88,17 @@ class DashboardRepository {
             callback: (payload) => _handleDbChange(payload, 'budgets'))
         .subscribe();
 
+    final goalsChannel = _client
+        .channel('public:goals')
+        .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'goals',
+            callback: (payload) => _handleDbChange(payload, 'goals'))
+        .subscribe();
+
     // Añadimos los canales a nuestra lista para poder gestionarlos
-    _subscriptions.addAll([accountsChannel, transactionsChannel, budgetsChannel]);
+    _subscriptions.addAll([accountsChannel, transactionsChannel, budgetsChannel,goalsChannel]);
   }
 
   void _handleDbChange(PostgresChangePayload payload, String table) {

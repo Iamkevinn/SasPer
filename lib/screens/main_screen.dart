@@ -2,18 +2,15 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax/iconsax.dart';
-
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'goals_screen.dart'; 
 import 'accounts_screen.dart';
 import 'add_transaction_screen.dart';
 import 'analysis_screen.dart';
-import 'budgets_screen.dart';
 import 'dashboard_screen.dart';
 import 'settings_screen.dart';
 import '../utils/custom_page_route.dart';
-// ELIMINADO: Ya no necesitamos el EventService para este flujo.
-// import '../services/event_service.dart';
-// ELIMINADO: No se está usando en este archivo.
-// import 'dart:developer' as developer; 
+import '../data/dashboard_repository.dart';
 
 // --- PANTALLA PRINCIPAL (CONTROLADOR DE NAVEGACIÓN) ---
 class MainScreen extends StatefulWidget {
@@ -24,22 +21,30 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
-  
-  // ELIMINADO: Las GlobalKeys ya no son necesarias porque no vamos a
-  // llamar a métodos de refresco manuales desde aquí.
-  // final GlobalKey<DashboardScreenState> _dashboardKey = GlobalKey<DashboardScreenState>();
-  // ... (y las otras keys) ...
+  late final DashboardRepository _dashboardRepository;
 
   // La lista de widgets es ahora más simple. Son solo las pantallas.
-  static const List<Widget> _widgetOptions = <Widget>[
-    DashboardScreen(),
-    AccountsScreen(), // El estado de esta pantalla también debería ser reactivo.
+  List<Widget> get _widgetOptions => <Widget>[
+    DashboardScreen(repository: _dashboardRepository), // Pasamos la instancia
+    AccountsScreen(), // Esta pantalla se adaptará después si es necesario
+    GoalsScreen(repository: _dashboardRepository),   // Pasamos la instancia
     AnalysisScreen(),
     SettingsScreen(),
   ];
 
-  // ELIMINADO: Este método es completamente obsoleto con la arquitectura de Streams.
-  // void _refreshDataForCurrentTab() { ... }
+  @override
+  void initState() {
+    super.initState();
+    // 3. Inicializamos el repositorio con el cliente de Supabase
+    _dashboardRepository = DashboardRepository(Supabase.instance.client);
+  }
+  
+  @override
+  void dispose() {
+    // 4. Liberamos los recursos del repositorio al cerrar la pantalla.
+    _dashboardRepository.dispose();
+    super.dispose();
+  }
 
   // CAMBIO: El método para añadir transacción ahora es mucho más simple.
   void _navigateToAddTransaction() {
@@ -48,9 +53,7 @@ class _MainScreenState extends State<MainScreen> {
     Navigator.of(context).push(
       FadePageRoute(child: const AddTransactionScreen()),
     );
-    // ELIMINADO: El bloque .then() es innecesario. Cuando esta pantalla
-    // guarde la transacción en Supabase, los streams se activarán
-    // y actualizarán el Dashboard automáticamente. ¡No hay que hacer nada más!
+
   }
 
   void _onItemTapped(int index) {
@@ -124,8 +127,9 @@ class _MainScreenState extends State<MainScreen> {
             children: [
               _buildNavItem(index: 0, selectedIcon: Iconsax.home_15, regularIcon: Iconsax.home),
               _buildNavItem(index: 1, selectedIcon: Iconsax.wallet_money, regularIcon: Iconsax.wallet_3),
-              _buildNavItem(index: 2, selectedIcon: Iconsax.chart_215, regularIcon: Iconsax.chart_21),
-              _buildNavItem(index: 3, selectedIcon: Iconsax.setting_4, regularIcon: Iconsax.setting_2),
+              _buildNavItem(index: 2, selectedIcon: Iconsax.flag5, regularIcon: Iconsax.flag),
+              _buildNavItem(index: 3, selectedIcon: Iconsax.chart_215, regularIcon: Iconsax.chart_21),
+              _buildNavItem(index: 4, selectedIcon: Iconsax.setting_4, regularIcon: Iconsax.setting_2),
             ],
           ),
         ),

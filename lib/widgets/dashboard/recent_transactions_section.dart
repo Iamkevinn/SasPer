@@ -6,7 +6,6 @@ import '../shared/transaction_tile.dart';
 
 class RecentTransactionsSection extends StatelessWidget {
   final List<Transaction> transactions;
-
   // CAMBIO CLAVE: Los callbacks han desaparecido del constructor.
   const RecentTransactionsSection({
     super.key,

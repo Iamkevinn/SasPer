@@ -1,17 +1,22 @@
+// lib/models/dashboard_data_model.dart
+
 import 'transaction_models.dart';
 import 'budget_models.dart';
+import 'goal_model.dart'; // <-- IMPORTA EL MODELO DE METAS
 
 class DashboardData {
   final double totalBalance;
   final String fullName;
   final List<Transaction> recentTransactions;
   final List<BudgetProgress> budgetsProgress;
+  final List<Goal> goals; // <-- AÑADE LA LISTA DE METAS
 
   DashboardData({
     required this.totalBalance,
     required this.fullName,
     required this.recentTransactions,
     required this.budgetsProgress,
+    required this.goals, // <-- AÑÁDELO AL CONSTRUCTOR
   });
 
   factory DashboardData.fromJson(Map<String, dynamic> json) {
@@ -23,6 +28,10 @@ class DashboardData {
           .toList(),
       budgetsProgress: (json['budgets_progress'] as List<dynamic>? ?? [])
           .map((e) => BudgetProgress.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      // --- AÑADE ESTA LÓGICA DE PARSEO ---
+      goals: (json['goals'] as List<dynamic>? ?? [])
+          .map((e) => Goal.fromMap(e as Map<String, dynamic>))
           .toList(),
     );
   }

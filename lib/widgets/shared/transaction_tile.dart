@@ -4,17 +4,19 @@ import 'package:flutter/services.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../models/transaction_models.dart';
 import '../../screens/edit_transaction_screen.dart';
+import '../../services/event_service.dart';
 
 class TransactionTile extends StatelessWidget {
   final Transaction transaction;
-
   const TransactionTile({
     super.key,
     required this.transaction,
   });
 
+  // El diálogo de confirmación está perfecto, no necesita cambios.
   Future<bool?> _showDeleteConfirmationDialog(BuildContext context) {
     return showDialog<bool>(
       context: context,
@@ -45,8 +47,48 @@ class TransactionTile extends StatelessWidget {
   
   @override
   Widget build(BuildContext context) {
-    final isExpense = transaction.type == 'Gasto';
-    final color = isExpense ? Colors.redAccent : Colors.green;
+    // --- NUEVA LÓGICA DE VISUALIZACIÓN ---
+    IconData icon;
+    Color color;
+    String amountText;
+    String title = transaction.category ?? 'Sin categoría';
+    String subtitle = transaction.description ?? '';
+    
+    // Usamos el `type` de la transacción para decidir cómo se ve.
+    // ¡Asegúrate de que los strings coincidan con los de tu base de datos!
+    switch (transaction.type) {
+      case 'income': // O 'Ingreso' si usas español
+        icon = Iconsax.arrow_up_1;
+        color = Colors.green;
+        amountText = '+${NumberFormat.currency(symbol: '\$').format(transaction.amount)}';
+        break;
+      case 'expense': // O 'Gasto'
+        icon = Iconsax.arrow_down_2;
+        color = Colors.redAccent;
+        amountText = '-${NumberFormat.currency(symbol: '\$').format(transaction.amount)}';
+        break;
+      case 'goal_contribution':
+        icon = Iconsax.flag; // Ícono de meta
+        color = Theme.of(context).colorScheme.secondary; // Un color distintivo
+        title = 'Aportación a Meta'; // Título claro
+        subtitle = transaction.description ?? ''; // La descripción dirá "Aportación a meta: [Nombre]"
+        // El monto de la transacción ya es negativo en la BD, lo mostramos como tal.
+        amountText = NumberFormat.currency(symbol: '\$').format(transaction.amount); 
+        break;
+      case 'transfer':
+        icon = Iconsax.refresh; // Ícono de transferencia
+        color = Colors.orange;
+        title = 'Transferencia';
+        // En una transferencia, el monto puede ser positivo o negativo dependiendo de la cuenta,
+        // así que lo mostramos con su signo.
+        amountText = NumberFormat.currency(symbol: '\$').format(transaction.amount);
+        break;
+      default:
+        icon = Iconsax.wallet_money;
+        color = Colors.grey;
+        amountText = NumberFormat.currency(symbol: '\$').format(transaction.amount);
+    }
+    // --- FIN DE LA NUEVA LÓGICA ---
 
     return Dismissible(
       key: ValueKey(transaction.id),
@@ -62,8 +104,10 @@ class TransactionTile extends StatelessWidget {
         final confirmed = await _showDeleteConfirmationDialog(context);
         if (confirmed == true) {
           try {
+            // La lógica de borrado aquí está bien. El trigger en Supabase hará el trabajo pesado.
             await Supabase.instance.client.from('transactions').delete().match({'id': transaction.id});
             if (context.mounted) {
+              EventService.instance.emit(AppEvent.transactionDeleted);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Transacción eliminada'), backgroundColor: Colors.green),
               );
@@ -80,26 +124,20 @@ class TransactionTile extends StatelessWidget {
         return false;
       },
       child: InkWell(
-        onTap: () async {
-          // Navegamos a la pantalla de edición
-          await Navigator.of(context).push(
+        onTap: () {
+          // La navegación a la pantalla de edición
+          Navigator.of(context).push(
             MaterialPageRoute(
-              // --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
               builder: (context) => EditTransactionScreen(transaction: transaction.toJson()),
             ),
           );
         },
         child: ListTile(
-          leading: Icon(
-            isExpense ? Iconsax.arrow_down_2 : Iconsax.arrow_up_1,
-            color: color,
-          ),
-          title: Text(transaction.category ?? 'Transferencia'),
-          subtitle: (transaction.description != null && transaction.description!.isNotEmpty)
-              ? Text(transaction.description!)
-              : null,
+          leading: Icon(icon, color: color),
+          title: Text(title),
+          subtitle: subtitle.isNotEmpty ? Text(subtitle) : null,
           trailing: Text(
-            '${isExpense ? '-' : '+'}${NumberFormat.currency(symbol: '\$').format(transaction.amount)}',
+            amountText,
             style: TextStyle(fontWeight: FontWeight.w600, color: color),
           ),
         ),
