@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- El nombre de tu app, esto probablemente ya exista -->
-    <string name="app_name">Finanzas App</string> 
-    
-    <!-- AÑADE ESTA LÍNEA -->
-    <string name="app_widget_description">Un resumen de tu saldo y finanzas.</string>
-    
-</resources>

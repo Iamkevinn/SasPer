@@ -1,30 +1,47 @@
 // lib/services/widget_service.dart
+
+import 'dart:developer' as developer;
 import 'package:home_widget/home_widget.dart';
 import 'package:intl/intl.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 class WidgetService {
-  static const String appGroupId = 'group.com.example.sasper'; // Necesario para iOS
+  // 1. Constantes centralizadas dentro de la clase para una mejor organización.
+  static const String _appGroupId = 'group.com.example.sasper'; // Necesario para iOS
+  static const String _androidProviderName = 'HomeWidgetExampleProvider';
+  static const String _iOSProviderName = 'HomeWidgetExampleProvider'; // Reemplazar con el nombre de tu widget de iOS
 
-  static Future<void> updateBalanceWidget() async {
+  /// Inicializa el HomeWidget, necesario para iOS.
+  static Future<void> initialize() async {
+    // Es una buena práctica registrar el app group al inicio.
+    await HomeWidget.setAppGroupId(_appGroupId);
+  }
+
+  /// Actualiza el widget de la pantalla de inicio con los datos proporcionados.
+  /// Este método ya no busca los datos, los recibe como parámetros.
+  static Future<void> updateWidgetData({
+    required double totalBalance,
+    // Podrías pasar más datos en el futuro
+    // required String lastTransactionDesc,
+  }) async {
+    developer.log('🔄 [Service] Updating home widget data...', name: 'WidgetService');
     try {
-      // Obtenemos el saldo total directamente
-      final data = await Supabase.instance.client.rpc('get_dashboard_data');
-      final totalBalance = (data['total_balance'] as num? ?? 0).toDouble();
+      // 2. La lógica de formato se mantiene aquí, es parte de la preparación de datos para el widget.
       final formattedBalance = NumberFormat.currency(locale: 'es_MX', symbol: '\$').format(totalBalance);
-
-      // Guardamos los datos que el widget nativo leerá
-      await HomeWidget.saveWidgetData<String>('balance', formattedBalance);
       
-      // Le decimos al sistema que actualice la vista del widget
+      // Guardamos cada dato con una clave única que el widget nativo pueda leer.
+      await HomeWidget.saveWidgetData<String>('balance', formattedBalance);
+      // await HomeWidget.saveWidgetData<String>('last_transaction', lastTransactionDesc);
+      
+      // 3. Solicitamos la actualización de la UI del widget nativo.
       await HomeWidget.updateWidget(
-        name: 'HomeWidgetExampleProvider', // Debe coincidir con el nombre de la clase en Kotlin
-        androidName: 'HomeWidgetExampleProvider',
-        // iOSName: 'TuNombreDeWidgetEniOS'
+        name: _iOSProviderName,
+        androidName: _androidProviderName,
       );
-      print('Widget de saldo actualizado con: $formattedBalance');
-    } catch (e) {
-      print('Error al actualizar el widget: $e');
+      
+      developer.log('✅ [Service] Home widget updated successfully with balance: $formattedBalance', name: 'WidgetService');
+    } catch (e, stackTrace) {
+      // 4. Logging de errores mejorado.
+      developer.log('🔥 [Service] Error updating home widget: $e', name: 'WidgetService', error: e, stackTrace: stackTrace);
     }
   }
 }

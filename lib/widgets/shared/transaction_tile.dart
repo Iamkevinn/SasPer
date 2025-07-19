@@ -13,8 +13,30 @@ class TransactionTile extends StatelessWidget {
   final Transaction transaction;
   const TransactionTile({
     super.key,
-    required this.transaction,
+    required this.transaction, required void Function() onTap,
   });
+
+  // --- NUEVO WIDGET: Diálogo de advertencia para deudas ---
+  Future<void> _showDebtLinkedWarning(BuildContext context) {
+    return showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28.0)),
+          title: const Text('Acción no permitida'),
+          content: Text(
+            "Esta transacción está vinculada a la deuda o préstamo '${transaction.description}'.\n\nPara gestionarla, ve a la sección de Deudas.",
+          ),
+          actions: <Widget>[
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Entendido'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   // El diálogo de confirmación está perfecto, no necesita cambios.
   Future<bool?> _showDeleteConfirmationDialog(BuildContext context) {
@@ -90,58 +112,79 @@ class TransactionTile extends StatelessWidget {
     }
     // --- FIN DE LA NUEVA LÓGICA ---
 
-    return Dismissible(
-      key: ValueKey(transaction.id),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        color: Theme.of(context).colorScheme.errorContainer,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        alignment: Alignment.centerRight,
-        child: Icon(Iconsax.trash, color: Theme.of(context).colorScheme.onErrorContainer),
-      ),
-      confirmDismiss: (direction) async {
-        HapticFeedback.mediumImpact();
-        final confirmed = await _showDeleteConfirmationDialog(context);
-        if (confirmed == true) {
-          try {
-            // La lógica de borrado aquí está bien. El trigger en Supabase hará el trabajo pesado.
-            await Supabase.instance.client.from('transactions').delete().match({'id': transaction.id});
-            if (context.mounted) {
-              EventService.instance.emit(AppEvent.transactionDeleted);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Transacción eliminada'), backgroundColor: Colors.green),
-              );
-            }
-            return true;
-          } catch (e) {
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Error al eliminar: $e'), backgroundColor: Theme.of(context).colorScheme.error),
-              );
-            }
-          }
-        }
-        return false;
-      },
-      child: InkWell(
-        onTap: () {
-          // La navegación a la pantalla de edición
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => EditTransactionScreen(transaction: transaction.toJson()),
-            ),
+    // En lib/widgets/shared/transaction_tile.dart, dentro del método build()
+
+  return Dismissible(
+    key: ValueKey(transaction.id),
+    direction: DismissDirection.endToStart,
+    background: Container(
+      color: Theme.of(context).colorScheme.errorContainer,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      alignment: Alignment.centerRight,
+      child: Icon(Iconsax.trash, color: Theme.of(context).colorScheme.onErrorContainer),
+    ),
+    
+    // --- LÓGICA CORREGIDA Y SIMPLIFICADA ---
+    
+    onDismissed: (direction) async {
+      // Esta función SÓLO se ejecuta si confirmDismiss devuelve 'true'.
+      // Y confirmDismiss solo devuelve true si la transacción NO está vinculada a una deuda.
+      try {
+        await Supabase.instance.client
+            .from('transactions')
+            .delete()
+            .eq('id', transaction.id);
+
+        if (context.mounted) {
+          EventService.instance.fire(AppEvent.transactionDeleted);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Transacción eliminada'), backgroundColor: Colors.green),
           );
-        },
-        child: ListTile(
-          leading: Icon(icon, color: color),
-          title: Text(title),
-          subtitle: subtitle.isNotEmpty ? Text(subtitle) : null,
-          trailing: Text(
-            amountText,
-            style: TextStyle(fontWeight: FontWeight.w600, color: color),
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error al eliminar: $e'), backgroundColor: Theme.of(context).colorScheme.error),
+          );
+        }
+      }
+    },
+
+    confirmDismiss: (direction) async {
+      HapticFeedback.mediumImpact();
+
+      // 1. PRIMERA Y ÚNICA RESPONSABILIDAD: Comprobar si está vinculada.
+      if (transaction.debtId != null) {
+        await _showDebtLinkedWarning(context);
+        return false; // NO se puede borrar. Finaliza la acción.
+      }
+
+      // 2. SI NO ESTÁ VINCULADA, mostrar el diálogo de confirmación normal.
+      final bool? confirmed = await _showDeleteConfirmationDialog(context);
+      
+      // El valor de 'confirmed' (true o false) decidirá si onDismissed se ejecuta.
+      return confirmed ?? false;
+    },
+    
+    child: InkWell(
+      onTap: () {
+        // La navegación a la pantalla de edición
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => EditTransactionScreen(transaction: transaction),
           ),
+        );
+      },
+      child: ListTile(
+        leading: Icon(icon, color: color),
+        title: Text(title),
+        subtitle: subtitle.isNotEmpty ? Text(subtitle) : null,
+        trailing: Text(
+          amountText,
+          style: TextStyle(fontWeight: FontWeight.w600, color: color),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

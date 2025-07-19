@@ -1,47 +1,71 @@
+// lib/screens/auth_gate.dart
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:sasper/services/notification_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'loading_screen.dart'; // Tu pantalla de carga
 import 'main_screen.dart';
 import 'login_screen.dart';
-import 'package:sas_per/services/updateUserFCMToken.dart'; // Asegúrate de que la ruta es correcta
 
-class AuthGate extends StatelessWidget {
+class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
 
   @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  Future<void>? _initializationFuture;
+
+  @override
   Widget build(BuildContext context) {
-    // Escuchamos los cambios en el estado de autenticación
     return StreamBuilder<AuthState>(
       stream: Supabase.instance.client.auth.onAuthStateChange,
       builder: (context, snapshot) {
-        // Mientras el stream se está conectando, es buena idea mostrar un loader.
-        // Si no, puede haber un "parpadeo" a la pantalla de login antes de detectar la sesión.
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
+          // Usamos tu LoadingScreen sin parámetros
+          return const LoadingScreen();
+        }
+
+        final session = snapshot.data?.session;
+
+        if (session != null) {
+          _initializationFuture ??= _initializeUserServices();
+
+          return FutureBuilder<void>(
+            future: _initializationFuture,
+            builder: (context, futureSnapshot) {
+              if (futureSnapshot.connectionState == ConnectionState.done) {
+                return const MainScreen();
+              } else {
+                // Mientras se inicializa, mostramos la pantalla de carga.
+                return const LoadingScreen();
+              }
+            },
           );
-        }
-
-        // Si hay un error en el stream, mostramos la pantalla de login
-        if (snapshot.hasError) {
-          return const LoginScreen();
-        }
-
-        // Si el stream tiene datos y hay una sesión activa...
-        if (snapshot.hasData && snapshot.data?.session != null) {
-          
-          // --- ¡AQUÍ ESTÁ LA LÓGICA CLAVE! ---
-          // El usuario está autenticado, así que intentamos actualizar su token de FCM.
-          // Llamamos a la función aquí. No usamos 'await' porque no queremos
-          // detener la construcción de la UI. La función se ejecutará en segundo plano.
-          updateUserFCMToken();
-
-          // ...mostramos la MainScreen
-          return const MainScreen();
         } else {
-          // ...de lo contrario, mostramos la pantalla de Login
+          _initializationFuture = null;
           return const LoginScreen();
         }
       },
     );
+  }
+
+  Future<void> _initializeUserServices() async {
+    if (kDebugMode) {
+      print("✅ Usuario autenticado. Orquestando inicialización de servicios...");
+    }
+    try {
+      await Future.wait([
+        NotificationService.instance.initialize(),
+      ]);
+      if (kDebugMode) {
+        print("✅ Todos los servicios de usuario inicializados exitosamente.");
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print("🚨 Error fatal durante la inicialización de servicios: $e");
+      }
+    }
   }
 }

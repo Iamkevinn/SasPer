@@ -1,136 +1,138 @@
+// lib/screens/budgets_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
-import 'add_budget_screen.dart';
 
-// Pantalla para mostrar y gestionar los presupuestos del mes actual
+// Importamos la arquitectura limpia
+import '../data/budget_repository.dart';
+import '../models/budget_models.dart';
+import 'add_budget_screen.dart';
+import '../widgets/shared/empty_state_card.dart';
+
 class BudgetsScreen extends StatefulWidget {
   const BudgetsScreen({super.key});
-
   @override
   State<BudgetsScreen> createState() => _BudgetsScreenState();
 }
 
 class _BudgetsScreenState extends State<BudgetsScreen> {
-  final supabase = Supabase.instance.client;
-  
-  // Future para cargar los presupuestos y gastos del mes actual
-  late Future<Map<String, dynamic>> _budgetsDataFuture;
-  final int _currentMonth = DateTime.now().month;
-  final int _currentYear = DateTime.now().year;
+  // 1. LA PANTALLA SOLO NECESITA EL REPOSITORIO Y EL STREAM
+  final _budgetRepository = BudgetRepository();
+  late final Stream<List<BudgetProgress>> _budgetsStream;
 
   @override
   void initState() {
     super.initState();
-    _budgetsDataFuture = _fetchBudgetsAndExpenses();
-  }
-
-  // Función para obtener los presupuestos y los gastos totales por categoría
-  Future<Map<String, dynamic>> _fetchBudgetsAndExpenses() async {
-    final budgets = await supabase
-        .from('budgets')
-        .select()
-        .eq('user_id', supabase.auth.currentUser!.id)
-        .eq('month', _currentMonth)
-        .eq('year', _currentYear);
-
-    final expenses = await supabase
-        .from('transactions')
-        .select('category, amount')
-        .eq('user_id', supabase.auth.currentUser!.id)
-        .eq('type', 'Gasto')
-        .gte('transaction_date', '$_currentYear-$_currentMonth-01')
-        .lt('transaction_date', '$_currentYear-${_currentMonth + 1}-01');
-
-    final Map<String, double> expensesByCategory = {};
-    for (var expense in expenses) {
-      final category = expense['category'] as String;
-      final amount = (expense['amount'] as num).toDouble();
-      expensesByCategory.update(category, (value) => value + amount, ifAbsent: () => amount);
-    }
-    
-    return {'budgets': budgets, 'expenses': expensesByCategory};
+    // Obtenemos el stream reactivo desde el repositorio
+    _budgetsStream = _budgetRepository.getBudgetsProgressStream();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Presupuestos de ${DateFormat.MMMM('es_ES').format(DateTime.now())}')),
-      body: FutureBuilder<Map<String, dynamic>>(
-        future: _budgetsDataFuture,
+      appBar: AppBar(
+        title: Text('Presupuestos de ${DateFormat.MMMM('es_CO').format(DateTime.now())}'),
+        actions: [
+          IconButton(
+            icon: const Icon(Iconsax.add_square),
+            tooltip: 'Añadir Presupuesto',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => const AddBudgetScreen()),
+              );
+              // No necesitamos recargar, el stream lo hará automáticamente
+            },
+          ),
+        ],
+      ),
+      // 2. USAMOS UN ÚNICO STREAMBUILDER
+      body: StreamBuilder<List<BudgetProgress>>(
+        stream: _budgetsStream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
+            return Center(child: Text('Error al cargar presupuestos: ${snapshot.error}'));
           }
-          final budgets = snapshot.data!['budgets'] as List;
-          final expenses = snapshot.data!['expenses'] as Map<String, double>;
-
-          if (budgets.isEmpty) {
-            return const Center(child: Text('No tienes presupuestos para este mes.'));
+          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return const Center(
+              child: EmptyStateCard(
+                title: 'Sin Presupuestos',
+                message: 'Aún no has creado ningún presupuesto para este mes. ¡Empieza ahora!',
+                icon: Iconsax.additem,
+              ),
+            );
           }
 
+          final budgets = snapshot.data!;
           return ListView.builder(
             padding: const EdgeInsets.all(16.0),
             itemCount: budgets.length,
             itemBuilder: (context, index) {
               final budget = budgets[index];
-              final category = budget['category'] as String;
-              final budgetAmount = (budget['amount'] as num).toDouble();
-              final spentAmount = expenses[category] ?? 0.0;
-              final progress = (spentAmount / budgetAmount).clamp(0.0, 1.0);
-
-              return _buildBudgetTile(category, budgetAmount, spentAmount, progress);
+              // 3. Pasamos el objeto BudgetProgress directamente al tile
+              return _buildBudgetTile(budget);
             },
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          // Navegamos a la pantalla de añadir presupuesto
-          await Navigator.of(context).push(
-            MaterialPageRoute(builder: (context) => const AddBudgetScreen()),
-          );
-          // Cuando volvemos, refrescamos los datos para mostrar el nuevo presupuesto
-          setState(() {
-            _budgetsDataFuture = _fetchBudgetsAndExpenses();
-          });
-        },
-        child: const Icon(Iconsax.add),
-      ),
     );
   }
 
-  Widget _buildBudgetTile(String category, double budgetAmount, double spentAmount, double progress) {
+  // 4. EL TILE AHORA RECIBE UN OBJETO BudgetProgress
+  Widget _buildBudgetTile(BudgetProgress budget) {
+    final theme = Theme.of(context);
+    final statusColor = budget.status.getColor(context);
+    final currencyFormat = NumberFormat.currency(locale: 'es_CO', symbol: '\$');
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
+      elevation: 0,
+      color: theme.colorScheme.surface.withAlpha(100),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(category, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(budget.category, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                Icon(budget.status.icon, color: statusColor),
+              ],
+            ),
             const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(NumberFormat.currency(symbol: '\$').format(spentAmount), style: const TextStyle(fontWeight: FontWeight.w500)),
-                Text(NumberFormat.currency(symbol: '\$').format(budgetAmount), style: TextStyle(color: Colors.grey.shade600)),
+                Text(
+                  currencyFormat.format(budget.spentAmount),
+                  style: TextStyle(fontWeight: FontWeight.w500, color: statusColor),
+                ),
+                Text(
+                  currencyFormat.format(budget.budgetAmount),
+                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                ),
               ],
             ),
             const SizedBox(height: 8),
             LinearProgressIndicator(
-              value: progress,
+              value: budget.progress,
               minHeight: 10,
               borderRadius: BorderRadius.circular(5),
-              backgroundColor: Colors.grey.shade300,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                progress > 0.9 ? Colors.red : (progress > 0.7 ? Colors.orange : Colors.green),
-              ),
+              backgroundColor: statusColor.withOpacity(0.2),
+              valueColor: AlwaysStoppedAnimation<Color>(statusColor),
             ),
+            if (budget.remainingAmount > 0) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Restante: ${currencyFormat.format(budget.remainingAmount)}',
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              )
+            ]
           ],
         ),
       ),

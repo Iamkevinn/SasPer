@@ -1,59 +1,115 @@
 // lib/models/goal_model.dart
 
-class Goal {
+import 'package:equatable/equatable.dart';
+
+// 1. Creamos un enum para el estado de la meta.
+enum GoalStatus {
+  active,
+  completed,
+  archived;
+
+  // Helper para convertir un string a un enum de forma segura.
+  static GoalStatus fromString(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'active':
+        return GoalStatus.active;
+      case 'completed':
+        return GoalStatus.completed;
+      case 'archived':
+        return GoalStatus.archived;
+      default:
+        // Valor por defecto si el string no coincide.
+        return GoalStatus.active;
+    }
+  }
+}
+
+// 2. Hacemos la clase inmutable y comparable.
+class Goal extends Equatable {
   final String id;
   final String userId;
   final String name;
   final double targetAmount;
-  double currentAmount;
+  final double currentAmount;
   final DateTime? targetDate;
   final DateTime createdAt;
-  String status;
+  final GoalStatus status;
   final String? iconName;
 
-  Goal({
+  const Goal({
     required this.id,
     required this.userId,
     required this.name,
     required this.targetAmount,
-    this.currentAmount = 0.0,
+    required this.currentAmount,
     this.targetDate,
     required this.createdAt,
-    this.status = 'active',
+    required this.status,
     this.iconName,
   });
 
-  // Método factory para crear una instancia de Goal desde un mapa (JSON de Supabase)
+  // 3. Método `fromMap` robustecido.
   factory Goal.fromMap(Map<String, dynamic> map) {
+    try {
+      return Goal(
+        id: map['id'] as String,
+        userId: map['user_id'] as String,
+        name: map['name'] as String? ?? 'Meta sin nombre',
+        targetAmount: (map['target_amount'] as num? ?? 0).toDouble(),
+        currentAmount: (map['current_amount'] as num? ?? 0).toDouble(),
+        targetDate: map['target_date'] != null ? DateTime.parse(map['target_date'] as String) : null,
+        createdAt: DateTime.parse(map['created_at'] as String),
+        status: GoalStatus.fromString(map['status'] as String?),
+        iconName: map['icon_name'] as String?,
+      );
+    } catch (e) {
+      throw FormatException('Error al parsear Goal: $e', map);
+    }
+  }
+  
+  // 4. Método `copyWith` para crear copias modificadas.
+  Goal copyWith({
+    String? id,
+    String? userId,
+    String? name,
+    double? targetAmount,
+    double? currentAmount,
+    DateTime? targetDate,
+    DateTime? createdAt,
+    GoalStatus? status,
+    String? iconName,
+  }) {
     return Goal(
-      id: map['id'],
-      userId: map['user_id'],
-      name: map['name'],
-      // Supabase devuelve 'numeric' como double o int, así que lo casteamos de forma segura.
-      targetAmount: (map['target_amount'] as num).toDouble(),
-      currentAmount: (map['current_amount'] as num).toDouble(),
-      targetDate: map['target_date'] != null ? DateTime.parse(map['target_date']) : null,
-      createdAt: DateTime.parse(map['created_at']),
-      status: map['status'],
-      iconName: map['icon_name'],
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      name: name ?? this.name,
+      targetAmount: targetAmount ?? this.targetAmount,
+      currentAmount: currentAmount ?? this.currentAmount,
+      targetDate: targetDate ?? this.targetDate,
+      createdAt: createdAt ?? this.createdAt,
+      status: status ?? this.status,
+      iconName: iconName ?? this.iconName,
     );
   }
 
-  // Método para convertir una instancia de Goal a un mapa (para enviar a Supabase)
-  Map<String, dynamic> toMap() {
-    return {
-      // 'id' y 'created_at' no se envían al crear, Supabase los genera.
-      // 'user_id' tampoco, se infiere del usuario autenticado.
-      'name': name,
-      'target_amount': targetAmount,
-      'current_amount': currentAmount,
-      'target_date': targetDate?.toIso8601String(),
-      'status': status,
-      'icon_name': iconName,
-      // Al crear, añadiremos el user_id explícitamente en el servicio.
-    };
-  }
+  // Los getters computados son una excelente práctica.
+  double get progress => (currentAmount > 0 && targetAmount > 0) 
+      ? (currentAmount / targetAmount).clamp(0.0, 1.0) 
+      : 0.0;
 
-  // Getter para el progreso (de 0.0 a 1.0)
-  double get progress => (currentAmount > 0 && targetAmount > 0) ? currentAmount / targetAmount : 0.0;
+  double get remainingAmount => targetAmount - currentAmount;
+
+  // 5. Propiedades para Equatable.
+  @override
+  List<Object?> get props => [
+        id,
+        userId,
+        name,
+        targetAmount,
+        currentAmount,
+        targetDate,
+        createdAt,
+        status,
+        iconName,
+      ];
 }

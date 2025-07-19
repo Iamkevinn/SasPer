@@ -1,19 +1,25 @@
-import 'package:sas_per/widgets/dashboard/ai_analysis_section.dart';
+// lib/screens/dashboard_screen.dart
+
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+// Importamos la arquitectura limpia
 import '../data/dashboard_repository.dart';
 import '../models/dashboard_data_model.dart';
+import '../services/event_service.dart';
+import '../services/widget_service.dart';
+import '../widgets/dashboard/ai_analysis_section.dart';
 import '../widgets/dashboard/balance_card.dart';
 import '../widgets/dashboard/budgets_section.dart';
 import '../widgets/dashboard/dashboard_header.dart';
 import '../widgets/dashboard/recent_transactions_section.dart';
-import 'package:sas_per/services/notification_service.dart'; // ¡Importa el servicio!
-
 
 class DashboardScreen extends StatefulWidget {
-  final DashboardRepository  repository;
+  // 1. Es una buena práctica recibir el repositorio en el constructor.
+  // Esto se conoce como Inyección de Dependencias.
+  final DashboardRepository repository;
 
   const DashboardScreen({super.key, required this.repository});
 
@@ -22,90 +28,98 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class DashboardScreenState extends State<DashboardScreen> {
-  late final DashboardRepository _repository;
-  // CAMBIO: De un Future a un Stream. ¡Adiós a la recarga manual!
-  late Stream<DashboardData> _dashboardDataStream;
+  late final Stream<DashboardData> _dashboardDataStream;
+  late final StreamSubscription<AppEvent> _eventSubscription;
 
   @override
   void initState() {
     super.initState();
-    _setupNotifications();
+    // 2. SIMPLIFICACIÓN: Obtenemos el stream. El repositorio se encargará
+    // de la carga inicial la primera vez que el StreamBuilder escuche.
     _dashboardDataStream = widget.repository.getDashboardDataStream();
+
+    // La suscripción a eventos sigue siendo útil para forzar recargas
+    // desde otras partes de la app.
+    _eventSubscription = EventService.instance.eventStream.listen((event) {
+      if ({AppEvent.transactionsChanged, AppEvent.transactionDeleted, AppEvent.accountCreated, AppEvent.debtsChanged, AppEvent.goalsChanged}.contains(event)) {
+        if (kDebugMode) print("Dashboard: Evento '$event' recibido. Forzando refresh...");
+        widget.repository.forceRefresh();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _eventSubscription.cancel();
+    // No necesitamos llamar a repository.dispose() aquí si el repositorio
+    // es manejado por un provider (como Riverpod) que gestiona su ciclo de vida.
+    // Si no, sí sería necesario.
+    super.dispose();
   }
 
   Future<void> _handleRefresh() async {
-    await widget.repository.forceRefresh();
-  }
-  Future<void> _setupNotifications() async {
-    // Creamos una instancia y llamamos al método de inicialización
-    await NotificationService().initializeNotifications();
+    // El 'silent: false' es importante para que el repositorio emita el estado de carga.
+    await widget.repository.forceRefresh(silent: false);
   }
   
   @override
   Widget build(BuildContext context) {
-    final mediaQuery = MediaQuery.of(context);
-    
-    return Padding(
-      padding: EdgeInsets.only(top: mediaQuery.padding.top),
-      child: Container(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        // CAMBIO: De FutureBuilder a StreamBuilder
-        child: StreamBuilder<DashboardData>(
-          stream: _dashboardDataStream,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-              return _buildLoadingShimmer();
-            }
-            if (snapshot.hasError) {
-              return Center(child: Text('Error al cargar: ${snapshot.error}'));
-            }
-            if (snapshot.hasData) {
-              final data = snapshot.data!;
-              return _buildDashboardContent(data);
-            }
-            return _buildLoadingShimmer(); // Estado por defecto
-          },
-        ),
+    return Scaffold(
+      body: StreamBuilder<DashboardData>(
+        stream: _dashboardDataStream,
+        builder: (context, snapshot) {
+          // Si tenemos datos, los usamos. La propiedad 'isLoading' del modelo
+          // nos dirá si estamos en medio de una recarga.
+          if (snapshot.hasData) {
+            final data = snapshot.data!;
+            
+            // Actualizamos el widget de la pantalla de inicio cada vez que hay datos nuevos
+            WidgetService.updateWidgetData(totalBalance: data.totalBalance);
+
+            // Si data.isLoading es true, podríamos mostrar el shimmer sobre el contenido antiguo
+            // pero el RefreshIndicator ya da buen feedback.
+            return _buildDashboardContent(data);
+          }
+          // Si hay un error, lo mostramos
+          if (snapshot.hasError) {
+            return Center(child: Text('Error al cargar los datos: ${snapshot.error}'));
+          }
+          // Si no hay datos ni error (estado inicial), mostramos el shimmer
+          return _buildLoadingShimmer();
+        },
       ),
     );
   }
 
   Widget _buildDashboardContent(DashboardData data) {
     return RefreshIndicator(
-      onRefresh: () async {
-        // El stream se actualiza solo, pero si el usuario tira para refrescar,
-        // podemos forzar una llamada para que sienta que la app responde.
-        // La forma de hacerlo es pedirle al repositorio que lo haga.
-        // Para este caso, podríamos añadir un método `forceRefresh()` en el repo,
-        // pero por ahora, esto es suficiente. El stream ya hace el trabajo pesado.
-        setState(() {
-          _dashboardDataStream = _repository.getDashboardDataStream();
-        });
-      },
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            DashboardHeader(userName: data.fullName),
-            BalanceCard(totalBalance: data.totalBalance),
-            const SizedBox(height: 24),
-            AiAnalysisSection(), 
-            const SizedBox(height: 24),
-            if (data.budgetsProgress.isNotEmpty)
-              BudgetsSection(budgets: data.budgetsProgress),
-            // Ya no pasamos callbacks a los hijos. Es mucho más limpio.
-            RecentTransactionsSection(
+      onRefresh: _handleRefresh,
+      child: CustomScrollView( // Usar CustomScrollView es a menudo más performante que SingleChildScrollView+Column
+        slivers: [
+          SliverToBoxAdapter(child: DashboardHeader(userName: data.fullName)),
+          SliverToBoxAdapter(child: BalanceCard(totalBalance: data.totalBalance)),
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+          const SliverToBoxAdapter(child: AiAnalysisSection()),
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+          if (data.budgetsProgress.isNotEmpty)
+            SliverToBoxAdapter(child: BudgetsSection(budgets: data.budgetsProgress)),
+          SliverToBoxAdapter(
+            child: RecentTransactionsSection(
               transactions: data.recentTransactions,
+              onViewAllPressed: () {
+                // Lógica para cambiar de pestaña en MainScreen
+                if (kDebugMode) print('Navegar a la pantalla completa de transacciones');
+              },
             ),
-            const SizedBox(height: 150),
-          ],
-        ),
+          ),
+          // Espaciador final para que el contenido no quede pegado al fondo
+          const SliverToBoxAdapter(child: SizedBox(height: 150)),
+        ],
       ),
     );
   }
 
-  // Tu widget de Shimmer está perfecto, no necesita cambios.
+  // El Shimmer sigue siendo el mismo, está muy bien.
   Widget _buildLoadingShimmer() {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final baseColor = isDarkMode ? Colors.grey[800]! : Colors.grey[300]!;
@@ -230,3 +244,5 @@ class DashboardScreenState extends State<DashboardScreen> {
     );
   }
 }
+
+

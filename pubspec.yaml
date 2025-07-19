@@ -1,5 +1,5 @@
 # Nombre interno del paquete, actualizado a la convención recomendada.
-name: sas_per
+name: sasper
 description: "Una aplicación para finanzas personales."
 publish_to: 'none' # Evita que se publique accidentalmente.
 
@@ -47,6 +47,7 @@ dependencies:
   firebase_core: ^2.32.0 
   firebase_messaging: ^14.9.3
   connectivity_plus: ^6.0.3
+  equatable: ^2.0.5
 
 # Dependencias que solo se usan durante el desarrollo.
 dev_dependencies:

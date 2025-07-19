@@ -1,19 +1,22 @@
 // lib/models/account_model.dart
 
 import 'package:flutter/material.dart';
+import 'package:equatable/equatable.dart';
 
-class Account {
+// 1. Hacemos que la clase extienda Equatable para simplificar la comparación.
+class Account extends Equatable {
   final String id;
   final String userId;
   final String name;
   final String type;
-  double balance; // El balance puede cambiar, así que no es final.
-  final double initialBalance; // El balance inicial no cambia.
+  final double balance; // Mantenemos el balance como el único campo mutable si es necesario.
+  final double initialBalance;
   final DateTime createdAt;
   final String? iconName;
   final String? color;
 
-  Account({
+  // El constructor ahora es `const`.
+  const Account({
     required this.id,
     required this.userId,
     required this.name,
@@ -25,54 +28,85 @@ class Account {
     this.color,
   });
 
-  // Método factory para crear un objeto Account desde un mapa (JSON de Supabase).
+  // 2. Método factory `fromMap` mejorado para ser más estricto.
   factory Account.fromMap(Map<String, dynamic> map) {
+    try {
+      // Usamos 'ArgumentError.checkNotNull' para fallar rápido si faltan datos críticos.
+      ArgumentError.checkNotNull(map['id'], 'id');
+      ArgumentError.checkNotNull(map['user_id'], 'user_id');
+
+      final currentBalance = (map['current_balance'] as num?);
+      final initialBalance = (map['initial_balance'] as num? ?? 0.0);
+
+      return Account(
+        id: map['id'].toString(),
+        userId: map['user_id'].toString(),
+        name: map['name'] as String? ?? 'Cuenta sin nombre',
+        type: map['type'] as String? ?? 'Sin tipo',
+        balance: (currentBalance ?? initialBalance).toDouble(),
+        initialBalance: initialBalance.toDouble(),
+        createdAt: DateTime.parse(map['created_at'] as String),
+        iconName: map['icon_name'] as String?,
+        color: map['color'] as String?,
+      );
+    } catch (e) {
+      // Si algo falla (un campo nulo, un parseo incorrecto), lanzamos un error claro.
+      // Esto hace que la depuración sea 100 veces más fácil.
+      throw FormatException('Error al parsear Account desde el mapa: $e', map);
+    }
+  }
+
+  // 3. Método `copyWith` para facilitar la creación de copias modificadas.
+  Account copyWith({
+    String? id,
+    String? userId,
+    String? name,
+    String? type,
+    double? balance,
+    double? initialBalance,
+    DateTime? createdAt,
+    String? iconName,
+    String? color,
+  }) {
     return Account(
-      // Supabase devuelve el ID como un entero en tu ejemplo, pero debería ser UUID (string).
-      // Lo convertimos a String por si acaso.
-      id: map['id'].toString(), 
-      userId: map['user_id'],
-      name: map['name'],
-      type: map['type'],
-      // Casteo seguro de `numeric` a `double`.
-      balance: (map['balance'] as num).toDouble(),
-      // 'initial_balance' puede ser nulo en cuentas antiguas, le damos un fallback.
-      initialBalance: (map['initial_balance'] as num?)?.toDouble() ?? 0.0,
-      createdAt: DateTime.parse(map['created_at']),
-      iconName: map['icon_name'],
-      color: map['color'],
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      name: name ?? this.name,
+      type: type ?? this.type,
+      balance: balance ?? this.balance,
+      initialBalance: initialBalance ?? this.initialBalance,
+      createdAt: createdAt ?? this.createdAt,
+      iconName: iconName ?? this.iconName,
+      color: color ?? this.color,
     );
   }
 
-  // Método para convertir un objeto Account a un mapa (para enviar a Supabase).
-  // Útil si implementamos la edición o creación de cuentas desde la app.
-  Map<String, dynamic> toMap() {
-    return {
-      'name': name,
-      'type': type,
-      'balance': balance,
-      'initial_balance': initialBalance,
-      'icon_name': iconName,
-      'color': color,
-      // 'id', 'user_id' y 'created_at' son manejados por Supabase.
-    };
-  }
-
-  // Helper para obtener el color de la cuenta con un fallback.
+  // El getter de color ya estaba perfecto.
   Color get accountColor {
     if (color != null && color!.length >= 6) {
-      // Asume que el color está guardado como 'RRGGBB' o '#RRGGBB'
       final hexColor = color!.replaceAll('#', '');
       if (hexColor.length == 6) {
         try {
           return Color(int.parse('FF$hexColor', radix: 16));
-        } catch (e) {
-          // Si el parseo falla, devuelve el color por defecto.
+        } catch (_) {
           return Colors.grey.shade700;
         }
       }
     }
-    // Color por defecto si no hay uno especificado o es inválido.
     return Colors.grey.shade700;
   }
+
+  // 4. Propiedades para Equatable. Dos cuentas son "iguales" si todos estos campos coinciden.
+  @override
+  List<Object?> get props => [
+        id,
+        userId,
+        name,
+        type,
+        balance,
+        initialBalance,
+        createdAt,
+        iconName,
+        color,
+      ];
 }

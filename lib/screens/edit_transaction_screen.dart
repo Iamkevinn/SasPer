@@ -1,10 +1,18 @@
-import 'dart:ui'; // Para el BackdropFilter
+// lib/screens/edit_transaction_screen.dart
+
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+// Importamos los modelos que hemos creado
+import '../models/account_model.dart';
+import '../models/transaction_models.dart';
+import '../services/event_service.dart'; // Para notificar cambios
+
 class EditTransactionScreen extends StatefulWidget {
-  final Map<String, dynamic> transaction;
+  // 1. AHORA RECIBE UN OBJETO 'Transaction'
+  final Transaction transaction;
 
   const EditTransactionScreen({super.key, required this.transaction});
 
@@ -21,9 +29,10 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
   String? _selectedAccountId;
   bool _isLoading = false;
 
-  late Future<List<Map<String, dynamic>>> _accountsFuture;
+  late Future<List<Account>> _accountsFuture;
   final supabase = Supabase.instance.client;
 
+  // Los mapas de categorías se mantienen, están perfectos
   final Map<String, IconData> _expenseCategories = {
     'Comida': Iconsax.cup,
     'Transporte': Iconsax.bus,
@@ -42,30 +51,30 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
     'Otro': Iconsax.category_2
   };
   Map<String, IconData> get _currentCategories =>
-      _transactionType == 'Gasto'
+      _transactionType == 'Gasto' || _transactionType == 'expense'
           ? _expenseCategories
           : _incomeCategories;
 
   @override
   void initState() {
     super.initState();
-    _amountController = TextEditingController(
-        text: widget.transaction['amount'].toString());
-    _descriptionController = TextEditingController(
-        text: widget.transaction['description'] ?? '');
-    _transactionType = widget.transaction['type'] as String;
-    _selectedCategory = widget.transaction['category'] as String?;
-    _selectedAccountId =
-        widget.transaction['account_id']?.toString();
+    // 2. INICIALIZAMOS EL ESTADO DESDE EL OBJETO 'widget.transaction'
+    _amountController =
+        TextEditingController(text: widget.transaction.amount.toString());
+    _descriptionController =
+        TextEditingController(text: widget.transaction.description ?? '');
+    _transactionType = widget.transaction.type;
+    _selectedCategory = widget.transaction.category;
+    _selectedAccountId = widget.transaction.accountId;
 
-    // CORRECCIÓN: pedimos el campo "account_name", y lo mostramos igual
+    // 3. EL FUTURE AHORA DEVUELVE UNA LISTA DE OBJETOS 'Account'
     _accountsFuture = supabase
         .from('accounts')
-        .select('id, name')
+        .select() // select * para tener todos los datos para el fromMap
         .eq('user_id', supabase.auth.currentUser!.id)
-        .then((value) {
-      // valor debería ser List<dynamic>
-      return List<Map<String, dynamic>>.from(value);
+        .then((data) {
+      // Parseamos la respuesta JSON en una lista de objetos Account
+      return data.map<Account>((item) => Account.fromMap(item)).toList();
     });
   }
 
@@ -74,8 +83,7 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
     if (_selectedCategory == null || _selectedAccountId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content:
-              Text('Por favor, selecciona una categoría y una cuenta.'),
+          content: Text('Por favor, selecciona una categoría y una cuenta.'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -84,7 +92,6 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
 
     setState(() => _isLoading = true);
     try {
-      final accountIdAsInt = int.parse(_selectedAccountId!);
       await supabase
           .from('transactions')
           .update({
@@ -92,12 +99,15 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
             'description': _descriptionController.text.trim(),
             'type': _transactionType,
             'category': _selectedCategory,
-            'account_id': accountIdAsInt,
-            'transaction_date':
-                widget.transaction['transaction_date']
+            'account_id': _selectedAccountId,
+            // No actualizamos la fecha, la mantenemos como la original
           })
-          .eq('id', widget.transaction['id']);
+          // 4. USAMOS EL ID DEL OBJETO PARA LA CLÁUSULA 'eq'
+          .eq('id', int.parse(widget.transaction.id));
+
       if (!mounted) return;
+
+      EventService.instance.fire(AppEvent.transactionUpdated); // Notificamos el cambio
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('¡Transacción actualizada!'),
@@ -119,6 +129,28 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
   }
 
   Future<void> _deleteTransaction() async {
+    // 5. USAMOS EL OBJETO PARA COMPROBAR SI LA TRANSACCIÓN ESTÁ VINCULADA
+    if (widget.transaction.debtId != null) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(28.0)),
+          title: const Text('Acción no permitida'),
+          content: Text(
+            "Esta transacción está vinculada a una deuda o préstamo ('${widget.transaction.description}').\n\nPara gestionarla, ve a la sección de Deudas.",
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Entendido'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     final shouldDelete = await showDialog<bool>(
       context: context,
       builder: (context) => BackdropFilter(
@@ -129,18 +161,16 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(28.0)),
           title: const Text('Confirmar eliminación'),
-          content: const Text(
-              '¿Estás seguro? Esta acción no se puede deshacer.'),
+          content:
+              const Text('¿Estás seguro? Esta acción no se puede deshacer.'),
           actions: [
             TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
                 child: const Text('Cancelar')),
             FilledButton.tonal(
               style: FilledButton.styleFrom(
-                backgroundColor:
-                    Theme.of(context).colorScheme.errorContainer,
-                foregroundColor:
-                    Theme.of(context).colorScheme.onErrorContainer,
+                backgroundColor: Theme.of(context).colorScheme.errorContainer,
+                foregroundColor: Theme.of(context).colorScheme.onErrorContainer,
               ),
               onPressed: () => Navigator.of(context).pop(true),
               child: const Text('Eliminar'),
@@ -156,15 +186,18 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
         await supabase
             .from('transactions')
             .delete()
-            .eq('id', widget.transaction['id']);
+            .eq('id', int.parse(widget.transaction.id));
+
         if (!mounted) return;
+
+        EventService.instance.fire(AppEvent.transactionDeleted);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Transacción eliminada'),
             backgroundColor: Colors.blue,
           ),
         );
-        Navigator.of(context).pop(true);
+        Navigator.of(context).pop(true); // Cierra la pantalla de edición
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -206,7 +239,6 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // MONTO
               TextFormField(
                 controller: _amountController,
                 keyboardType:
@@ -224,7 +256,6 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
                     : null,
               ),
               const SizedBox(height: 24),
-              // TIPO
               SegmentedButton<String>(
                 segments: const [
                   ButtonSegment(
@@ -237,80 +268,74 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
                       icon: Icon(Iconsax.arrow_up_1)),
                 ],
                 selected: {_transactionType},
-                onSelectionChanged: (sel) => setState(() {
-                  _transactionType = sel.first;
-                  if (!_currentCategories
-                      .containsKey(_selectedCategory)) {
-                    _selectedCategory = null;
+                onSelectionChanged: (selection) {
+                  if (selection.isNotEmpty) {
+                    setState(() {
+                      _transactionType = selection.first;
+                      if (!_currentCategories.containsKey(_selectedCategory)) {
+                        _selectedCategory = null;
+                      }
+                    });
                   }
-                }),
+                },
               ),
               const SizedBox(height: 24),
-              // CUENTA
-              FutureBuilder<List<Map<String, dynamic>>>(
+              // 6. EL FUTUREBUILDER AHORA TRABAJA CON OBJETOS 'Account'
+              FutureBuilder<List<Account>>(
                 future: _accountsFuture,
-                builder: (context, snap) {
-                  if (snap.connectionState ==
-                      ConnectionState.waiting) {
-                    return const Center(
-                        child:
-                            CircularProgressIndicator());
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
                   }
-                  if (snap.hasError ||
-                      !snap.hasData ||
-                      snap.data!.isEmpty) {
-                    return const Text(
-                      'No se pudieron cargar las cuentas.',
-                      style: TextStyle(color: Colors.red),
+                  if (snapshot.hasError ||
+                      !snapshot.hasData ||
+                      snapshot.data!.isEmpty) {
+                    return Text(
+                      'Error: No se pudieron cargar las cuentas.',
+                      style: TextStyle(color: Theme.of(context).colorScheme.error),
                     );
                   }
-                  final accounts = snap.data!;
+                  final accounts = snapshot.data!;
                   return DropdownButtonFormField<String>(
                     value: _selectedAccountId,
-                    items: accounts.map((acct) {
+                    items: accounts.map((account) {
                       return DropdownMenuItem<String>(
-                        value: acct['id'].toString(),
-                        child: Text(acct['name']
-                            .toString()),
+                        value: account.id,
+                        child: Text(account.name),
                       );
                     }).toList(),
-                    onChanged: (v) =>
-                        setState(() => _selectedAccountId = v),
+                    onChanged: (value) => setState(() => _selectedAccountId = value),
                     decoration: InputDecoration(
                       labelText: 'Cuenta',
                       border: OutlineInputBorder(
-                          borderRadius:
-                              BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(12)),
                     ),
-                    validator: (v) =>
-                        v == null ? 'Selecciona una cuenta' : null,
+                    validator: (value) =>
+                        value == null ? 'Debes seleccionar una cuenta' : null,
                   );
                 },
               ),
               const SizedBox(height: 24),
-              // CATEGORÍA
               const Text('Categoría',
-                  style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold)),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: _currentCategories.entries.map(
-                  (e) {
-                    return ChoiceChip(
-                      label: Text(e.key),
-                      avatar: Icon(e.value),
-                      selected: _selectedCategory == e.key,
-                      onSelected: (_) => setState(
-                          () => _selectedCategory = e.key),
-                    );
-                  },
-                ).toList(),
+                children: _currentCategories.entries.map((entry) {
+                  return ChoiceChip(
+                    label: Text(entry.key),
+                    avatar: Icon(entry.value),
+                    selected: _selectedCategory == entry.key,
+                    onSelected: (isSelected) {
+                      if (isSelected) {
+                        setState(() => _selectedCategory = entry.key);
+                      }
+                      },
+                  );
+                }).toList(),
               ),
               const SizedBox(height: 24),
-              // DESCRIPCIÓN
               TextFormField(
                 controller: _descriptionController,
                 decoration: InputDecoration(
@@ -320,7 +345,6 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
                 ),
               ),
               const SizedBox(height: 32),
-              // GUARDAR
               ElevatedButton.icon(
                 icon: _isLoading
                     ? const SizedBox.shrink()
@@ -329,14 +353,11 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
                     ? const CircularProgressIndicator(
                         strokeWidth: 2, color: Colors.white)
                     : const Text('Guardar Cambios'),
-                onPressed:
-                    _isLoading ? null : _updateTransaction,
+                onPressed: _isLoading ? null : _updateTransaction,
                 style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                      vertical: 16),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                   textStyle: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold),
+                      fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
             ],

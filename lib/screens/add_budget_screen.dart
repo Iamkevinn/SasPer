@@ -1,6 +1,11 @@
+// lib/screens/add_budget_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+
+// Importamos la configuración y el nuevo repositorio
+import '../config/app_constants.dart';
+import '../data/budget_repository.dart';
 
 class AddBudgetScreen extends StatefulWidget {
   const AddBudgetScreen({super.key});
@@ -15,49 +20,55 @@ class _AddBudgetScreenState extends State<AddBudgetScreen> {
   String? _selectedCategory;
   bool _isLoading = false;
 
-  // Usamos solo las categorías de gastos, ya que los presupuestos son para controlar gastos.
-  final List<String> _expenseCategories = [
-    'Comida', 'Transporte', 'Ocio', 'Salud', 'Hogar', 'Compras', 'Servicios'
-  ];
+  // Dependencia: Instanciamos el repositorio
+  final _budgetRepository = BudgetRepository();
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    super.dispose();
+  }
 
   Future<void> _saveBudget() async {
-    if (_formKey.currentState!.validate() && _selectedCategory != null) {
-      setState(() => _isLoading = true);
-      
-      final currentMonth = DateTime.now().month;
-      final currentYear = DateTime.now().year;
+    if (!_formKey.currentState!.validate()) return;
+    
+    setState(() => _isLoading = true);
+
+    try {
       final amount = double.parse(_amountController.text.trim());
-      final category = _selectedCategory!;
-      final userId = Supabase.instance.client.auth.currentUser!.id;
+      
+      // ¡AQUÍ ESTÁ EL CAMBIO!
+      // Delegamos toda la lógica de guardado al repositorio.
+      await _budgetRepository.saveBudget(
+        category: _selectedCategory!,
+        amount: amount,
+      );
 
-      try {
-        // Usamos 'upsert' para crear o actualizar un presupuesto existente para la misma categoría/mes.
-        await Supabase.instance.client.from('budgets').upsert({
-          'user_id': userId,
-          'category': category,
-          'month': currentMonth,
-          'year': currentYear,
-          'amount': amount,
-        }, onConflict: 'user_id, category, month, year'); // Clave única que definimos en la tabla
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('¡Presupuesto guardado!'), backgroundColor: Colors.green));
-          Navigator.of(context).pop(); // Volver a la pantalla anterior
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al guardar el presupuesto: $e'), backgroundColor: Colors.red));
-        }
-      } finally {
-        if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('¡Presupuesto guardado!'), backgroundColor: Colors.green),
+        );
+        // Devolvemos true para que la pantalla anterior sepa que la operación fue exitosa.
+        // Esto es útil si la pantalla anterior no usa streams en tiempo real.
+        Navigator.of(context).pop(true);
       }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString()), backgroundColor: Theme.of(context).colorScheme.error),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // El método build ya estaba muy bien, no necesita cambios de lógica,
+    // solo asegurarse de que el import de `app_constants` sea correcto.
     return Scaffold(
-      appBar: AppBar(title: const Text('Nuevo Presupuesto')),
+      appBar: AppBar(title: const Text('Nuevo o Editar Presupuesto')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Form(
@@ -65,32 +76,56 @@ class _AddBudgetScreenState extends State<AddBudgetScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Selector de Categoría
               DropdownButtonFormField<String>(
                 value: _selectedCategory,
-                decoration: const InputDecoration(labelText: 'Categoría de Gasto', border: OutlineInputBorder(), prefixIcon: Icon(Iconsax.category)),
-                items: _expenseCategories.map((type) => DropdownMenuItem(value: type, child: Text(type))).toList(),
+                decoration: const InputDecoration(
+                  labelText: 'Categoría de Gasto',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Iconsax.category),
+                ),
+                items: AppConstants.expenseCategories.entries.map((entry) {
+                  return DropdownMenuItem(
+                    value: entry.key,
+                    child: Row(
+                      children: [
+                        Icon(entry.value, size: 20, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                        const SizedBox(width: 12),
+                        Text(entry.key),
+                      ],
+                    ),
+                  );
+                }).toList(),
                 onChanged: (value) => setState(() => _selectedCategory = value),
-                validator: (value) => (value == null) ? 'Debes seleccionar una categoría' : null,
+                validator: (value) => value == null ? 'Debes seleccionar una categoría' : null,
               ),
               const SizedBox(height: 16),
-              
-              // Campo para el Monto Límite
               TextFormField(
                 controller: _amountController,
-                decoration: const InputDecoration(labelText: 'Monto Límite', border: OutlineInputBorder(), prefixIcon: Icon(Iconsax.dollar_circle)),
+                decoration: const InputDecoration(
+                  labelText: 'Monto Límite',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Iconsax.dollar_circle),
+                ),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                validator: (value) => (value == null || double.tryParse(value) == null || double.parse(value) <= 0) ? 'Introduce un monto válido' : null,
+                validator: (value) {
+                  if (value == null || value.isEmpty) return 'Introduce un monto';
+                  final amount = double.tryParse(value);
+                  if (amount == null || amount <= 0) return 'El monto debe ser un número positivo';
+                  return null;
+                },
               ),
               const SizedBox(height: 32),
-
-              // Botón de Guardar
               ElevatedButton.icon(
                 onPressed: _isLoading ? null : _saveBudget,
-                icon: _isLoading ? const SizedBox.shrink() : const Icon(Iconsax.save_2),
-                label: _isLoading ? const CircularProgressIndicator(strokeWidth: 2) : const Text('Guardar Presupuesto'),
-                style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-              )
+                icon: _isLoading 
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) 
+                    : const Icon(Iconsax.save_2),
+                label: Text(_isLoading ? 'Guardando...' : 'Guardar Presupuesto'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
             ],
           ),
         ),

@@ -1,5 +1,8 @@
+// lib/screens/login_screen.dart
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:iconsax/iconsax.dart';
+import 'package:sasper/data/auth_repository.dart'; // <-- ¡IMPORTANTE!
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -11,26 +14,30 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _formKey = GlobalKey<FormState>(); // Key para validaciones
   bool _isLoading = false;
 
-  final supabase = Supabase.instance.client;
+  // --- ¡CAMBIO ARQUITECTÓNICO! ---
+  // Instanciamos el repositorio. En una app más grande, usaríamos un Provider.
+  final _authRepository = AuthRepository();
 
   Future<void> _signIn() async {
+    // Validamos el formulario antes de continuar
+    if (!_formKey.currentState!.validate()) return;
+
     setState(() { _isLoading = true; });
     try {
-      await supabase.auth.signInWithPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+      await _authRepository.signInWithPassword(
+        _emailController.text.trim(),
+        _passwordController.text.trim(),
       );
-      // El AuthGate se encargará de redirigir si el login es exitoso
-    } on AuthException catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message), backgroundColor: Colors.red),
-      );
+      // El AuthGate se encargará de redirigir
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ocurrió un error inesperado'), backgroundColor: Colors.red),
-      );
+      if(mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString()), backgroundColor: Theme.of(context).colorScheme.error),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() { _isLoading = false; });
@@ -38,28 +45,32 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-   Future<void> _signUp() async {
+  Future<void> _signUp() async {
+    if (!_formKey.currentState!.validate()) return;
+
     setState(() { _isLoading = true; });
     try {
-      await supabase.auth.signUp(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+      await _authRepository.signUp(
+        _emailController.text.trim(),
+        _passwordController.text.trim(),
       );
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('¡Registro exitoso! Revisa tu email para confirmar.')),
-      );
-    } on AuthException catch (e) {
-       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message), backgroundColor: Colors.red),
-      );
-    }
-    finally {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('¡Registro exitoso! Revisa tu email para confirmar.'), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if(mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString()), backgroundColor: Theme.of(context).colorScheme.error),
+        );
+      }
+    } finally {
       if (mounted) {
         setState(() { _isLoading = false; });
       }
     }
   }
-
 
   @override
   void dispose() {
@@ -70,43 +81,78 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Bienvenido')),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.savings_rounded, size: 80, color: Colors.blue),
-              const SizedBox(height: 20),
-              Text('Finanzas con IA', style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: 40),
-              TextFormField(
-                controller: _emailController,
-                decoration: const InputDecoration(labelText: 'Email', border: OutlineInputBorder()),
-                keyboardType: TextInputType.emailAddress,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _passwordController,
-                decoration: const InputDecoration(labelText: 'Contraseña', border: OutlineInputBorder()),
-                obscureText: true,
-              ),
-              const SizedBox(height: 24),
-              _isLoading
-                  ? const CircularProgressIndicator()
-                  : ElevatedButton(
-                      onPressed: _signIn,
-                      style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
-                      child: const Text('Iniciar Sesión'),
-                    ),
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: _signUp,
-                child: const Text('¿No tienes cuenta? Regístrate'),
-              ),
-            ],
+          child: Form( // Envolvemos en un Form
+            key: _formKey,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Iconsax.wallet_check, size: 80, color: colorScheme.primary),
+                const SizedBox(height: 16),
+                Text(
+                  'Bienvenido a SasPer',
+                  style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  'Toma el control de tus finanzas',
+                  style: GoogleFonts.poppins(fontSize: 16, color: colorScheme.onSurfaceVariant),
+                ),
+                const SizedBox(height: 40),
+                TextFormField(
+                  controller: _emailController,
+                  decoration: const InputDecoration(
+                    labelText: 'Correo Electrónico',
+                    prefixIcon: Icon(Iconsax.sms),
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.emailAddress,
+                  validator: (value) {
+                    if (value == null || value.isEmpty || !value.contains('@')) {
+                      return 'Por favor, introduce un correo válido.';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _passwordController,
+                  decoration: const InputDecoration(
+                    labelText: 'Contraseña',
+                    prefixIcon: Icon(Iconsax.key),
+                    border: OutlineInputBorder(),
+                  ),
+                  obscureText: true,
+                  validator: (value) {
+                     if (value == null || value.isEmpty || value.length < 6) {
+                      return 'La contraseña debe tener al menos 6 caracteres.';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 24),
+                _isLoading
+                    ? const CircularProgressIndicator()
+                    : ElevatedButton.icon(
+                        onPressed: _signIn,
+                        icon: const Icon(Iconsax.login),
+                        label: const Text('Iniciar Sesión'),
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 50),
+                          textStyle: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 16)
+                        ),
+                      ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: _isLoading ? null : _signUp, // Deshabilitar mientras carga
+                  child: const Text('¿No tienes cuenta? Regístrate'),
+                ),
+              ],
+            ),
           ),
         ),
       ),

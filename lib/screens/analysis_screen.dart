@@ -143,7 +143,7 @@ class AnalysisScreenState extends State<AnalysisScreen> {
                 color: Theme.of(context).colorScheme.surfaceContainer, 
                 borderRadius: BorderRadius.circular(20),
                 // opcional: sombra ligera
-                boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8)],
+                boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8)],
               ),
             ),
           ),
@@ -159,7 +159,7 @@ class AnalysisScreenState extends State<AnalysisScreen> {
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.surfaceContainer,
                 borderRadius: BorderRadius.circular(20),
-                boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8)],
+                boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8)],
               ),
             ),
           ),
@@ -175,7 +175,7 @@ class AnalysisScreenState extends State<AnalysisScreen> {
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.surfaceContainer,
                 borderRadius: BorderRadius.circular(20),
-                boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8)],
+                boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8)],
               ),
             ),
           ),

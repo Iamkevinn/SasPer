@@ -1,44 +1,58 @@
-// Este archivo contendrá las clases para tipar los datos de tus gráficos.
-// Esto nos da seguridad de tipos y autocompletado.
+// lib/models/analysis_models.dart
+import 'package:equatable/equatable.dart';
 
-// Modelo para el gráfico de pastel de gastos
-class ExpenseByCategory {
+// --- MODELOS INDIVIDUALES PARA CADA GRÁFICO ---
+
+// Usamos el mixin Equatable en lugar de extenderlo para clases más simples.
+class ExpenseByCategory with EquatableMixin {
   final String category;
   final double totalSpent;
 
-  ExpenseByCategory({required this.category, required this.totalSpent});
+  const ExpenseByCategory({required this.category, required this.totalSpent});
 
   factory ExpenseByCategory.fromJson(Map<String, dynamic> json) {
-    return ExpenseByCategory(
-      category: json['category'] as String? ?? 'Sin Categoría',
-      totalSpent: (json['total_spent'] as num? ?? 0).toDouble(),
-    );
+    try {
+      return ExpenseByCategory(
+        category: json['category'] as String? ?? 'Sin Categoría',
+        totalSpent: (json['total_spent'] as num? ?? 0).toDouble(),
+      );
+    } catch (e) {
+      throw FormatException('Error al parsear ExpenseByCategory: $e', json);
+    }
   }
+
+  @override
+  List<Object?> get props => [category, totalSpent];
 }
 
-// Modelo para el gráfico de línea de patrimonio
-class NetWorthDataPoint {
+class NetWorthDataPoint with EquatableMixin {
   final DateTime monthEnd;
   final double netWorth;
 
-  NetWorthDataPoint({required this.monthEnd, required this.netWorth});
+  const NetWorthDataPoint({required this.monthEnd, required this.netWorth});
 
   factory NetWorthDataPoint.fromJson(Map<String, dynamic> json) {
-    return NetWorthDataPoint(
-      monthEnd: DateTime.tryParse((json['month_end']?.toString() ?? '1970-01') + '-01') ?? DateTime.now(),
-      netWorth: (json['net_worth'] as num? ?? 0).toDouble(),
-    );
+    try {
+      return NetWorthDataPoint(
+        monthEnd: DateTime.parse(json['month_end'] as String),
+        netWorth: (json['net_worth'] as num? ?? 0).toDouble(),
+      );
+    } catch (e) {
+      throw FormatException('Error al parsear NetWorthDataPoint: $e', json);
+    }
   }
+
+  @override
+  List<Object?> get props => [monthEnd, netWorth];
 }
 
-// Modelo para el gráfico de barras de Flujo de Caja
-class MonthlyCashflowData {
+class MonthlyCashflowData with EquatableMixin {
   final DateTime monthStart;
   final double income;
   final double expense;
   final double cashFlow;
 
-  MonthlyCashflowData({
+  const MonthlyCashflowData({
     required this.monthStart,
     required this.income,
     required this.expense,
@@ -46,75 +60,101 @@ class MonthlyCashflowData {
   });
 
   factory MonthlyCashflowData.fromJson(Map<String, dynamic> json) {
-    return MonthlyCashflowData(
-      monthStart: DateTime.tryParse((json['month_start']?.toString() ?? '1970-01') + '-01') ?? DateTime.now(),
-      income: (json['income'] as num? ?? 0).toDouble(),
-      expense: (json['expense'] as num? ?? 0).toDouble(),
-      cashFlow: (json['cash_flow'] as num? ?? 0).toDouble(),
-    );
+    try {
+      return MonthlyCashflowData(
+        monthStart: DateTime.parse(json['month_start'] as String),
+        income: (json['income'] as num? ?? 0).toDouble(),
+        expense: (json['expense'] as num? ?? 0).toDouble(),
+        cashFlow: (json['cash_flow'] as num? ?? 0).toDouble(),
+      );
+    } catch (e) {
+      throw FormatException('Error al parsear MonthlyCashflowData: $e', json);
+    }
   }
+  
+  @override
+  List<Object?> get props => [monthStart, income, expense, cashFlow];
 }
 
-// Modelo para el gráfico de comparación de gastos
-class CategorySpendingComparisonData {
+class CategorySpendingComparisonData with EquatableMixin {
   final String category;
   final double currentMonthSpent;
   final double previousMonthSpent;
 
-  CategorySpendingComparisonData({
+  const CategorySpendingComparisonData({
     required this.category,
     required this.currentMonthSpent,
     required this.previousMonthSpent,
   });
 
   factory CategorySpendingComparisonData.fromJson(Map<String, dynamic> json) {
-    return CategorySpendingComparisonData(
-      category: json['category'] as String? ?? 'Sin Categoría',
-      currentMonthSpent: (json['current_month_spent'] as num? ?? 0).toDouble(),
-      previousMonthSpent: (json['previous_month_spent'] as num? ?? 0).toDouble(),
-    );
+    try {
+      return CategorySpendingComparisonData(
+        category: json['category'] as String? ?? 'Sin Categoría',
+        currentMonthSpent: (json['current_month_spent'] as num? ?? 0).toDouble(),
+        previousMonthSpent: (json['previous_month_spent'] as num? ?? 0).toDouble(),
+      );
+    } catch (e) {
+      throw FormatException('Error al parsear CategorySpendingComparisonData: $e', json);
+    }
   }
+  
+  @override
+  List<Object?> get props => [category, currentMonthSpent, previousMonthSpent];
 }
 
-// Modelo para el gráfico de pastel de ingresos
-class IncomeByCategory {
+class IncomeByCategory with EquatableMixin {
     final String category;
     final double totalIncome;
 
-    IncomeByCategory({required this.category, required this.totalIncome});
+    const IncomeByCategory({required this.category, required this.totalIncome});
 
     factory IncomeByCategory.fromJson(Map<String, dynamic> json) {
+      try {
         return IncomeByCategory(
             category: json['category'] as String? ?? 'Sin Categoría',
             totalIncome: (json['total_income'] as num? ?? 0).toDouble(),
         );
+      } catch (e) {
+        throw FormatException('Error al parsear IncomeByCategory: $e', json);
+      }
     }
+
+    @override
+    List<Object?> get props => [category, totalIncome];
 }
 
-// Modelo para el gráfico de barras de Ingreso vs Gasto
-class MonthlyIncomeExpenseSummaryData {
+class MonthlyIncomeExpenseSummaryData with EquatableMixin {
     final DateTime monthStart;
     final double totalIncome;
     final double totalExpense;
 
-    MonthlyIncomeExpenseSummaryData({
+    const MonthlyIncomeExpenseSummaryData({
         required this.monthStart,
         required this.totalIncome,
         required this.totalExpense,
     });
 
     factory MonthlyIncomeExpenseSummaryData.fromJson(Map<String, dynamic> json) {
+      try {
         return MonthlyIncomeExpenseSummaryData(
-            monthStart: DateTime.tryParse((json['month_start']?.toString() ?? '1970-01') + '-01') ?? DateTime.now(),
+            monthStart: DateTime.parse(json['month_start'] as String),
             totalIncome: (json['total_income'] as num? ?? 0).toDouble(),
             totalExpense: (json['total_expense'] as num? ?? 0).toDouble(),
         );
+      } catch (e) {
+        throw FormatException('Error al parsear MonthlyIncomeExpenseSummaryData: $e', json);
+      }
     }
+
+    @override
+    List<Object?> get props => [monthStart, totalIncome, totalExpense];
 }
 
 
-// Un modelo contenedor para todos los datos del análisis.
-class AnalysisData {
+// --- MODELO CONTENEDOR PRINCIPAL ---
+
+class AnalysisData extends Equatable {
   final List<ExpenseByCategory> expensePieData;
   final List<NetWorthDataPoint> netWorthLineData;
   final List<MonthlyCashflowData> cashflowBarData;
@@ -123,7 +163,7 @@ class AnalysisData {
   final List<MonthlyIncomeExpenseSummaryData> incomeExpenseBarData;
   final Map<DateTime, int> heatmapData;
 
-  AnalysisData({
+  const AnalysisData({
     required this.expensePieData,
     required this.netWorthLineData,
     required this.cashflowBarData,
@@ -132,4 +172,29 @@ class AnalysisData {
     required this.incomeExpenseBarData,
     required this.heatmapData,
   });
+
+  // Constructor "vacío" para usar en estados iniciales o de carga.
+  // Esto es muy útil para evitar nulos en la UI.
+  factory AnalysisData.empty() {
+    return const AnalysisData(
+      expensePieData: [],
+      netWorthLineData: [],
+      cashflowBarData: [],
+      categoryComparisonData: [],
+      incomePieData: [],
+      incomeExpenseBarData: [],
+      heatmapData: {},
+    );
+  }
+
+  @override
+  List<Object?> get props => [
+        expensePieData,
+        netWorthLineData,
+        cashflowBarData,
+        categoryComparisonData,
+        incomePieData,
+        incomeExpenseBarData,
+        heatmapData,
+      ];
 }

@@ -1,78 +1,73 @@
-// En lib/services/checkBudgetStatusAfterTransaction.dart
+// lib/services/budget_service.dart (NUEVO ARCHIVO Y NOMBRE)
 
+import 'dart:developer' as developer;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-Future<void> checkBudgetStatusAfterTransaction({
-  required String categoryName, // <--- CAMBIO: Recibimos el nombre, no el ID
-  required String userId,
-}) async {
-  final supabase = Supabase.instance.client;
+// Importaríamos un NotificationService para enviar la notificación real
+// import 'notification_service.dart'; 
 
-  try {
-    // 1. Encontrar si existe un presupuesto para esta categoría (usando el nombre)
-    final budgetResponse = await supabase
-        .from('budgets')
-        .select('id, amount') // No necesitamos category_id
-        .eq('user_id', userId)
-        .eq('category', categoryName) // <--- CAMBIO: Buscamos por nombre
-        .maybeSingle(); // Usamos maybeSingle para manejar el caso de que no exista
+class BudgetService {
+  final SupabaseClient _client;
+  // final NotificationService _notificationService; // Para el futuro
 
-    if (budgetResponse == null) {
-      print('No hay presupuesto para la categoría "$categoryName". No se hace nada.');
-      return;
-    }
+  // 1. Inyección de dependencias para tests
+  BudgetService({
+    SupabaseClient? client,
+    // NotificationService? notificationService
+  })  : _client = client ?? Supabase.instance.client;
+        // _notificationService = notificationService ?? NotificationService();
 
-    final budgetAmount = budgetResponse['amount'] as double;
-
-    // 2. Calcular el total gastado en esta categoría este mes (usando el nombre)
-    final now = DateTime.now();
-    final firstDayOfMonth = DateTime(now.year, now.month, 1);
-    final lastDayOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
-
-    final transactionsResponse = await supabase
-        .from('transactions')
-        .select('amount')
-        .eq('user_id', userId)
-        .eq('type', 'Gasto') // Es buena práctica asegurarse de que solo sumamos gastos
-        .eq('category', categoryName) // <--- CAMBIO: Filtramos por nombre de categoría
-        .gte('transaction_date', firstDayOfMonth.toIso8601String())
-        .lte('transaction_date', lastDayOfMonth.toIso8601String());
-
-    double totalSpent = 0.0;
-    for (var transaction in transactionsResponse) {
-      // Los montos de gasto deberían ser positivos en la BD, pero si los guardas negativos, hay que usar .abs()
-      totalSpent += (transaction['amount'] as num).toDouble();
-    }
-
-    // 3. Verificar umbrales y "enviar" notificación (esta parte no cambia)
-    final percentageSpent = (totalSpent / budgetAmount) * 100;
-    print('Gasto del presupuesto para "$categoryName": ${percentageSpent.toStringAsFixed(2)}% de $budgetAmount');
-
-    String? notificationTitle;
-    String? notificationBody;
+  /// Verifica el estado de un presupuesto después de una transacción y, si es necesario,
+  /// activa una notificación.
+  Future<void> checkBudgetStatusAfterTransaction({
+    required String categoryName,
+    required String userId,
+  }) async {
+    developer.log(
+      '📊 [Service] Checking budget status for category "$categoryName"',
+      name: 'BudgetService',
+    );
     
-    // Podríamos añadir una columna 'last_notified_percentage' en la tabla de presupuestos
-    // para no enviar la misma notificación (ej. del 80%) varias veces.
-    // Pero por ahora, lo mantenemos simple.
+    try {
+      // 2. UNA ÚNICA LLAMADA a la función RPC del backend
+      final result = await _client.rpc('check_budget_status', params: {
+        'p_user_id': userId,
+        'p_category_name': categoryName,
+      });
 
-    if (percentageSpent >= 100) {
-      notificationTitle = 'Presupuesto Excedido';
-      notificationBody = '¡Cuidado! Has superado tu presupuesto para "$categoryName".';
-    } else if (percentageSpent >= 80) {
-      notificationTitle = 'Alerta de Presupuesto';
-      notificationBody = 'Ya has utilizado el 80% de tu presupuesto para "$categoryName".';
+      developer.log('📝 RPC Result: $result', name: 'BudgetService');
+
+      final status = result['status'] as String?;
+      
+      // 3. Si la RPC indica que se necesita una notificación, la enviamos.
+      if (status == 'notification_needed') {
+        final title = result['title'] as String;
+        final body = result['body'] as String;
+        
+        developer.log('❗❗❗ NOTIFICATION NEEDED: "$title" - "$body"', name: 'BudgetService');
+        
+        // --- LLAMADA AL SERVICIO DE NOTIFICACIONES REAL ---
+        // Aquí es donde invocarías a tu backend o a un servicio como Firebase
+        // para que envíe la notificación push al dispositivo.
+        // Ejemplo:
+        // await _notificationService.sendPushNotification(
+        //   userId: userId,
+        //   title: title,
+        //   body: body,
+        // );
+      } else {
+        developer.log('✅ Budget on track or no budget found. No action needed.', name: 'BudgetService');
+      }
+
+    } catch (e, stackTrace) {
+      developer.log(
+        '🔥 [Service] Error checking budget status: $e',
+        name: 'BudgetService',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      // No re-lanzamos el error, ya que esta es una operación "en segundo plano"
+      // y no debería impedir que la UI continúe (por ejemplo, después de añadir una transacción).
     }
-
-    if (notificationTitle != null && notificationBody != null) {
-      print('--- SIMULANDO NOTIFICACIÓN ---');
-      print('Título: $notificationTitle');
-      print('Cuerpo: $notificationBody');
-      print('------------------------------');
-
-      // Aquí es donde llamaremos al backend.
-    }
-
-  } catch (e) {
-    print('Error verificando el estado del presupuesto: $e');
   }
 }

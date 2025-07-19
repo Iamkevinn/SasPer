@@ -85,4 +85,5 @@ class DefaultFirebaseOptions {
     storageBucket: 'sasper-6fc6c.firebasestorage.app',
     measurementId: 'G-QK0MTNCZ30',
   );
+
 }

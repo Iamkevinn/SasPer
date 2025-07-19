@@ -1,29 +1,47 @@
-import 'package:connectivity_plus/connectivity_plus.dart';
+// lib/screens/settings_screen.dart
+
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 
-class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
+import '../data/auth_repository.dart'; // <-- ¡IMPORTANTE!
 
-  // Función para mostrar el diálogo de confirmación de cierre de sesión
-  Future<void> _showLogoutConfirmationDialog(BuildContext context) async {
+class SettingsScreen extends StatefulWidget {
+  // Ahora requiere el AuthRepository
+  final AuthRepository authRepository;
+
+  const SettingsScreen({super.key, required this.authRepository});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  User? _user;
+
+  @override
+  void initState() {
+    super.initState();
+    // Obtenemos el usuario desde el repositorio, no directamente de Supabase
+    _user = widget.authRepository.currentUser;
+  }
+
+  Future<void> _showLogoutConfirmationDialog() async {
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Confirmar Cierre de Sesión'),
+          title: Text('Confirmar Cierre de Sesión', style: GoogleFonts.poppins()),
           content: const Text('¿Estás seguro de que quieres cerrar tu sesión?'),
           actions: <Widget>[
             TextButton(
-              onPressed: () => Navigator.of(context).pop(false), // No confirmar
+              onPressed: () => Navigator.of(context).pop(false),
               child: const Text('Cancelar'),
             ),
             TextButton(
-              onPressed: () => Navigator.of(context).pop(true), // Sí confirmar
-              style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
+              onPressed: () => Navigator.of(context).pop(true),
+              style: TextButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
               child: const Text('Cerrar Sesión'),
             ),
           ],
@@ -31,18 +49,19 @@ class SettingsScreen extends StatelessWidget {
       },
     );
 
-    // Si el usuario confirmó y el widget todavía está montado, cerramos la sesión
-    if (confirm == true && context.mounted) {
+    if (confirm == true && mounted) {
       try {
-        await Supabase.instance.client.auth.signOut();
-        // No necesitamos navegar. El AuthGate escuchará el cambio de estado
-        // y nos redirigirá automáticamente a la pantalla de login.
+        // --- ¡CAMBIO CLAVE! ---
+        // Usamos el método del repositorio para cerrar sesión.
+        await widget.authRepository.signOut();
+        // El AuthGate se encargará del resto.
       } catch (e) {
-        if (context.mounted) {
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-                content: Text('Error al cerrar sesión: $e'),
-                backgroundColor: Colors.red),
+              content: Text('Error al cerrar sesión: ${e.toString()}'),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
           );
         }
       }
@@ -51,66 +70,92 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mediaQuery = MediaQuery.of(context);
     final colorScheme = Theme.of(context).colorScheme;
-    final user = Supabase.instance.client.auth.currentUser;
 
-    return Padding(
-      // Padding superior para respetar la barra de estado
-      padding: EdgeInsets.only(top: mediaQuery.padding.top),
-      child: ListView(
-        padding: const EdgeInsets.all(16.0),
+    return Scaffold(
+      // --- ¡NUEVO! ---
+      // Usamos un AppBar para una estructura más estándar.
+      appBar: AppBar(
+        title: Text('Ajustes', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
         children: [
-          // Título de la pantalla
-          Text(
-            'Ajustes',
-            style: Theme.of(context)
-                .textTheme
-                .headlineMedium
-                ?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 24),
-
           // --- SECCIÓN DE PERFIL ---
+          _buildSectionHeader('Perfil'),
           Card(
             elevation: 0,
             color: colorScheme.surfaceContainer,
             child: ListTile(
-              leading: const Icon(Iconsax.user, size: 30),
-              title: const Text('Sesión Iniciada como',
-                  style: TextStyle(fontSize: 14)),
+              leading: CircleAvatar(
+                backgroundColor: colorScheme.primaryContainer,
+                child: Text(
+                  _user?.email?.substring(0, 1).toUpperCase() ?? '?',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onPrimaryContainer,
+                  ),
+                ),
+              ),
+              title: const Text('Sesión Iniciada como'),
               subtitle: Text(
-                user?.email ?? 'No autenticado',
-                style:
-                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                _user?.email ?? 'No autenticado',
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 16),
               ),
             ),
           ),
-
-          const Divider(), // Un separador visual
           
+          // --- SECCIÓN DE APARIENCIA (Ejemplo de extensibilidad) ---
           const SizedBox(height: 16),
-
-          // --- SECCIÓN DE ACCIONES ---
-          Card(
+          _buildSectionHeader('Apariencia'),
+           Card(
             elevation: 0,
             color: colorScheme.surfaceContainer,
-            child: Column(
-              children: [
-                // Aquí podríamos añadir más opciones en el futuro (Ej: Apariencia, Notificaciones)
-                ListTile(
-                  leading: Icon(Iconsax.logout, color: colorScheme.error),
-                  title: Text('Cerrar Sesión',
-                      style: TextStyle(color: colorScheme.error)),
-                  onTap: () => _showLogoutConfirmationDialog(context),
-                ),
-              ],
+            child: SwitchListTile(
+              title: const Text('Modo Oscuro'),
+              secondary: const Icon(Iconsax.moon),
+              value: Theme.of(context).brightness == Brightness.dark,
+              onChanged: (bool value) {
+                // Aquí iría la lógica para cambiar el tema de la app
+                // usando un ThemeProvider (ej. Riverpod, Provider, etc.)
+                 ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Funcionalidad de tema no implementada aún.')),
+                 );
+              },
             ),
           ),
 
-          // Espacio extra al final para que el menú flotante no tape nada
-          const SizedBox(height: 150),
+          // --- SECCIÓN DE ACCIONES ---
+          const SizedBox(height: 16),
+          _buildSectionHeader('Cuenta'),
+          Card(
+            elevation: 0,
+            color: colorScheme.surfaceContainer,
+            child: ListTile(
+              leading: Icon(Iconsax.logout, color: colorScheme.error),
+              title: Text('Cerrar Sesión', style: TextStyle(color: colorScheme.error)),
+              onTap: _showLogoutConfirmationDialog,
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  // Widget auxiliar para los títulos de sección
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0, top: 8.0, left: 4.0),
+      child: Text(
+        title.toUpperCase(),
+        style: GoogleFonts.poppins(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+          letterSpacing: 0.5,
+        ),
       ),
     );
   }

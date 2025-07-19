@@ -2,9 +2,9 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:sasper/services/event_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:sas_per/services/checkBudgetStatusAfterTransaction.dart';
 class AddTransactionScreen extends StatefulWidget {
   const AddTransactionScreen({super.key});
 
@@ -18,9 +18,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   final _descriptionController = TextEditingController();
   String _transactionType = 'Gasto';
   String? _selectedCategory;
-  int? _selectedAccountId; // Variable para el ID de la cuenta
   bool _isLoading = false;
-
+  String? _selectedAccountId; 
   final supabase = Supabase.instance.client;
 
   final Map<String, IconData> _expenseCategories = { 'Comida': Iconsax.cup, 'Transporte': Iconsax.bus, 'Ocio': Iconsax.gameboy, 'Salud': Iconsax.health, 'Hogar': Iconsax.home, 'Compras': Iconsax.shopping_bag, 'Servicios': Iconsax.flash_1, };
@@ -42,7 +41,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       try {
         await supabase.from('transactions').insert({
           'user_id': userId,
-          'account_id': _selectedAccountId,
+          'account_id': _selectedAccountId, 
           'amount': double.parse(_amountController.text),
           'type': transactionType,
           'category': categoryName,
@@ -60,7 +59,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('¡Transacción guardada!'), backgroundColor: Colors.green));
-          Navigator.of(context).pop(true);
+          EventService.instance.fire(AppEvent.transactionsChanged);
+          Navigator.of(context).pop();
         }
       } catch (e) {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al guardar: $e'), backgroundColor: Colors.red));
@@ -150,10 +150,16 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                     return Text('No tienes cuentas. Crea una primero en la pestaña "Cuentas".', textAlign: TextAlign.center, style: TextStyle(color: colorScheme.error));
                   }
                   final accounts = snapshot.data!;
-                  return DropdownButtonFormField<int>(
+                  return DropdownButtonFormField<String>(
                     value: _selectedAccountId,
                     decoration: const InputDecoration(labelText: 'Mover desde/hacia la cuenta', border: OutlineInputBorder(), prefixIcon: Icon(Iconsax.wallet_3)),
-                    items: accounts.map((account) => DropdownMenuItem<int>(value: account['id'], child: Text(account['name']))).toList(),
+                    items: accounts.map((account) {
+                      return DropdownMenuItem<String>(
+                        // --- CAMBIO 4: Aseguramos que el valor es un String ---
+                        value: account['id'].toString(), 
+                        child: Text(account['name']),
+                      );
+                    }).toList(),
                     onChanged: (value) => setState(() => _selectedAccountId = value),
                     validator: (value) => value == null ? 'Debes seleccionar una cuenta' : null,
                   );

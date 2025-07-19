@@ -1,53 +1,74 @@
 // lib/services/ai_analysis_service.dart
 
+import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+// Asumimos que has creado este archivo de configuración
+import '../config/app_config.dart'; 
+
 class AiAnalysisService {
-  // --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
-  // La URL base debe apuntar al endpoint específico que queremos usar.
-  static const String _baseUrl = "https://sasper.onrender.com/api/analisis-financiero";
+  final http.Client _httpClient;
+  final SupabaseClient _supabaseClient;
+  
+  // Usamos una constante para el endpoint específico
+  static const String _analysisEndpoint = "/analisis-financiero";
+
+  // 1. Inyección de dependencias en el constructor
+  AiAnalysisService({
+    http.Client? httpClient,
+    SupabaseClient? supabaseClient,
+  })  : _httpClient = httpClient ?? http.Client(),
+        _supabaseClient = supabaseClient ?? Supabase.instance.client;
 
   Future<String> getFinancialAnalysis() async {
+    developer.log('🤖 [Service] Requesting financial analysis...', name: 'AiAnalysisService');
+    
     try {
-      // 1. Obtener el ID del usuario actual de Supabase
-      final user = Supabase.instance.client.auth.currentUser;
+      final user = _supabaseClient.auth.currentUser;
       if (user == null) {
         throw Exception("Usuario no autenticado.");
       }
       final userId = user.id;
+      
+      // 2. Construcción de la URL desde una configuración central
+      final url = Uri.parse('${AppConfig.renderBackendBaseUrl}$_analysisEndpoint?user_id=$userId');
 
-      // 2. Construir la URL completa con el user_id
-      // Ahora la URL se construirá correctamente
-      final url = Uri.parse('$_baseUrl?user_id=$userId');
+      developer.log('📞 Calling API: $url', name: 'AiAnalysisService');
 
-      print('Llamando a la API de análisis: $url');
+      // 3. Llamada HTTP con timeout
+      final response = await _httpClient
+          .get(url)
+          .timeout(const Duration(seconds: 45), onTimeout: () {
+            // Esto se ejecuta si el tiempo de espera se agota
+            throw TimeoutException('La conexión con el servidor de análisis ha superado el tiempo de espera.');
+          });
 
-      // 3. Hacer la llamada HTTP GET
-      final response = await http.get(url);
-
-      // 4. Procesar la respuesta
       if (response.statusCode == 200) {
-        // Decodificamos el cuerpo de la respuesta, que debería ser UTF-8 por defecto
         final data = jsonDecode(utf8.decode(response.bodyBytes));
-        
-        // El backend devuelve un JSON como {"analisis": "texto..."}
         final analysis = data['analisis'];
         if (analysis == null) {
-          throw Exception("La respuesta del servidor no contiene la clave 'analisis'.");
+          throw Exception("Respuesta inválida del servidor: no se encontró la clave 'analisis'.");
         }
+        developer.log('✅ [Service] Analysis received successfully.', name: 'AiAnalysisService');
         return analysis as String;
       } else {
-        // Manejar errores del servidor
-        print('Error del servidor: ${response.statusCode}');
-        print('Cuerpo de la respuesta: ${response.body}');
-        throw Exception('Error al obtener el análisis del servidor.');
+        developer.log(
+          '🔥 [Service] Server error: ${response.statusCode}\nBody: ${response.body}',
+          name: 'AiAnalysisService',
+          level: 1000, // Nivel de error
+        );
+        throw Exception('Error del servidor al obtener el análisis. Código: ${response.statusCode}');
       }
-    } catch (e) {
-      // Manejar errores de red o cualquier otra excepción
-      print('Error en AiAnalysisService: $e');
-      throw Exception('No se pudo conectar con el servicio de análisis. Revisa tu conexión.');
+    } on TimeoutException catch (e) {
+      developer.log('⏱️ [Service] Timeout error: $e', name: 'AiAnalysisService', error: e);
+      rethrow; // Re-lanzamos la excepción para que la UI pueda manejarla específicamente
+    } catch (e, stackTrace) {
+      developer.log('🔥 [Service] General error: $e', name: 'AiAnalysisService', error: e, stackTrace: stackTrace);
+      // Re-lanzamos una excepción más genérica para la UI
+      throw Exception('No se pudo completar el análisis. Por favor, inténtalo de nuevo.');
     }
   }
 }
