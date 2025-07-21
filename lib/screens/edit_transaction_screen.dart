@@ -8,7 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 // Importamos los modelos que hemos creado
 import '../models/account_model.dart';
 import '../models/transaction_models.dart';
-import '../services/event_service.dart'; // Para notificar cambios
+import '../services/event_service.dart'; // Para notificar cambios.
 
 class EditTransactionScreen extends StatefulWidget {
   // 1. AHORA RECIBE UN OBJETO 'Transaction'
