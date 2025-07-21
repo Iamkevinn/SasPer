@@ -1,0 +1,14 @@
+certifi==2025.4.26
+charset-normalizer==3.4.2
+duolingo-api==0.5.4
+idna==3.10
+requests==2.32.3
+urllib3==2.4.0
+gunicorn
+fastapi
+uvicorn
+httpx
+google-generativeai>=0.4.1
+supabase
+python-dotenv>=1.0.0
+firebase-admin>=6.0.0

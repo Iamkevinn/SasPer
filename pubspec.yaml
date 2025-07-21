@@ -1,0 +1,93 @@
+# Nombre interno del paquete, actualizado a la convención recomendada.
+name: sasper
+description: "Una aplicación para finanzas personales."
+publish_to: 'none' # Evita que se publique accidentalmente.
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.3 <4.0.0'
+
+# Dependencias que la aplicación necesita para funcionar.
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Iconos de estilo iOS
+  cupertino_icons: ^1.0.8
+
+  # Base de datos y backend
+  supabase_flutter: ^2.5.2
+
+  # Herramientas de formato y utilidades
+  intl: ^0.19.0
+  http: ^1.2.1
+
+  # UI y Gráficos
+  fl_chart: ^0.68.0
+  google_fonts: ^6.2.1
+  iconsax: ^0.0.8
+
+  # Widgets y efectos visuales
+  shimmer: ^3.0.0
+  flutter_staggered_animations: ^1.1.1
+  flutter_heatmap_calendar: ^1.0.5
+  flutter_svg: ^2.0.10
+  
+  # Theming y colores dinámicos
+  dynamic_color: ^1.7.0
+  
+  # Widget de la pantalla de inicio
+  home_widget: ^0.5.0
+  
+  # Para mostrar texto con formato (Markdown)
+  flutter_markdown: ^0.7.1
+  
+  # Dependencias para Notificaciones Push (listos para el siguiente paso)
+  firebase_core: ^2.32.0 
+  firebase_messaging: ^14.9.3
+  connectivity_plus: ^6.0.3
+  equatable: ^2.0.5
+
+# Dependencias que solo se usan durante el desarrollo.
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  # Paquete para generar los íconos de la aplicación.
+  flutter_launcher_icons: ^0.13.1
+
+  # Herramientas para asegurar un código limpio y consistente.
+  flutter_lints: ^4.0.0
+
+# Configuración específica de Flutter.
+flutter:
+  uses-material-design: true
+
+  # ¡IMPORTANTE! Declara la carpeta de assets para que Flutter la incluya.
+  assets:
+    - assets/icons/
+
+  # Shaders para efectos visuales (como el ruido en la navbar).
+  shaders:
+    - shaders/noise.frag
+
+# --- CONFIGURACIÓN PARA EL GENERADOR DE ÍCONOS ---
+# Esta sección es leída por el paquete flutter_launcher_icons.
+flutter_launcher_icons:
+  # Activa la generación de íconos para ambas plataformas.
+  android: true
+  ios: true
+  
+  # Ruta a tu ícono principal (cuadrado, con fondo).
+  # Se usará para iOS y versiones antiguas de Android.
+  image_path: "assets/icons/SasPer.png"
+  
+  min_sdk_android: 21
+  
+  # --- CONFIGURACIÓN PARA ÍCONOS ADAPTATIVOS (Android 8.0+) ---
+  # Color que se usará como capa de fondo.
+  adaptive_icon_background: "#2a2a2a" 
+  
+  # Ruta a tu ícono de primer plano (sin fondo, solo el logo).
+  adaptive_icon_foreground: "assets/icons/SasPer_foreground.png"
