@@ -8,6 +8,8 @@ import 'package:sasper/data/budget_repository.dart';
 import 'package:sasper/data/debt_repository.dart';
 import 'package:sasper/data/transaction_repository.dart';
 import 'package:sasper/data/goal_repository.dart';
+import 'package:sasper/data/recurring_repository.dart'; 
+import 'package:sasper/screens/recurring_transactions_screen.dart'; 
 import 'package:sasper/screens/accounts_screen.dart';
 import 'package:sasper/screens/analysis_screen.dart';
 import 'package:sasper/screens/budgets_screen.dart';
@@ -21,6 +23,7 @@ class PlanningHubScreen extends StatelessWidget {
   final DebtRepository debtRepository;
   final AccountRepository accountRepository;
   final TransactionRepository transactionRepository;
+  final RecurringRepository recurringRepository;
   const PlanningHubScreen({
     super.key,
     required this.budgetRepository,
@@ -28,6 +31,7 @@ class PlanningHubScreen extends StatelessWidget {
     required this.debtRepository,
     required this.accountRepository,
     required this.transactionRepository,
+    required this.recurringRepository,
   });
 
   @override
@@ -47,7 +51,7 @@ class PlanningHubScreen extends StatelessWidget {
             onTap: () => Navigator.of(context).push(MaterialPageRoute(
               builder: (_) => AccountsScreen(
                   repository: accountRepository, 
-                  transactionRepository: transactionRepository
+                  transactionRepository: transactionRepository,
               ),
             )),
           ),
@@ -85,6 +89,18 @@ class PlanningHubScreen extends StatelessWidget {
             subtitle: 'Entiende a fondo a dónde se va tu dinero.',
             onTap: () => Navigator.of(context).push(MaterialPageRoute(
               builder: (_) => const AnalysisScreen(),
+            )),
+          ),
+          _buildHubCard(
+            context,
+            icon: Iconsax.repeat,
+            title: 'Gastos Fijos',
+            subtitle: 'Automatiza tus ingresos y gastos recurrentes.',
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => RecurringTransactionsScreen(
+                repository: recurringRepository,
+                accountRepository: accountRepository, // Pasa el account repo también
+              ),
             )),
           ),
         ],

@@ -12,12 +12,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:async';
 
 // Repositorios
-import '../data/auth_repository.dart';
-import '../data/dashboard_repository.dart';
-import '../data/goal_repository.dart';
-import '../data/debt_repository.dart';
-import '../data/account_repository.dart';
-import '../data/budget_repository.dart';
+import 'package:sasper/data/auth_repository.dart';
+import 'package:sasper/data/dashboard_repository.dart';
+import 'package:sasper/data/goal_repository.dart';
+import 'package:sasper/data/debt_repository.dart';
+import 'package:sasper/data/account_repository.dart';
+import 'package:sasper/data/budget_repository.dart';
+import 'package:sasper/data/recurring_repository.dart';
 
 // Servicios
 import '../services/event_service.dart';
@@ -34,7 +35,6 @@ import 'dashboard_screen.dart';
 import 'debts_screen.dart';
 import 'goals_screen.dart';
 import 'settings_screen.dart';
-
 // Utilidades
 import '../utils/custom_page_route.dart';
 
@@ -55,6 +55,7 @@ class _MainScreenState extends State<MainScreen> {
   late final TransactionRepository _transactionRepository;
   late final BudgetRepository _budgetRepository;
   late StreamSubscription<AppEvent> _eventSubscription;
+  late final RecurringRepository _recurringRepository;
 
   late final List<Widget> _widgetOptions;
 
@@ -69,6 +70,7 @@ class _MainScreenState extends State<MainScreen> {
     _accountRepository = AccountRepository();
     _transactionRepository = TransactionRepository();
     _budgetRepository = BudgetRepository();
+    _recurringRepository = RecurringRepository();
 
     _widgetOptions = <Widget>[
       DashboardScreen(
@@ -82,7 +84,9 @@ class _MainScreenState extends State<MainScreen> {
         budgetRepository: _budgetRepository,
         goalRepository: _goalRepository,
         debtRepository: _debtRepository,
-        accountRepository: _accountRepository, transactionRepository: _transactionRepository,
+        accountRepository: _accountRepository, 
+        transactionRepository: _transactionRepository,
+        recurringRepository: _recurringRepository, 
       ),
       SettingsScreen(authRepository: _authRepository),
     ];
