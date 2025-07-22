@@ -14,37 +14,38 @@ class AnalysisRepository {
     developer.log("📈 [Repository] Fetching all analysis data...", name: 'AnalysisRepository');
     try {
       final today = DateTime.now();
+      final userId = _client.auth.currentUser?.id;
       final startDate = DateFormat('yyyy-MM-dd').format(today.subtract(const Duration(days: 120)));
       final endDate = DateFormat('yyyy-MM-dd').format(today);
       final clientDate = DateFormat('yyyy-MM-dd').format(today);
 
-      // 2. HACEMOS LAS LLAMADAS RESILIENTES. Si una falla, no rompe todo.
+      // Todas las llamadas ahora pasan el ID del usuario explícitamente.
       final results = await Future.wait([
-        _client.rpc('get_expense_summary_by_category').catchError((e) {
+        _client.rpc('get_expense_summary_by_category', params: {'p_user_id': userId, 'client_date': clientDate}).catchError((e) {
           developer.log('🔥 Error en get_expense_summary_by_category: $e', name: 'AnalysisRepository');
-          return []; // Devuelve un valor por defecto en caso de error
+          return [];
         }),
-        _client.rpc('get_net_worth_trend', params: {'client_date': clientDate}).catchError((e) {
+        _client.rpc('get_net_worth_trend', params: {'p_user_id': userId, 'client_date': clientDate}).catchError((e) {
           developer.log('🔥 Error en get_net_worth_trend: $e', name: 'AnalysisRepository');
           return [];
         }),
-        _client.rpc('get_monthly_cash_flow').catchError((e) {
+        _client.rpc('get_monthly_cash_flow', params: {'p_user_id': userId}).catchError((e) {
           developer.log('🔥 Error en get_monthly_cash_flow: $e', name: 'AnalysisRepository');
           return [];
         }),
-        _client.rpc('get_category_spending_comparison').catchError((e) {
+        _client.rpc('get_category_spending_comparison', params: {'p_user_id': userId}).catchError((e) {
           developer.log('🔥 Error en get_category_spending_comparison: $e', name: 'AnalysisRepository');
           return [];
         }),
-        _client.rpc('get_income_summary_by_category').catchError((e) {
+        _client.rpc('get_income_summary_by_category', params: {'p_user_id': userId, 'client_date': clientDate}).catchError((e) {
           developer.log('🔥 Error en get_income_summary_by_category: $e', name: 'AnalysisRepository');
           return [];
         }),
-        _client.rpc('get_monthly_income_expense_summary', params: {'client_date': clientDate}).catchError((e) {
+        _client.rpc('get_monthly_income_expense_summary', params: {'p_user_id': userId, 'client_date': clientDate}).catchError((e) {
           developer.log('🔥 Error en get_monthly_income_expense_summary: $e', name: 'AnalysisRepository');
           return [];
         }),
-        _client.rpc('get_daily_net_flow', params: {'start_date': startDate, 'end_date': endDate}).catchError((e) {
+        _client.rpc('get_daily_net_flow', params: {'p_user_id': userId, 'start_date': startDate, 'end_date': endDate}).catchError((e) {
           developer.log('🔥 Error en get_daily_net_flow: $e', name: 'AnalysisRepository');
           return [];
         }),

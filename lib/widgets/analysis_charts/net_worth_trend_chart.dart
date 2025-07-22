@@ -15,7 +15,7 @@ class NetWorthTrendChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (data.isEmpty || data.every((d) => d.netWorth == 0)) {
+    if (data.isEmpty || data.every((d) => d.totalBalance == 0)) {
       return const EmptyStateCard(
         title: 'Evolución de tu Patrimonio',
         message: 'Registra tus transacciones para ver cómo crece tu patrimonio a lo largo del tiempo.',
@@ -24,7 +24,7 @@ class NetWorthTrendChart extends StatelessWidget {
     }
 
     final spots = List.generate(data.length, (index) {
-      return FlSpot(index.toDouble(), data[index].netWorth);
+      return FlSpot(index.toDouble(), data[index].totalBalance);
     });
     
     return Column(

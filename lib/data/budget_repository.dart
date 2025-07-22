@@ -91,6 +91,33 @@ class BudgetRepository {
   }
 
   /// Guarda (crea o actualiza) un presupuesto para el mes y año actuales.
+  Future<void> addBudget({
+    required String category,
+    required double amount,
+    required int month, // Añadido para flexibilidad
+    required int year,  // Añadido para flexibilidad
+  }) async {
+    developer.log('💾 [Repo] Adding budget for "$category" with amount $amount');
+    final userId = _client.auth.currentUser!.id;
+
+    try {
+      // Usamos upsert para crear o actualizar si ya existe.
+      await _client.from('budgets').upsert({
+        'user_id': userId,
+        'category': category,
+        'month': month,
+        'year': year,
+        'amount': amount,
+      }, onConflict: 'user_id, category, month, year');
+
+      developer.log('✅ [Repo] Budget added/updated successfully.');
+    } catch (e) {
+      developer.log('🔥 [Repo] Error adding budget: $e');
+      throw Exception('No se pudo guardar el presupuesto.');
+    }
+  }
+
+  /// Guarda (crea o actualiza) un presupuesto para el mes y año actuales.
   /// Lanza una excepción si la operación falla.
   Future<void> saveBudget({
     required String category,

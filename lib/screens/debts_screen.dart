@@ -9,6 +9,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:sasper/data/account_repository.dart';
 import 'package:sasper/data/debt_repository.dart';
 import 'package:sasper/models/debt_model.dart';
+import 'package:sasper/screens/add_debt_screen.dart';
 import 'package:sasper/widgets/debts/debt_card.dart';
 import 'package:sasper/widgets/shared/empty_state_card.dart';
 import 'register_payment_screen.dart';
@@ -65,6 +66,14 @@ class _DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderStat
             Tab(text: 'Me Deben (Préstamos)'),
           ],
         ),
+        actions: [
+          // --- ¡BOTÓN AÑADIDO AQUÍ! ---
+          IconButton(
+            icon: const Icon(Iconsax.add_square, size: 28),
+            tooltip: 'Añadir Deuda/Préstamo',
+            onPressed: _navigateToAddDebt,
+          ),
+        ],
       ),
       body: StreamBuilder<List<Debt>>(
         stream: _debtsStream,
@@ -95,6 +104,16 @@ class _DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderStat
     );
   }
 
+  // Este método maneja la navegación a la pantalla para añadir una nueva deuda.
+  void _navigateToAddDebt() {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => AddDebtScreen(
+        debtRepository: widget.repository,
+        accountRepository: widget.accountRepository,
+      ),
+    ));
+  }
+  
   Widget _buildDebtsList(List<Debt> debts, {required bool isMyDebt}) {
     if (debts.isEmpty) {
       return _buildEmptyStateForTab(isMyDebt: isMyDebt);

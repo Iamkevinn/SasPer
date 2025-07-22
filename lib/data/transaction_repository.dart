@@ -12,8 +12,63 @@ import 'dart:developer' as developer;
 class TransactionRepository {
   final SupabaseClient _client;
 
+  // 1. AÑADIDO: Controlador para manejar el stream.
+  final _transactionsController = StreamController<List<Transaction>>.broadcast();
+  
+  // 2. AÑADIDO: Variable para guardar la suscripción de Supabase.
+  RealtimeChannel? _transactionsChannel;
+
+
   TransactionRepository({SupabaseClient? client})
       : _client = client ?? Supabase.instance.client;
+
+  // --- ¡NUEVO MÉTODO REACTIVO! ---
+  Stream<List<Transaction>> getTransactionsStream() {
+    // Si no estamos suscritos, nos suscribimos la primera vez.
+    _transactionsChannel ??= _client
+        .channel('public:transactions')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'transactions',
+          // Cualquier cambio en la tabla llamará a nuestra función para recargar datos.
+          callback: (payload) => _fetchAndPushTransactions(),
+        )
+        .subscribe();
+    
+    _fetchAndPushTransactions(); // Hacemos una carga inicial de los datos.
+    return _transactionsController.stream;
+  }
+
+  // --- NUEVO MÉTODO ---
+  Future<void> forceRefresh() async {
+    developer.log('🔄 [Repo] Manual refresh requested for all transactions.');
+    await _fetchAndPushTransactions();
+  }
+
+  /// Función privada que obtiene los datos de Supabase y los añade al stream.
+  Future<void> _fetchAndPushTransactions() async {
+    developer.log('🔄 [Repo] Fetching all transactions...');
+    try {
+      final data = await _client
+          .from('transactions')
+          .select()
+          .eq('user_id', _client.auth.currentUser!.id)
+          .order('transaction_date', ascending: false);
+      
+      final transactions = (data as List).map((t) => Transaction.fromMap(t)).toList();
+      
+      if (!_transactionsController.isClosed) {
+        _transactionsController.add(transactions);
+        developer.log('✅ [Repo] Pushed ${transactions.length} transactions to the stream.');
+      }
+    } catch (e) {
+       if (!_transactionsController.isClosed) {
+        _transactionsController.addError(e);
+        developer.log('🔥 [Repo] Error fetching transactions: $e');
+      }
+    }
+  }
 
   /// Añade una nueva transacción a la base de datos.
   /// Lanza una excepción si la operación falla.
@@ -30,7 +85,7 @@ class TransactionRepository {
       await _client.from('transactions').insert({
         'user_id': _client.auth.currentUser!.id,
         'account_id': accountId,
-        'amount': amount,
+        'amount': amount.abs(),
         'type': type,
         'category': category,
         'description': description,
@@ -98,4 +153,11 @@ class TransactionRepository {
       throw Exception('No se pudo eliminar la transacción.');
     }
   }
+
+   void dispose() {
+    developer.log('❌ [Repo] Disposing TransactionRepository resources.');
+    _transactionsChannel?.unsubscribe();
+    _transactionsController.close();
+  }
+
 }

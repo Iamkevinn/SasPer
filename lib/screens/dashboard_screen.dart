@@ -10,6 +10,7 @@ import 'package:sasper/models/transaction_models.dart';
 import 'package:sasper/screens/edit_transaction_screen.dart';
 import 'package:shimmer/shimmer.dart';
 
+import 'package:sasper/data/budget_repository.dart';
 import 'package:sasper/data/dashboard_repository.dart';
 import 'package:sasper/models/dashboard_data_model.dart';
 import 'package:sasper/services/event_service.dart';
@@ -26,12 +27,13 @@ class DashboardScreen extends StatefulWidget {
   // 1. AÑADIDO: Recibimos los repositorios necesarios para las acciones.
   final AccountRepository accountRepository;
   final TransactionRepository transactionRepository;
-
+  final BudgetRepository budgetRepository;
   const DashboardScreen({
     super.key,
     required this.repository,
     required this.accountRepository,
     required this.transactionRepository,
+    required this.budgetRepository,
   });
 
   @override
@@ -54,7 +56,9 @@ class DashboardScreenState extends State<DashboardScreen> {
         AppEvent.transactionDeleted,
         AppEvent.accountCreated,
         AppEvent.debtsChanged,
-        AppEvent.goalsChanged
+        AppEvent.goalsChanged,
+        AppEvent.transactionCreated, // <-- AÑADIDO
+        AppEvent.transactionUpdated,
       }.contains(event)) {
         if (kDebugMode) print("Dashboard: Evento '$event' recibido. Forzando refresh...");
         widget.repository.forceRefresh();
@@ -141,49 +145,73 @@ class DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: StreamBuilder<DashboardData>(
-        stream: _dashboardDataStream,
-        builder: (context, snapshot) {
-          if (snapshot.hasData) {
-            final data = snapshot.data!;
-            WidgetService.updateWidgetData(totalBalance: data.totalBalance);
-            return _buildDashboardContent(data);
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text('Error al cargar los datos: ${snapshot.error}'));
-          }
-          return _buildLoadingShimmer();
-        },
+      // 1. Usamos SafeArea para evitar que la UI se solape con la barra de estado.
+      body: SafeArea(
+        top: true, // Aplicar solo en la parte superior
+        bottom: false, // La barra de navegación ya maneja el área inferior
+        child: StreamBuilder<DashboardData>(
+          stream: _dashboardDataStream,
+          builder: (context, snapshot) {
+            if (snapshot.hasData) {
+              final data = snapshot.data!;
+              WidgetService.updateWidgetData(totalBalance: data.totalBalance);
+              return _buildDashboardContent(data);
+            }
+            if (snapshot.hasError) {
+              return Center(child: Text('Error al cargar los datos: ${snapshot.error}'));
+            }
+            return _buildLoadingShimmer();
+          },
+        ),
       ),
     );
   }
 
   Widget _buildDashboardContent(DashboardData data) {
+    // 2. Usamos CustomScrollView para un layout más avanzado y profesional.
     return RefreshIndicator(
       onRefresh: _handleRefresh,
       child: CustomScrollView(
         slivers: [
-          SliverToBoxAdapter(child: DashboardHeader(userName: data.fullName)),
+          // 3. SliverAppBar permite un encabezado fijo o flotante.
+          SliverAppBar(
+            pinned: true, // Mantiene el encabezado visible al hacer scroll
+            floating: true,
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            elevation: 0,
+            titleSpacing: 16.0,
+            title: DashboardHeader(userName: data.fullName),
+            toolbarHeight: 80, // Aumenta la altura para dar más espacio
+          ),
+          
+          // 4. Cada widget principal ahora es un "Sliver".
           SliverToBoxAdapter(child: BalanceCard(totalBalance: data.totalBalance)),
-          if (data.budgetsProgress.isNotEmpty) ...[
-             const SliverToBoxAdapter(child: SizedBox(height: 24)),
-             SliverToBoxAdapter(child: BudgetsSection(budgets: data.budgetsProgress)),
-          ],
+
+          SliverToBoxAdapter(
+            child: BudgetsSection(
+              budgets: data.budgetsProgress,
+              budgetRepository: widget.budgetRepository,
+            ),
+          ),
+          
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
           const SliverToBoxAdapter(child: AiAnalysisSection()),
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+          
           SliverToBoxAdapter(
             child: RecentTransactionsSection(
               transactions: data.recentTransactions,
-              // 4. CONEXIÓN: Pasamos las funciones al widget hijo.
               onTransactionTapped: _handleTransactionTap,
               onTransactionDeleted: _handleTransactionDelete,
               onViewAllPressed: () {
-                // Aquí iría la lógica para cambiar a la pestaña de transacciones
-                // en tu MainScreen, probablemente usando un Provider o un callback.
+                // TODO: Aquí iría la lógica para cambiar a la pestaña de Movimientos
+                // Por ejemplo, usando un Provider para controlar el índice de MainScreen.
                 if (kDebugMode) print('Navegar a la pantalla completa de transacciones');
               },
             ),
           ),
+          
+          // Espacio al final para que el scroll no se corte bruscamente
           const SliverToBoxAdapter(child: SizedBox(height: 150)),
         ],
       ),

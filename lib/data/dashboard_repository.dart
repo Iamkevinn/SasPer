@@ -1,59 +1,86 @@
-// lib/data/dashboard_repository.dart
+// lib/data/dashboard_repository.dart (COMPLETO Y CORREGIDO)
+
 import 'dart:async';
+import 'dart:developer' as developer;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sasper/models/dashboard_data_model.dart';
-import 'dart:developer' as developer;
 
 class DashboardRepository {
   final SupabaseClient _client;
-  // Lo inicializamos aquí para poder usar los callbacks
-  late final StreamController<DashboardData> _controller;
+  final _dashboardDataController = StreamController<DashboardData>.broadcast();
+  RealtimeChannel? _subscriptionChannel;
 
-  DashboardRepository(this._client) {
-    _controller = StreamController<DashboardData>.broadcast(
-      onListen: () {
-        // 2. Se llama a refresh la PRIMERA vez que alguien escucha el stream.
-        developer.log('[DashboardRepository] First listener attached. Fetching initial data...', name: 'DashboardRepository');
-        forceRefresh();
-      },
-      onCancel: () {
-        developer.log('[DashboardRepository] All listeners detached.', name: 'DashboardRepository');
-      }
-    );
+  DashboardRepository(this._client);
+
+  Stream<DashboardData> getDashboardDataStream() {
+    // Suscripción a cambios en tiempo real (si aún no está activa)
+    _subscriptionChannel ??= _client
+        .channel('public:all_tables_for_dashboard')
+        .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'transactions',
+            callback: (payload) => forceRefresh())
+        .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'accounts',
+            callback: (payload) => forceRefresh())
+        .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'goals',
+            callback: (payload) => forceRefresh())
+        .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'budgets',
+            callback: (payload) => forceRefresh())
+        .subscribe();
+
+    // Carga inicial de datos
+    forceRefresh();
+    
+    return _dashboardDataController.stream;
   }
 
-  Stream<DashboardData> getDashboardDataStream() => _controller.stream;
-  
-  Future<void> forceRefresh({bool silent = false}) async {
-    developer.log('[DashboardRepository] Forcing refresh (silent: $silent)...', name: 'DashboardRepository');
+  Future<void> forceRefresh({bool silent = true}) async {
+    // `silent` puede usarse en el futuro para no mostrar un shimmer en recargas de fondo.
+    developer.log('🔄 [Repo] Fetching fresh dashboard data...', name: 'DashboardRepository');
     
-    // 1. Emitir un estado de carga si no es una recarga silenciosa
-    if (!silent && !_controller.isClosed) {
-      _controller.add(DashboardData.empty().copyWith(fullName: 'Actualizando...'));
-    }
-    
+    // --- ¡CORRECCIÓN CLAVE AQUÍ! ---
     try {
-      final data = await fetchDashboardData();
-      if (!_controller.isClosed) {
-        _controller.add(data);
-        developer.log('[DashboardRepository] Data stream updated.', name: 'DashboardRepository');
+      // 1. Obtenemos el ID del usuario actual.
+      final userId = _client.auth.currentUser?.id;
+      if (userId == null) {
+        throw Exception('Usuario no autenticado. No se pueden cargar los datos del dashboard.');
       }
-    } catch (e, stackTrace) {
-      developer.log('Error fetching dashboard data', error: e, stackTrace: stackTrace, name: 'DashboardRepository');
-      if (!_controller.isClosed) {
-        _controller.addError(e, stackTrace);
+
+      // 2. Llamamos a la función RPC pasándole el user_id como parámetro.
+      final data = await _client.rpc(
+        'get_dashboard_data',
+        params: {'p_user_id': userId},
+      );
+
+      final dashboardData = DashboardData.fromJson(data);
+      if (!_dashboardDataController.isClosed) {
+        _dashboardDataController.add(dashboardData);
+        developer.log('✅ [Repo] Pushed new dashboard data to the stream.', name: 'DashboardRepository');
+      }
+    } catch (e) {
+      developer.log('🔥 [Repo] Error fetching dashboard data: $e', name: 'DashboardRepository');
+      if (!_dashboardDataController.isClosed) {
+        _dashboardDataController.addError(e);
       }
     }
   }
 
-  Future<DashboardData> fetchDashboardData() async {
-    final response = await _client.rpc('get_dashboard_data');
-    developer.log("✅ RAW JSON from get_dashboard_data: $response", name: 'DashboardRepository');
-    return DashboardData.fromJson(response as Map<String, dynamic>);
-  }
-  
   void dispose() {
-    developer.log('[DashboardRepository] Disposing controller.', name: 'DashboardRepository');
-    _controller.close();
+    developer.log('❌ [Repo] Disposing DashboardRepository resources.', name: 'DashboardRepository');
+    if (_subscriptionChannel != null) {
+      _client.removeChannel(_subscriptionChannel!);
+      _subscriptionChannel = null;
+    }
+    _dashboardDataController.close();
   }
 }

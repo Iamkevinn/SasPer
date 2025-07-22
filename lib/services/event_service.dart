@@ -1,16 +1,19 @@
-// lib/services/event_service.dart
+// lib/services/event_service.dart (CORREGIDO)
+
 import 'dart:async';
 
 enum AppEvent {
-  transactionsChanged,
+  transactionCreated, // <-- AÑADIDO: Más específico
+  transactionUpdated,
   transactionDeleted,
+  transactionsChanged, // Genérico por si acaso
   accountCreated,
   accountUpdated,
   budgetsChanged,
   debtsChanged,
-  goalUpdated,
   goalCreated,
-  transactionUpdated, goalsChanged,
+  goalUpdated,
+  goalsChanged,
 }
 
 class EventService {

@@ -1,7 +1,7 @@
-// lib/data/account_repository.dart (VERSIÓN FINAL CORREGIDA)
+// lib/data/account_repository.dart (COMPLETO Y FINAL)
 
 import 'dart:async';
-import 'dart:developer' as developer; // Usamos un alias para evitar conflictos
+import 'dart:developer' as developer;
 import 'package:sasper/models/account_model.dart';
 import 'package:sasper/models/transaction_models.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -9,22 +9,31 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class AccountRepository {
   final SupabaseClient _client;
   final _accountsStreamController = StreamController<List<Account>>.broadcast();
-  RealtimeChannel? _accountsChannel;
-  RealtimeChannel? _transactionsChannel;
+  RealtimeChannel? _subscriptionChannel;
 
   AccountRepository({SupabaseClient? client}) : _client = client ?? Supabase.instance.client;
 
   Stream<List<Account>> getAccountsWithBalanceStream() {
-    if (_accountsChannel == null) {
+    if (_subscriptionChannel == null) {
       _setupRealtimeSubscriptions();
     }
+    // La carga inicial se dispara desde la suscripción,
+    // pero la llamamos aquí también para asegurar datos inmediatos.
     _fetchAccountsWithBalance();
     return _accountsStreamController.stream;
   }
 
   Future<void> _fetchAccountsWithBalance() async {
+    developer.log('🔄 [Repo] Fetching accounts with balance...');
     try {
-      final response = await _client.rpc('get_accounts_with_balance');
+      final userId = _client.auth.currentUser?.id;
+      if (userId == null) throw Exception('Usuario no autenticado');
+
+      final response = await _client.rpc(
+        'get_accounts_with_balance', 
+        params: {'p_user_id': userId}
+      );
+
       final accounts = (response as List).map((data) => Account.fromMap(data)).toList();
       if (!_accountsStreamController.isClosed) {
         _accountsStreamController.add(accounts);
@@ -37,18 +46,20 @@ class AccountRepository {
     }
   }
   
-  // 1. CORRECCIÓN CRÍTICA: La lógica de filtrado ahora se hace en Dart.
   Future<Account?> getAccountById(String accountId) async {
+    developer.log('ℹ️ [Repo] Fetching account by ID: $accountId...');
     try {
-      // Primero, obtenemos la lista completa de cuentas con sus balances.
-      final response = await _client.rpc('get_accounts_with_balance');
+      final userId = _client.auth.currentUser?.id;
+      if (userId == null) throw Exception('Usuario no autenticado');
+
+      final response = await _client.rpc(
+        'get_accounts_with_balance', 
+        params: {'p_user_id': userId}
+      );
+
       final accounts = (response as List).map((data) => Account.fromMap(data)).toList();
-      
-      // Luego, buscamos la cuenta específica en la lista.
-      // Usamos 'firstWhere' dentro de un try-catch para manejar el caso en que no se encuentre.
       return accounts.firstWhere((account) => account.id == accountId);
     } catch (e) {
-      // Esto se activará si 'firstWhere' no encuentra ningún elemento, o por otros errores.
       developer.log('🔥 Error fetching or finding account by id $accountId: $e', name: 'AccountRepository');
       return null;
     }
@@ -89,7 +100,7 @@ class AccountRepository {
         'name': name,
         'type': type,
         'initial_balance': initialBalance,
-        'balance': initialBalance, // El balance actual se recalculará con la función RPC
+        'balance': initialBalance,
       });
     } catch (e) {
       developer.log('🔥 Error adding account: $e', name: 'AccountRepository');
@@ -128,24 +139,35 @@ class AccountRepository {
   }
 
   void _setupRealtimeSubscriptions() {
-    developer.log('📡 [Repo] Setting up realtime subscriptions...', name: 'AccountRepository');
-    void onDbChange(payload) {
-      developer.log('🔄 [Repo] DB change detected, fetching fresh data...', name: 'AccountRepository');
-      _fetchAccountsWithBalance();
-    }
-    _accountsChannel = _client.channel('public:accounts').onPostgresChanges(event: PostgresChangeEvent.all, schema: 'public', table: 'accounts', callback: onDbChange).subscribe();
-    _transactionsChannel = _client.channel('public:transactions').onPostgresChanges(event: PostgresChangeEvent.all, schema: 'public', table: 'transactions', callback: onDbChange).subscribe();
+    developer.log('📡 [Repo] Setting up realtime subscriptions for accounts & transactions...', name: 'AccountRepository');
+    _subscriptionChannel ??= _client
+        .channel('public:all_tables_for_accounts_screen')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'accounts',
+          callback: (payload) => _fetchAccountsWithBalance(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'transactions',
+          callback: (payload) => _fetchAccountsWithBalance(),
+        )
+        .subscribe();
   }
 
   Future<void> forceRefresh() async {
-    developer.log('🔄 [Repo] Manual refresh requested.', name: 'AccountRepository');
+    developer.log('🔄 [Repo] Manual refresh requested for accounts.');
     await _fetchAccountsWithBalance();
   }
 
   void dispose() {
     developer.log('❌ [Repo] Disposing AccountRepository resources.', name: 'AccountRepository');
-    _accountsChannel?.unsubscribe();
-    _transactionsChannel?.unsubscribe();
+    if (_subscriptionChannel != null) {
+      _client.removeChannel(_subscriptionChannel!);
+      _subscriptionChannel = null;
+    }
     _accountsStreamController.close();
   }
 }

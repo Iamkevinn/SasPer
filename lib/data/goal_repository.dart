@@ -57,10 +57,13 @@ class GoalRepository {
     developer.log('💾 [Repo] Adding new goal: "$name"', name: 'GoalRepository');
     try {
       final userId = _client.auth.currentUser!.id;
+      // Somos explícitos sobre los valores iniciales.
       await _client.from('goals').insert({
         'user_id': userId,
         'name': name,
         'target_amount': targetAmount,
+        'current_amount': 0, // Aseguramos que el monto actual siempre empiece en 0.
+        'status': 'active',  // Aseguramos que el estado inicial siempre sea 'active'.
         'target_date': targetDate?.toIso8601String(),
         'icon_name': iconName,
       });

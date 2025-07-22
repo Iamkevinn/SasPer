@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:sasper/data/account_repository.dart';
+import 'package:sasper/data/budget_repository.dart';
 import 'package:sasper/data/dashboard_repository.dart';
 import 'package:sasper/data/transaction_repository.dart';
 import 'package:sasper/screens/dashboard_screen.dart';
@@ -54,7 +55,7 @@ class DevApp extends StatelessWidget {
         body: DashboardScreen(
           repository: dashboardRepository,
           accountRepository: accountRepository,
-          transactionRepository: transactionRepository,
+          transactionRepository: transactionRepository, budgetRepository: BudgetRepository(),
         ),
       ),
     );

@@ -1,12 +1,25 @@
-import 'dart:convert';
+// lib/screens/add_transaction_screen.dart (CORREGIDO Y REFACTORIZADO)
 
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
+import 'package:iconsax/iconsax.dart';
+import 'package:sasper/data/account_repository.dart';
+import 'package:sasper/data/transaction_repository.dart';
+import 'package:sasper/models/account_model.dart';
 import 'package:sasper/services/event_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:iconsax/iconsax.dart';
+
 class AddTransactionScreen extends StatefulWidget {
-  const AddTransactionScreen({super.key});
+  final TransactionRepository transactionRepository;
+  final AccountRepository accountRepository;
+
+  const AddTransactionScreen({
+    super.key,
+    required this.transactionRepository,
+    required this.accountRepository,
+  });
 
   @override
   State<AddTransactionScreen> createState() => _AddTransactionScreenState();
@@ -19,63 +32,75 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   String _transactionType = 'Gasto';
   String? _selectedCategory;
   bool _isLoading = false;
-  String? _selectedAccountId; 
-  final supabase = Supabase.instance.client;
+  String? _selectedAccountId;
+  
+  late Future<List<Account>> _accountsFuture;
 
-  final Map<String, IconData> _expenseCategories = { 'Comida': Iconsax.cup, 'Transporte': Iconsax.bus, 'Ocio': Iconsax.gameboy, 'Salud': Iconsax.health, 'Hogar': Iconsax.home, 'Compras': Iconsax.shopping_bag, 'Servicios': Iconsax.flash_1, };
-  final Map<String, IconData> _incomeCategories = { 'Sueldo': Iconsax.money_recive, 'Inversión': Iconsax.chart, 'Freelance': Iconsax.briefcase, 'Regalo': Iconsax.gift, 'Otro': Iconsax.category, };
+  final Map<String, IconData> _expenseCategories = { 'Comida': Iconsax.cup, 'Transporte': Iconsax.bus, 'Ocio': Iconsax.gameboy, 'Salud': Iconsax.health, 'Hogar': Iconsax.home, 'Compras': Iconsax.shopping_bag, 'Servicios': Iconsax.flash_1, 'Otro': Iconsax.category };
+  final Map<String, IconData> _incomeCategories = { 'Sueldo': Iconsax.money_recive, 'Inversión': Iconsax.chart, 'Freelance': Iconsax.briefcase, 'Regalo': Iconsax.gift, 'Otro': Iconsax.category_2 };
   Map<String, IconData> get _currentCategories => _transactionType == 'Gasto' ? _expenseCategories : _incomeCategories;
 
-  // En add_transaction_screen.dart
+  @override
+  void initState() {
+    super.initState();
+    _accountsFuture = widget.accountRepository.getAccounts();
+  }
 
   Future<void> _saveTransaction() async {
-    if (_formKey.currentState!.validate() && _selectedCategory != null && _selectedAccountId != null) {
-      setState(() => _isLoading = true);
+    if (!_formKey.currentState!.validate() || _selectedCategory == null || _selectedAccountId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Por favor, completa todos los campos requeridos.'), backgroundColor: Colors.orange));
+      return;
+    }
+    
+    setState(() => _isLoading = true);
+
+    double amount = (double.tryParse(_amountController.text.trim().replaceAll(',', '.')) ?? 0.0).abs();
+
+    if (_transactionType == 'Gasto') {
+      amount = -amount.abs();
+    } else {
+      amount = amount.abs();
+    }
+
+    try {
       
-      // --- CORRECCIÓN: Definimos las variables aquí ---
-      final String userId = supabase.auth.currentUser!.id;
-      final String categoryName = _selectedCategory!;
-      final String transactionType = _transactionType;
-      // --- FIN DE LA CORRECCIÓN ---
-
-      try {
-        await supabase.from('transactions').insert({
-          'user_id': userId,
-          'account_id': _selectedAccountId, 
-          'amount': double.parse(_amountController.text),
-          'type': transactionType,
-          'category': categoryName,
-          'description': _descriptionController.text.trim(),
-          'transaction_date': DateTime.now().toIso8601String(),
-        });
-        
-        // Ahora usamos las variables que definimos antes, que sí son accesibles aquí.
-        if (transactionType == 'Gasto') {
-          _checkBudgetOnBackend(
-            userId: userId,
-            categoryName: categoryName,
-          );
+      await widget.transactionRepository.addTransaction(
+        accountId: _selectedAccountId!,
+        amount: amount,
+        type: _transactionType,
+        category: _selectedCategory!,
+        description: _descriptionController.text.trim(),
+        transactionDate: DateTime.now(),
+      );
+      
+      if (mounted) {
+        final userId = Supabase.instance.client.auth.currentUser?.id;
+        if (_transactionType == 'Gasto') {
+          if (userId != null && _selectedCategory != null) {
+            _checkBudgetOnBackend(
+              userId: userId,
+              categoryName: _selectedCategory!,
+            );
+          }
         }
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('¡Transacción guardada!'), backgroundColor: Colors.green));
-          EventService.instance.fire(AppEvent.transactionsChanged);
-          Navigator.of(context).pop();
-        }
-      } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al guardar: $e'), backgroundColor: Colors.red));
-      } finally {
-        if (mounted) setState(() => _isLoading = false);
+        // Disparamos el evento específico para que el dashboard escuche.
+        EventService.instance.fire(AppEvent.transactionCreated);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('¡Transacción guardada!'), backgroundColor: Colors.green));
+        Navigator.of(context).pop(true);
       }
-    } else if (_selectedAccountId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Por favor, selecciona una cuenta'), backgroundColor: Colors.orange));
-    } else if (_selectedCategory == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Por favor, selecciona una categoría'), backgroundColor: Colors.orange));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al guardar: $e'), backgroundColor: Colors.red));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // La función _checkBudgetOnBackend no necesita cambios.
-  Future<void> _checkBudgetOnBackend({required String userId, required String categoryName}) async {
+  // Volvemos a añadir el userId y lo usamos en el body.
+  Future<void> _checkBudgetOnBackend({
+    required String userId, 
+    required String categoryName
+  }) async {
     final url = Uri.parse('https://sasper.onrender.com/check-budget-on-transaction');
     try {
       final response = await http.post(
@@ -92,6 +117,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     }
   }
 
+
   @override
   void dispose() {
     _amountController.dispose();
@@ -104,9 +130,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Añadir Transacción'), backgroundColor: Colors.transparent, elevation: 0),
+      appBar: AppBar(title: Text('Añadir Transacción', style: GoogleFonts.poppins())),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        padding: const EdgeInsets.all(16.0),
         child: Form(
           key: _formKey,
           child: Column(
@@ -115,16 +141,20 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               TextFormField(
                 controller: _amountController,
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 56, fontWeight: FontWeight.bold, color: _transactionType == 'Gasto' ? colorScheme.error : Colors.green.shade600),
+                style: GoogleFonts.poppins(fontSize: 56, fontWeight: FontWeight.bold, color: _transactionType == 'Gasto' ? colorScheme.error : Colors.green.shade600),
                 decoration: InputDecoration(
                   prefixText: '\$',
                   hintText: '0.00',
                   hintStyle: TextStyle(color: Colors.grey.withOpacity(0.5)),
                   border: InputBorder.none,
-                  prefixStyle: TextStyle(fontSize: 40, fontWeight: FontWeight.w300, color: _transactionType == 'Gasto' ? colorScheme.error.withOpacity(0.7) : Colors.green.shade600.withOpacity(0.7)),
+                  prefixStyle: GoogleFonts.poppins(fontSize: 40, fontWeight: FontWeight.w300, color: _transactionType == 'Gasto' ? colorScheme.error.withOpacity(0.7) : Colors.green.shade600.withOpacity(0.7)),
                 ),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                validator: (value) => (value == null || value.isEmpty || double.tryParse(value) == null) ? 'Introduce un monto válido' : null,
+                validator: (value) {
+                  if (value == null || value.isEmpty) return 'Introduce un monto';
+                  if (double.tryParse(value.replaceAll(',', '.')) == null) return 'Introduce un monto válido';
+                  return null;
+                },
               ),
 
               SegmentedButton<String>(
@@ -139,25 +169,23 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 }),
               ),
               const SizedBox(height: 24),
-
-              // --- SELECTOR DE CUENTA ---
-              // Ahora es uno de los primeros campos a rellenar, por su importancia
-              FutureBuilder<List<Map<String, dynamic>>>(
-                future: supabase.from('accounts').select('id, name').eq('user_id', supabase.auth.currentUser!.id).order('name'),
+              
+              FutureBuilder<List<Account>>(
+                future: _accountsFuture,
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) return const LinearProgressIndicator();
-                  if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
-                    return Text('No tienes cuentas. Crea una primero en la pestaña "Cuentas".', textAlign: TextAlign.center, style: TextStyle(color: colorScheme.error));
+                  if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: LinearProgressIndicator());
+                  if (snapshot.hasError) return Text('Error al cargar cuentas: ${snapshot.error}');
+                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return const Center(child: Text('No tienes cuentas. Crea una primero.'));
                   }
                   final accounts = snapshot.data!;
                   return DropdownButtonFormField<String>(
                     value: _selectedAccountId,
-                    decoration: const InputDecoration(labelText: 'Mover desde/hacia la cuenta', border: OutlineInputBorder(), prefixIcon: Icon(Iconsax.wallet_3)),
+                    decoration: InputDecoration(labelText: 'Cuenta', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), prefixIcon: const Icon(Iconsax.wallet_3)),
                     items: accounts.map((account) {
                       return DropdownMenuItem<String>(
-                        // --- CAMBIO 4: Aseguramos que el valor es un String ---
-                        value: account['id'].toString(), 
-                        child: Text(account['name']),
+                        value: account.id, 
+                        child: Text(account.name),
                       );
                     }).toList(),
                     onChanged: (value) => setState(() => _selectedAccountId = value),
@@ -167,14 +195,14 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               ),
               const SizedBox(height: 24),
 
-              const Text('Categorías', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              Text('Categorías', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8.0,
                 runSpacing: 8.0,
                 children: _currentCategories.entries.map((entry) {
                   return FilterChip(
-                    label: Text(entry.key),
+                    label: Text(entry.key, style: GoogleFonts.poppins()),
                     avatar: Icon(entry.value, color: _selectedCategory == entry.key ? colorScheme.onSecondaryContainer : colorScheme.onSurfaceVariant),
                     selected: _selectedCategory == entry.key,
                     onSelected: (selected) => setState(() => _selectedCategory = selected ? entry.key : null),
@@ -187,18 +215,19 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               
               TextFormField(
                 controller: _descriptionController,
-                decoration: const InputDecoration(labelText: 'Descripción (Opcional)', border: OutlineInputBorder(), prefixIcon: Icon(Iconsax.document_text)),
+                decoration: InputDecoration(labelText: 'Descripción (Opcional)', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), prefixIcon: const Icon(Iconsax.document_text)),
                 maxLines: 2,
               ),
               const SizedBox(height: 32),
               
               ElevatedButton.icon(
                 icon: _isLoading ? const SizedBox.shrink() : const Icon(Iconsax.send_1),
-                label: _isLoading ? const CircularProgressIndicator(strokeWidth: 2) : const Text('Guardar Transacción'),
+                label: _isLoading ? const CircularProgressIndicator(strokeWidth: 2, color: Colors.white) : const Text('Guardar Transacción'),
                 onPressed: _isLoading ? null : _saveTransaction,
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)
+                  textStyle: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
               const SizedBox(height: 20),

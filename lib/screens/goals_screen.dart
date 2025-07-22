@@ -6,7 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
-
+import 'package:sasper/screens/add_goal_screen.dart';
 import 'package:sasper/data/goal_repository.dart';
 import 'package:sasper/models/goal_model.dart';
 import 'package:sasper/widgets/goals/contribute_to_goal_dialog.dart';
@@ -32,6 +32,11 @@ class _GoalsScreenState extends State<GoalsScreen> {
     await Future.delayed(const Duration(milliseconds: 500));
   }
 
+  void navigateToAddGoal() {
+    Navigator.of(context).push(MaterialPageRoute(
+    builder: (_) => AddGoalScreen(goalRepository: widget.repository),
+    ));
+  }
   Future<void> _deleteGoal(String goalId, String goalName) async {
     try {
       await widget.repository.deleteGoal(goalId);
@@ -65,6 +70,14 @@ class _GoalsScreenState extends State<GoalsScreen> {
         centerTitle: false,
         elevation: 0,
         backgroundColor: Colors.transparent,
+        actions: [
+          // --- ¡BOTÓN AÑADIDO AQUÍ! ---
+          IconButton(
+          icon: const Icon(Iconsax.add_square),
+          tooltip: 'Añadir Meta',
+          onPressed: _navigateToAddGoal,
+          ),
+        ],
       ),
       body: StreamBuilder<List<Goal>>(
         stream: _goalsStream,
@@ -83,8 +96,8 @@ class _GoalsScreenState extends State<GoalsScreen> {
             return _buildEmptyState();
           }
 
-          final activeGoals = allGoals.where((g) => g.status == 'active').toList();
-          final completedGoals = allGoals.where((g) => g.status != 'active').toList();
+          final activeGoals = allGoals.where((g) => g.status == GoalStatus.active).toList();
+          final completedGoals = allGoals.where((g) => g.status != GoalStatus.active).toList();
 
           return RefreshIndicator(
             onRefresh: _handleRefresh,
@@ -106,6 +119,13 @@ class _GoalsScreenState extends State<GoalsScreen> {
         },
       ),
     );
+  }
+
+  // --- ¡DEFINICIÓN AÑADIDA AQUÍ! ---
+  void _navigateToAddGoal() {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => AddGoalScreen(goalRepository: widget.repository),
+    ));
   }
 
   Widget _buildGoalsList(List<Goal> goals, {bool isCompleted = false}) {

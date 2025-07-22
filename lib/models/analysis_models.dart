@@ -27,15 +27,15 @@ class ExpenseByCategory with EquatableMixin {
 
 class NetWorthDataPoint with EquatableMixin {
   final DateTime monthEnd;
-  final double netWorth;
+  final double totalBalance;
 
-  const NetWorthDataPoint({required this.monthEnd, required this.netWorth});
+  const NetWorthDataPoint({required this.monthEnd, required this.totalBalance});
 
   factory NetWorthDataPoint.fromJson(Map<String, dynamic> json) {
     try {
       return NetWorthDataPoint(
-        monthEnd: DateTime.parse(json['month_end'] as String),
-        netWorth: (json['net_worth'] as num? ?? 0).toDouble(),
+        monthEnd: DateTime.parse(json['month_end_text'] as String),
+        totalBalance: (json['total_balance'] as num? ?? 0).toDouble(),
       );
     } catch (e) {
       throw FormatException('Error al parsear NetWorthDataPoint: $e', json);
@@ -43,7 +43,7 @@ class NetWorthDataPoint with EquatableMixin {
   }
 
   @override
-  List<Object?> get props => [monthEnd, netWorth];
+  List<Object?> get props => [monthEnd, totalBalance];
 }
 
 class MonthlyCashflowData with EquatableMixin {
@@ -63,8 +63,8 @@ class MonthlyCashflowData with EquatableMixin {
     try {
       return MonthlyCashflowData(
         monthStart: DateTime.parse(json['month_start'] as String),
-        income: (json['income'] as num? ?? 0).toDouble(),
-        expense: (json['expense'] as num? ?? 0).toDouble(),
+        income: (json['total_income'] as num? ?? 0).toDouble(),
+        expense: (json['total_expense'] as num? ?? 0).toDouble(),
         cashFlow: (json['cash_flow'] as num? ?? 0).toDouble(),
       );
     } catch (e) {
