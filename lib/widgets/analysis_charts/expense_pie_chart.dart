@@ -4,8 +4,8 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
-import '../../models/analysis_models.dart';
-import '../shared/empty_state_card.dart';
+import 'package:sasper/models/analysis_models.dart';
+import 'package:sasper/widgets/shared/empty_state_card.dart';
 
 class ExpensePieChart extends StatefulWidget { // 1. Convertido a StatefulWidget para manejar el estado del toque
   final List<ExpenseByCategory> data;
@@ -163,7 +163,7 @@ class _ExpensePieChartState extends State<ExpensePieChart> {
         ],
       ),
       child: Text(
-        '${category}\n${NumberFormat.currency(locale: 'es_CO', symbol: '\$').format(amount)}',
+        '$category\n${NumberFormat.currency(locale: 'es_CO', symbol: '\$').format(amount)}',
         textAlign: TextAlign.center,
         style: const TextStyle(
           color: Colors.white,

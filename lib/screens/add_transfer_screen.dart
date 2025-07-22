@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 
-import '../data/account_repository.dart';
-import '../models/account_model.dart';
-import '../services/event_service.dart';
+import 'package:sasper/data/account_repository.dart';
+import 'package:sasper/models/account_model.dart';
+import 'package:sasper/services/event_service.dart';
 
 class AddTransferScreen extends StatefulWidget {
   // Ahora recibe el repositorio, siguiendo nuestra arquitectura.

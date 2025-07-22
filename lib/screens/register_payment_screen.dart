@@ -5,11 +5,11 @@ import 'package:google_fonts/google_fonts.dart'; // Fuente consistente
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 
-import '../data/account_repository.dart'; // <-- Usamos el repo
-import '../data/debt_repository.dart';   // <-- Usamos el repo
-import '../models/account_model.dart';
-import '../models/debt_model.dart';
-import '../services/event_service.dart'; // Para refrescar la UI global
+import 'package:sasper/data/account_repository.dart'; // <-- Usamos el repo
+import 'package:sasper/data/debt_repository.dart';   // <-- Usamos el repo
+import 'package:sasper/models/account_model.dart';
+import 'package:sasper/models/debt_model.dart';
+import 'package:sasper/services/event_service.dart'; // Para refrescar la UI global
 
 class RegisterPaymentScreen extends StatefulWidget {
   final Debt debt;

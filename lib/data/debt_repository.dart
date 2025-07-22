@@ -3,10 +3,7 @@
 import 'dart:async';
 import 'dart:developer' as developer;
 import 'package:supabase_flutter/supabase_flutter.dart';
-
-
-import '../models/debt_model.dart';
-// import '../services/event_service.dart'; // Ya no es necesario con streams reactivos
+import 'package:sasper/models/debt_model.dart';
 
 class DebtRepository {
   final SupabaseClient _client;

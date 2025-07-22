@@ -8,8 +8,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 // Asumimos que tienes un archivo de config para la URL base de tu API
-import '../config/app_config.dart'; 
-import '../firebase_options.dart';
+import 'package:sasper/config/app_config.dart'; 
+import 'package:sasper/firebase_options.dart';
 
 // La función de background handler se mantiene igual.
 @pragma('vm:entry-point')

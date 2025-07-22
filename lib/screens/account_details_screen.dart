@@ -5,10 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:sasper/data/transaction_repository.dart';
-import '../data/account_repository.dart';
-import '../models/account_model.dart';
-import '../models/transaction_models.dart';
-import '../widgets/shared/transaction_tile.dart';
+import 'package:sasper/data/account_repository.dart';
+import 'package:sasper/models/account_model.dart';
+import 'package:sasper/models/transaction_models.dart';
+import 'package:sasper/widgets/shared/transaction_tile.dart';
 import 'edit_transaction_screen.dart';
 
 class AccountDetailsScreen extends StatefulWidget {

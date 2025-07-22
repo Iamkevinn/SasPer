@@ -2,7 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../../models/budget_models.dart';
+import 'package:sasper/models/budget_models.dart';
 
 class BudgetCard extends StatelessWidget {
   final BudgetProgress budget;

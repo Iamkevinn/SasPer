@@ -1,14 +1,13 @@
 // lib/widgets/goals/contribute_to_goal_dialog.dart
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../data/account_repository.dart'; // Asumimos que tienes un AccountRepository
-import '../../models/account_model.dart';
-import '../../models/goal_model.dart';
-// import '../../services/goal_service.dart'; // Idealmente, la lógica de RPC iría aquí
+import 'package:sasper/data/account_repository.dart'; // Asumimos que tienes un AccountRepository
+import 'package:sasper/models/account_model.dart';
+import 'package:sasper/models/goal_model.dart';
+// import 'package:sasperpackage:sasperservices/goal_service.dart'; // Idealmente, la lógica de RPC iría aquí
 
 class ContributeToGoalDialog extends StatefulWidget {
   final Goal goal;

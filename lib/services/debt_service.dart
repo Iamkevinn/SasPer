@@ -3,8 +3,8 @@
 import 'dart:async';
 import 'dart:developer' as developer;
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../models/debt_model.dart';
-import '../services/event_service.dart'; // Para notificar cambios
+import 'package:sasper/models/debt_model.dart';
+import 'package:sasper/services/event_service.dart'; // Para notificar cambios
 
 class DebtService {
   final SupabaseClient _client;

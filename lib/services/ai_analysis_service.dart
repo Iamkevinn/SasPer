@@ -7,7 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 // Asumimos que has creado este archivo de configuración
-import '../config/app_config.dart'; 
+import 'package:sasper/config/app_config.dart'; 
 
 class AiAnalysisService {
   final http.Client _httpClient;

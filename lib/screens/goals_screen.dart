@@ -7,9 +7,9 @@ import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
 
-import '../data/goal_repository.dart';
-import '../models/goal_model.dart';
-import '../widgets/goals/contribute_to_goal_dialog.dart';
+import 'package:sasper/data/goal_repository.dart';
+import 'package:sasper/models/goal_model.dart';
+import 'package:sasper/widgets/goals/contribute_to_goal_dialog.dart';
 
 class GoalsScreen extends StatefulWidget {
   final GoalRepository repository;

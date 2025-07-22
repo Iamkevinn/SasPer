@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 
 // Importamos la configuración y el nuevo repositorio
-import '../config/app_constants.dart';
-import '../data/budget_repository.dart';
+import 'package:sasper/config/app_constants.dart';
+import 'package:sasper/data/budget_repository.dart';
 
 class AddBudgetScreen extends StatefulWidget {
   const AddBudgetScreen({super.key});

@@ -2,10 +2,10 @@
 
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
-import '../../models/budget_models.dart';
-import '../../screens/budgets_screen.dart';
-import '../shared/budget_card.dart';
-import '../shared/empty_state_card.dart'; // Importamos el empty state
+import 'package:sasper/models/budget_models.dart';
+import 'package:sasper/screens/budgets_screen.dart';
+import 'package:sasper/widgets/shared/budget_card.dart';
+import 'package:sasper/widgets/shared/empty_state_card.dart'; // Importamos el empty state
 
 class BudgetsSection extends StatelessWidget {
   final List<BudgetProgress> budgets;

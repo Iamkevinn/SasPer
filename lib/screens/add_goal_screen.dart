@@ -4,8 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart'; // Para consistencia de UI
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
-
-import '../data/goal_repository.dart';
+import 'package:sasper/data/goal_repository.dart';
 
 class AddGoalScreen extends StatefulWidget {
   // --- ¡CAMBIO CLAVE! ---

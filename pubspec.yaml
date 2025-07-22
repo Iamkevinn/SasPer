@@ -20,11 +20,11 @@ dependencies:
   supabase_flutter: ^2.5.2
 
   # Herramientas de formato y utilidades
-  intl: ^0.19.0
+  intl: ^0.20.2
   http: ^1.2.1
 
   # UI y Gráficos
-  fl_chart: ^0.68.0
+  fl_chart: ^1.0.0 
   google_fonts: ^6.2.1
   iconsax: ^0.0.8
 
@@ -38,14 +38,14 @@ dependencies:
   dynamic_color: ^1.7.0
   
   # Widget de la pantalla de inicio
-  home_widget: ^0.5.0
+  home_widget: ^0.8.0
   
   # Para mostrar texto con formato (Markdown)
   flutter_markdown: ^0.7.1
   
-  # Dependencias para Notificaciones Push (listos para el siguiente paso)
-  firebase_core: ^2.32.0 
-  firebase_messaging: ^14.9.3
+  # Dependencias para Notificaciones Push
+  firebase_core: ^3.15.2
+  firebase_messaging: ^15.2.10
   connectivity_plus: ^6.0.3
   equatable: ^2.0.5
 
@@ -55,10 +55,10 @@ dev_dependencies:
     sdk: flutter
 
   # Paquete para generar los íconos de la aplicación.
-  flutter_launcher_icons: ^0.13.1
+  flutter_launcher_icons: ^0.14.4
 
   # Herramientas para asegurar un código limpio y consistente.
-  flutter_lints: ^4.0.0
+  flutter_lints: ^6.0.0
 
 # Configuración específica de Flutter.
 flutter:

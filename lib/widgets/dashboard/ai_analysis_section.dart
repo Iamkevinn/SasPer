@@ -3,7 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:iconsax/iconsax.dart';
-import '../../services/ai_analysis_service.dart';
+import 'package:sasper/services/ai_analysis_service.dart';
 
 // 1. Enum para representar los estados de forma explícita
 enum AiAnalysisState { initial, loading, success, error }

@@ -5,8 +5,8 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
-import '../../models/analysis_models.dart';
-import '../shared/empty_state_card.dart';
+import 'package:sasper/models/analysis_models.dart';
+import 'package:sasper/widgets/shared/empty_state_card.dart';
 
 class NetWorthTrendChart extends StatelessWidget {
   final List<NetWorthDataPoint> data;
@@ -160,8 +160,8 @@ class NetWorthTrendChart extends StatelessWidget {
     
     final title = DateFormat.MMM('es_CO').format(data[index].monthEnd);
     return SideTitleWidget(
-      axisSide: meta.axisSide,
       space: 8.0,
+      meta: meta,
       child: Text(title, style: textTheme.bodySmall),
     );
   }

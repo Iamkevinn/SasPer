@@ -4,7 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:developer' as developer;
 import 'dart:async';
 
-import '../models/goal_model.dart'; // Asegúrate de importar tu modelo Goal
+import 'package:sasper/models/goal_model.dart'; // Asegúrate de importar tu modelo Goal
 
 class GoalRepository {
   final SupabaseClient _client;

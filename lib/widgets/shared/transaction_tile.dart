@@ -6,7 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 
-import '../../models/transaction_models.dart';
+import 'package:sasper/models/transaction_models.dart';
 
 class TransactionTile extends StatelessWidget {
   final Transaction transaction;

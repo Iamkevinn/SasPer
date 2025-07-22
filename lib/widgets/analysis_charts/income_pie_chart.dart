@@ -4,8 +4,8 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
-import '../../models/analysis_models.dart';
-import '../shared/empty_state_card.dart';
+import 'package:sasper/models/analysis_models.dart';
+import 'package:sasper/widgets/shared/empty_state_card.dart';
 
 class IncomePieChart extends StatefulWidget {
   final List<IncomeByCategory> data;

@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
-import '../../models/transaction_models.dart';
-import '../shared/empty_state_card.dart';
-import '../shared/transaction_tile.dart';
+import 'package:sasper/models/transaction_models.dart';
+import 'package:sasper/widgets/shared/empty_state_card.dart';
+import 'package:sasper/widgets/shared/transaction_tile.dart';
 
 class RecentTransactionsSection extends StatelessWidget {
   final List<Transaction> transactions;

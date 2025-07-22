@@ -6,12 +6,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 
 // Importamos la arquitectura limpia
-import '../data/account_repository.dart';
-import '../data/debt_repository.dart';
-import '../models/debt_model.dart';
-import '../widgets/debts/debt_card.dart';
-import '../widgets/shared/empty_state_card.dart';
-import 'add_debt_screen.dart';
+import 'package:sasper/data/account_repository.dart';
+import 'package:sasper/data/debt_repository.dart';
+import 'package:sasper/models/debt_model.dart';
+import 'package:sasper/widgets/debts/debt_card.dart';
+import 'package:sasper/widgets/shared/empty_state_card.dart';
 import 'register_payment_screen.dart';
 
 class DebtsScreen extends StatefulWidget {

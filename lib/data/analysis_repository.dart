@@ -1,7 +1,7 @@
 import 'dart:developer' as developer;
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../models/analysis_models.dart';
+import 'package:sasper/models/analysis_models.dart';
 
 class AnalysisRepository {
   final SupabaseClient _client;

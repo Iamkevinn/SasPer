@@ -8,13 +8,13 @@ import 'package:shimmer/shimmer.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 
 import 'account_details_screen.dart';
-import '../data/account_repository.dart';
-import '../data/transaction_repository.dart';
-import '../models/account_model.dart';
+import 'package:sasper/data/account_repository.dart';
+import 'package:sasper/data/transaction_repository.dart';
+import 'package:sasper/models/account_model.dart';
 import 'add_account_screen.dart';
 import 'add_transfer_screen.dart';
-import '../widgets/accounts/projection_card.dart';
-import '../widgets/shared/empty_state_card.dart';
+import 'package:sasper/widgets/accounts/projection_card.dart';
+import 'package:sasper/widgets/shared/empty_state_card.dart';
 
 class AccountsScreen extends StatefulWidget {
   // Recibe las dependencias, no crea las suyas.

@@ -6,11 +6,11 @@ import 'package:intl/intl.dart';
 
 // --- ¡CAMBIO CLAVE! ---
 // Solo importamos los repositorios y modelos, no los servicios.
-import '../data/account_repository.dart';
-import '../data/debt_repository.dart';
-import '../models/account_model.dart';
-import '../models/debt_model.dart';
-import '../services/event_service.dart';
+import 'package:sasper/data/account_repository.dart';
+import 'package:sasper/data/debt_repository.dart';
+import 'package:sasper/models/account_model.dart';
+import 'package:sasper/models/debt_model.dart';
+import 'package:sasper/services/event_service.dart';
 
 class AddDebtScreen extends StatefulWidget {
   // --- ¡CAMBIO CLAVE! ---

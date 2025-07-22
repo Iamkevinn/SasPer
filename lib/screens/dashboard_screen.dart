@@ -10,15 +10,15 @@ import 'package:sasper/models/transaction_models.dart';
 import 'package:sasper/screens/edit_transaction_screen.dart';
 import 'package:shimmer/shimmer.dart';
 
-import '../data/dashboard_repository.dart';
-import '../models/dashboard_data_model.dart';
-import '../services/event_service.dart';
-import '../services/widget_service.dart';
-import '../widgets/dashboard/ai_analysis_section.dart';
-import '../widgets/dashboard/balance_card.dart';
-import '../widgets/dashboard/budgets_section.dart';
-import '../widgets/dashboard/dashboard_header.dart';
-import '../widgets/dashboard/recent_transactions_section.dart';
+import 'package:sasper/data/dashboard_repository.dart';
+import 'package:sasper/models/dashboard_data_model.dart';
+import 'package:sasper/services/event_service.dart';
+import 'package:sasper/services/widget_service.dart';
+import 'package:sasper/widgets/dashboard/ai_analysis_section.dart';
+import 'package:sasper/widgets/dashboard/balance_card.dart';
+import 'package:sasper/widgets/dashboard/budgets_section.dart';
+import 'package:sasper/widgets/dashboard/dashboard_header.dart';
+import 'package:sasper/widgets/dashboard/recent_transactions_section.dart';
 
 class DashboardScreen extends StatefulWidget {
   final DashboardRepository repository;

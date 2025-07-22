@@ -5,10 +5,10 @@ import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 
 // Importamos la arquitectura limpia
-import '../data/budget_repository.dart';
-import '../models/budget_models.dart';
+import 'package:sasper/data/budget_repository.dart';
+import 'package:sasper/models/budget_models.dart';
 import 'add_budget_screen.dart';
-import '../widgets/shared/empty_state_card.dart';
+import 'package:sasper/widgets/shared/empty_state_card.dart';
 
 class BudgetsScreen extends StatefulWidget {
   const BudgetsScreen({super.key});

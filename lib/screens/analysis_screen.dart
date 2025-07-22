@@ -5,19 +5,17 @@ import 'package:shimmer/shimmer.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'; // Importante
 
-import '../data/analysis_repository.dart';
-import '../models/analysis_models.dart';
-// ELIMINADO: Ya no necesitamos EventService
-// import '../services/event_service.dart';
+import 'package:sasper/data/analysis_repository.dart';
+import 'package:sasper/models/analysis_models.dart';
 
-import '../widgets/analysis_charts/heatmap_section.dart';
-import '../widgets/analysis_charts/monthly_cashflow_chart.dart';
-import '../widgets/analysis_charts/net_worth_trend_chart.dart';
-import '../widgets/analysis_charts/income_expense_bar_chart.dart';
-import '../widgets/analysis_charts/category_comparison_chart.dart';
-import '../widgets/analysis_charts/expense_pie_chart.dart';
-import '../widgets/analysis_charts/income_pie_chart.dart';
-import '../widgets/shared/empty_state_card.dart';
+import 'package:sasper/widgets/analysis_charts/heatmap_section.dart';
+import 'package:sasper/widgets/analysis_charts/monthly_cashflow_chart.dart';
+import 'package:sasper/widgets/analysis_charts/net_worth_trend_chart.dart';
+import 'package:sasper/widgets/analysis_charts/income_expense_bar_chart.dart';
+import 'package:sasper/widgets/analysis_charts/category_comparison_chart.dart';
+import 'package:sasper/widgets/analysis_charts/expense_pie_chart.dart';
+import 'package:sasper/widgets/analysis_charts/income_pie_chart.dart';
+import 'package:sasper/widgets/shared/empty_state_card.dart';
 
 class AnalysisScreen extends StatefulWidget {
   const AnalysisScreen({super.key});

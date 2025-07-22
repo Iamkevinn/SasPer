@@ -3,7 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
-import '../data/account_repository.dart'; // Importamos el repositorio
+import 'package:sasper/data/account_repository.dart'; // Importamos el repositorio
 
 class AddAccountScreen extends StatefulWidget {
   // 1. AÑADIDO: El widget ahora recibe el repositorio.

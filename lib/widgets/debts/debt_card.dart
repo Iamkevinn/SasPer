@@ -3,7 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
-import '../../models/debt_model.dart';
+import 'package:sasper/models/debt_model.dart';
 
 class DebtCard extends StatelessWidget {
   final Debt debt;

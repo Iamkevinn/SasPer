@@ -1,6 +1,6 @@
 // lib/widgets/analysis_charts/heatmap_section.dart
 
-import 'dart:math'; // Para encontrar el mínimo de forma eficiente
+// Para encontrar el mínimo de forma eficiente
 import 'package:flutter/material.dart';
 import 'package:flutter_heatmap_calendar/flutter_heatmap_calendar.dart';
 import 'package:iconsax/iconsax.dart';

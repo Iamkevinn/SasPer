@@ -6,7 +6,7 @@ import 'dart:developer' as developer;
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../models/budget_models.dart';
+import 'package:sasper/models/budget_models.dart';
 
 class BudgetRepository {
   final SupabaseClient _client;

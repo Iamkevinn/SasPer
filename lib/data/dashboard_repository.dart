@@ -1,7 +1,7 @@
 // lib/data/dashboard_repository.dart
 import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../models/dashboard_data_model.dart';
+import 'package:sasper/models/dashboard_data_model.dart';
 import 'dart:developer' as developer;
 
 class DashboardRepository {

@@ -10,14 +10,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:async';
 
 // Repositorios
-import '../data/auth_repository.dart';
-import '../data/dashboard_repository.dart';
-import '../data/goal_repository.dart';
-import '../data/debt_repository.dart';
-import '../data/account_repository.dart';
+import 'package:sasper/data/auth_repository.dart';
+import 'package:sasper/data/dashboard_repository.dart';
+import 'package:sasper/data/goal_repository.dart';
+import 'package:sasper/data/debt_repository.dart';
+import 'package:sasper/data/account_repository.dart';
 
 // Servicios
-import '../services/event_service.dart';
+import 'package:sasper/services/event_service.dart';
 
 // Pantallas
 import 'accounts_screen.dart';
@@ -31,7 +31,7 @@ import 'goals_screen.dart';
 import 'settings_screen.dart';
 
 // Utilidades
-import '../utils/custom_page_route.dart';
+import 'package:sasper/utils/custom_page_route.dart';
 
 
 class MainScreen extends StatefulWidget {

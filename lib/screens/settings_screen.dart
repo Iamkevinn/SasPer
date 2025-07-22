@@ -5,7 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../data/auth_repository.dart'; // <-- ¡IMPORTANTE!
+import 'package:sasper/data/auth_repository.dart'; // <-- ¡IMPORTANTE!
 
 class SettingsScreen extends StatefulWidget {
   // Ahora requiere el AuthRepository
