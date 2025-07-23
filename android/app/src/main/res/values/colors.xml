@@ -1,0 +1,4 @@
+<!-- android/app/src/main/res/values/colors.xml (CORREGIDO) -->
+<resources>
+    <color name="widget_fallback_background">#EFEFEF</color>
+</resources> <!-- Se corrigió '}' por '</resources>' -->

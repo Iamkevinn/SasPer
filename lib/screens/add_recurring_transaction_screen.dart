@@ -88,7 +88,7 @@ class _AddRecurringTransactionScreenState extends State<AddRecurringTransactionS
         interval: 1, // Por simplicidad, puedes añadir un campo para esto
         startDate: _startDate,
       );
-      if (mounted) Navigator.of(context).pop();
+      if (mounted) Navigator.of(context).pop(true);
     }
   }
 }

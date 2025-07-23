@@ -1,6 +1,7 @@
 // lib/screens/main_screen.dart (VERSIÓN FINAL CON UX MEJORADA)
 
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -36,7 +37,8 @@ import 'debts_screen.dart';
 import 'goals_screen.dart';
 import 'settings_screen.dart';
 // Utilidades
-import '../utils/custom_page_route.dart';
+import 'package:sasper/utils/custom_page_route.dart';
+import 'package:app_links/app_links.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -46,7 +48,6 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
-
   late final DashboardRepository _dashboardRepository;
   late final GoalRepository _goalRepository;
   late final AuthRepository _authRepository;
@@ -56,7 +57,8 @@ class _MainScreenState extends State<MainScreen> {
   late final BudgetRepository _budgetRepository;
   late StreamSubscription<AppEvent> _eventSubscription;
   late final RecurringRepository _recurringRepository;
-
+  late final AppLinks _appLinks;
+  late final StreamSubscription<Uri?> _linkSub;
   late final List<Widget> _widgetOptions;
 
   @override
@@ -90,7 +92,19 @@ class _MainScreenState extends State<MainScreen> {
       ),
       SettingsScreen(authRepository: _authRepository),
     ];
-
+    
+    _initDeepLinks();
+    _linkSub = _appLinks.uriLinkStream.listen(
+      (Uri? uri) {
+        if (uri != null && mounted) {
+          print('Deep link recibido: $uri');
+          _handleIncomingLink(uri);
+        }
+      },
+      onError: (err) {
+        debugPrint('Error en deep link stream: $err');
+      },
+    );
     _eventSubscription = EventService.instance.eventStream.listen((event) {
       final refreshEvents = {
         AppEvent.transactionsChanged, AppEvent.transactionUpdated, AppEvent.transactionDeleted,
@@ -110,6 +124,7 @@ class _MainScreenState extends State<MainScreen> {
     _accountRepository.dispose();
     _budgetRepository.dispose();
     _eventSubscription.cancel();
+    _linkSub.cancel(); 
     super.dispose();
   }
 
@@ -119,6 +134,38 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
+  /// Revisa si la app fue abierta desde un estado "terminado" con un enlace.
+  void _initDeepLinks() {
+  _appLinks = AppLinks();
+  
+  // 1) Nos suscribimos al mismo stream para el enlace inicial y todos los siguientes
+  _appLinks.uriLinkStream.listen(
+    (uri) {
+      if (uri != null && mounted) {
+        if (kDebugMode) {
+          print('Deep link recibido: $uri');
+        }
+        _handleIncomingLink(uri);
+      }
+    },
+    onError: (err) {
+      debugPrint('Error en deep link stream: $err');
+    },
+  );
+}
+
+
+  // Este método no cambia, ya estaba bien.
+  void _handleIncomingLink(Uri uri) {
+    if (uri.scheme == 'sasper' && uri.host == 'add_transaction') {
+      if (kDebugMode) {
+        print('Navegando a Añadir Transacción...');
+      }
+      _navigateToAddTransaction();
+    }
+  }
+
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -140,8 +187,17 @@ class _MainScreenState extends State<MainScreen> {
     );
 }
 
-  void _navigateToAddTransaction() {
-    Navigator.of(context).push(FadePageRoute(child: AddTransactionScreen(transactionRepository: _transactionRepository, accountRepository: _accountRepository)));
+   void _navigateToAddTransaction() {
+    // Usamos un Future.delayed para asegurar que la navegación ocurra después
+    // de que el frame inicial de la app se haya construido.
+    Future.delayed(const Duration(milliseconds: 100), () {
+      Navigator.of(context).push(FadePageRoute(
+        child: AddTransactionScreen(
+          transactionRepository: _transactionRepository,
+          accountRepository: _accountRepository,
+        ),
+      ));
+    });
   }
 
   Widget _buildBottomNavBar() {
