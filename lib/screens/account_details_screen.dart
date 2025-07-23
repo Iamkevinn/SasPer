@@ -8,6 +8,8 @@ import 'package:sasper/data/transaction_repository.dart';
 import 'package:sasper/data/account_repository.dart';
 import 'package:sasper/models/account_model.dart';
 import 'package:sasper/models/transaction_models.dart';
+import 'package:sasper/utils/NotificationHelper.dart';
+import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:sasper/widgets/shared/transaction_tile.dart';
 import 'edit_transaction_screen.dart';
 
@@ -106,14 +108,22 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
       try {
         await widget.transactionRepository.deleteTransaction(transaction.id);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Transacción eliminada'), backgroundColor: Colors.blueAccent));
+          NotificationHelper.show(
+            context: context,
+            message: 'Transacción eliminada correctamente.',
+            type: NotificationType.success,
+          );
           _loadData(); // Recargamos TODOS los datos
           widget.accountRepository.forceRefresh();
         }
         return true;
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al eliminar: $e'), backgroundColor: Theme.of(context).colorScheme.error));
+          NotificationHelper.show(
+            context: context,
+            message: 'Error al eliminar la transacción.',
+            type: NotificationType.error,
+          );
         }
         return false;
       }

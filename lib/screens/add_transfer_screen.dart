@@ -7,6 +7,8 @@ import 'package:iconsax/iconsax.dart';
 import 'package:sasper/data/account_repository.dart';
 import 'package:sasper/models/account_model.dart';
 import 'package:sasper/services/event_service.dart';
+import 'package:sasper/utils/NotificationHelper.dart';
+import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 
 class AddTransferScreen extends StatefulWidget {
   // Ahora recibe el repositorio, siguiendo nuestra arquitectura.
@@ -46,11 +48,19 @@ class _AddTransferScreenState extends State<AddTransferScreen> {
     if (!_formKey.currentState!.validate()) return;
     
     if (_fromAccount == null || _toAccount == null) {
-       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Debes seleccionar ambas cuentas.'), backgroundColor: Colors.orange));
+       NotificationHelper.show(
+            context: context,
+            message: 'Debes seleccionar ambas cuentas.',
+            type: NotificationType.error,
+          );
        return;
     }
     if (_fromAccount!.id == _toAccount!.id) {
-       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No puedes transferir a la misma cuenta.'), backgroundColor: Colors.orange));
+       NotificationHelper.show(
+            context: context,
+            message: 'No puedes transferir a la misma cuenta.',
+            type: NotificationType.error,
+          );
        return;
     }
 
@@ -71,13 +81,21 @@ class _AddTransferScreenState extends State<AddTransferScreen> {
         
         EventService.instance.fire(AppEvent.transactionsChanged);
 
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Transferencia realizada con éxito'), backgroundColor: Colors.green));
+        NotificationHelper.show(
+            context: context,
+            message: 'Transacción realizada con exito!',
+            type: NotificationType.success,
+          );
         Navigator.of(context).pop();
       }
 
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: Theme.of(context).colorScheme.error));
+        NotificationHelper.show(
+            context: context,
+            message: 'Error al realizar la transacción.',
+            type: NotificationType.error,
+          );
       }
     } finally {
       if (mounted) {

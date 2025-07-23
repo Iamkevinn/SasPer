@@ -9,6 +9,8 @@ import 'package:sasper/data/account_repository.dart';
 import 'package:sasper/data/recurring_repository.dart';
 import 'package:sasper/models/recurring_transaction_model.dart';
 import 'package:sasper/screens/add_recurring_transaction_screen.dart';
+import 'package:sasper/utils/NotificationHelper.dart';
+import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:sasper/widgets/shared/empty_state_card.dart';
 
 // Enum para definir los estados visuales de un gasto fijo.
@@ -47,9 +49,11 @@ class _RecurringTransactionsScreenState extends State<RecurringTransactionsScree
     ));
 
     if (result == true && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Gasto fijo programado con éxito.'), backgroundColor: Colors.green),
-      );
+      NotificationHelper.show(
+            context: context,
+            message: 'Gasto fijo creado correctamente.',
+            type: NotificationType.success,
+          );
     }
   }
 
@@ -69,20 +73,24 @@ class _RecurringTransactionsScreenState extends State<RecurringTransactionsScree
     }
   }
   
-  // Elimina un gasto fijo y muestra un SnackBar.
+  // Elimina un gasto fijo y muestra una notificación.
   Future<void> _deleteItem(RecurringTransaction item) async {
     try {
       await widget.repository.deleteRecurringTransaction(item.id);
       if(mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('"${item.description}" eliminado.'), backgroundColor: Colors.blueAccent),
-        );
+        NotificationHelper.show(
+            context: context,
+            message: '"${item.description}" eliminado.',
+            type: NotificationType.error,
+          );
       }
     } catch (e) {
       if(mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al eliminar: $e'), backgroundColor: Colors.red),
-        );
+        NotificationHelper.show(
+            context: context,
+            message: 'Error al eliminar "${e.toString()}"',
+            type: NotificationType.error,
+          );
       }
     }
   }

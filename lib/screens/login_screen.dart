@@ -2,7 +2,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:sasper/data/auth_repository.dart'; // <-- ¡IMPORTANTE!
+import 'package:sasper/data/auth_repository.dart';
+import 'package:sasper/utils/NotificationHelper.dart';
+import 'package:sasper/widgets/shared/custom_notification_widget.dart'; // <-- ¡IMPORTANTE!
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -31,12 +33,15 @@ class _LoginScreenState extends State<LoginScreen> {
         _emailController.text.trim(),
         _passwordController.text.trim(),
       );
+      
       // El AuthGate se encargará de redirigir
     } catch (e) {
       if(mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: Theme.of(context).colorScheme.error),
-        );
+       NotificationHelper.show(
+            context: context,
+            message: e.toString(),
+            type: NotificationType.error,
+          );
       }
     } finally {
       if (mounted) {
@@ -55,15 +60,19 @@ class _LoginScreenState extends State<LoginScreen> {
         _passwordController.text.trim(),
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('¡Registro exitoso! Revisa tu email para confirmar.'), backgroundColor: Colors.green),
-        );
+        NotificationHelper.show(
+            context: context,
+            message: 'Registro exitoso! Revisa tu correo electronico',
+            type: NotificationType.success,
+          );
       }
     } catch (e) {
       if(mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: Theme.of(context).colorScheme.error),
-        );
+        NotificationHelper.show(
+            context: context,
+            message: e.toString(),
+            type: NotificationType.error,
+          );
       }
     } finally {
       if (mounted) {

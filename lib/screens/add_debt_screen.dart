@@ -11,6 +11,8 @@ import 'package:sasper/data/debt_repository.dart';
 import 'package:sasper/models/account_model.dart';
 import 'package:sasper/models/debt_model.dart';
 import 'package:sasper/services/event_service.dart';
+import 'package:sasper/utils/NotificationHelper.dart';
+import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 
 class AddDebtScreen extends StatefulWidget {
   // --- ¡CAMBIO CLAVE! ---
@@ -60,7 +62,11 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedAccount == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Por favor, selecciona una cuenta.'), backgroundColor: Colors.orange));
+      NotificationHelper.show(
+            context: context,
+            message: 'Porfavor seleccionar una cuenta.',
+            type: NotificationType.error,
+          );
       return;
     }
 
@@ -84,12 +90,20 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
       // Solo necesitamos notificar al Dashboard que las transacciones cambiaron.
       EventService.instance.fire(AppEvent.transactionsChanged);
 
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('¡Operación guardada!'), backgroundColor: Colors.green));
+      NotificationHelper.show(
+            context: context,
+            message: 'Operación guardada!',
+            type: NotificationType.success,
+          );
       Navigator.of(context).pop();
 
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: Theme.of(context).colorScheme.error));
+      NotificationHelper.show(
+            context: context,
+            message: 'Error al guardar la transacción.',
+            type: NotificationType.error,
+          );
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);

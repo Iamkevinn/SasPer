@@ -76,7 +76,7 @@ class NotificationService {
       developer.log('🔔 Message received in foreground!', name: 'NotificationService');
       if (message.notification != null) {
         developer.log('Notification: ${message.notification!.title} - ${message.notification!.body}', name: 'NotificationService');
-        // Aquí podrías mostrar un SnackBar o un diálogo en la app.
+        // Aquí podrías mostrar una notificación o un diálogo en la app.
       }
     });
 

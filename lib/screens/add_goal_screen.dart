@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart'; // Para consistencia de UI
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 import 'package:sasper/data/goal_repository.dart';
+import 'package:sasper/utils/NotificationHelper.dart';
+import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 
 class AddGoalScreen extends StatefulWidget {
   // --- ¡CAMBIO CLAVE! ---
@@ -59,19 +61,20 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('¡Meta creada con éxito!'), backgroundColor: Colors.green),
-        );
+        NotificationHelper.show(
+            context: context,
+            message: 'Meta creada con exito!',
+            type: NotificationType.success,
+          );
         Navigator.of(context).pop();
       }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(error.toString()),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        NotificationHelper.show(
+            context: context,
+            message: 'Error al crear meta.',
+            type: NotificationType.error,
+          );
       }
     } finally {
       if (mounted) {

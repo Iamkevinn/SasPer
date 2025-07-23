@@ -2,6 +2,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:sasper/utils/NotificationHelper.dart';
+import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:sasper/data/account_repository.dart'; // Asumimos que tienes un AccountRepository
@@ -63,18 +65,19 @@ class _ContributeToGoalDialogState extends State<ContributeToGoalDialog> {
       if (mounted) {
         Navigator.of(context).pop();
         widget.onSuccess();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('¡Aportación realizada!'), backgroundColor: Colors.green),
-        );
+        NotificationHelper.show(
+            context: context,
+            message: 'Aportación realizada!',
+            type: NotificationType.success,
+          );
       }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${error.toString()}'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        NotificationHelper.show(
+            context: context,
+            message: 'Error: ${error.toString()}',
+            type: NotificationType.error,
+          );
       }
     } finally {
       if (mounted) {

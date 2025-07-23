@@ -9,6 +9,8 @@ import 'package:sasper/data/account_repository.dart';
 import 'package:sasper/data/transaction_repository.dart';
 import 'package:sasper/models/account_model.dart';
 import 'package:sasper/services/event_service.dart';
+import 'package:sasper/utils/NotificationHelper.dart';
+import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AddTransactionScreen extends StatefulWidget {
@@ -48,7 +50,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
   Future<void> _saveTransaction() async {
     if (!_formKey.currentState!.validate() || _selectedCategory == null || _selectedAccountId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Por favor, completa todos los campos requeridos.'), backgroundColor: Colors.orange));
+      NotificationHelper.show(
+            context: context,
+            message: 'Porfavor rellena todos los campos!',
+            type: NotificationType.error,
+          );
       return;
     }
     
@@ -86,11 +92,21 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
         // Disparamos el evento específico para que el dashboard escuche.
         EventService.instance.fire(AppEvent.transactionCreated);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('¡Transacción guardada!'), backgroundColor: Colors.green));
+        NotificationHelper.show(
+            context: context,
+            message: 'Transacción gurdada!',
+            type: NotificationType.success,
+          );
         Navigator.of(context).pop(true);
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al guardar: $e'), backgroundColor: Colors.red));
+      if (mounted) {
+        NotificationHelper.show(
+            context: context,
+            message: 'Error al guardar la transacción.',
+            type: NotificationType.error,
+          );
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

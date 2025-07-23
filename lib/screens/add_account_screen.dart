@@ -3,7 +3,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:sasper/data/account_repository.dart'; // Importamos el repositorio
+import 'package:sasper/data/account_repository.dart';
+import 'package:sasper/utils/NotificationHelper.dart';
+import 'package:sasper/widgets/shared/custom_notification_widget.dart'; // Importamos el repositorio
 
 class AddAccountScreen extends StatefulWidget {
   // 1. AÑADIDO: El widget ahora recibe el repositorio.
@@ -63,16 +65,20 @@ class _AddAccountScreenState extends State<AddAccountScreen> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('¡Cuenta creada con éxito!'), backgroundColor: Colors.green),
-        );
+        NotificationHelper.show(
+            context: context,
+            message: 'Cuenta creada exitosamente!',
+            type: NotificationType.success,
+          );
         Navigator.of(context).pop(true);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al crear la cuenta: ${e.toString()}'), backgroundColor: Theme.of(context).colorScheme.error),
-        );
+        NotificationHelper.show(
+            context: context,
+            message: 'Error al crear la cuenta.',
+            type: NotificationType.error,
+          );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);

@@ -8,6 +8,8 @@ import 'package:sasper/data/account_repository.dart';
 import 'package:sasper/data/transaction_repository.dart';
 import 'package:sasper/models/account_model.dart';
 import 'package:sasper/models/transaction_models.dart';
+import 'package:sasper/utils/NotificationHelper.dart';
+import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 
 class EditTransactionScreen extends StatefulWidget {
   final Transaction transaction;
@@ -58,7 +60,11 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
 
   Future<void> _updateTransaction() async {
     if (!_formKey.currentState!.validate() || _selectedCategory == null || _selectedAccountId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Por favor, completa todos los campos requeridos.'), backgroundColor: Colors.orange));
+      NotificationHelper.show(
+            context: context,
+            message: 'Porfavor completa todos los campos requeridos.',
+            type: NotificationType.error,
+          );
       return;
     }
 
@@ -85,12 +91,20 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
 
       if (!mounted) return;
       widget.accountRepository.forceRefresh();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('¡Transacción actualizada!'), backgroundColor: Colors.green));
+      NotificationHelper.show(
+            context: context,
+            message: 'Transacción actualizada correctamente!',
+            type: NotificationType.success,
+          );
       Navigator.of(context).pop(true);
 
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al actualizar: $e'), backgroundColor: Colors.red));
+      NotificationHelper.show(
+            context: context,
+            message: 'Error al actualizar la transacción.',
+            type: NotificationType.error,
+          );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -147,11 +161,19 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
         await widget.transactionRepository.deleteTransaction(widget.transaction.id);
         if (!mounted) return;
         widget.accountRepository.forceRefresh();
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Transacción eliminada'), backgroundColor: Colors.blueAccent));
+        NotificationHelper.show(
+            context: context,
+            message: 'Transacción eliminada correctamente.',
+            type: NotificationType.success,
+          );
         Navigator.of(context).pop(true);
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al eliminar: $e'), backgroundColor: Colors.red));
+        NotificationHelper.show(
+            context: context,
+            message: 'Error al eliminar la transacción.',
+            type: NotificationType.error,
+          );
       } finally {
         if (mounted) setState(() => _isLoading = false);
       }

@@ -9,7 +9,9 @@ import 'package:sasper/data/account_repository.dart'; // <-- Usamos el repo
 import 'package:sasper/data/debt_repository.dart';   // <-- Usamos el repo
 import 'package:sasper/models/account_model.dart';
 import 'package:sasper/models/debt_model.dart';
-import 'package:sasper/services/event_service.dart'; // Para refrescar la UI global
+import 'package:sasper/services/event_service.dart';
+import 'package:sasper/utils/NotificationHelper.dart';
+import 'package:sasper/widgets/shared/custom_notification_widget.dart'; // Para refrescar la UI global
 
 class RegisterPaymentScreen extends StatefulWidget {
   final Debt debt;
@@ -89,17 +91,20 @@ class _RegisterPaymentScreenState extends State<RegisterPaymentScreen> {
       EventService.instance.fire(AppEvent.debtsChanged);
       EventService.instance.fire(AppEvent.transactionsChanged);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('¡Operación registrada con éxito!'), backgroundColor: Colors.green),
-      );
-
+      NotificationHelper.show(
+            context: context,
+            message: 'Operación registrada con exito!',
+            type: NotificationType.success,
+          );
       Navigator.of(context).pop(); // Simplemente cerramos la pantalla
 
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString()), backgroundColor: Theme.of(context).colorScheme.error),
-      );
+      NotificationHelper.show(
+            context: context,
+            message: 'Error "${e.toString()}"',
+            type: NotificationType.error,
+          );
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);

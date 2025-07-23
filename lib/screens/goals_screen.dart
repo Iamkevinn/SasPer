@@ -5,6 +5,8 @@ import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
+import 'package:sasper/utils/NotificationHelper.dart';
+import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:sasper/screens/add_goal_screen.dart';
 import 'package:sasper/data/goal_repository.dart';
@@ -41,23 +43,20 @@ class _GoalsScreenState extends State<GoalsScreen> {
     try {
       await widget.repository.deleteGoal(goalId);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Meta "$goalName" eliminada.'),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: Colors.green,
-          ),
-        );
+        NotificationHelper.show(
+            context: context,
+            message: 'Meta "$goalName" eliminada.',
+            type: NotificationType.success,
+          );
       }
+
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al eliminar la meta: ${e.toString()}'),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        NotificationHelper.show(
+            context: context,
+            message: 'Error al eliminar la meta: ${e.toString()}',
+            type: NotificationType.error,
+          );
       }
     }
   }

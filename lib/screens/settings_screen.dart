@@ -3,6 +3,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:sasper/utils/NotificationHelper.dart';
+import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:sasper/data/auth_repository.dart'; // <-- ¡IMPORTANTE!
@@ -57,11 +59,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         // El AuthGate se encargará del resto.
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error al cerrar sesión: ${e.toString()}'),
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
+          NotificationHelper.show(
+            context: context,
+            message: 'Error al cerrar sesión: "${e.toString()}"',
+            type: NotificationType.error,
           );
         }
       }
@@ -120,9 +121,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onChanged: (bool value) {
                 // Aquí iría la lógica para cambiar el tema de la app
                 // usando un ThemeProvider (ej. Riverpod, Provider, etc.)
-                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Funcionalidad de tema no implementada aún.')),
-                 );
+                 NotificationHelper.show(
+                  context: context,
+                  message: 'No se ha implementado esta función aún.',
+                  type: NotificationType.error,
+                );
               },
             ),
           ),
