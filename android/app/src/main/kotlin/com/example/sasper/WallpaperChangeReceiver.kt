@@ -1,4 +1,4 @@
-// android/app/src/main/kotlin/com/example/sasper/WallpaperChangeReceiver.kt
+// android/app/src/main/kotlin/com/example/sasper/WallpaperChangeReceiver.kt (VERSIÓN FINAL)
 package com.example.sasper
 
 import android.appwidget.AppWidgetManager
@@ -6,21 +6,25 @@ import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import es.antonborri.home_widget.HomeWidgetPlugin
 
 class WallpaperChangeReceiver : BroadcastReceiver() {
-  override fun onReceive(context: Context, intent: Intent?) {
-    if (intent?.action != Intent.ACTION_WALLPAPER_CHANGED) return
+    override fun onReceive(context: Context, intent: Intent?) {
+        // Solo reaccionar a estas dos acciones
+        if (intent?.action == Intent.ACTION_WALLPAPER_CHANGED || intent?.action == Intent.ACTION_CONFIGURATION_CHANGED) {
+            
+            // Obtenemos una instancia del AppWidgetManager
+            val appWidgetManager = AppWidgetManager.getInstance(context)
+            
+            // Obtenemos los IDs de todos los widgets de nuestra app
+            val componentName = ComponentName(context, SasPerWidgetProvider::class.java)
+            val appWidgetIds = appWidgetManager.getAppWidgetIds(componentName)
 
-    // Encontrar todos los IDs de tu widget
-    val mgr = AppWidgetManager.getInstance(context)
-    val comp = ComponentName(context, SasPerWidgetProvider::class.java)
-    val ids = mgr.getAppWidgetIds(comp)
+            // Obtenemos los datos guardados por Flutter (el balance)
+            val widgetData = HomeWidgetPlugin.getData(context)
 
-    // Re-emite el update para forzar onUpdate() en tu provider
-    val update = Intent(context, SasPerWidgetProvider::class.java).apply {
-      action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-      putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+            // Llamamos directamente a nuestra función de actualización centralizada
+            SasPerWidgetProvider.updateWidget(context, appWidgetManager, appWidgetIds, widgetData)
+        }
     }
-    context.sendBroadcast(update)
-  }
 }
