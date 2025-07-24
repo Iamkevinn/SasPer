@@ -1,13 +1,20 @@
 // lib/screens/budgets_screen.dart (CORREGIDO)
 
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 import 'package:sasper/data/budget_repository.dart';
 import 'package:sasper/models/budget_models.dart';
+import 'package:sasper/screens/edit_budget_screen.dart'; 
 import 'package:sasper/screens/add_budget_screen.dart';
+import 'package:sasper/utils/NotificationHelper.dart';
+import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:sasper/widgets/shared/empty_state_card.dart';
+import 'package:sasper/widgets/shared/budget_card.dart';
+
 class BudgetsScreen extends StatefulWidget {
   final BudgetRepository repository;
 
@@ -31,6 +38,58 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
       );
   }
 
+  // ---- NUEVA FUNCIÓN PARA NAVEGAR A EDITAR ----
+  void _navigateToEditBudget(BudgetProgress budget) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => EditBudgetScreen(
+          budgetRepository: widget.repository,
+          budget: budget,
+        ),
+      ),
+    );
+  }
+
+  // ---- NUEVA FUNCIÓN PARA MANEJAR EL BORRADO ----
+  Future<void> _handleDeleteBudget(BudgetProgress budget) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+        child: AlertDialog(
+          title: const Text('Confirmar eliminación'),
+          content: Text('¿Seguro que quieres eliminar el presupuesto para "${budget.category}"?'),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
+            FilledButton.tonal(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.errorContainer),
+              child: const Text('Eliminar'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        await widget.repository.deleteBudgetSafely(budget.budgetId);
+        NotificationHelper.show(
+          context: context,
+          message: 'Presupuesto eliminado.',
+          type: NotificationType.success,
+        );
+      } catch (e) {
+        NotificationHelper.show(
+          context: context,
+          message: e.toString(), // El repositorio ya formatea el mensaje de error
+          type: NotificationType.error,
+        );
+      }
+    }
+  }
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -69,12 +128,20 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
           }
 
           final budgets = snapshot.data!;
-          return ListView.builder(
+          // USAMOS LISTVIEW.SEPARATED PARA MEJOR ESPACIADO
+          return ListView.separated(
             padding: const EdgeInsets.all(16.0),
             itemCount: budgets.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
               final budget = budgets[index];
-              return _buildBudgetTile(budget);
+              // AHORA USAMOS EL BUDGETCARD CON LAS NUEVAS ACCIONES
+              return BudgetCard(
+                budget: budget,
+                onTap: () => _navigateToEditBudget(budget),
+                onEdit: () => _navigateToEditBudget(budget),
+                onDelete: () => _handleDeleteBudget(budget),
+              );
             },
           );
         },

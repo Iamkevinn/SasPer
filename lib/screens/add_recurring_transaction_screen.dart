@@ -28,7 +28,7 @@ class _AddRecurringTransactionScreenState extends State<AddRecurringTransactionS
   String _type = 'Gasto';
   String _frequency = 'mensual';
   String? _selectedAccountId;
-  DateTime _startDate = DateTime.now();
+  final DateTime _startDate = DateTime.now();
 
   @override
   Widget build(BuildContext context) {

@@ -1,6 +1,7 @@
 // lib/widgets/shared/budget_card.dart
 
 import 'package:flutter/material.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 import 'package:sasper/models/budget_models.dart';
 
@@ -8,11 +9,15 @@ class BudgetCard extends StatelessWidget {
   final BudgetProgress budget;
   // 1. AÑADIMOS UN CALLBACK OPCIONAL para cuando se toca la tarjeta
   final VoidCallback? onTap;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   const BudgetCard({
     super.key, 
     required this.budget,
     this.onTap,
+    this.onEdit,
+    this.onDelete,
   });
 
   @override
@@ -39,6 +44,7 @@ class BudgetCard extends StatelessWidget {
         side: BorderSide(color: statusColor.withOpacity(0.3), width: 1),
         borderRadius: BorderRadius.circular(20),
       ),
+      clipBehavior: Clip.antiAlias, // Asegura que el InkWell no se salga de los bordes
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(20), // Para que el splash coincida con la forma
@@ -65,26 +71,34 @@ class BudgetCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Icon(status.icon, color: statusColor, size: 20),
+                  // --- AÑADIMOS EL MENÚ DE OPCIONES ---
+                  PopupMenuButton<String>(
+                    onSelected: (value) {
+                      if (value == 'edit') onEdit?.call();
+                      if (value == 'delete') onDelete?.call();
+                    },
+                    itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                      const PopupMenuItem<String>(
+                        value: 'edit',
+                        child: ListTile(leading: Icon(Iconsax.edit), title: Text('Editar Monto')),
+                      ),
+                      const PopupMenuItem<String>(
+                        value: 'delete',
+                        child: ListTile(leading: Icon(Iconsax.trash), title: Text('Eliminar')),
+                      ),
+                    ],
+                    icon: Icon(Iconsax.more, color: colorScheme.onSurfaceVariant),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
                 ],
               ),
-              const Spacer(), // Ocupa el espacio disponible para empujar el resto hacia abajo
-              Text.rich(
-                TextSpan(
-                  style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
-                  children: [
-                    TextSpan(
-                      text: spentText,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.onSurface,
-                      ),
-                    ),
-                    TextSpan(text: ' de $totalText'),
-                  ],
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(spentText, style: textTheme.titleSmall?.copyWith(color: statusColor, fontWeight: FontWeight.bold)),
+                  Text(totalText, style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant)),
+                ],
               ),
               const SizedBox(height: 8),
               LinearProgressIndicator(
@@ -92,7 +106,7 @@ class BudgetCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
                 backgroundColor: statusColor.withOpacity(0.2),
                 valueColor: AlwaysStoppedAnimation<Color>(statusColor),
-                minHeight: 8,
+                minHeight: 10,
               ),
             ],
           ),

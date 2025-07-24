@@ -1,62 +1,76 @@
-// lib/models/budget_models.dart
+// lib/models/budget_models.dart (VERSIÓN FINAL Y COMPLETA)
 
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 
-// El enum no necesita cambios, está perfecto.
+// El enum no necesita cambios. Define los posibles estados de un presupuesto.
 enum BudgetStatus { onTrack, warning, exceeded }
 
 class BudgetProgress extends Equatable {
+  final int budgetId; // El ID del presupuesto, necesario para editar/eliminar
   final String category;
   final double budgetAmount;
   final double spentAmount;
 
-  // 1. Constructor `const`.
   const BudgetProgress({
+    required this.budgetId,
     required this.category,
     required this.budgetAmount,
     required this.spentAmount,
   });
 
-  // Los getters computados ya estaban muy bien.
-  double get progress => (budgetAmount > 0) ? (spentAmount / budgetAmount).clamp(0.0, 1.0) : 0.0;
+  // --- Getters computados ---
+  // La lógica de negocio vive aquí, en el modelo.
   
-  double get remainingAmount => (budgetAmount - spentAmount);
+  /// Calcula el progreso como un valor entre 0.0 y 1.0.
+  /// Si el monto del presupuesto es 0, el progreso es 0.
+  double get progress => (budgetAmount > 0) ? (spentAmount / budgetAmount) : 0.0;
+  
+  /// Calcula el dinero restante del presupuesto. Puede ser negativo si se excede.
+  double get remainingAmount => budgetAmount - spentAmount;
 
+  /// Determina el estado del presupuesto (en curso, al límite o excedido) basado en el progreso.
   BudgetStatus get status {
-    if (progress >= 1.0) return BudgetStatus.exceeded;
-    if (progress >= 0.8) return BudgetStatus.warning; // Ligeramente ajustado a 80%
+    // Usamos una variable local para evitar recalcular el progreso.
+    final currentProgress = progress;
+    if (currentProgress >= 1.0) return BudgetStatus.exceeded;
+    if (currentProgress >= 0.8) return BudgetStatus.warning;
     return BudgetStatus.onTrack;
   }
 
-  // 2. Método `fromJson` robustecido.
+  /// Constructor factory para crear una instancia de BudgetProgress desde un mapa JSON
+  /// que viene de la API de Supabase.
   factory BudgetProgress.fromJson(Map<String, dynamic> json) {
     try {
       return BudgetProgress(
+        // Leemos el 'budget_id' que ahora nos envía la función RPC.
+        budgetId: json['budget_id'] as int? ?? 0,
         category: json['category'] as String? ?? 'Sin Categoría',
         budgetAmount: (json['budget_amount'] as num? ?? 0).toDouble(),
         spentAmount: (json['spent_amount'] as num? ?? 0).toDouble(),
       );
     } catch (e) {
-      throw FormatException('Error al parsear BudgetProgress: $e', json);
+      // Si algo falla durante el parseo, lanzamos un error más descriptivo.
+      throw FormatException('Error al parsear BudgetProgress desde JSON: $e', json);
     }
   }
 
-  // 3. Propiedades para Equatable.
+  // Define las propiedades que Equatable usará para comparar instancias.
+  // Dos objetos BudgetProgress serán iguales si todos estos campos coinciden.
   @override
-  List<Object?> get props => [category, budgetAmount, spentAmount];
+  List<Object?> get props => [budgetId, category, budgetAmount, spentAmount];
 }
 
-
-// La extensión ya estaba perfecta, no necesita cambios.
-// Es una excelente práctica mantenerla aquí.
+/// Extensión sobre el enum BudgetStatus para añadirle funcionalidades
+/// relacionadas con la UI, como obtener un color o un icono.
+/// Esto mantiene la lógica de la UI separada del modelo principal.
 extension BudgetStatusX on BudgetStatus {
   Color getColor(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     switch (this) {
       case BudgetStatus.onTrack:
-        return colors.primary; // Usar colores del tema es más adaptable.
+        return colors.primary;
       case BudgetStatus.warning:
         return Colors.orange.shade600;
       case BudgetStatus.exceeded:

@@ -63,6 +63,48 @@ class BudgetRepository {
     }
   }
 
+  // ---- NUEVO MÉTODO PARA ACTUALIZAR ----
+  /// Actualiza el monto de un presupuesto existente.
+  Future<void> updateBudget({required int budgetId, required double newAmount}) async {
+    developer.log('🔄 [Repo] Updating budget $budgetId with new amount $newAmount');
+    try {
+      await _client
+          .from('budgets')
+          .update({'amount': newAmount})
+          .eq('id', budgetId);
+      developer.log('✅ [Repo] Budget updated successfully.');
+    } catch (e) {
+      developer.log('🔥 [Repo] Error updating budget: $e');
+      throw Exception('No se pudo actualizar el presupuesto.');
+    }
+  }
+
+  /// ---- MÉTODO DE BORRADO MODIFICADO PARA USAR LA FUNCIÓN SEGURA ----
+  /// Llama a la función RPC para eliminar un presupuesto de forma segura.
+  /// Lanza una excepción si la función RPC devuelve un error.
+  Future<void> deleteBudgetSafely(int budgetId) async {
+    developer.log('🗑️ [Repo] Safely deleting budget with id $budgetId');
+    try {
+      final result = await _client.rpc(
+        'delete_budget_safely',
+        params: {'budget_id_to_delete': budgetId},
+      ) as String;
+
+      // La función RPC devuelve un texto. Si empieza con 'Error:', lanzamos una excepción.
+      if (result.startsWith('Error:')) {
+        throw Exception(result.replaceFirst('Error: ', ''));
+      }
+      
+      developer.log('✅ [Repo] Budget safely deleted successfully.');
+    } catch (e) {
+      developer.log('🔥 [Repo] Error in RPC delete_budget_safely: $e');
+      // Relanzamos la excepción para que la UI pueda mostrarla.
+      throw Exception(e.toString().contains('No se puede eliminar') 
+          ? e.toString().replaceFirst('Exception: ', '')
+          : 'No se pudo eliminar el presupuesto.');
+    }
+  }
+  
   /// Obtiene los datos de progreso de los presupuestos llamando a la función RPC.
   /// Es privado porque solo se usa dentro de esta clase.
   Future<List<BudgetProgress>> _fetchBudgetsProgress() async {

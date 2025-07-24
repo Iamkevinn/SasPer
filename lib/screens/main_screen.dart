@@ -141,7 +141,7 @@ class _MainScreenState extends State<MainScreen> {
   // 1) Nos suscribimos al mismo stream para el enlace inicial y todos los siguientes
   _appLinks.uriLinkStream.listen(
     (uri) {
-      if (uri != null && mounted) {
+      if (mounted) {
         if (kDebugMode) {
           print('Deep link recibido: $uri');
         }
