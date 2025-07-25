@@ -133,7 +133,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final currencyFormat = NumberFormat.currency(locale: 'es_MX', symbol: '\$');
+    final currencyFormat = NumberFormat.currency(locale: 'ES_CO', symbol: '\$');
 
     return Scaffold(
       appBar: AppBar(

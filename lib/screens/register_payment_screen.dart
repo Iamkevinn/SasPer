@@ -244,7 +244,7 @@ class _RegisterPaymentScreenState extends State<RegisterPaymentScreen> {
               children: [
                 const Text('Saldo Pendiente:'),
                 Text(
-                  NumberFormat.currency(locale: 'es_MX', symbol: '\$').format(widget.debt.currentBalance),
+                  NumberFormat.currency(locale: 'ES_CO', symbol: '\$').format(widget.debt.currentBalance),
                   style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
                 ),
               ],

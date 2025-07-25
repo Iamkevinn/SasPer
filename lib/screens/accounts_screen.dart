@@ -6,6 +6,11 @@ import 'package:intl/intl.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+// Añade estos imports al inicio del archivo
+import 'dart:ui';
+import 'package:sasper/screens/edit_account_screen.dart';
+import 'package:sasper/utils/NotificationHelper.dart';
+import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 
 import 'account_details_screen.dart';
 import 'package:sasper/data/account_repository.dart';
@@ -68,6 +73,73 @@ class AccountsScreenState extends State<AccountsScreen> {
         builder: (context) => AddAccountScreen(accountRepository: widget.repository),
       ),
     );
+  }
+
+  // ---- NUEVA FUNCIÓN PARA NAVEGAR A EDITAR ----
+  void _navigateToEditAccount(Account account) {
+    Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (context) => EditAccountScreen(
+          accountRepository: widget.repository,
+          account: account,
+        ),
+      ),
+    ).then((changed) {
+      // Si la pantalla de edición devuelve 'true', es una señal de que hubo un cambio.
+      // Aunque el stream ya lo hace, una actualización forzada es más rápida.
+      if (changed == true) {
+        widget.repository.forceRefresh();
+      }
+    });
+  }
+
+  // ---- NUEVA FUNCIÓN PARA MANEJAR EL BORRADO ----
+  Future<void> _handleDeleteAccount(Account account) async {
+    // Primera validación en la UI para feedback instantáneo
+    if (account.balance != 0) {
+      NotificationHelper.show(
+        context: context,
+        message: 'No se puede eliminar. La cuenta aún tiene saldo.',
+        type: NotificationType.error,
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+        child: AlertDialog(
+          title: const Text('Confirmar eliminación'),
+          content: Text('¿Seguro que quieres eliminar la cuenta "${account.name}"? Esta acción no se puede deshacer.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
+            FilledButton.tonal(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.errorContainer),
+              child: const Text('Eliminar'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        await widget.repository.deleteAccountSafely(account.id);
+        NotificationHelper.show(
+          context: context,
+          message: 'Cuenta eliminada.',
+          type: NotificationType.success,
+        );
+      } catch (e) {
+        NotificationHelper.show(
+          context: context,
+          message: e.toString(), // El repositorio ya formatea el mensaje de error
+          type: NotificationType.error,
+        );
+      }
+    }
   }
 
   @override
@@ -163,6 +235,7 @@ class AccountsScreenState extends State<AccountsScreen> {
     );
   }
 
+  // ---- MODIFICAMOS EL WIDGET _buildAccountTile ----
   Widget _buildAccountTile(Account account) {
     return Card(
       elevation: 0,
@@ -181,13 +254,36 @@ class AccountsScreenState extends State<AccountsScreen> {
         },
         borderRadius: const BorderRadius.all(Radius.circular(16)),
         child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          contentPadding: const EdgeInsets.fromLTRB(20, 12, 8, 12), // Reducimos padding derecho
           leading: Icon(_accountIcons[account.type] ?? _accountIcons['default'], size: 30, color: Theme.of(context).colorScheme.primary),
           title: Text(account.name, style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
           subtitle: Text(account.type),
-          trailing: Text(
-            NumberFormat.currency(locale: 'es_MX', symbol: '\$', decimalDigits: 2).format(account.balance),
-            style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: account.balance < 0 ? Theme.of(context).colorScheme.error : Theme.of(context).colorScheme.onSurface),
+          trailing: Row( // Usamos un Row para el saldo y el menú
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                NumberFormat.currency(locale: 'ES_CO', symbol: '\$', decimalDigits: 0).format(account.balance),
+                style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: account.balance < 0 ? Theme.of(context).colorScheme.error : Theme.of(context).colorScheme.onSurface),
+              ),
+              PopupMenuButton<String>(
+                onSelected: (value) {
+                  if (value == 'edit') _navigateToEditAccount(account);
+                  if (value == 'delete') _handleDeleteAccount(account);
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: ListTile(leading: Icon(Iconsax.edit), title: Text('Editar')),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: ListTile(leading: Icon(Iconsax.trash), title: Text('Eliminar')),
+                  ),
+                ],
+                icon: const Icon(Iconsax.more),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ],
           ),
         ),
       ),

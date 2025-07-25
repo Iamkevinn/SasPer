@@ -31,7 +31,7 @@ class WidgetService {
       // Solicitamos la actualización de la UI del widget nativo con el nombre correcto.
       await HomeWidget.updateWidget(
         name: 'SasPerWidgetProvider',
-        androidName: 'com.example.sasper.SasPerWidgetProvider',
+        androidName: 'SasPerWidgetProvider',
       );
       
       developer.log('✅ [Service] Home widget update call sent with balance: $formattedBalance', name: 'WidgetService');

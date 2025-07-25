@@ -23,6 +23,42 @@ class AccountRepository {
     return _accountsStreamController.stream;
   }
 
+  // ---- NUEVO MÉTODO PARA ACTUALIZAR ----
+  Future<void> updateAccount(Account account) async {
+    developer.log('🔄 [Repo] Updating account ${account.id}');
+    try {
+      await _client
+          .from('accounts')
+          .update({ 'name': account.name, 'type': account.type }) // Solo actualiza lo que puede cambiar
+          .eq('id', account.id); // La comparación String (uuid) vs uuid funciona
+      
+    } catch (e) {
+      developer.log('🔥 [Repo] Error updating account: $e');
+      throw Exception('No se pudo actualizar la cuenta.');
+    }
+  }
+
+  // ---- NUEVO MÉTODO PARA BORRADO SEGURO ----
+  Future<void> deleteAccountSafely(String accountId) async {
+    developer.log('🗑️ [Repo] Safely deleting account with id $accountId');
+    try {
+      // No se necesita ninguna conversión. Pasamos el String (UUID) directamente.
+      final result = await _client.rpc(
+        'delete_account_safely',
+        params: {'account_id_to_delete': accountId},
+      ) as String;
+
+      if (result.startsWith('Error:')) {
+        throw Exception(result.replaceFirst('Error: ', ''));
+      }
+      
+      developer.log('✅ [Repo] Account safely deleted successfully.');
+    } catch (e) {
+      developer.log('🔥 [Repo] Error in RPC delete_account_safely: $e');
+      throw Exception(e.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
   Future<void> _fetchAccountsWithBalance() async {
     developer.log('🔄 [Repo] Fetching accounts with balance...');
     try {
@@ -108,9 +144,10 @@ class AccountRepository {
     }
   }
   
+  // Asegúrate de que los IDs se pasen como String
   Future<void> createTransfer({
-    required String fromAccountId,
-    required String toAccountId,
+    required String fromAccountId, // Ya es String, ¡perfecto!
+    required String toAccountId,   // Ya es String, ¡perfecto!
     required double amount,
     String? description,
   }) async {
@@ -127,14 +164,29 @@ class AccountRepository {
     }
   }
 
+
   Future<double> getAccountProjectionInDays(String accountId) async {
     try {
-      final response = await _client.rpc('get_burn_rate_projection', params: {'account_id_param': accountId}) as List;
-      if (response.isEmpty || response.first == null) return 0.0;
-      return (response.first as num).toDouble();
+      final response = await _client.rpc(
+        'get_burn_rate_projection', 
+        params: {'account_id_param': accountId}
+      );
+
+      // La respuesta de una función que devuelve TABLE es una Lista de Mapas
+      if (response is List && response.isNotEmpty) {
+        // Accedemos al primer elemento de la lista (la primera fila)
+        final firstRow = response.first as Map<String, dynamic>;
+        // Accedemos al valor dentro del mapa usando la clave que definimos en el SQL
+        final projectionValue = (firstRow['projection_days'] as num? ?? 0.0).toDouble();
+        return projectionValue;
+      }
+      
+      // Si la respuesta está vacía, no hay proyección
+      return 0.0;
+
     } catch (e, stackTrace) {
       developer.log('🔥 Error fetching projection for account $accountId: $e', name: 'AccountRepository', error: e, stackTrace: stackTrace);
-      return 0.0;
+      return 0.0; // Devolvemos 0 en caso de error
     }
   }
 

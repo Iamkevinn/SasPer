@@ -272,7 +272,7 @@ class _GoalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final currencyFormat = NumberFormat.currency(locale: 'es_MX', symbol: '\$');
+    final currencyFormat = NumberFormat.currency(locale: 'ES_CO', symbol: '\$');
     final colorScheme = Theme.of(context).colorScheme;
     final onSurfaceColor = Theme.of(context).colorScheme.onSurface;
     final cardColor = isCompleted ? colorScheme.onSurfaceVariant : onSurfaceColor;
@@ -363,7 +363,7 @@ class _GoalCard extends StatelessWidget {
                         Icon(Iconsax.calendar_1, size: 14, color: colorScheme.onSurfaceVariant),
                         const SizedBox(width: 4),
                         Text(
-                          DateFormat.yMMMd('es_MX').format(goal.targetDate!),
+                          DateFormat.yMMMd('ES_CO').format(goal.targetDate!),
                           style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12),
                         ),
                       ],

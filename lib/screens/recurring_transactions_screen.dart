@@ -196,7 +196,7 @@ class _RecurringTransactionsScreenState extends State<RecurringTransactionsScree
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          '${item.type == 'Gasto' ? '-' : '+'}${NumberFormat.currency(locale: 'es_MX', symbol: '\$').format(item.amount)}',
+                          '${item.type == 'Gasto' ? '-' : '+'}${NumberFormat.currency(locale: 'ES_CO', symbol: '\$').format(item.amount)}',
                           style: GoogleFonts.poppins(
                             fontWeight: FontWeight.bold,
                             color: item.type == 'Gasto' ? Colors.red.shade300 : Colors.green.shade400,

@@ -178,7 +178,7 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
               ListTile(
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: Theme.of(context).colorScheme.outline)),
                 leading: const Icon(Iconsax.calendar_1),
-                title: Text(_dueDate == null ? 'Fecha de Vencimiento (Opcional)' : 'Vence: ${DateFormat.yMMMd('es_MX').format(_dueDate!)}'),
+                title: Text(_dueDate == null ? 'Fecha de Vencimiento (Opcional)' : 'Vence: ${DateFormat.yMMMd('ES_CO').format(_dueDate!)}'),
                 trailing: const Icon(Iconsax.arrow_right_3),
                 onTap: () async {
                   final pickedDate = await showDatePicker(context: context, initialDate: _dueDate ?? DateTime.now(), firstDate: DateTime.now(), lastDate: DateTime(2100));

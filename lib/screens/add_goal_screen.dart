@@ -131,7 +131,7 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                   side: BorderSide(color: Theme.of(context).dividerColor),
                 ),
                 leading: const Icon(Iconsax.calendar_1),
-                title: Text(_targetDate == null ? 'Fecha Límite (Opcional)' : 'Vence: ${DateFormat.yMMMd('es_MX').format(_targetDate!)}'),
+                title: Text(_targetDate == null ? 'Fecha Límite (Opcional)' : 'Vence: ${DateFormat.yMMMd('ES_CO').format(_targetDate!)}'),
                 trailing: _targetDate != null ? IconButton(icon: const Icon(Iconsax.close_circle, size: 20), onPressed: () => setState(() => _targetDate = null)) : null,
                 onTap: () => _selectDate(context),
               ),

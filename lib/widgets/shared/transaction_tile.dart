@@ -54,7 +54,7 @@ class TransactionTile extends StatelessWidget {
     final String title = transaction.category ?? 'Sin categoría';
     final String subtitle = transaction.description ?? '';
 
-    final currencyFormat = NumberFormat.currency(locale: 'es_MX', symbol: '\$');
+    final currencyFormat = NumberFormat.currency(locale: 'ES_CO', symbol: '\$');
 
     switch (transaction.type) {
       case 'Ingreso':
