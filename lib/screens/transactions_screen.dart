@@ -15,6 +15,7 @@ import 'package:sasper/widgets/shared/transaction_tile.dart';
 import 'package:sasper/services/event_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/config/app_constants.dart';
+import 'package:intl/intl.dart';
 
 class TransactionsScreen extends StatefulWidget {
   final TransactionRepository transactionRepository;
@@ -31,6 +32,9 @@ class TransactionsScreen extends StatefulWidget {
 }
 
 class _TransactionsScreenState extends State<TransactionsScreen> {
+  // --- 1. AÑADIMOS ESTADO PARA EL RANGO DE FECHAS ---
+  DateTimeRange? _selectedDateRange;
+
   // --- 1. GESTIÓN DEL ESTADO DE LA BÚSQUEDA ---
   late Future<List<Transaction>> _transactionsFuture;
   final TextEditingController _searchController = TextEditingController();
@@ -77,7 +81,8 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     setState(() {
       _transactionsFuture = widget.transactionRepository.getFilteredTransactions(
         searchQuery: _searchQuery,
-        categoryFilter: _selectedCategories, // Pasamos las categorías seleccionadas
+        categoryFilter: _selectedCategories,
+        dateRange: _selectedDateRange, // Pasamos las categorías seleccionadas
       );
     });
   }
@@ -86,9 +91,27 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   void _showFilterBottomSheet() {
     // Usamos una copia temporal para que los cambios solo se apliquen al presionar "Aceptar"
     List<String> tempSelectedCategories = List.from(_selectedCategories);
-    
+    DateTimeRange? tempDateRange = _selectedDateRange;
+
     // Unimos las categorías de gastos e ingresos y eliminamos duplicados
     final allCategories = {...AppConstants.expenseCategories.keys, ...AppConstants.incomeCategories.keys}.toList();
+
+    // --- FUNCIÓN PARA MOSTRAR EL SELECTOR DE FECHAS ---
+    // La definimos aquí fuera, usando el 'context' principal de la pantalla.
+    Future<void> pickDateRange(StateSetter setModalState) async {
+      final newDateRange = await showDateRangePicker(
+        context: context, // Usamos el 'context' de _TransactionsScreenState
+        initialDateRange: tempDateRange,
+        firstDate: DateTime(2020),
+        lastDate: DateTime.now().add(const Duration(days: 365)),
+        locale: const Locale('es'),
+      );
+
+      if (newDateRange != null) {
+        // Usamos el 'setModalState' que nos pasan como parámetro para actualizar la UI del sheet.
+        setModalState(() => tempDateRange = newDateRange);
+      }
+    }
 
     showModalBottomSheet(
       context: context,
@@ -96,10 +119,11 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (context) {
+      builder: (bottomSheetContext) {
         // Usamos un StatefulWidget para que los checkboxes se puedan actualizar visualmente
         return StatefulBuilder(
-          builder: (BuildContext context, StateSetter setModalState) {
+          builder: (BuildContext context, StateSetter setModalState) { 
+
             return DraggableScrollableSheet(
               expand: false,
               initialChildSize: 0.6, // Ocupa el 60% de la pantalla inicialmente
@@ -120,6 +144,25 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                     ),
                     Text('Filtrar por Categoría', style: Theme.of(context).textTheme.titleLarge),
                     const SizedBox(height: 16),
+                    ListTile(
+                      leading: const Icon(Iconsax.calendar_1),
+                      title: const Text('Rango de Fechas'),
+                      subtitle: Text(
+                        tempDateRange == null
+                            ? 'Cualquier fecha'
+                            : '${DateFormat.yMMMd('es').format(tempDateRange!.start)} - ${DateFormat.yMMMd('es').format(tempDateRange!.end)}',
+                      ),
+                      trailing: const Icon(Iconsax.arrow_right_3),
+                      onTap: () => pickDateRange(setModalState),
+                    ),
+                    const Divider(height: 1),
+                    const Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text('Categorías', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
                     // Lista de categorías con checkboxes
                     Expanded(
                       child: ListView.builder(
@@ -152,9 +195,12 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                           Expanded(
                             child: TextButton(
                               onPressed: () {
-                                setModalState(() => tempSelectedCategories.clear());
+                                 setModalState(() {
+                                  tempSelectedCategories.clear();
+                                  tempDateRange = null; // Limpiamos también las fechas
+                                });
                               },
-                              child: const Text('Limpiar'),
+                              child: const Text('Limpiar Todo'),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -164,6 +210,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                               onPressed: () {
                                 setState(() {
                                   _selectedCategories = tempSelectedCategories;
+                                  _selectedDateRange = tempDateRange; // Aplicamos las fechas
                                 });
                                 _fetchTransactions(); // Aplicamos el filtro
                                 Navigator.pop(context); // Cerramos el BottomSheet
@@ -279,7 +326,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   @override
   Widget build(BuildContext context) {
     // El 'badge' que indica si hay filtros activos
-    final bool hasActiveFilters = _selectedCategories.isNotEmpty;
+    final bool hasActiveFilters = _selectedCategories.isNotEmpty || _selectedDateRange != null;
     return Scaffold(
       appBar: AppBar(
         // El título cambia si estamos buscando o no

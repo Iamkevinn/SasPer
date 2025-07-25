@@ -10,7 +10,7 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-
+import 'package:flutter_localizations/flutter_localizations.dart';
 // NO es necesario runZonedGuarded para la depuración, lo volveremos a poner si hace falta.
 
 Future<void> main() async {
@@ -80,6 +80,16 @@ class MyApp extends StatelessWidget {
             colorScheme: darkColorScheme,
             useMaterial3: true,
           ),
+          // --- AÑADE ESTAS LÍNEAS PARA EL SOPORTE DE IDIOMA ---
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [
+            Locale('es', ''), // Español
+            Locale('en', ''), // Inglés (como fallback)
+          ],
           home: const AuthGate(),
         );
       },

@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:sasper/models/transaction_models.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:developer' as developer;
@@ -86,9 +87,7 @@ class TransactionRepository {
   Future<List<Transaction>> getFilteredTransactions({
     String? searchQuery,
     List<String>? categoryFilter, // <-- AÑADIDO: Recibe la lista de categorías
-    // En el futuro, podríamos añadir más parámetros:
-    // String? categoryFilter,
-    // DateTime? startDate,
+    DateTimeRange? dateRange,
   }) async {
     // Empezamos con la consulta base
     var query = _client.from('transactions').select();
@@ -110,10 +109,15 @@ class TransactionRepository {
       query = query.inFilter('category', categoryFilter);
     }
 
-    // Aquí se podrían añadir más filtros en el futuro...
-    // if (categoryFilter != null) {
-    //   query = query.eq('category', categoryFilter);
-    // }
+    // --- NUEVO: APLICAMOS EL FILTRO DE FECHAS ---
+    if (dateRange != null) {
+      // .gte() => greater than or equal to (mayor o igual que)
+      query = query.gte('transaction_date', dateRange.start.toIso8601String());
+      // .lte() => less than or equal to (menor o igual que)
+      // Añadimos un día a la fecha final para incluir todas las transacciones de ese día
+      final endOfDay = dateRange.end.add(const Duration(days: 1));
+      query = query.lt('transaction_date', endOfDay.toIso8601String()); // usamos .lt (less than)
+    }
 
     // 2. Ordenamos y ejecutamos la consulta final
     final response = await query.order('transaction_date', ascending: false);

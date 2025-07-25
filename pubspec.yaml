@@ -12,7 +12,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-
+  flutter_localizations: # <-- AÑADE ESTA LÍNEA
+    sdk: flutter 
+    
   # Iconos de estilo iOS
   cupertino_icons: ^1.0.8
 
