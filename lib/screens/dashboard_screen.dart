@@ -8,6 +8,7 @@ import 'package:sasper/data/account_repository.dart';
 import 'package:sasper/data/transaction_repository.dart';
 import 'package:sasper/models/transaction_models.dart';
 import 'package:sasper/screens/edit_transaction_screen.dart';
+import 'package:sasper/screens/transactions_screen.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:shimmer/shimmer.dart';
@@ -78,6 +79,19 @@ class DashboardScreenState extends State<DashboardScreen> {
     await widget.repository.forceRefresh(silent: false);
   }
 
+  // +++ NUEVA FUNCIÓN: Maneja la navegación a la pantalla de transacciones +++
+  void _navigateToTransactionsScreen() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => TransactionsScreen(
+          // Le pasamos los repositorios que necesita la pantalla de destino
+          transactionRepository: widget.transactionRepository,
+          accountRepository: widget.accountRepository,
+        ),
+      ),
+    );
+  }
+  
   // 2. NUEVA FUNCIÓN: Maneja el toque en una transacción.
   void _handleTransactionTap(Transaction transaction) {
     Navigator.of(context).push<bool>(
@@ -209,11 +223,8 @@ class DashboardScreenState extends State<DashboardScreen> {
               transactions: data.recentTransactions,
               onTransactionTapped: _handleTransactionTap,
               onTransactionDeleted: _handleTransactionDelete,
-              onViewAllPressed: () {
-                // TODO: Aquí iría la lógica para cambiar a la pestaña de Movimientos
-                // Por ejemplo, usando un Provider para controlar el índice de MainScreen.
-                if (kDebugMode) print('Navegar a la pantalla completa de transacciones');
-              },
+              // Conectamos la propiedad del widget hijo con nuestra función de navegación.
+              onViewAllPressed: _navigateToTransactionsScreen,
             ),
           ),
           
