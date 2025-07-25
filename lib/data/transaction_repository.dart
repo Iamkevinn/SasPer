@@ -81,6 +81,47 @@ class TransactionRepository {
       throw Exception('Error al conectar con la base de datos.');
     }
   }
+
+  // --- NUEVO MÉTODO PARA BÚSQUEDA Y FILTROS ---
+  Future<List<Transaction>> getFilteredTransactions({
+    String? searchQuery,
+    List<String>? categoryFilter, // <-- AÑADIDO: Recibe la lista de categorías
+    // En el futuro, podríamos añadir más parámetros:
+    // String? categoryFilter,
+    // DateTime? startDate,
+  }) async {
+    // Empezamos con la consulta base
+    var query = _client.from('transactions').select();
+    
+    // 1. Aplicamos el filtro de búsqueda de texto si existe
+    if (searchQuery != null && searchQuery.isNotEmpty) {
+      // El formato `ilike` no distingue mayúsculas/minúsculas.
+      // El formato con `%` busca el texto en cualquier parte de la cadena.
+      final queryFilter = '%$searchQuery%';
+      // Usamos .or() para buscar en múltiples columnas.
+      query = query.or(
+        'description.ilike.$queryFilter,category.ilike.$queryFilter'
+      );
+    }
+    
+    // --- NUEVO: APLICAMOS EL FILTRO DE CATEGORÍAS ---
+    if (categoryFilter != null && categoryFilter.isNotEmpty) {
+      // Usamos el filtro 'in' de Supabase para buscar en una lista de valores.
+      query = query.inFilter('category', categoryFilter);
+    }
+
+    // Aquí se podrían añadir más filtros en el futuro...
+    // if (categoryFilter != null) {
+    //   query = query.eq('category', categoryFilter);
+    // }
+
+    // 2. Ordenamos y ejecutamos la consulta final
+    final response = await query.order('transaction_date', ascending: false);
+    
+    // 3. Mapeamos el resultado
+    return response.map((data) => Transaction.fromMap(data)).toList();
+  }
+
   // --- NUEVO MÉTODO ---
   Future<void> forceRefresh() async {
     developer.log('🔄 [Repo] Manual refresh requested for all transactions.');
