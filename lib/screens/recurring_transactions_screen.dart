@@ -1,6 +1,7 @@
-// lib/screens/recurring_transactions_screen.dart (COMPLETO Y MEJORADO)
+// lib/screens/recurring_transactions_screen.dart (VERSIÓN FINAL Y CORREGIDA)
 
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
@@ -9,6 +10,8 @@ import 'package:sasper/data/account_repository.dart';
 import 'package:sasper/data/recurring_repository.dart';
 import 'package:sasper/models/recurring_transaction_model.dart';
 import 'package:sasper/screens/add_recurring_transaction_screen.dart';
+import 'package:sasper/screens/edit_recurring_transaction_screen.dart';
+import 'package:sasper/services/event_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:sasper/widgets/shared/empty_state_card.dart';
@@ -32,66 +35,102 @@ class RecurringTransactionsScreen extends StatefulWidget {
 
 class _RecurringTransactionsScreenState extends State<RecurringTransactionsScreen> {
   late final Stream<List<RecurringTransaction>> _stream;
+  // --- DECLARACIÓN AÑADIDA AQUÍ ---
+  late final StreamSubscription<AppEvent> _eventSubscription;
 
   @override
   void initState() {
     super.initState();
     _stream = widget.repository.getRecurringTransactionsStream();
+    
+    // Nos suscribimos al stream de eventos
+    _eventSubscription = EventService.instance.eventStream.listen((event) {
+      // Si el evento es el que nos interesa, forzamos la recarga de datos
+      if (event == AppEvent.recurringTransactionChanged) {
+        widget.repository.forceRefresh();
+      }
+    });
   }
 
-  // Navega a la pantalla de añadir y espera un resultado para mostrar feedback.
+  @override
+  void dispose() {
+    _eventSubscription.cancel(); // Cancelamos la suscripción al evento
+    widget.repository.dispose(); // Limpiamos los recursos del repositorio
+    super.dispose();
+  }
+  
+  void _navigateToEdit(RecurringTransaction transaction) {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => EditRecurringTransactionScreen(
+        repository: widget.repository,
+        accountRepository: widget.accountRepository,
+        transaction: transaction,
+      ),
+    ));
+  }
+
+  Future<void> _handleDelete(RecurringTransaction item) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+        child: AlertDialog(
+          title: const Text('Confirmar Eliminación'),
+          content: Text('¿Seguro que quieres eliminar "${item.description}"?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancelar')),
+            FilledButton.tonal(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.errorContainer),
+              child: const Text('Eliminar')),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        await widget.repository.deleteRecurringTransaction(item.id);
+        EventService.instance.fire(AppEvent.recurringTransactionChanged);
+        NotificationHelper.show(
+          context: context,
+          message: '"${item.description}" eliminado.',
+          type: NotificationType.success,
+        );
+      } catch (e) {
+        NotificationHelper.show(
+          context: context,
+          message: 'Error al eliminar: ${e.toString()}',
+          type: NotificationType.error,
+        );
+      }
+    }
+  }
+
   void _navigateToAdd() async {
-    final result = await Navigator.of(context).push<bool>(MaterialPageRoute(
+    // La pantalla de añadir debería disparar un evento, igual que la de editar.
+    // Opcionalmente, puedes esperar un resultado `true` si prefieres ese método.
+    Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => AddRecurringTransactionScreen(
         repository: widget.repository,
         accountRepository: widget.accountRepository,
       ),
     ));
-
-    if (result == true && mounted) {
-      NotificationHelper.show(
-            context: context,
-            message: 'Gasto fijo creado correctamente.',
-            type: NotificationType.success,
-          );
-    }
   }
 
-  // Determina el estado de un gasto fijo basado en su próxima fecha de vencimiento.
   RecurringStatus _getStatus(DateTime nextDueDate) {
     final now = DateTime.now();
-    // Normalizamos las fechas a medianoche para comparaciones precisas
     final today = DateTime(now.year, now.month, now.day);
     final dueDate = DateTime(nextDueDate.year, nextDueDate.month, nextDueDate.day);
     
     if (dueDate.isBefore(today) || dueDate.isAtSameMomentAs(today)) {
-      return RecurringStatus.due; // Vencido o para hoy
+      return RecurringStatus.due;
     } else if (dueDate.difference(today).inDays <= 7) {
-      return RecurringStatus.upcoming; // Próximo en los siguientes 7 días
+      return RecurringStatus.upcoming;
     } else {
-      return RecurringStatus.scheduled; // Programado para más adelante
-    }
-  }
-  
-  // Elimina un gasto fijo y muestra una notificación.
-  Future<void> _deleteItem(RecurringTransaction item) async {
-    try {
-      await widget.repository.deleteRecurringTransaction(item.id);
-      if(mounted) {
-        NotificationHelper.show(
-            context: context,
-            message: '"${item.description}" eliminado.',
-            type: NotificationType.error,
-          );
-      }
-    } catch (e) {
-      if(mounted) {
-        NotificationHelper.show(
-            context: context,
-            message: 'Error al eliminar "${e.toString()}"',
-            type: NotificationType.error,
-          );
-      }
+      return RecurringStatus.scheduled;
     }
   }
 
@@ -167,18 +206,7 @@ class _RecurringTransactionsScreenState extends State<RecurringTransactionsScree
                   break;
               }
 
-              return Dismissible(
-                key: ValueKey(item.id),
-                direction: DismissDirection.endToStart,
-                onDismissed: (_) => _deleteItem(item),
-                background: Container(
-                  color: Colors.red.shade400,
-                  alignment: Alignment.centerRight,
-                  padding: const EdgeInsets.only(right: 20.0),
-                  margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  child: const Icon(Iconsax.trash, color: Colors.white),
-                ),
-                child: Card(
+              return Card(
                   elevation: 0,
                   color: Theme.of(context).colorScheme.surfaceContainer,
                   margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -202,13 +230,19 @@ class _RecurringTransactionsScreenState extends State<RecurringTransactionsScree
                             color: item.type == 'Gasto' ? Colors.red.shade300 : Colors.green.shade400,
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        if (animationWidget != null) animationWidget,
+                        PopupMenuButton<String>(
+                            onSelected: (value) {
+                              if (value == 'edit') _navigateToEdit(item);
+                              if (value == 'delete') _handleDelete(item);
+                            },
+                            itemBuilder: (context) => [
+                                  const PopupMenuItem(value: 'edit', child: Text('Editar')),
+                                  const PopupMenuItem(value: 'delete', child: Text('Eliminar')),
+                                ]),
                       ],
                     ),
                   ),
-                ),
-              );
+                );
             },
           );
         },

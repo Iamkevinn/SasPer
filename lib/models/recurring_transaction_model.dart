@@ -51,6 +51,51 @@ class RecurringTransaction extends Equatable {
     );
   }
 
+  // ---- AÑADIMOS MÉTODO toJson ----
+  Map<String, dynamic> toJson() {
+    return {
+      'description': description,
+      'amount': amount,
+      'type': type,
+      'category': category,
+      'account_id': accountId,
+      'frequency': frequency,
+      'interval': interval,
+      'start_date': startDate.toIso8601String(),
+      'next_due_date': nextDueDate.toIso8601String(),
+      'end_date': endDate?.toIso8601String(),
+    };
+  }
+  
+  // ---- AÑADIMOS MÉTODO copyWith ----
+  RecurringTransaction copyWith({
+    String? id,
+    String? description,
+    double? amount,
+    String? type,
+    String? category,
+    String? accountId,
+    String? frequency,
+    int? interval,
+    // ... otros campos
+  }) {
+    return RecurringTransaction(
+      id: id ?? this.id,
+      userId: this.userId, // El userId no debería cambiar
+      description: description ?? this.description,
+      amount: amount ?? this.amount,
+      type: type ?? this.type,
+      category: category ?? this.category,
+      accountId: accountId ?? this.accountId,
+      frequency: frequency ?? this.frequency,
+      interval: interval ?? this.interval,
+      startDate: this.startDate, // La fecha de inicio no debería cambiar
+      nextDueDate: this.nextDueDate, // La próxima fecha la calcula el backend
+      endDate: this.endDate,
+      createdAt: this.createdAt,
+    );
+  }
+  
   @override
   List<Object?> get props => [id, userId, description, amount, type, category, accountId, frequency, interval, startDate, nextDueDate, endDate, createdAt];
 }

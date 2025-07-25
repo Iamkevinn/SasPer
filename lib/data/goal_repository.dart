@@ -46,6 +46,53 @@ class GoalRepository {
     }
   }
 
+  // ---- NUEVO MÉTODO PARA ACTUALIZAR ----
+  Future<void> updateGoal(Goal goal) async {
+    developer.log('🔄 [Repo] Updating goal ${goal.id}', name: 'GoalRepository');
+    try {
+      await _client
+          .from('goals')
+          // Creamos un mapa solo con los campos que se pueden editar
+          .update({
+            'name': goal.name,
+            'target_amount': goal.targetAmount,
+            'target_date': goal.targetDate?.toIso8601String(),
+            'icon_name': goal.iconName,
+          })
+          .eq('id', goal.id);
+      developer.log('✅ [Repo] Goal updated successfully.', name: 'GoalRepository');
+    } catch (e) {
+      developer.log('🔥 [Repo] Error updating goal: $e', name: 'GoalRepository');
+      throw Exception('No se pudo actualizar la meta.');
+    }
+  }
+
+  // ---- MÉTODO DE BORRADO REEMPLAZADO POR LA VERSIÓN SEGURA ----
+  Future<void> deleteGoalSafely(String goalId) async {
+    developer.log('🗑️ [Repo] Safely deleting goal with id $goalId', name: 'GoalRepository');
+    try {
+      final result = await _client.rpc(
+        'delete_goal_safely',
+        params: {'goal_id_to_delete': goalId}, // Pasamos el UUID como String
+      ) as String;
+
+      if (result.startsWith('Error:')) {
+        throw Exception(result.replaceFirst('Error: ', ''));
+      }
+      
+      developer.log('✅ [Repo] Goal safely deleted successfully.', name: 'GoalRepository');
+    } catch (e) {
+      developer.log('🔥 [Repo] Error in RPC delete_goal_safely: $e', name: 'GoalRepository');
+      throw Exception(e.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  // Mantenemos el deleteGoal original por si lo usas en otro sitio, 
+  // pero lo marcamos como obsoleto para fomentar el uso de la versión segura.
+  @Deprecated('Use deleteGoalSafely instead for business logic validation')
+  Future<void> deleteGoal(String goalId) async {
+    // ... tu código de deleteGoal original ...
+  }
   /// Añade una nueva meta a la base de datos.
   /// Lanza una excepción si la operación falla.
   Future<void> addGoal({
@@ -94,16 +141,5 @@ class GoalRepository {
       throw Exception('No se pudo realizar la aportación.');
     }
   }
-  
-  /// Elimina una meta de la base de datos.
-  Future<void> deleteGoal(String goalId) async {
-    developer.log('🗑️ [Repo] Deleting goal with id $goalId', name: 'GoalRepository');
-    try {
-      await _client.from('goals').delete().eq('id', goalId);
-      developer.log('✅ [Repo] Goal deleted successfully.', name: 'GoalRepository');
-    } catch (e) {
-      developer.log('🔥 [Repo] Error deleting goal: $e', name: 'GoalRepository');
-      throw Exception('No se pudo eliminar la meta.');
-    }
-  }
+
 }

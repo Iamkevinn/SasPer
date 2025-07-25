@@ -1,4 +1,6 @@
 // lib/screens/goals_screen.dart
+import 'dart:ui';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
@@ -12,6 +14,7 @@ import 'package:sasper/screens/add_goal_screen.dart';
 import 'package:sasper/data/goal_repository.dart';
 import 'package:sasper/models/goal_model.dart';
 import 'package:sasper/widgets/goals/contribute_to_goal_dialog.dart';
+import 'package:sasper/screens/edit_goal_screen.dart';
 
 class GoalsScreen extends StatefulWidget {
   final GoalRepository repository;
@@ -61,6 +64,53 @@ class _GoalsScreenState extends State<GoalsScreen> {
     }
   }
 
+  // ---- NUEVA FUNCIÓN PARA NAVEGAR A EDITAR ----
+  void _navigateToEditGoal(Goal goal) {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => EditGoalScreen(goalRepository: widget.repository, goal: goal),
+    ));
+  }
+
+  // ---- FUNCIÓN DE BORRADO ACTUALIZADA PARA SER SEGURA ----
+  Future<void> _handleDeleteGoal(Goal goal) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+        child: AlertDialog(
+          title: const Text('Confirmar eliminación'),
+          content: Text('¿Seguro que quieres eliminar la meta "${goal.name}"?'),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
+            FilledButton.tonal(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.errorContainer),
+              child: const Text('Eliminar'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        // Usamos la nueva función segura
+        await widget.repository.deleteGoalSafely(goal.id); 
+        NotificationHelper.show(
+            context: context,
+            message: 'Meta eliminada.',
+            type: NotificationType.success,
+        );
+      } catch (e) {
+        NotificationHelper.show(
+            context: context,
+            message: e.toString(), // El repo ya formatea el error
+            type: NotificationType.error,
+        );
+      }
+    }
+  }
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -138,36 +188,15 @@ class _GoalsScreenState extends State<GoalsScreen> {
           return AnimationConfiguration.staggeredList(
             position: index,
             duration: const Duration(milliseconds: 375),
-            child: SlideAnimation(
-              verticalOffset: 50.0,
-              child: FadeInAnimation(
-                child: Dismissible(
-                  key: ValueKey(goal.id),
-                  direction: DismissDirection.endToStart,
-                  onDismissed: (direction) => _deleteGoal(goal.id, goal.name),
-                  background: Container(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.error,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Icon(Iconsax.trash, color: Colors.white),
-                        SizedBox(width: 8),
-                        Text('Eliminar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  ),
-                  child: _GoalCard(
-                    goal: goal,
-                    isCompleted: isCompleted,
-                  ),
+            child: FadeInAnimation(
+                // REEMPLAZAMOS EL DISMISSIBLE POR EL _GoalCard con acciones
+                child: _GoalCard(
+                  goal: goal,
+                  isCompleted: isCompleted,
+                  onEdit: isCompleted ? null : () => _navigateToEditGoal(goal), // No se puede editar si ya está completada
+                  onDelete: () => _handleDeleteGoal(goal),
                 ),
               ),
-            ),
           );
         },
       ),
@@ -267,8 +296,15 @@ class _GoalsScreenState extends State<GoalsScreen> {
 class _GoalCard extends StatelessWidget {
   final Goal goal;
   final bool isCompleted;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
-  const _GoalCard({required this.goal, this.isCompleted = false});
+  const _GoalCard({
+    required this.goal, 
+    this.isCompleted = false,
+    this.onEdit,
+    this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -292,16 +328,22 @@ class _GoalCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Flexible(
-                    child: Text(
-                      goal.name,
-                      style: GoogleFonts.poppins(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: cardColor,
-                      ),
-                    ),
+                    child: Text(goal.name, style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold)),
                   ),
-                  if (isCompleted)
+                  // Si no está completada, mostramos el menú de opciones
+                  if (!isCompleted)
+                    PopupMenuButton<String>(
+                      onSelected: (value) {
+                        if (value == 'edit') onEdit?.call();
+                        if (value == 'delete') onDelete?.call();
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Iconsax.edit), title: Text('Editar Meta'))),
+                        const PopupMenuItem(value: 'delete', child: ListTile(leading: Icon(Iconsax.trash), title: Text('Eliminar'))),
+                      ],
+                      icon: const Icon(Iconsax.more),
+                    )
+                  else
                     Icon(Iconsax.verify, color: Colors.green, size: 24),
                 ],
               ),
