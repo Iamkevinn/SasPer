@@ -209,7 +209,7 @@ class DashboardScreenState extends State<DashboardScreen> {
 
           SliverToBoxAdapter(
             child: BudgetsSection(
-              budgets: data.budgetsProgress,
+              budgets: data.featuredBudgets,
               budgetRepository: widget.budgetRepository,
               // --- PASAMOS LOS REPOSITORIOS ADICIONALES ---
               transactionRepository: widget.transactionRepository,

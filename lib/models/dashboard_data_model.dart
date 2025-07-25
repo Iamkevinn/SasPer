@@ -11,6 +11,7 @@ class DashboardData extends Equatable {
   final String fullName;
   final List<Transaction> recentTransactions;
   final List<BudgetProgress> budgetsProgress;
+  final List<BudgetProgress> featuredBudgets; 
   final List<Goal> goals;
   final bool isLoading; 
 
@@ -19,6 +20,7 @@ class DashboardData extends Equatable {
     required this.fullName,
     required this.recentTransactions,
     required this.budgetsProgress,
+    required this.featuredBudgets,
     required this.goals,
     this.isLoading = false,
   });
@@ -46,6 +48,10 @@ class DashboardData extends Equatable {
         goals: (map['goals'] as List<dynamic>? ?? [])
             .map((e) => Goal.fromMap(e as Map<String, dynamic>))
             .toList(),
+         // --- 3. AÑADE EL MAPEO PARA LA NUEVA LISTA ---
+        featuredBudgets: (map['featured_budgets'] as List<dynamic>? ?? [])
+            .map((e) => BudgetProgress.fromMap(e as Map<String, dynamic>))
+            .toList(),
         isLoading: false,
       );
     } catch (e) {
@@ -63,6 +69,7 @@ class DashboardData extends Equatable {
       recentTransactions: [],
       budgetsProgress: [],
       goals: [],
+      featuredBudgets: [],
       isLoading: true,
     );
   }
@@ -72,6 +79,7 @@ class DashboardData extends Equatable {
     String? fullName,
     List<Transaction>? recentTransactions,
     List<BudgetProgress>? budgetsProgress,
+    List<BudgetProgress>? featuredBudgets,
     List<Goal>? goals,
     bool? isLoading,
   }) {
@@ -80,6 +88,7 @@ class DashboardData extends Equatable {
       fullName: fullName ?? this.fullName,
       recentTransactions: recentTransactions ?? this.recentTransactions,
       budgetsProgress: budgetsProgress ?? this.budgetsProgress,
+      featuredBudgets: featuredBudgets ?? this.featuredBudgets,
       goals: goals ?? this.goals,
       isLoading: isLoading ?? this.isLoading,
     );
@@ -91,6 +100,7 @@ class DashboardData extends Equatable {
         fullName,
         recentTransactions,
         budgetsProgress,
+        featuredBudgets,
         goals,
         isLoading,
       ];
