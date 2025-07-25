@@ -1,6 +1,7 @@
 // lib/models/dashboard_data_model.dart
 
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 import 'transaction_models.dart';
 import 'budget_models.dart';
 import 'goal_model.dart';
@@ -22,24 +23,36 @@ class DashboardData extends Equatable {
     this.isLoading = false,
   });
 
-  factory DashboardData.fromJson(Map<String, dynamic> json) {
+  factory DashboardData.fromMap(Map<String, dynamic> map) {
+    // --- AÑADIMOS PRINT DE DEBUG ---
+    if (kDebugMode) {
+      print('DEBUG [DashboardData.fromMap]: Mapa recibido: $map');
+    }
+    if (kDebugMode) {
+      print('DEBUG [DashboardData.fromMap]: Tipo de budgets_progress: ${map['budgets_progress'].runtimeType}');
+    }
+    
     try {
       return DashboardData(
-        totalBalance: (json['total_balance'] as num? ?? 0).toDouble(),
-        fullName: json['full_name'] as String? ?? 'Usuario',
-        recentTransactions: (json['recent_transactions'] as List<dynamic>? ?? [])
+        totalBalance: (map['total_balance'] as num? ?? 0).toDouble(),
+        fullName: map['full_name'] as String? ?? 'Usuario',
+        recentTransactions: (map['recent_transactions'] as List<dynamic>? ?? [])
             .map((e) => Transaction.fromMap(e as Map<String, dynamic>))
             .toList(),
-        budgetsProgress: (json['budgets_progress'] as List<dynamic>? ?? [])
-            .map((e) => BudgetProgress.fromJson(e as Map<String, dynamic>))
+        // --- Usamos el nuevo nombre del método: BudgetProgress.fromMap ---
+        budgetsProgress: (map['budgets_progress'] as List<dynamic>? ?? [])
+            .map((e) => BudgetProgress.fromMap(e as Map<String, dynamic>))
             .toList(),
-        goals: (json['goals'] as List<dynamic>? ?? [])
+        goals: (map['goals'] as List<dynamic>? ?? [])
             .map((e) => Goal.fromMap(e as Map<String, dynamic>))
             .toList(),
-        isLoading: false, // <-- LA CORRECCIÓN ESTÁ AQUÍ
+        isLoading: false,
       );
     } catch (e) {
-      throw FormatException('Error al parsear DashboardData: $e', json);
+      if (kDebugMode) {
+        print('🔥 ERROR en DashboardData.fromMap: $e, Mapa: $map');
+      }
+      throw FormatException('Error al parsear DashboardData: $e', map);
     }
   }
 

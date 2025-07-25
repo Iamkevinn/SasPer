@@ -1,20 +1,21 @@
-// lib/models/transaction_models.dart
+// lib/models/transaction_models.dart (CORREGIDO)
 import 'package:equatable/equatable.dart';
 
 class Transaction extends Equatable {
-  // En tu tabla es 'bigint', lo representamos como String para consistencia
-  // con los UUIDs de otros modelos, pero lo parseamos desde un número.
-  final int  id; 
+  final int id; 
   final String userId;
-  final String? accountId;
-  final String type; // En tu tabla es 'text', así que String es correcto.
+  final String? accountId; // UUID, correcto como String
+  final String type;
   final String? category;
   final String? description;
-  final double amount; // 'numeric' en SQL se mapea a double en Dart.
+  final double amount;
   final DateTime transactionDate;
-  final String? debtId;
-  final String? goalId;
-  final String? transferId; // Campo que ya tienes en tu tabla.
+
+  // --- CORRECCIÓN DE TIPOS DE DATOS ---
+  // Los IDs de otras tablas son numéricos (bigint), por lo tanto, 'int' en Dart.
+  final int? debtId;
+  final int? goalId;
+  final int? transferId;
 
   const Transaction({
     required this.id,
@@ -32,32 +33,37 @@ class Transaction extends Equatable {
 
   factory Transaction.fromMap(Map<String, dynamic> map) {
     try {
-      // Validamos los campos no nulos según tu esquema
+      // Esta validación no es estrictamente necesaria si el catch es bueno, pero la mantenemos.
       ArgumentError.checkNotNull(map['id'], 'id');
       ArgumentError.checkNotNull(map['user_id'], 'user_id');
       ArgumentError.checkNotNull(map['transaction_date'], 'transaction_date');
 
       return Transaction(
-        // El ID es un bigint, pero lo convertimos a String para la UI.
         id: map['id'] as int, 
         userId: map['user_id'] as String,
         accountId: map['account_id'] as String?,
-        // Proporcionamos un valor por defecto si el tipo es nulo
         type: map['type'] as String? ?? 'Gasto', 
         category: map['category'] as String?,
         description: map['description'] as String?,
-        // Tu tabla permite 'amount' nulo, así que lo manejamos.
         amount: (map['amount'] as num? ?? 0.0).toDouble(),
         transactionDate: DateTime.parse(map['transaction_date'] as String),
-        debtId: map['debt_id'] as String?,
-        goalId: map['goal_id'] as String?,
-        transferId: map['transfer_id'] as String?,
+
+        // --- CORRECCIÓN DE CASTEO ---
+        // Ahora casteamos a 'int?' para que coincida con el tipo de la propiedad.
+        debtId: map['debt_id'] as int?,
+        goalId: map['goal_id'] as int?,
+        transferId: map['transfer_id'] as int?,
       );
-    } catch (e) {
-      throw FormatException('Error al parsear Transaction: $e', map);
+    } catch (e, stackTrace) {
+      // Un catch más informativo para depuración futura.
+      print('🔥🔥🔥 ERROR FATAL al parsear Transaction: $e');
+      print('🔥🔥🔥 Mapa que causó el error: $map');
+      print('🔥🔥🔥 StackTrace: $stackTrace');
+      rethrow;
     }
   }
 
+  // El método copyWith también debe ser actualizado con los nuevos tipos.
   Transaction copyWith({
     int? id,
     String? userId,
@@ -67,9 +73,9 @@ class Transaction extends Equatable {
     String? description,
     double? amount,
     DateTime? transactionDate,
-    String? debtId,
-    String? goalId,
-    String? transferId,
+    int? debtId, // <-- tipo corregido
+    int? goalId, // <-- tipo corregido
+    int? transferId, // <-- tipo corregido
   }) {
     return Transaction(
       id: id ?? this.id,

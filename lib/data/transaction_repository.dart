@@ -1,6 +1,7 @@
 // lib/data/transaction_repository.dart
 
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:sasper/models/transaction_models.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:developer' as developer;
@@ -13,11 +14,11 @@ class TransactionRepository {
   final SupabaseClient _client;
 
   // 1. AÑADIDO: Controlador para manejar el stream.
-  final _transactionsController = StreamController<List<Transaction>>.broadcast();
-  
+  final _transactionsController =
+      StreamController<List<Transaction>>.broadcast();
+
   // 2. AÑADIDO: Variable para guardar la suscripción de Supabase.
   RealtimeChannel? _transactionsChannel;
-
 
   TransactionRepository({SupabaseClient? client})
       : _client = client ?? Supabase.instance.client;
@@ -35,11 +36,51 @@ class TransactionRepository {
           callback: (payload) => _fetchAndPushTransactions(),
         )
         .subscribe();
-    
+
     _fetchAndPushTransactions(); // Hacemos una carga inicial de los datos.
     return _transactionsController.stream;
   }
 
+  // --- NUEVO MÉTODO ---
+  // --- FUNCIÓN REESCRITA PARA SER 100% ROBUSTA ---
+  Future<List<Transaction>> getTransactionsForBudget(String budgetId) async {
+    developer.log('🔄 [Repo] Fetching transactions for budget ID: $budgetId', name: 'TransactionRepository');
+    
+    try {
+      // 1. Ejecutamos la consulta a la base de datos.
+      // Usamos int.parse() para asegurar que comparamos números con números.
+      final response = await _client
+          .from('transactions')
+          .select()
+          .eq('budget_id', int.parse(budgetId))
+          .order('transaction_date', ascending: false);
+
+      // 2. Comprobamos explícitamente si la respuesta es una lista.
+      // Aunque Supabase casi siempre devuelve una lista, esto añade una capa de seguridad.
+      if (response is List) {
+        // 3. Mapeamos la lista a nuestros objetos Transaction.
+        // Si la lista está vacía, .map no hará nada y devolverá una lista vacía, lo cual es perfecto.
+        final transactions = response.map((data) => Transaction.fromMap(data)).toList();
+        developer.log('✅ [Repo] Found ${transactions.length} transactions for budget $budgetId.', name: 'TransactionRepository');
+        return transactions;
+      } else {
+        // 4. Si la respuesta no es una lista (caso muy raro), lo registramos y devolvemos una lista vacía.
+        developer.log('⚠️ [Repo] Response for budget transactions was not a List. Type: ${response.runtimeType}', name: 'TransactionRepository');
+        return [];
+      }
+
+    } catch (e, stackTrace) {
+      // 5. El bloque CATCH ahora solo se activará por errores REALES:
+      //    - Error de red (sin conexión).
+      //    - Error de permisos (RLS).
+      //    - Error de sintaxis en la consulta (ej. columna mal escrita).
+      //    - Error de parseo en Transaction.fromMap (que ya tiene su propio log).
+      developer.log('🔥 [Repo] FATAL ERROR fetching budget transactions: $e', name: 'TransactionRepository', error: e, stackTrace: stackTrace);
+      
+      // 6. En caso de un error fatal, lanzamos la excepción para que la UI pueda mostrar un mensaje de error real.
+      throw Exception('Error al conectar con la base de datos.');
+    }
+  }
   // --- NUEVO MÉTODO ---
   Future<void> forceRefresh() async {
     developer.log('🔄 [Repo] Manual refresh requested for all transactions.');
@@ -55,15 +96,17 @@ class TransactionRepository {
           .select()
           .eq('user_id', _client.auth.currentUser!.id)
           .order('transaction_date', ascending: false);
-      
-      final transactions = (data as List).map((t) => Transaction.fromMap(t)).toList();
-      
+
+      final transactions =
+          (data as List).map((t) => Transaction.fromMap(t)).toList();
+
       if (!_transactionsController.isClosed) {
         _transactionsController.add(transactions);
-        developer.log('✅ [Repo] Pushed ${transactions.length} transactions to the stream.');
+        developer.log(
+            '✅ [Repo] Pushed ${transactions.length} transactions to the stream.');
       }
     } catch (e) {
-       if (!_transactionsController.isClosed) {
+      if (!_transactionsController.isClosed) {
         _transactionsController.addError(e);
         developer.log('🔥 [Repo] Error fetching transactions: $e');
       }
@@ -80,7 +123,8 @@ class TransactionRepository {
     required String description,
     required DateTime transactionDate,
   }) async {
-    developer.log('➕ [Repo] Adding new transaction...', name: 'TransactionRepository');
+    developer.log('➕ [Repo] Adding new transaction...',
+        name: 'TransactionRepository');
     try {
       await _client.from('transactions').insert({
         'user_id': _client.auth.currentUser!.id,
@@ -91,10 +135,12 @@ class TransactionRepository {
         'description': description,
         'transaction_date': transactionDate.toIso8601String(),
       });
-      developer.log('✅ [Repo] Transaction added successfully.', name: 'TransactionRepository');
+      developer.log('✅ [Repo] Transaction added successfully.',
+          name: 'TransactionRepository');
       // No necesitamos EventService aquí. El DashboardRepository ya escucha los cambios en la tabla 'transactions'.
     } catch (e) {
-      developer.log('🔥 [Repo] Error adding transaction: $e', name: 'TransactionRepository');
+      developer.log('🔥 [Repo] Error adding transaction: $e',
+          name: 'TransactionRepository');
       throw Exception('No se pudo añadir la transacción.');
     }
   }
@@ -107,14 +153,15 @@ class TransactionRepository {
           .select()
           .eq('id', transactionId)
           .single(); // .single() espera una sola fila o lanza un error
-          
+
       return Transaction.fromMap(response);
     } catch (e) {
-      developer.log('🔥 Error fetching transaction by id $transactionId: $e', name: 'TransactionRepository');
+      developer.log('🔥 Error fetching transaction by id $transactionId: $e',
+          name: 'TransactionRepository');
       return null; // Devuelve null si no se encuentra o hay un error
     }
   }
-  
+
   /// Actualiza una transacción existente.
   Future<void> updateTransaction({
     required int transactionId, // El ID de la transacción es un 'bigint' -> int
@@ -125,7 +172,8 @@ class TransactionRepository {
     required String description,
     required DateTime transactionDate,
   }) async {
-    developer.log('🔄 [Repo] Updating transaction $transactionId...', name: 'TransactionRepository');
+    developer.log('🔄 [Repo] Updating transaction $transactionId...',
+        name: 'TransactionRepository');
     try {
       await _client.from('transactions').update({
         'account_id': accountId,
@@ -135,29 +183,33 @@ class TransactionRepository {
         'description': description,
         'transaction_date': transactionDate.toIso8601String(),
       }).eq('id', transactionId);
-      developer.log('✅ [Repo] Transaction updated successfully.', name: 'TransactionRepository');
+      developer.log('✅ [Repo] Transaction updated successfully.',
+          name: 'TransactionRepository');
     } catch (e) {
-      developer.log('🔥 [Repo] Error updating transaction: $e', name: 'TransactionRepository');
+      developer.log('🔥 [Repo] Error updating transaction: $e',
+          name: 'TransactionRepository');
       throw Exception('No se pudo actualizar la transacción.');
     }
   }
 
   /// Elimina una transacción.
   Future<void> deleteTransaction(int transactionId) async {
-    developer.log('🗑️ [Repo] Deleting transaction $transactionId...', name: 'TransactionRepository');
+    developer.log('🗑️ [Repo] Deleting transaction $transactionId...',
+        name: 'TransactionRepository');
     try {
       await _client.from('transactions').delete().eq('id', transactionId);
-      developer.log('✅ [Repo] Transaction deleted successfully.', name: 'TransactionRepository');
+      developer.log('✅ [Repo] Transaction deleted successfully.',
+          name: 'TransactionRepository');
     } catch (e) {
-      developer.log('🔥 [Repo] Error deleting transaction: $e', name: 'TransactionRepository');
+      developer.log('🔥 [Repo] Error deleting transaction: $e',
+          name: 'TransactionRepository');
       throw Exception('No se pudo eliminar la transacción.');
     }
   }
 
-   void dispose() {
+  void dispose() {
     developer.log('❌ [Repo] Disposing TransactionRepository resources.');
     _transactionsChannel?.unsubscribe();
     _transactionsController.close();
   }
-
 }

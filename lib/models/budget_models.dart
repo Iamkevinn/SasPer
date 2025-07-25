@@ -1,6 +1,7 @@
 // lib/models/budget_models.dart (VERSIÓN FINAL Y COMPLETA)
 
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 
@@ -41,18 +42,24 @@ class BudgetProgress extends Equatable {
 
   /// Constructor factory para crear una instancia de BudgetProgress desde un mapa JSON
   /// que viene de la API de Supabase.
-  factory BudgetProgress.fromJson(Map<String, dynamic> json) {
+  factory BudgetProgress.fromMap(Map<String, dynamic> map) {
     try {
+      // --- AÑADIMOS PRINT DE DEBUG ---
+      if (kDebugMode) {
+        print('DEBUG [BudgetProgress.fromMap]: Procesando mapa: $map');
+      }
+
       return BudgetProgress(
-        // Leemos el 'budget_id' que ahora nos envía la función RPC.
-        budgetId: json['budget_id'] as int? ?? 0,
-        category: json['category'] as String? ?? 'Sin Categoría',
-        budgetAmount: (json['budget_amount'] as num? ?? 0).toDouble(),
-        spentAmount: (json['spent_amount'] as num? ?? 0).toDouble(),
+        budgetId: map['budget_id'] as int? ?? 0,
+        category: map['category'] as String? ?? 'Sin Categoría',
+        budgetAmount: (map['budget_amount'] as num? ?? 0).toDouble(),
+        spentAmount: (map['spent_amount'] as num? ?? 0).toDouble(),
       );
     } catch (e) {
-      // Si algo falla durante el parseo, lanzamos un error más descriptivo.
-      throw FormatException('Error al parsear BudgetProgress desde JSON: $e', json);
+      if (kDebugMode) {
+        print('🔥 ERROR en BudgetProgress.fromMap: $e, Mapa: $map');
+      }
+      throw FormatException('Error al parsear BudgetProgress desde JSON: $e', map);
     }
   }
 

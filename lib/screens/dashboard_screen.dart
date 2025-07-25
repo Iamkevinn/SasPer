@@ -211,6 +211,9 @@ class DashboardScreenState extends State<DashboardScreen> {
             child: BudgetsSection(
               budgets: data.budgetsProgress,
               budgetRepository: widget.budgetRepository,
+              // --- PASAMOS LOS REPOSITORIOS ADICIONALES ---
+              transactionRepository: widget.transactionRepository,
+              accountRepository: widget.accountRepository,
             ),
           ),
           

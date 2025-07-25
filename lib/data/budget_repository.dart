@@ -111,7 +111,7 @@ class BudgetRepository {
     try {
       final response = await _client.rpc('get_budgets_progress');
       final budgetsProgress = (response as List)
-          .map((data) => BudgetProgress.fromJson(data))
+          .map((data) => BudgetProgress.fromMap(data))
           .toList();
       developer.log('✅ [Repo] Fetched ${budgetsProgress.length} budget progress items via RPC.');
       return budgetsProgress;

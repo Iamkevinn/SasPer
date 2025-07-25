@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'dart:developer' as developer;
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sasper/models/dashboard_data_model.dart';
 
@@ -62,7 +63,14 @@ class DashboardRepository {
         params: {'p_user_id': userId},
       );
 
-      final dashboardData = DashboardData.fromJson(data);
+      // --- AÑADIMOS PRINT DE DEBUG ---
+      if (kDebugMode) {
+        print('DEBUG [DashboardRepository]: Datos crudos RPC: $data');
+      }
+      
+      // --- Usamos el nuevo nombre del método: DashboardData.fromMap ---
+      final dashboardData = DashboardData.fromMap(data);
+      
       if (!_dashboardDataController.isClosed) {
         _dashboardDataController.add(dashboardData);
         developer.log('✅ [Repo] Pushed new dashboard data to the stream.', name: 'DashboardRepository');
