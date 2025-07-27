@@ -40,6 +40,12 @@ class BudgetProgress extends Equatable {
     return BudgetStatus.onTrack;
   }
 
+  Map<String, dynamic> toJson() => {
+    'category': category,
+    'budgetAmount': budgetAmount,
+    'spentAmount': spentAmount,
+    'progress': progress,
+  };
   /// Constructor factory para crear una instancia de BudgetProgress desde un mapa JSON
   /// que viene de la API de Supabase.
   factory BudgetProgress.fromMap(Map<String, dynamic> map) {

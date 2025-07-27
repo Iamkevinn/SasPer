@@ -49,6 +49,7 @@ dependencies {
     implementation("androidx.multidex:multidex:2.0.1")
     implementation("androidx.palette:palette:1.0.0")
     implementation("androidx.core:core-ktx:1.12.0")
+    implementation("com.google.code.gson:gson:2.10.1")
 }
 
 flutter {

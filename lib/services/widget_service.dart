@@ -5,6 +5,7 @@ import 'dart:developer' as developer;
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
+import 'dart:convert'; 
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart'; // Ahora es crucial para TextPainter
 import 'package:home_widget/home_widget.dart';
@@ -13,15 +14,19 @@ import 'package:path_provider/path_provider.dart';
 import 'package:sasper/data/analysis_repository.dart';
 import 'package:sasper/models/analysis_models.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:sasper/models/budget_models.dart'; // <-- IMPORTANTE
+import 'package:sasper/models/dashboard_data_model.dart'; // <-- IMPORTANTE
+import 'package:sasper/models/transaction_models.dart'; // <-- IMPORTANTE
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class WidgetService {
   
-  static Future<void> updateAllWidgetData({required double totalBalance}) async {
+  static Future<void> updateAllWidgetData({required DashboardData data,}) async {
     developer.log('🔄 [Service] Starting full widget update...', name: 'WidgetService');
     try {
       final formattedBalance = NumberFormat.currency(
-        locale: 'es_ES', symbol: '€', decimalDigits: 2,
-      ).format(totalBalance);
+        locale: 'es_CO', symbol: '', decimalDigits: 2,
+      ).format(data.totalBalance);
 
       final analysisRepo = AnalysisRepository(client: Supabase.instance.client);
       final expenseData = await analysisRepo.getExpenseSummaryForWidget();
@@ -41,11 +46,26 @@ class WidgetService {
         developer.log('ℹ️ [Service] No expense data for chart.', name: 'WidgetService');
       }
 
+      // --- 3. SERIALIZAR LAS LISTAS A JSON ---
+      // Convertimos la lista de presupuestos destacados a un String JSON.
+      final budgetsJson = jsonEncode(
+        data.budgetsProgress.map((budget) => budget.toJson()).toList()
+      );
+      // Convertimos la lista de transacciones recientes a un String JSON.
+      final transactionsJson = jsonEncode(
+        data.recentTransactions.take(3).map((tx) => tx.toJson()).toList()
+      );
+      
       await HomeWidget.saveWidgetData<String>('total_balance', formattedBalance);
       await HomeWidget.saveWidgetData<String>('widget_chart_path', chartPath);
+      await HomeWidget.saveWidgetData<String>('featured_budgets_json', budgetsJson);
+      await HomeWidget.saveWidgetData<String>('recent_transactions_json', transactionsJson);
+      await HomeWidget.saveWidgetData<String>('budgets_json', budgetsJson);
+
 
       await HomeWidget.updateWidget(name: 'SasPerWidgetProvider');
       await HomeWidget.updateWidget(name: 'SasPerMediumWidgetProvider');
+      await HomeWidget.updateWidget(name: 'SasPerLargeWidgetProvider');
       
       developer.log('✅ [Service] Full widget update sent.', name: 'WidgetService');
     } catch (e, stackTrace) {

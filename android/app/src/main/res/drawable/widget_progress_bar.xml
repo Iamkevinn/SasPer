@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Capa de fondo (la parte "sin rellenar" de la barra) -->
+    <item android:id="@android:id/background">
+        <shape>
+            <corners android:radius="5dp" />
+            <!-- Color de fallback para Android < 12 -->
+            <solid android:color="#E0E0E0" />
+        </shape>
+    </item>
+
+    <!-- Capa de progreso (la parte que se rellena) -->
+    <item android:id="@android:id/progress">
+        <clip>
+            <shape>
+                <corners android:radius="5dp" />
+                <!-- Color de fallback para Android < 12 -->
+                <solid android:color="#0D47A1" />
+            </shape>
+        </clip>
+    </item>
+
+</layer-list>

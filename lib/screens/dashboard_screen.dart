@@ -188,7 +188,11 @@ class DashboardScreenState extends State<DashboardScreen> {
     // Esto agrupa las llamadas y solo ejecuta la última después de 500ms de inactividad.
     _widgetUpdateTimer?.cancel();
     _widgetUpdateTimer = Timer(const Duration(milliseconds: 500), () {
-      WidgetService.updateAllWidgetData(totalBalance: data.totalBalance);
+      //WidgetService.updateAllWidgetData(totalBalance: data.totalBalance);
+      if (mounted) {
+        // --- LLAMADA CORREGIDA ---
+        WidgetService.updateAllWidgetData(data: data);
+      }
     });
   }
 

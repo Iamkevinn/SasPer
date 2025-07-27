@@ -74,7 +74,7 @@
         </receiver>
 
         <!-- === AÑADE ESTE BLOQUE NUEVO PARA EL WIDGET MEDIANO === -->
-        <receiver android:name=".SasPerMediumWidgetProvider" android:exported="false">
+        <receiver android:name=".SasPerMediumWidgetProvider" android:exported="true" tools:replace="android:exported" android:label="SasPer Gráfico">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
@@ -82,6 +82,20 @@
                 android:resource="@xml/widget_medium_info" />
         </receiver>
         
+         <!-- === AÑADE ESTE BLOQUE NUEVO PARA EL WIDGET GRANDE === -->
+        <receiver android:name=".SasPerLargeWidgetProvider" android:exported="true" tools:replace="android:exported" android:label="SasPer Detallado">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/widget_large_info" />
+        </receiver>
+        
+        <service
+            android:name=".WidgetListService"
+            android:permission="android.permission.BIND_REMOTEVIEWS"
+            android:exported="false" />
+
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />

@@ -1,5 +1,6 @@
 // lib/models/transaction_models.dart (CORREGIDO)
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 
 class Transaction extends Equatable {
   final int id; 
@@ -31,6 +32,13 @@ class Transaction extends Equatable {
     this.transferId,
   });
 
+  Map<String, dynamic> toJson() => {
+     'description': description,
+     'amount': amount,
+     'type': type,
+     'category': category,
+   };
+
   factory Transaction.fromMap(Map<String, dynamic> map) {
     try {
       // Esta validación no es estrictamente necesaria si el catch es bueno, pero la mantenemos.
@@ -56,9 +64,15 @@ class Transaction extends Equatable {
       );
     } catch (e, stackTrace) {
       // Un catch más informativo para depuración futura.
-      print('🔥🔥🔥 ERROR FATAL al parsear Transaction: $e');
-      print('🔥🔥🔥 Mapa que causó el error: $map');
-      print('🔥🔥🔥 StackTrace: $stackTrace');
+      if (kDebugMode) {
+        print('🔥🔥🔥 ERROR FATAL al parsear Transaction: $e');
+      }
+      if (kDebugMode) {
+        print('🔥🔥🔥 Mapa que causó el error: $map');
+      }
+      if (kDebugMode) {
+        print('🔥🔥🔥 StackTrace: $stackTrace');
+      }
       rethrow;
     }
   }
