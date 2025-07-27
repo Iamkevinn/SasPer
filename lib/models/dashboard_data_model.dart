@@ -1,11 +1,12 @@
-// lib/models/dashboard_data_model.dart
+// lib/models/dashboard_data_model.dart (VERSIÓN FINAL Y LIMPIA)
 
 import 'package:equatable/equatable.dart';
-import 'package:flutter/foundation.dart';
 import 'transaction_models.dart';
 import 'budget_models.dart';
 import 'goal_model.dart';
+import 'analysis_models.dart';
 
+/// Representa todos los datos necesarios para construir la pantalla del Dashboard.
 class DashboardData extends Equatable {
   final double totalBalance;
   final String fullName;
@@ -25,15 +26,8 @@ class DashboardData extends Equatable {
     this.isLoading = false,
   });
 
+  /// Crea una instancia de [DashboardData] a partir de un mapa JSON (generalmente de una API).
   factory DashboardData.fromMap(Map<String, dynamic> map) {
-    // --- AÑADIMOS PRINT DE DEBUG ---
-    if (kDebugMode) {
-      print('DEBUG [DashboardData.fromMap]: Mapa recibido: $map');
-    }
-    if (kDebugMode) {
-      print('DEBUG [DashboardData.fromMap]: Tipo de budgets_progress: ${map['budgets_progress'].runtimeType}');
-    }
-    
     try {
       return DashboardData(
         totalBalance: (map['total_balance'] as num? ?? 0).toDouble(),
@@ -41,39 +35,38 @@ class DashboardData extends Equatable {
         recentTransactions: (map['recent_transactions'] as List<dynamic>? ?? [])
             .map((e) => Transaction.fromMap(e as Map<String, dynamic>))
             .toList(),
-        // --- Usamos el nuevo nombre del método: BudgetProgress.fromMap ---
         budgetsProgress: (map['budgets_progress'] as List<dynamic>? ?? [])
+            .map((e) => BudgetProgress.fromMap(e as Map<String, dynamic>))
+            .toList(),
+        featuredBudgets: (map['featured_budgets'] as List<dynamic>? ?? [])
             .map((e) => BudgetProgress.fromMap(e as Map<String, dynamic>))
             .toList(),
         goals: (map['goals'] as List<dynamic>? ?? [])
             .map((e) => Goal.fromMap(e as Map<String, dynamic>))
             .toList(),
-         // --- 3. AÑADE EL MAPEO PARA LA NUEVA LISTA ---
-        featuredBudgets: (map['featured_budgets'] as List<dynamic>? ?? [])
-            .map((e) => BudgetProgress.fromMap(e as Map<String, dynamic>))
-            .toList(),
         isLoading: false,
       );
     } catch (e) {
-      if (kDebugMode) {
-        print('🔥 ERROR en DashboardData.fromMap: $e, Mapa: $map');
-      }
-      throw FormatException('Error al parsear DashboardData: $e', map);
+      // relanzar el error ayuda a la depuración, pero se puede quitar en producción
+      // si se quiere que la app no crashee por datos malformados.
+      rethrow; 
     }
   }
 
+  /// Crea una instancia "vacía" o de carga de [DashboardData].
   factory DashboardData.empty() {
     return const DashboardData(
       totalBalance: 0.0,
       fullName: 'Cargando...',
       recentTransactions: [],
       budgetsProgress: [],
-      goals: [],
       featuredBudgets: [],
+      goals: [],
       isLoading: true,
     );
   }
 
+  /// Crea una copia del objeto actual con los valores proporcionados.
   DashboardData copyWith({
     double? totalBalance,
     String? fullName,

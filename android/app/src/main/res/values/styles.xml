@@ -23,5 +23,18 @@
     <style name="Theme.Material3.Widget.AppWidget" parent="AppTheme">
         <!-- No necesitas redeclarar colorSurfaceVariant aquí -->
     </style>
+    
+    <!-- NUEVOS ESTILOS PARA EL TEXTO DEL WIDGET -->
+    <style name="Widget.Text.Title" parent="android:Widget.TextView">
+        <item name="android:textSize">16sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textColor">?android:attr/textColorPrimary</item>
+    </style>
 
+    <style name="Widget.Text.Balance" parent="android:Widget.TextView">
+        <item name="android:textSize">28sp</item>
+        <item name="android:fontFamily">sans-serif-black</item> <!-- Usamos "black" para máxima negrita -->
+        <item name="android:textColor">?android:attr/textColorPrimary</item>
+    </style>
+    
 </resources>

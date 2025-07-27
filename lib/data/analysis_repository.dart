@@ -10,6 +10,30 @@ class AnalysisRepository {
   AnalysisRepository({SupabaseClient? client})
       : _client = client ?? Supabase.instance.client;
 
+  // --- NUEVO MÉTODO PÚBLICO ---
+  // Extraemos la lógica que ya tenías para poder llamarla individualmente.
+  Future<List<ExpenseByCategory>> getExpenseSummaryForWidget() async {
+    developer.log("📈 [Repository] Fetching expense summary for widget...", name: 'AnalysisRepository');
+    try {
+      final userId = _client.auth.currentUser?.id;
+      if (userId == null) return []; // Si no hay usuario, devuelve una lista vacía.
+
+      final clientDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+      final result = await _client.rpc(
+        'get_expense_summary_by_category', 
+        params: {'p_user_id': userId, 'client_date': clientDate}
+      );
+      
+      // El parseo es el mismo que ya usas en fetchAllAnalysisData.
+      return (result as List).map((e) => ExpenseByCategory.fromJson(e)).toList();
+
+    } catch (e) {
+      developer.log('🔥 Error en getExpenseSummaryForWidget: $e', name: 'AnalysisRepository');
+      return []; // En caso de error, devuelve una lista vacía para no romper el widget.
+    }
+  }
+  
   Future<AnalysisData> fetchAllAnalysisData() async {
     developer.log("📈 [Repository] Fetching all analysis data...", name: 'AnalysisRepository');
     try {

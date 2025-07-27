@@ -1,18 +1,24 @@
 // lib/screens/dashboard_screen.dart (CORREGIDO Y COMPLETO)
 
 import 'dart:async';
+import 'dart:io';
 import 'dart:ui'; // Necesario para ImageFilter.blur
+import 'dart:ui' as ui;
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:sasper/data/account_repository.dart';
+import 'package:sasper/data/analysis_repository.dart';
 import 'package:sasper/data/transaction_repository.dart';
+import 'package:sasper/models/analysis_models.dart';
 import 'package:sasper/models/transaction_models.dart';
 import 'package:sasper/screens/edit_transaction_screen.dart';
 import 'package:sasper/screens/transactions_screen.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:shimmer/shimmer.dart';
-
+import 'package:flutter/rendering.dart';
 import 'package:sasper/data/budget_repository.dart';
 import 'package:sasper/data/dashboard_repository.dart';
 import 'package:sasper/models/dashboard_data_model.dart';
@@ -23,6 +29,7 @@ import 'package:sasper/widgets/dashboard/balance_card.dart';
 import 'package:sasper/widgets/dashboard/budgets_section.dart';
 import 'package:sasper/widgets/dashboard/dashboard_header.dart';
 import 'package:sasper/widgets/dashboard/recent_transactions_section.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class DashboardScreen extends StatefulWidget {
   final DashboardRepository repository;
@@ -46,6 +53,9 @@ class DashboardScreen extends StatefulWidget {
 class DashboardScreenState extends State<DashboardScreen> {
   late final Stream<DashboardData> _dashboardDataStream;
   late final StreamSubscription<AppEvent> _eventSubscription;
+  final GlobalKey repaintBoundaryKey = GlobalKey();
+  Timer? _widgetUpdateTimer;
+  // 1. Creamos la GlobalKey para el RepaintBoundary
 
   @override
   void initState() {
@@ -63,7 +73,9 @@ class DashboardScreenState extends State<DashboardScreen> {
         AppEvent.transactionCreated, // <-- AÑADIDO
         AppEvent.transactionUpdated,
       }.contains(event)) {
-        if (kDebugMode) print("Dashboard: Evento '$event' recibido. Forzando refresh...");
+        if (kDebugMode) {
+          print("Dashboard: Evento '$event' recibido. Forzando refresh...");
+        }
         widget.repository.forceRefresh();
       }
     });
@@ -91,10 +103,11 @@ class DashboardScreenState extends State<DashboardScreen> {
       ),
     );
   }
-  
+
   // 2. NUEVA FUNCIÓN: Maneja el toque en una transacción.
   void _handleTransactionTap(Transaction transaction) {
-    Navigator.of(context).push<bool>(
+    Navigator.of(context)
+        .push<bool>(
       MaterialPageRoute(
         builder: (context) => EditTransactionScreen(
           transaction: transaction,
@@ -102,7 +115,8 @@ class DashboardScreenState extends State<DashboardScreen> {
           accountRepository: widget.accountRepository,
         ),
       ),
-    ).then((changed) {
+    )
+        .then((changed) {
       // Si la pantalla de edición devuelve 'true', refrescamos los datos.
       if (changed == true) {
         widget.repository.forceRefresh();
@@ -117,16 +131,22 @@ class DashboardScreenState extends State<DashboardScreen> {
       builder: (context) => BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
         child: AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28.0)),
-          backgroundColor: Theme.of(context).colorScheme.surface.withOpacity(0.85),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(28.0)),
+          backgroundColor:
+              Theme.of(context).colorScheme.surface.withOpacity(0.85),
           title: const Text('Confirmar eliminación'),
-          content: const Text('¿Estás seguro? Esta acción no se puede deshacer.'),
+          content:
+              const Text('¿Estás seguro? Esta acción no se puede deshacer.'),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
+            TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancelar')),
             FilledButton.tonal(
               style: FilledButton.styleFrom(
                   backgroundColor: Theme.of(context).colorScheme.errorContainer,
-                  foregroundColor: Theme.of(context).colorScheme.onErrorContainer),
+                  foregroundColor:
+                      Theme.of(context).colorScheme.onErrorContainer),
               onPressed: () => Navigator.of(context).pop(true),
               child: const Text('Eliminar'),
             ),
@@ -161,6 +181,16 @@ class DashboardScreenState extends State<DashboardScreen> {
     }
     return false; // No se confirmó el borrado
   }
+  
+  // Se simplifica enormemente. Ya no necesita el 'context' ni el callback.
+  void _updateWidgets(DashboardData data) {
+    // Usamos un Timer para evitar llamar a la actualización en cada rebuild.
+    // Esto agrupa las llamadas y solo ejecuta la última después de 500ms de inactividad.
+    _widgetUpdateTimer?.cancel();
+    _widgetUpdateTimer = Timer(const Duration(milliseconds: 500), () {
+      WidgetService.updateAllWidgetData(totalBalance: data.totalBalance);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -172,15 +202,20 @@ class DashboardScreenState extends State<DashboardScreen> {
         child: StreamBuilder<DashboardData>(
           stream: _dashboardDataStream,
           builder: (context, snapshot) {
-            if (snapshot.hasData) {
-              final data = snapshot.data!;
-              WidgetService.updateWidgetData(totalBalance: data.totalBalance);
-              return _buildDashboardContent(data);
-            }
             if (snapshot.hasError) {
               return Center(child: Text('Error al cargar los datos: ${snapshot.error}'));
             }
-            return _buildLoadingShimmer();
+            if (!snapshot.hasData) {
+              return _buildLoadingShimmer(); // Muestra el shimmer mientras no haya datos
+            }
+
+            final data = snapshot.data!;
+
+            // Llamamos a la función de actualización de una forma segura y optimizada
+            _updateWidgets(data); 
+            return _buildDashboardContent(data);
+
+
           },
         ),
       ),
@@ -203,9 +238,10 @@ class DashboardScreenState extends State<DashboardScreen> {
             title: DashboardHeader(userName: data.fullName),
             toolbarHeight: 80, // Aumenta la altura para dar más espacio
           ),
-          
+
           // 4. Cada widget principal ahora es un "Sliver".
-          SliverToBoxAdapter(child: BalanceCard(totalBalance: data.totalBalance)),
+          SliverToBoxAdapter(
+              child: BalanceCard(totalBalance: data.totalBalance)),
 
           SliverToBoxAdapter(
             child: BudgetsSection(
@@ -216,11 +252,11 @@ class DashboardScreenState extends State<DashboardScreen> {
               accountRepository: widget.accountRepository,
             ),
           ),
-          
+
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
           const SliverToBoxAdapter(child: AiAnalysisSection()),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
-          
+
           SliverToBoxAdapter(
             child: RecentTransactionsSection(
               transactions: data.recentTransactions,
@@ -230,7 +266,7 @@ class DashboardScreenState extends State<DashboardScreen> {
               onViewAllPressed: _navigateToTransactionsScreen,
             ),
           ),
-          
+
           // Espacio al final para que el scroll no se corte bruscamente
           const SliverToBoxAdapter(child: SizedBox(height: 150)),
         ],
@@ -238,7 +274,6 @@ class DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  
   // El Shimmer sigue siendo el mismo, está muy bien.
   Widget _buildLoadingShimmer() {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -358,6 +393,51 @@ class DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+  
+}
+
+/// Widget privado que define la apariencia del gráfico a ser renderizado como imagen.
+/// Se usa dentro del Stack invisible del DashboardScreen.
+/// Widget privado para el gráfico invisible.
+class _WidgetChartImage extends StatelessWidget {
+  final List<ExpenseByCategory> data;
+  const _WidgetChartImage({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    if (data.isEmpty) {
+      return Container(width: 400, height: 200, color: Colors.transparent);
+    }
+    final colors = [
+      Colors.blue.shade400, Colors.red.shade400, Colors.green.shade400,
+      Colors.orange.shade400, Colors.purple.shade400, Colors.yellow.shade700,
+    ];
+    final total = data.fold<double>(0.0, (sum, e) => sum + e.totalSpent);
+    return Container(
+      width: 400,
+      height: 200,
+      color: Colors.transparent,
+      child: PieChart(
+        PieChartData(
+          sectionsSpace: 2,
+          centerSpaceRadius: 40,
+          sections: List.generate(
+            data.length.clamp(0, 6), (i) {
+              final item = data[i];
+              final pct = total > 0 ? (item.totalSpent / total) * 100 : 0;
+              return PieChartSectionData(
+                color: colors[i % colors.length],
+                value: item.totalSpent,
+                title: '${pct.toStringAsFixed(0)}%',
+                radius: 50,
+                titleStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white, shadows: [Shadow(blurRadius: 2)]),
+              );
+            },
           ),
         ),
       ),

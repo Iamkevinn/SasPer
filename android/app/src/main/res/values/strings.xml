@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Puedes añadir más strings aquí en el futuro -->
+    <string name="widget_medium_description">Muestra tu saldo y un gráfico de gastos.</string>
+</resources>

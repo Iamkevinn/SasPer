@@ -56,7 +56,7 @@ class TransactionTile extends StatelessWidget {
     final String? subtitle = transaction.description;
 
     // Formato de moneda.
-    final currencyFormat = NumberFormat.currency(locale: 'es_ES', symbol: '€');
+    final currencyFormat = NumberFormat.currency(locale: 'es_CO', symbol: '');
 
     // Lógica para determinar el icono, color y formato del monto según el tipo.
     switch (transaction.type) {

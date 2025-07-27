@@ -81,7 +81,7 @@ class RecurringTransaction extends Equatable {
   }) {
     return RecurringTransaction(
       id: id ?? this.id,
-      userId: this.userId, // El userId no debería cambiar
+      userId: userId, // El userId no debería cambiar
       description: description ?? this.description,
       amount: amount ?? this.amount,
       type: type ?? this.type,
@@ -89,10 +89,10 @@ class RecurringTransaction extends Equatable {
       accountId: accountId ?? this.accountId,
       frequency: frequency ?? this.frequency,
       interval: interval ?? this.interval,
-      startDate: this.startDate, // La fecha de inicio no debería cambiar
-      nextDueDate: this.nextDueDate, // La próxima fecha la calcula el backend
-      endDate: this.endDate,
-      createdAt: this.createdAt,
+      startDate: startDate, // La fecha de inicio no debería cambiar
+      nextDueDate: nextDueDate, // La próxima fecha la calcula el backend
+      endDate: endDate,
+      createdAt: createdAt,
     );
   }
   

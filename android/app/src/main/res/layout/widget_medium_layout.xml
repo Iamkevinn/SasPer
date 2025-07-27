@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_medium_container"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_background"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <!-- Quitamos todo el estilo, solo dejamos el ID y el texto -->
+        <TextView
+            android:id="@+id/widget_medium_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Saldo Total" />
+
+        <ImageButton
+            android:id="@+id/widget_medium_add_button"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/widget_button_background"
+            android:src="@drawable/ic_add"
+            android:importantForAccessibility="no" />
+    </LinearLayout>
+
+    <!-- Quitamos todo el estilo, solo dejamos el ID y el texto -->
+    <TextView
+        android:id="@+id/widget_medium_balance"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="€0,00" />
+    
+    <ImageView
+        android:id="@+id/widget_medium_chart"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="8dp"
+        android:scaleType="centerCrop"
+        android:src="@android:color/transparent" />
+</LinearLayout>

@@ -1,6 +1,5 @@
 // lib/screens/main_screen.dart (VERSIÓN FINAL CON UX MEJORADA)
 
-import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -25,16 +24,8 @@ import 'package:sasper/data/recurring_repository.dart';
 import '../services/event_service.dart';
 
 // Pantallas
-import 'accounts_screen.dart';
-import 'add_budget_screen.dart';
-import 'add_debt_screen.dart';
-import 'add_goal_screen.dart';
 import 'add_transaction_screen.dart';
-import 'analysis_screen.dart';
-import 'budgets_screen.dart';
 import 'dashboard_screen.dart';
-import 'debts_screen.dart';
-import 'goals_screen.dart';
 import 'settings_screen.dart';
 // Utilidades
 import 'package:sasper/utils/custom_page_route.dart';

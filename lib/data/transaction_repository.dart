@@ -58,18 +58,12 @@ class TransactionRepository {
 
       // 2. Comprobamos explícitamente si la respuesta es una lista.
       // Aunque Supabase casi siempre devuelve una lista, esto añade una capa de seguridad.
-      if (response is List) {
-        // 3. Mapeamos la lista a nuestros objetos Transaction.
-        // Si la lista está vacía, .map no hará nada y devolverá una lista vacía, lo cual es perfecto.
-        final transactions = response.map((data) => Transaction.fromMap(data)).toList();
-        developer.log('✅ [Repo] Found ${transactions.length} transactions for budget $budgetId.', name: 'TransactionRepository');
-        return transactions;
-      } else {
-        // 4. Si la respuesta no es una lista (caso muy raro), lo registramos y devolvemos una lista vacía.
-        developer.log('⚠️ [Repo] Response for budget transactions was not a List. Type: ${response.runtimeType}', name: 'TransactionRepository');
-        return [];
-      }
-
+      // 3. Mapeamos la lista a nuestros objetos Transaction.
+      // Si la lista está vacía, .map no hará nada y devolverá una lista vacía, lo cual es perfecto.
+      final transactions = response.map((data) => Transaction.fromMap(data)).toList();
+      developer.log('✅ [Repo] Found ${transactions.length} transactions for budget $budgetId.', name: 'TransactionRepository');
+      return transactions;
+    
     } catch (e, stackTrace) {
       // 5. El bloque CATCH ahora solo se activará por errores REALES:
       //    - Error de red (sin conexión).

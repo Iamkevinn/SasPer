@@ -1,10 +1,8 @@
 // lib/screens/edit_recurring_transaction_screen.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sasper/services/event_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
-import 'package:iconsax/iconsax.dart';
 import 'package:sasper/data/account_repository.dart';
 import 'package:sasper/data/recurring_repository.dart';
 import 'package:sasper/models/account_model.dart';

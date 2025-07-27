@@ -39,7 +39,7 @@ class _BudgetDetailsScreenState extends State<BudgetDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final formatCurrency = NumberFormat.currency(locale: 'es_ES', symbol: '€');
+    final formatCurrency = NumberFormat.currency(locale: 'es_CO', symbol: '');
     final budget = widget.budgetProgress;
 
     return Scaffold(
