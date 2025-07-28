@@ -1,6 +1,7 @@
 // lib/screens/add_transaction_screen.dart (CORREGIDO Y REFACTORIZADO)
 
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
@@ -31,6 +32,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
   final _descriptionController = TextEditingController();
+  // 1. AÑADIDO: Lista para guardar los presupuestos activos del mes
+  List<Map<String, dynamic>> _activeBudgets = [];
+  // 2. AÑADIDO: Variable para guardar el ID del presupuesto seleccionado
+  int? _selectedBudgetId;
   String _transactionType = 'Gasto';
   String? _selectedCategory;
   bool _isLoading = false;
@@ -42,10 +47,37 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   final Map<String, IconData> _incomeCategories = { 'Sueldo': Iconsax.money_recive, 'Inversión': Iconsax.chart, 'Freelance': Iconsax.briefcase, 'Regalo': Iconsax.gift, 'Otro': Iconsax.category_2 };
   Map<String, IconData> get _currentCategories => _transactionType == 'Gasto' ? _expenseCategories : _incomeCategories;
 
+  // 4. AÑADIDO: Nueva función para obtener los presupuestos activos
+  Future<void> _loadActiveBudgets() async {
+    try {
+      final userId = Supabase.instance.client.auth.currentUser!.id;
+      final response = await Supabase.instance.client
+          .from('budgets')
+          .select('id, category')
+          .eq('user_id', userId)
+          .eq('year', DateTime.now().year)
+          .eq('month', DateTime.now().month);
+      
+      if (mounted) {
+        setState(() {
+          _activeBudgets = (response as List).map((item) => item as Map<String, dynamic>).toList();
+        });
+        if (kDebugMode) {
+          print('✅ Presupuestos activos cargados: $_activeBudgets');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('🔥 Error al cargar presupuestos activos: $e');
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _accountsFuture = widget.accountRepository.getAccounts();
+    _loadActiveBudgets(); // 3. AÑADIDO: Llamada para cargar los presupuestos
   }
 
   Future<void> _saveTransaction() async {
@@ -77,6 +109,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         category: _selectedCategory!,
         description: _descriptionController.text.trim(),
         transactionDate: DateTime.now(),
+        budgetId: _selectedBudgetId,
       );
       
       if (mounted) {
@@ -141,6 +174,31 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     super.dispose();
   }
 
+  // 6. AÑADIDO: Nueva función que busca el ID del presupuesto
+  void _onCategorySelected(String categoryName) {
+    setState(() {
+      _selectedCategory = categoryName; // Guardamos el nombre de la categoría
+
+      // Buscamos en la lista de presupuestos que cargamos antes
+      try {
+        final budget = _activeBudgets.firstWhere(
+          (b) => b['category'] == categoryName,
+        );
+        // Si lo encontramos, guardamos su ID
+        _selectedBudgetId = budget['id'] as int?;
+        if (kDebugMode) {
+          print('✅ Presupuesto encontrado para "$categoryName". ID: $_selectedBudgetId');
+        }
+      } catch (e) {
+        // Si no hay un presupuesto para esa categoría, `firstWhere` da un error.
+        // Lo capturamos y nos aseguramos de que el ID sea nulo.
+        _selectedBudgetId = null;
+        if (kDebugMode) {
+          print('ℹ️ No hay un presupuesto activo para "$categoryName".');
+        }
+      }
+    });
+  }
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -221,7 +279,18 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                     label: Text(entry.key, style: GoogleFonts.poppins()),
                     avatar: Icon(entry.value, color: _selectedCategory == entry.key ? colorScheme.onSecondaryContainer : colorScheme.onSurfaceVariant),
                     selected: _selectedCategory == entry.key,
-                    onSelected: (selected) => setState(() => _selectedCategory = selected ? entry.key : null),
+                    onSelected: (selected) {
+                      // 5. MODIFICADO: Llamamos a una función más inteligente
+                      if (selected) {
+                        _onCategorySelected(entry.key);
+                      } else {
+                        // Si se deselecciona, limpiamos ambos
+                        setState(() {
+                          _selectedCategory = null;
+                          _selectedBudgetId = null;
+                        });
+                      }
+                    },
                     selectedColor: colorScheme.secondaryContainer,
                     checkmarkColor: colorScheme.onSecondaryContainer,
                   );

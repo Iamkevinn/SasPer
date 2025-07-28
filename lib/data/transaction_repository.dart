@@ -48,31 +48,27 @@ class TransactionRepository {
     developer.log('🔄 [Repo] Fetching transactions for budget ID: $budgetId', name: 'TransactionRepository');
     
     try {
-      // 1. Ejecutamos la consulta a la base de datos.
-      // Usamos int.parse() para asegurar que comparamos números con números.
+      // Convertimos el String que llega de la UI a un entero para la consulta.
+      // Esto es NECESARIO porque el ID es un número.
+      final int budgetIdAsInt = int.parse(budgetId);
+
       final response = await _client
           .from('transactions')
           .select()
-          .eq('budget_id', int.parse(budgetId))
+          // La consulta ahora compara un número con un número, lo cual es correcto.
+          .eq('budget_id', budgetIdAsInt)
           .order('transaction_date', ascending: false);
 
-      // 2. Comprobamos explícitamente si la respuesta es una lista.
-      // Aunque Supabase casi siempre devuelve una lista, esto añade una capa de seguridad.
-      // 3. Mapeamos la lista a nuestros objetos Transaction.
-      // Si la lista está vacía, .map no hará nada y devolverá una lista vacía, lo cual es perfecto.
       final transactions = response.map((data) => Transaction.fromMap(data)).toList();
-      developer.log('✅ [Repo] Found ${transactions.length} transactions for budget $budgetId.', name: 'TransactionRepository');
+      developer.log('✅ [Repo] Found ${transactions.length} transactions for budget $budgetIdAsInt.', name: 'TransactionRepository');
       return transactions;
     
+    } on FormatException {
+        // Este bloque se activa si budgetId no es un número válido (ej. un UUID).
+        developer.log('⚠️ [Repo] budgetId "$budgetId" no es un número válido. Devolviendo lista vacía.', name: 'TransactionRepository');
+        return []; // Devolvemos una lista vacía para no romper la app.
     } catch (e, stackTrace) {
-      // 5. El bloque CATCH ahora solo se activará por errores REALES:
-      //    - Error de red (sin conexión).
-      //    - Error de permisos (RLS).
-      //    - Error de sintaxis en la consulta (ej. columna mal escrita).
-      //    - Error de parseo en Transaction.fromMap (que ya tiene su propio log).
       developer.log('🔥 [Repo] FATAL ERROR fetching budget transactions: $e', name: 'TransactionRepository', error: e, stackTrace: stackTrace);
-      
-      // 6. En caso de un error fatal, lanzamos la excepción para que la UI pueda mostrar un mensaje de error real.
       throw Exception('Error al conectar con la base de datos.');
     }
   }
@@ -161,6 +157,7 @@ class TransactionRepository {
     required String category,
     required String description,
     required DateTime transactionDate,
+    int? budgetId,
   }) async {
     developer.log('➕ [Repo] Adding new transaction...',
         name: 'TransactionRepository');
@@ -173,6 +170,7 @@ class TransactionRepository {
         'category': category,
         'description': description,
         'transaction_date': transactionDate.toIso8601String(),
+        'budget_id': budgetId,
       });
       developer.log('✅ [Repo] Transaction added successfully.',
           name: 'TransactionRepository');
