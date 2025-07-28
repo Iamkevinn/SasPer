@@ -18,7 +18,6 @@ import 'package:sasper/data/goal_repository.dart';
 import 'package:sasper/data/debt_repository.dart';
 import 'package:sasper/data/account_repository.dart';
 import 'package:sasper/data/budget_repository.dart';
-import 'package:sasper/data/recurring_repository.dart';
 
 // Servicios
 import '../services/event_service.dart';
@@ -47,7 +46,6 @@ class _MainScreenState extends State<MainScreen> {
   late final TransactionRepository _transactionRepository;
   late final BudgetRepository _budgetRepository;
   late StreamSubscription<AppEvent> _eventSubscription;
-  late final RecurringRepository _recurringRepository;
   late final AppLinks _appLinks;
   late final StreamSubscription<Uri?> _linkSub;
   late final List<Widget> _widgetOptions;
@@ -63,7 +61,6 @@ class _MainScreenState extends State<MainScreen> {
     _accountRepository = AccountRepository();
     _transactionRepository = TransactionRepository();
     _budgetRepository = BudgetRepository();
-    _recurringRepository = RecurringRepository();
 
     _widgetOptions = <Widget>[
       DashboardScreen(
@@ -79,7 +76,6 @@ class _MainScreenState extends State<MainScreen> {
         debtRepository: _debtRepository,
         accountRepository: _accountRepository, 
         transactionRepository: _transactionRepository,
-        recurringRepository: _recurringRepository, 
       ),
       SettingsScreen(authRepository: _authRepository),
     ];

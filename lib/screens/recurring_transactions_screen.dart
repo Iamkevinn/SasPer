@@ -1,31 +1,29 @@
-// lib/screens/recurring_transactions_screen.dart (VERSIÓN FINAL Y CORREGIDA)
+// lib/screens/recurring_transactions_screen.dart (VERSIÓN FINAL CON SINGLETON Y SIMPLIFICADA)
 
-import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 import 'package:sasper/data/account_repository.dart';
-import 'package:sasper/data/recurring_repository.dart';
+import 'package:sasper/data/recurring_repository.dart'; // Importamos el repositorio
 import 'package:sasper/models/recurring_transaction_model.dart';
 import 'package:sasper/screens/add_recurring_transaction_screen.dart';
 import 'package:sasper/screens/edit_recurring_transaction_screen.dart';
-import 'package:sasper/services/event_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:sasper/widgets/shared/empty_state_card.dart';
 
-// Enum para definir los estados visuales de un gasto fijo.
 enum RecurringStatus { due, upcoming, scheduled }
 
 class RecurringTransactionsScreen extends StatefulWidget {
-  final RecurringRepository repository;
+  // El RecurringRepository ya no se pasa como parámetro.
+  // Podrías hacer AccountRepository un Singleton también, pero lo mantenemos
+  // por ahora para enfocarnos en un solo cambio.
   final AccountRepository accountRepository;
 
   const RecurringTransactionsScreen({
     super.key,
-    required this.repository,
     required this.accountRepository,
   });
 
@@ -34,39 +32,39 @@ class RecurringTransactionsScreen extends StatefulWidget {
 }
 
 class _RecurringTransactionsScreenState extends State<RecurringTransactionsScreen> {
+  // Accedemos a la única instancia del repositorio directamente.
+  final RecurringRepository _repository = RecurringRepository.instance;
   late final Stream<List<RecurringTransaction>> _stream;
-  // --- DECLARACIÓN AÑADIDA AQUÍ ---
-  late final StreamSubscription<AppEvent> _eventSubscription;
 
   @override
   void initState() {
     super.initState();
-    _stream = widget.repository.getRecurringTransactionsStream();
-    
-    // Nos suscribimos al stream de eventos
-    _eventSubscription = EventService.instance.eventStream.listen((event) {
-      // Si el evento es el que nos interesa, forzamos la recarga de datos
-      if (event == AppEvent.recurringTransactionChanged) {
-        widget.repository.forceRefresh();
-      }
-    });
+    // Obtenemos el stream de la instancia singleton.
+    _stream = _repository.getRecurringTransactionsStream();
   }
 
   @override
   void dispose() {
-    _eventSubscription.cancel(); // Cancelamos la suscripción al evento
-    widget.repository.dispose(); // Limpiamos los recursos del repositorio
+    // --- CAMBIO CRÍTICO: YA NO LLAMAMOS A DISPOSE DEL REPOSITORIO ---
+    // El repositorio debe vivir mientras la app esté viva, no morir con la pantalla.
     super.dispose();
   }
   
-  void _navigateToEdit(RecurringTransaction transaction) {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => EditRecurringTransactionScreen(
-        repository: widget.repository,
-        accountRepository: widget.accountRepository,
-        transaction: transaction,
+  void _navigateToEdit(RecurringTransaction transaction) async  {
+    final result = await Navigator.of(context).push<bool>( // <-- esperar el resultado
+      MaterialPageRoute(
+        builder: (_) => EditRecurringTransactionScreen(
+          accountRepository: widget.accountRepository,
+          transaction: transaction,
+        ),
       ),
-    ));
+    );
+
+    // Si volvemos con 'true', le damos el "empujón" al repositorio.
+    if (result == true) {
+      _repository.refreshData();
+    }
+
   }
 
   Future<void> _handleDelete(RecurringTransaction item) async {
@@ -75,7 +73,8 @@ class _RecurringTransactionsScreenState extends State<RecurringTransactionsScree
       builder: (_) => BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
         child: AlertDialog(
-          title: const Text('Confirmar Eliminación'),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+          title: Text('Confirmar Eliminación', style: GoogleFonts.poppins()),
           content: Text('¿Seguro que quieres eliminar "${item.description}"?'),
           actions: [
             TextButton(
@@ -92,8 +91,9 @@ class _RecurringTransactionsScreenState extends State<RecurringTransactionsScree
 
     if (confirmed == true && mounted) {
       try {
-        await widget.repository.deleteRecurringTransaction(item.id);
-        EventService.instance.fire(AppEvent.recurringTransactionChanged);
+        // Usamos la instancia local _repository para borrar.
+        await _repository.deleteRecurringTransaction(item.id);
+        _repository.refreshData();
         NotificationHelper.show(
           context: context,
           message: '"${item.description}" eliminado.',
@@ -102,22 +102,27 @@ class _RecurringTransactionsScreenState extends State<RecurringTransactionsScree
       } catch (e) {
         NotificationHelper.show(
           context: context,
-          message: 'Error al eliminar: ${e.toString()}',
+          message: 'Error al eliminar: ${e.toString().replaceFirst("Exception: ", "")}',
           type: NotificationType.error,
         );
       }
     }
   }
 
-  void _navigateToAdd() async {
-    // La pantalla de añadir debería disparar un evento, igual que la de editar.
-    // Opcionalmente, puedes esperar un resultado `true` si prefieres ese método.
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => AddRecurringTransactionScreen(
-        repository: widget.repository,
-        accountRepository: widget.accountRepository,
+  // --- MÉTODO _navigateToAdd MODIFICADO ---
+  void _navigateToAdd() async { // <-- hacerlo async
+    final result = await Navigator.of(context).push<bool>( // <-- esperar el resultado
+      MaterialPageRoute(
+        builder: (_) => AddRecurringTransactionScreen(
+          accountRepository: widget.accountRepository,
+        ),
       ),
-    ));
+    );
+
+    // Si volvemos con 'true', le damos el "empujón" al repositorio.
+    if (result == true) {
+      _repository.refreshData();
+    }
   }
 
   RecurringStatus _getStatus(DateTime nextDueDate) {
@@ -180,69 +185,60 @@ class _RecurringTransactionsScreenState extends State<RecurringTransactionsScree
 
               Color statusColor;
               IconData statusIcon;
-              Widget? animationWidget;
 
               switch (status) {
                 case RecurringStatus.due:
                   statusColor = Colors.red.shade400;
                   statusIcon = Iconsax.warning_2;
-                  animationWidget = TweenAnimationBuilder<double>(
-                    tween: Tween(begin: 0.5, end: 1.0),
-                    duration: const Duration(milliseconds: 800),
-                    builder: (context, value, child) => Opacity(opacity: value, child: child),
-                    child: Icon(Icons.circle, color: statusColor.withOpacity(0.5), size: 10),
-                  );
                   break;
                 case RecurringStatus.upcoming:
                   statusColor = Colors.orange.shade400;
                   statusIcon = Iconsax.clock;
-                  animationWidget = null;
                   break;
                 case RecurringStatus.scheduled:
                 default:
                   statusColor = Theme.of(context).colorScheme.onSurfaceVariant;
                   statusIcon = Iconsax.calendar_1;
-                  animationWidget = null;
                   break;
               }
 
               return Card(
-                  elevation: 0,
-                  color: Theme.of(context).colorScheme.surfaceContainer,
-                  margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: statusColor.withOpacity(0.1),
-                      child: Icon(statusIcon, color: statusColor, size: 20),
-                    ),
-                    title: Text(item.description, style: GoogleFonts.poppins(fontWeight: FontWeight.w500)),
-                    subtitle: Text(
-                      'Próximo: ${DateFormat.yMMMd('es_CO').format(item.nextDueDate)} - ${item.frequency}',
-                      style: GoogleFonts.poppins(color: statusColor, fontSize: 12, fontWeight: FontWeight.w500),
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          '${item.type == 'Gasto' ? '-' : '+'}${NumberFormat.currency(locale: 'ES_CO', symbol: '\$').format(item.amount)}',
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.bold,
-                            color: item.type == 'Gasto' ? Colors.red.shade300 : Colors.green.shade400,
-                          ),
-                        ),
-                        PopupMenuButton<String>(
-                            onSelected: (value) {
-                              if (value == 'edit') _navigateToEdit(item);
-                              if (value == 'delete') _handleDelete(item);
-                            },
-                            itemBuilder: (context) => [
-                                  const PopupMenuItem(value: 'edit', child: Text('Editar')),
-                                  const PopupMenuItem(value: 'delete', child: Text('Eliminar')),
-                                ]),
-                      ],
-                    ),
+                elevation: 0,
+                color: Theme.of(context).colorScheme.surfaceContainer,
+                margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                child: ListTile(
+                  onTap: () => _navigateToEdit(item),
+                  leading: CircleAvatar(
+                    backgroundColor: statusColor.withOpacity(0.1),
+                    child: Icon(statusIcon, color: statusColor, size: 20),
                   ),
-                );
+                  title: Text(item.description, style: GoogleFonts.poppins(fontWeight: FontWeight.w500)),
+                  subtitle: Text(
+                    'Próximo: ${DateFormat.yMMMd('es_CO').format(item.nextDueDate)} - ${toBeginningOfSentenceCase(item.frequency)}',
+                    style: GoogleFonts.poppins(color: statusColor, fontSize: 12, fontWeight: FontWeight.w500),
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${item.type == 'Gasto' ? '-' : '+'}${NumberFormat.currency(locale: 'es_CO', symbol: '\$').format(item.amount)}',
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.bold,
+                          color: item.type == 'Gasto' ? Colors.red.shade300 : Colors.green.shade400,
+                        ),
+                      ),
+                       // El PopupMenu es una alternativa, pero es menos directo.
+                       // Tocar la fila es más intuitivo.
+                      IconButton(
+                        icon: const Icon(Iconsax.trash),
+                        onPressed: () => _handleDelete(item),
+                        tooltip: 'Eliminar',
+                        color: Theme.of(context).colorScheme.error,
+                      )
+                    ],
+                  ),
+                ),
+              );
             },
           );
         },
