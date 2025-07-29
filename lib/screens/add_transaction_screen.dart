@@ -1,89 +1,84 @@
-// lib/screens/add_transaction_screen.dart (CORREGIDO Y REFACTORIZADO)
+// lib/screens/add_transaction_screen.dart (VERSIÓN FINAL COMPLETA USANDO SINGLETONS)
 
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:iconsax/iconsax.dart';
 import 'package:sasper/data/account_repository.dart';
 import 'package:sasper/data/transaction_repository.dart';
+import 'package:sasper/data/budget_repository.dart'; // Importamos para la lógica de presupuestos
 import 'package:sasper/models/account_model.dart';
+import 'package:sasper/models/budget_models.dart';
 import 'package:sasper/services/event_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:developer' as developer;
 
 class AddTransactionScreen extends StatefulWidget {
-  final TransactionRepository transactionRepository;
-  final AccountRepository accountRepository;
-
-  const AddTransactionScreen({
-    super.key,
-    required this.transactionRepository,
-    required this.accountRepository,
-  });
+  // Los repositorios ya no se pasan en el constructor.
+  const AddTransactionScreen({super.key});
 
   @override
   State<AddTransactionScreen> createState() => _AddTransactionScreenState();
 }
 
 class _AddTransactionScreenState extends State<AddTransactionScreen> {
+  // Accedemos a las únicas instancias (Singletons) de los repositorios.
+  final TransactionRepository _transactionRepository = TransactionRepository.instance;
+  final AccountRepository _accountRepository = AccountRepository.instance;
+  final BudgetRepository _budgetRepository = BudgetRepository.instance;
+
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
   final _descriptionController = TextEditingController();
-  // 1. AÑADIDO: Lista para guardar los presupuestos activos del mes
-  List<Map<String, dynamic>> _activeBudgets = [];
-  // 2. AÑADIDO: Variable para guardar el ID del presupuesto seleccionado
-  int? _selectedBudgetId;
+  
   String _transactionType = 'Gasto';
   String? _selectedCategory;
   bool _isLoading = false;
   String? _selectedAccountId;
+  int? _selectedBudgetId;
   
   late Future<List<Account>> _accountsFuture;
+  late Future<List<BudgetProgress>> _budgetsFuture;
 
   final Map<String, IconData> _expenseCategories = { 'Comida': Iconsax.cup, 'Transporte': Iconsax.bus, 'Ocio': Iconsax.gameboy, 'Salud': Iconsax.health, 'Hogar': Iconsax.home, 'Compras': Iconsax.shopping_bag, 'Servicios': Iconsax.flash_1, 'Otro': Iconsax.category };
   final Map<String, IconData> _incomeCategories = { 'Sueldo': Iconsax.money_recive, 'Inversión': Iconsax.chart, 'Freelance': Iconsax.briefcase, 'Regalo': Iconsax.gift, 'Otro': Iconsax.category_2 };
   Map<String, IconData> get _currentCategories => _transactionType == 'Gasto' ? _expenseCategories : _incomeCategories;
 
-  // 4. AÑADIDO: Nueva función para obtener los presupuestos activos
-  Future<void> _loadActiveBudgets() async {
-    try {
-      final userId = Supabase.instance.client.auth.currentUser!.id;
-      final response = await Supabase.instance.client
-          .from('budgets')
-          .select('id, category')
-          .eq('user_id', userId)
-          .eq('year', DateTime.now().year)
-          .eq('month', DateTime.now().month);
-      
-      if (mounted) {
-        setState(() {
-          _activeBudgets = (response as List).map((item) => item as Map<String, dynamic>).toList();
-        });
-        if (kDebugMode) {
-          print('✅ Presupuestos activos cargados: $_activeBudgets');
-        }
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('🔥 Error al cargar presupuestos activos: $e');
-      }
-    }
-  }
-
   @override
   void initState() {
     super.initState();
-    _accountsFuture = widget.accountRepository.getAccounts();
-    _loadActiveBudgets(); // 3. AÑADIDO: Llamada para cargar los presupuestos
+    _accountsFuture = _accountRepository.getAccounts();
+    // Cargamos los presupuestos del mes actual para poder vincularlos.
+    _budgetsFuture = _budgetRepository.getBudgetsForCurrentMonth();
+  }
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  void _onCategorySelected(String categoryName, List<BudgetProgress> budgets) {
+    setState(() {
+      _selectedCategory = categoryName;
+      try {
+        final foundBudget = budgets.firstWhere((b) => b.category == categoryName);
+        _selectedBudgetId = foundBudget.budgetId;
+        developer.log('✅ Presupuesto encontrado para "$categoryName". ID: $_selectedBudgetId', name: 'AddTransactionScreen');
+      } catch (e) {
+        _selectedBudgetId = null;
+        developer.log('ℹ️ No hay presupuesto activo para "$categoryName".', name: 'AddTransactionScreen');
+      }
+    });
   }
 
   Future<void> _saveTransaction() async {
     if (!_formKey.currentState!.validate() || _selectedCategory == null || _selectedAccountId == null) {
       NotificationHelper.show(
-            context: context,
             message: 'Porfavor rellena todos los campos!',
             type: NotificationType.error,
           );
@@ -92,8 +87,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     
     setState(() => _isLoading = true);
 
-    double amount = (double.tryParse(_amountController.text.trim().replaceAll(',', '.')) ?? 0.0).abs();
-
+    double amount = (double.tryParse(_amountController.text.trim().replaceAll(',', '.')) ?? 0.0);
     if (_transactionType == 'Gasto') {
       amount = -amount.abs();
     } else {
@@ -101,8 +95,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     }
 
     try {
-      
-      await widget.transactionRepository.addTransaction(
+      await _transactionRepository.addTransaction(
         accountId: _selectedAccountId!,
         amount: amount,
         type: _transactionType,
@@ -114,28 +107,24 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       
       if (mounted) {
         final userId = Supabase.instance.client.auth.currentUser?.id;
-        if (_transactionType == 'Gasto') {
-          if (userId != null && _selectedCategory != null) {
-            _checkBudgetOnBackend(
-              userId: userId,
-              categoryName: _selectedCategory!,
-            );
-          }
+        if (_transactionType == 'Gasto' && userId != null && _selectedCategory != null) {
+            _checkBudgetOnBackend(userId: userId, categoryName: _selectedCategory!);
         }
 
-        // Disparamos el evento específico para que el dashboard escuche.
         EventService.instance.fire(AppEvent.transactionCreated);
-        NotificationHelper.show(
-            context: context,
-            message: 'Transacción gurdada!',
+        Navigator.of(context).pop(true);
+
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          NotificationHelper.show(
+            message: 'Transacción guardada!',
             type: NotificationType.success,
           );
-        Navigator.of(context).pop(true);
+        });
       }
     } catch (e) {
+      developer.log('🔥 FALLO AL GUARDAR TRANSACCIÓN: $e', name: 'AddTransactionScreen');
       if (mounted) {
         NotificationHelper.show(
-            context: context,
             message: 'Error al guardar la transacción.',
             type: NotificationType.error,
           );
@@ -145,7 +134,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     }
   }
 
-  // Volvemos a añadir el userId y lo usamos en el body.
   Future<void> _checkBudgetOnBackend({
     required String userId, 
     required String categoryName
@@ -155,50 +143,14 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'user_id': userId,
-          'category': categoryName,
-        }),
+        body: jsonEncode({'user_id': userId, 'category': categoryName}),
       );
-      print('Respuesta del backend (chequeo de presupuesto): ${response.statusCode} - ${response.body}');
+      developer.log('Backend response (budget check): ${response.statusCode} - ${response.body}', name: 'AddTransactionScreen');
     } catch (e) {
-      print('Error al llamar al backend para chequear presupuesto: $e');
+      developer.log('Error calling budget check backend: $e', name: 'AddTransactionScreen');
     }
   }
 
-
-  @override
-  void dispose() {
-    _amountController.dispose();
-    _descriptionController.dispose();
-    super.dispose();
-  }
-
-  // 6. AÑADIDO: Nueva función que busca el ID del presupuesto
-  void _onCategorySelected(String categoryName) {
-    setState(() {
-      _selectedCategory = categoryName; // Guardamos el nombre de la categoría
-
-      // Buscamos en la lista de presupuestos que cargamos antes
-      try {
-        final budget = _activeBudgets.firstWhere(
-          (b) => b['category'] == categoryName,
-        );
-        // Si lo encontramos, guardamos su ID
-        _selectedBudgetId = budget['id'] as int?;
-        if (kDebugMode) {
-          print('✅ Presupuesto encontrado para "$categoryName". ID: $_selectedBudgetId');
-        }
-      } catch (e) {
-        // Si no hay un presupuesto para esa categoría, `firstWhere` da un error.
-        // Lo capturamos y nos aseguramos de que el ID sea nulo.
-        _selectedBudgetId = null;
-        if (kDebugMode) {
-          print('ℹ️ No hay un presupuesto activo para "$categoryName".');
-        }
-      }
-    });
-  }
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -240,6 +192,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 onSelectionChanged: (newSelection) => setState(() {
                   _transactionType = newSelection.first;
                   _selectedCategory = null; 
+                  _selectedBudgetId = null;
                 }),
               ),
               const SizedBox(height: 24),
@@ -247,7 +200,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               FutureBuilder<List<Account>>(
                 future: _accountsFuture,
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: LinearProgressIndicator());
+                  if (snapshot.connectionState == ConnectionState.waiting) return const LinearProgressIndicator();
                   if (snapshot.hasError) return Text('Error al cargar cuentas: ${snapshot.error}');
                   if (!snapshot.hasData || snapshot.data!.isEmpty) {
                     return const Center(child: Text('No tienes cuentas. Crea una primero.'));
@@ -271,30 +224,35 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
               Text('Categorías', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 8.0,
-                runSpacing: 8.0,
-                children: _currentCategories.entries.map((entry) {
-                  return FilterChip(
-                    label: Text(entry.key, style: GoogleFonts.poppins()),
-                    avatar: Icon(entry.value, color: _selectedCategory == entry.key ? colorScheme.onSecondaryContainer : colorScheme.onSurfaceVariant),
-                    selected: _selectedCategory == entry.key,
-                    onSelected: (selected) {
-                      // 5. MODIFICADO: Llamamos a una función más inteligente
-                      if (selected) {
-                        _onCategorySelected(entry.key);
-                      } else {
-                        // Si se deselecciona, limpiamos ambos
-                        setState(() {
-                          _selectedCategory = null;
-                          _selectedBudgetId = null;
-                        });
-                      }
-                    },
-                    selectedColor: colorScheme.secondaryContainer,
-                    checkmarkColor: colorScheme.onSecondaryContainer,
+              
+              FutureBuilder<List<BudgetProgress>>(
+                future: _budgetsFuture,
+                builder: (context, snapshot) {
+                  final budgets = snapshot.data ?? [];
+                  return Wrap(
+                    spacing: 8.0,
+                    runSpacing: 8.0,
+                    children: _currentCategories.entries.map((entry) {
+                      return FilterChip(
+                        label: Text(entry.key, style: GoogleFonts.poppins()),
+                        avatar: Icon(entry.value, color: _selectedCategory == entry.key ? colorScheme.onSecondaryContainer : colorScheme.onSurfaceVariant),
+                        selected: _selectedCategory == entry.key,
+                        onSelected: (selected) {
+                           if (selected) {
+                             _onCategorySelected(entry.key, budgets);
+                           } else {
+                             setState(() {
+                               _selectedCategory = null;
+                               _selectedBudgetId = null;
+                             });
+                           }
+                        },
+                        selectedColor: colorScheme.secondaryContainer,
+                        checkmarkColor: colorScheme.onSecondaryContainer,
+                      );
+                    }).toList(),
                   );
-                }).toList(),
+                }
               ),
               const SizedBox(height: 24),
               

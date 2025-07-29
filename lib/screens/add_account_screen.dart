@@ -1,36 +1,32 @@
-// lib/screens/add_account_screen.dart (CORREGIDO Y COMPLETO)
+// lib/screens/add_account_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:sasper/data/account_repository.dart';
+import 'package:sasper/services/event_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
-import 'package:sasper/widgets/shared/custom_notification_widget.dart'; // Importamos el repositorio
+import 'package:sasper/widgets/shared/custom_notification_widget.dart';
+import 'dart:developer' as developer;
 
 class AddAccountScreen extends StatefulWidget {
-  // 1. AÑADIDO: El widget ahora recibe el repositorio.
-  final AccountRepository accountRepository;
-
-  const AddAccountScreen({
-    super.key,
-    required this.accountRepository,
-  });
+  // El constructor es constante y no recibe parámetros.
+  const AddAccountScreen({super.key});
 
   @override
   State<AddAccountScreen> createState() => _AddAccountScreenState();
 }
 
 class _AddAccountScreenState extends State<AddAccountScreen> {
+  // Accedemos a la única instancia (Singleton) del repositorio.
+  final AccountRepository _accountRepository = AccountRepository.instance;
+
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _balanceController = TextEditingController(text: '0'); // Valor inicial
+  final _balanceController = TextEditingController(text: '0');
 
-  // Estado
   String _selectedType = 'Efectivo';
   bool _isLoading = false;
-
-  // 2. ELIMINADO: Ya no creamos nuestra propia instancia del repositorio.
-  // final _accountRepository = AccountRepository();
 
   final Map<String, IconData> _accountTypes = {
     'Efectivo': Iconsax.money_3,
@@ -47,6 +43,7 @@ class _AddAccountScreenState extends State<AddAccountScreen> {
     super.dispose();
   }
 
+  /// Valida el formulario y llama al repositorio para guardar la nueva cuenta.
   Future<void> _saveAccount() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -57,25 +54,32 @@ class _AddAccountScreenState extends State<AddAccountScreen> {
     try {
       final initialBalance = double.tryParse(_balanceController.text.trim().replaceAll(',', '.')) ?? 0.0;
 
-      // 3. USAMOS EL REPOSITORIO DEL WIDGET: La instancia correcta que nos pasaron.
-      await widget.accountRepository.addAccount(
+      // Usamos la instancia Singleton para llamar al método.
+      await _accountRepository.addAccount(
         name: _nameController.text.trim(),
         type: _selectedType,
         initialBalance: initialBalance,
       );
 
       if (mounted) {
-        NotificationHelper.show(
-            context: context,
+        // Disparamos el evento global para que otras pantallas se actualicen.
+        EventService.instance.fire(AppEvent.accountCreated);
+
+        // Devolvemos 'true' para que la pantalla anterior sepa que la operación fue exitosa.
+        Navigator.of(context).pop(true);
+
+        // Mostramos la notificación después de que la pantalla se cierre.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          NotificationHelper.show(
             message: 'Cuenta creada exitosamente!',
             type: NotificationType.success,
           );
-        Navigator.of(context).pop(true);
+        });
       }
     } catch (e) {
+      developer.log('🔥 FALLO AL CREAR CUENTA: $e', name: 'AddAccountScreen');
       if (mounted) {
         NotificationHelper.show(
-            context: context,
             message: 'Error al crear la cuenta.',
             type: NotificationType.error,
           );
@@ -105,7 +109,7 @@ class _AddAccountScreenState extends State<AddAccountScreen> {
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   prefixIcon: const Icon(Iconsax.text),
                 ),
-                validator: (value) => (value == null || value.isEmpty) ? 'El nombre es obligatorio' : null,
+                validator: (value) => (value == null || value.trim().isEmpty) ? 'El nombre es obligatorio' : null,
               ),
               const SizedBox(height: 20),
               DropdownButtonFormField<String>(
@@ -145,7 +149,6 @@ class _AddAccountScreenState extends State<AddAccountScreen> {
                 keyboardType: const TextInputType.numberWithOptions(signed: true, decimal: true),
                 validator: (value) {
                    if (value == null || value.isEmpty) return 'El saldo es obligatorio';
-                   // Acepta comas y puntos como separador decimal
                    if (double.tryParse(value.replaceAll(',', '.')) == null) return 'Introduce un saldo válido';
                    return null;
                 },

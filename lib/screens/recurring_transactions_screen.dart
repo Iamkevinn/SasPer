@@ -1,31 +1,24 @@
-// lib/screens/recurring_transactions_screen.dart (VERSIÓN FINAL CON SINGLETON Y SIMPLIFICADA)
+// lib/screens/recurring_transactions_screen.dart
 
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
-import 'package:sasper/data/account_repository.dart';
-import 'package:sasper/data/recurring_repository.dart'; // Importamos el repositorio
+import 'package:sasper/data/recurring_repository.dart';
 import 'package:sasper/models/recurring_transaction_model.dart';
 import 'package:sasper/screens/add_recurring_transaction_screen.dart';
 import 'package:sasper/screens/edit_recurring_transaction_screen.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:sasper/widgets/shared/empty_state_card.dart';
+import 'package:sasper/main.dart'; // Para navigatorKey
 
 enum RecurringStatus { due, upcoming, scheduled }
 
 class RecurringTransactionsScreen extends StatefulWidget {
-  // El RecurringRepository ya no se pasa como parámetro.
-  // Podrías hacer AccountRepository un Singleton también, pero lo mantenemos
-  // por ahora para enfocarnos en un solo cambio.
-  final AccountRepository accountRepository;
-
-  const RecurringTransactionsScreen({
-    super.key,
-    required this.accountRepository,
-  });
+  // El constructor ya no recibe ningún repositorio.
+  const RecurringTransactionsScreen({super.key});
 
   @override
   State<RecurringTransactionsScreen> createState() => _RecurringTransactionsScreenState();
@@ -45,45 +38,45 @@ class _RecurringTransactionsScreenState extends State<RecurringTransactionsScree
 
   @override
   void dispose() {
-    // --- CAMBIO CRÍTICO: YA NO LLAMAMOS A DISPOSE DEL REPOSITORIO ---
-    // El repositorio debe vivir mientras la app esté viva, no morir con la pantalla.
+    // Ya no se llama a dispose() del repositorio.
     super.dispose();
   }
   
   void _navigateToEdit(RecurringTransaction transaction) async  {
-    final result = await Navigator.of(context).push<bool>( // <-- esperar el resultado
+    final result = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (_) => EditRecurringTransactionScreen(
-          accountRepository: widget.accountRepository,
-          transaction: transaction,
-        ),
+        // La pantalla de edición ahora tampoco necesita que le pasen repositorios.
+        // Ella misma obtendrá los Singletons que necesite.
+        builder: (_) => EditRecurringTransactionScreen(transaction: transaction),
       ),
     );
 
-    // Si volvemos con 'true', le damos el "empujón" al repositorio.
+    // Si volvemos con 'true', le damos el "empujón" al repositorio para
+    // asegurar una actualización visual inmediata si fuera necesario.
     if (result == true) {
       _repository.refreshData();
     }
-
   }
 
   Future<void> _handleDelete(RecurringTransaction item) async {
     final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => BackdropFilter(
+      context: navigatorKey.currentContext!,
+      builder: (dialogContext) => BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
         child: AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-          title: Text('Confirmar Eliminación', style: GoogleFonts.poppins()),
+          title: Text('Confirmar Eliminación', style: GoogleFonts.poppins(textStyle: Theme.of(dialogContext).textTheme.titleLarge)),
           content: Text('¿Seguro que quieres eliminar "${item.description}"?'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancelar')),
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancelar')
+            ),
             FilledButton.tonal(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.errorContainer),
-              child: const Text('Eliminar')),
+              style: FilledButton.styleFrom(backgroundColor: Theme.of(dialogContext).colorScheme.errorContainer),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Eliminar'),
+            ),
           ],
         ),
       ),
@@ -91,17 +84,14 @@ class _RecurringTransactionsScreenState extends State<RecurringTransactionsScree
 
     if (confirmed == true && mounted) {
       try {
-        // Usamos la instancia local _repository para borrar.
         await _repository.deleteRecurringTransaction(item.id);
-        _repository.refreshData();
+        _repository.refreshData(); // Asegura que la UI se actualice
         NotificationHelper.show(
-          context: context,
           message: '"${item.description}" eliminado.',
           type: NotificationType.success,
         );
       } catch (e) {
         NotificationHelper.show(
-          context: context,
           message: 'Error al eliminar: ${e.toString().replaceFirst("Exception: ", "")}',
           type: NotificationType.error,
         );
@@ -109,17 +99,14 @@ class _RecurringTransactionsScreenState extends State<RecurringTransactionsScree
     }
   }
 
-  // --- MÉTODO _navigateToAdd MODIFICADO ---
-  void _navigateToAdd() async { // <-- hacerlo async
-    final result = await Navigator.of(context).push<bool>( // <-- esperar el resultado
+  void _navigateToAdd() async {
+    final result = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (_) => AddRecurringTransactionScreen(
-          accountRepository: widget.accountRepository,
-        ),
+        // La pantalla de "Añadir" tampoco necesita repositorios en el constructor.
+        builder: (_) => const AddRecurringTransactionScreen(),
       ),
     );
 
-    // Si volvemos con 'true', le damos el "empujón" al repositorio.
     if (result == true) {
       _repository.refreshData();
     }
@@ -196,7 +183,6 @@ class _RecurringTransactionsScreenState extends State<RecurringTransactionsScree
                   statusIcon = Iconsax.clock;
                   break;
                 case RecurringStatus.scheduled:
-                default:
                   statusColor = Theme.of(context).colorScheme.onSurfaceVariant;
                   statusIcon = Iconsax.calendar_1;
                   break;
@@ -227,8 +213,6 @@ class _RecurringTransactionsScreenState extends State<RecurringTransactionsScree
                           color: item.type == 'Gasto' ? Colors.red.shade300 : Colors.green.shade400,
                         ),
                       ),
-                       // El PopupMenu es una alternativa, pero es menos directo.
-                       // Tocar la fila es más intuitivo.
                       IconButton(
                         icon: const Icon(Iconsax.trash),
                         onPressed: () => _handleDelete(item),

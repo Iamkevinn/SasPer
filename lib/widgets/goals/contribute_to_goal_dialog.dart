@@ -1,18 +1,21 @@
-// lib/widgets/goals/contribute_to_goal_dialog.dart
+// lib/widgets/goals/contribute_to_goal_dialog.dart (VERSIÓN FINAL CON SINGLETON)
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:sasper/data/account_repository.dart';
+import 'package:sasper/models/account_model.dart';
+import 'package:sasper/models/goal_model.dart';
+import 'package:sasper/services/event_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
-import 'package:sasper/data/account_repository.dart'; // Asumimos que tienes un AccountRepository
-import 'package:sasper/models/account_model.dart';
-import 'package:sasper/models/goal_model.dart';
-// import 'package:sasperpackage:sasperservices/goal_service.dart'; // Idealmente, la lógica de RPC iría aquí
+import 'dart:developer' as developer;
 
 class ContributeToGoalDialog extends StatefulWidget {
   final Goal goal;
+  // El onSuccess sigue siendo útil para que la pantalla de Metas
+  // sepa cuándo debe forzar su propio refresco si es necesario.
   final VoidCallback onSuccess;
 
   const ContributeToGoalDialog({
@@ -26,56 +29,65 @@ class ContributeToGoalDialog extends StatefulWidget {
 }
 
 class _ContributeToGoalDialogState extends State<ContributeToGoalDialog> {
+  // Accedemos a la única instancia (Singleton) del repositorio.
+  final AccountRepository _accountRepo = AccountRepository.instance;
+
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
   Account? _selectedAccount;
   bool _isSubmitting = false;
 
-  // 1. DEPENDENCIAS (idealmente inyectadas)
-  final _accountRepo = AccountRepository();
-  // final _goalService = GoalService();
-  final _supabase = Supabase.instance.client; // Lo mantenemos por ahora
-
-  // Futuro para cargar las cuentas
   late Future<List<Account>> _accountsFuture;
 
   @override
   void initState() {
     super.initState();
-    // Llamamos al repositorio para obtener las cuentas
-    _accountsFuture = _accountRepo.getAccounts(); // Asumimos que este método existe
+    // Usamos la instancia singleton para cargar las cuentas.
+    _accountsFuture = _accountRepo.getAccounts();
   }
 
+  @override
+  void dispose() {
+    _amountController.dispose();
+    super.dispose();
+  }
+  
   Future<void> _submitContribution() async {
-    // La validación ahora es un poco más simple
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate() || _selectedAccount == null) return;
 
     setState(() => _isSubmitting = true);
 
     try {
-      final amount = double.parse(_amountController.text);
-
-      // await _goalService.addContribution(...)
-      await _supabase.rpc('add_contribution_to_goal', params: {
+      final amount = double.parse(_amountController.text.replaceAll(',', '.'));
+      
+      // La llamada a la función RPC está bien, la mantenemos.
+      await Supabase.instance.client.rpc('add_contribution_to_goal', params: {
         'goal_id_input': widget.goal.id,
         'account_id_input': _selectedAccount!.id,
         'amount_input': amount,
       });
 
       if (mounted) {
-        Navigator.of(context).pop();
-        widget.onSuccess();
-        NotificationHelper.show(
-            context: context,
+        // Disparamos eventos globales porque una contribución afecta a
+        // las metas, las transacciones y las cuentas.
+        EventService.instance.fire(AppEvent.goalUpdated);
+        EventService.instance.fire(AppEvent.transactionCreated);
+
+        Navigator.of(context).pop(); // Cerramos el diálogo
+        widget.onSuccess(); // Llamamos al callback para refresco local
+
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          NotificationHelper.show(
             message: 'Aportación realizada!',
             type: NotificationType.success,
           );
+        });
       }
     } catch (error) {
+      developer.log('🔥 FALLO AL APORTAR A META: $error', name: 'ContributeToGoalDialog');
       if (mounted) {
         NotificationHelper.show(
-            context: context,
-            message: 'Error: ${error.toString()}',
+            message: 'Error al realizar la aportación.',
             type: NotificationType.error,
           );
       }
@@ -85,31 +97,21 @@ class _ContributeToGoalDialogState extends State<ContributeToGoalDialog> {
       }
     }
   }
-  
-  @override
-  void dispose() {
-    _amountController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-        left: 16, right: 16, top: 20,
-      ),
+      // Añadimos un poco más de padding vertical para que no se sienta tan apretado.
+      padding: EdgeInsets.fromLTRB(16, 20, 16, MediaQuery.of(context).viewInsets.bottom + 16),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
             'Aportar a "${widget.goal.name}"',
-            // 2. USAMOS EL TEMA
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 24),
-          // 3. Usamos un FutureBuilder para manejar la carga de cuentas
           FutureBuilder<List<Account>>(
             future: _accountsFuture,
             builder: (context, snapshot) {
@@ -122,9 +124,10 @@ class _ContributeToGoalDialogState extends State<ContributeToGoalDialog> {
               
               final accounts = snapshot.data!;
               // Seteamos la primera cuenta por defecto si no hay ninguna seleccionada
-              _selectedAccount ??= accounts.first;
+              if (_selectedAccount == null && accounts.isNotEmpty) {
+                _selectedAccount = accounts.first;
+              }
 
-              // Devolvemos el formulario solo cuando las cuentas están cargadas
               return _buildForm(accounts);
             },
           ),
@@ -133,7 +136,6 @@ class _ContributeToGoalDialogState extends State<ContributeToGoalDialog> {
     );
   }
 
-  // 4. El formulario se extrae a su propio método para mayor claridad
   Widget _buildForm(List<Account> accounts) {
     return Form(
       key: _formKey,
@@ -151,7 +153,7 @@ class _ContributeToGoalDialogState extends State<ContributeToGoalDialog> {
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             validator: (value) {
               if (value == null || value.isEmpty) return 'Introduce una cantidad';
-              final amount = double.tryParse(value);
+              final amount = double.tryParse(value.replaceAll(',', '.'));
               if (amount == null || amount <= 0) return 'Cantidad no válida';
               if (_selectedAccount != null && amount > _selectedAccount!.balance) {
                 return 'Saldo insuficiente en la cuenta';
@@ -181,12 +183,14 @@ class _ContributeToGoalDialogState extends State<ContributeToGoalDialog> {
           ElevatedButton.icon(
             onPressed: _isSubmitting ? null : _submitContribution,
             icon: _isSubmitting 
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) 
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) 
                 : const Icon(Iconsax.send_1),
             label: Text(_isSubmitting ? 'Procesando...' : 'Confirmar Aportación'),
-            style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              textStyle: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold)
+            ),
           ),
-          const SizedBox(height: 16),
         ],
       ),
     );

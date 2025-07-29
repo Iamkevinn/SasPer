@@ -1,26 +1,23 @@
-// lib/screens/edit_recurring_transaction_screen.dart (VERSIÓN FINAL USANDO SINGLETON)
+// lib/screens/edit_recurring_transaction_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
-import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/data/account_repository.dart';
-import 'package:sasper/data/recurring_repository.dart'; // Importamos el repositorio
+import 'package:sasper/data/recurring_repository.dart';
 import 'package:sasper/models/account_model.dart';
 import 'package:sasper/models/recurring_transaction_model.dart';
+import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'dart:developer' as developer;
 
 class EditRecurringTransactionScreen extends StatefulWidget {
-  // RecurringRepository ya no se pasa como parámetro.
-  final AccountRepository accountRepository;
   final RecurringTransaction transaction;
 
+  // El constructor ahora solo requiere la transacción a editar.
   const EditRecurringTransactionScreen({
     super.key,
-    required this.accountRepository,
     required this.transaction,
   });
 
@@ -29,8 +26,9 @@ class EditRecurringTransactionScreen extends StatefulWidget {
 }
 
 class _EditRecurringTransactionScreenState extends State<EditRecurringTransactionScreen> {
-  // Accedemos a la única instancia del repositorio directamente.
+  // Accedemos a las únicas instancias (Singletons) de los repositorios.
   final RecurringRepository _repository = RecurringRepository.instance;
+  final AccountRepository _accountRepository = AccountRepository.instance;
 
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _descriptionController;
@@ -46,7 +44,8 @@ class _EditRecurringTransactionScreenState extends State<EditRecurringTransactio
   @override
   void initState() {
     super.initState();
-    _accountsFuture = widget.accountRepository.getAccounts();
+    // Usamos el Singleton para obtener las cuentas.
+    _accountsFuture = _accountRepository.getAccounts();
     
     final t = widget.transaction;
     _descriptionController = TextEditingController(text: t.description);
@@ -76,15 +75,16 @@ class _EditRecurringTransactionScreenState extends State<EditRecurringTransactio
         frequency: _frequency,
       );
 
-      // Usamos la instancia _repository para llamar al método.
+      // Usamos el Singleton para actualizar la transacción.
       await _repository.updateRecurringTransaction(updatedTransaction);
 
       if (mounted) {
+        // Devolvemos 'true' para que la pantalla anterior sepa que hubo un cambio.
         Navigator.of(context).pop(true);
         
+        // Mostramos la notificación después de que la navegación haya terminado.
         WidgetsBinding.instance.addPostFrameCallback((_) {
           NotificationHelper.show(
-            context: Navigator.of(context).context,
             message: 'Gasto fijo actualizado.',
             type: NotificationType.success,
           );
@@ -94,8 +94,7 @@ class _EditRecurringTransactionScreenState extends State<EditRecurringTransactio
       developer.log('🔥 FALLO AL ACTUALIZAR GASTO FIJO: $e', name: 'EditRecurringScreen');
       if (mounted) {
         NotificationHelper.show(
-          context: context,
-          message: 'Error al actualizar. Revisa tu conexión o los permisos.',
+          message: 'Error al actualizar: ${e.toString().replaceFirst("Exception: ", "")}',
           type: NotificationType.error,
         );
       }
@@ -120,6 +119,7 @@ class _EditRecurringTransactionScreenState extends State<EditRecurringTransactio
           
           final accounts = snapshot.data ?? [];
           
+          // Lógica para manejar si la cuenta original fue borrada.
           if (_selectedAccountId != null && !accounts.any((acc) => acc.id == _selectedAccountId)) {
              _selectedAccountId = accounts.isNotEmpty ? accounts.first.id : null;
           }
@@ -151,6 +151,7 @@ class _EditRecurringTransactionScreenState extends State<EditRecurringTransactio
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'El monto es requerido';
                     if (double.tryParse(v.replaceAll(',', '.')) == null) return 'Ingresa un monto válido';
+                    if (double.parse(v.replaceAll(',', '.')) <= 0) return 'El monto debe ser mayor a cero';
                     return null;
                   },
                 ),

@@ -16,44 +16,43 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _formKey = GlobalKey<FormState>(); // Key para validaciones
+  final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
 
-  // --- ¡CAMBIO ARQUITECTÓNICO! ---
-  // Instanciamos el repositorio. En una app más grande, usaríamos un Provider.
-  final _authRepository = AuthRepository();
+  // --- CORRECCIÓN CLAVE: Usamos el Singleton ---
+  // Obtenemos la instancia global en lugar de crear una nueva.
+  final AuthRepository _authRepository = AuthRepository.instance;
 
+  /// Valida el formulario e intenta iniciar sesión.
   Future<void> _signIn() async {
-    // Validamos el formulario antes de continuar
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() { _isLoading = true; });
+    setState(() => _isLoading = true);
     try {
       await _authRepository.signInWithPassword(
         _emailController.text.trim(),
         _passwordController.text.trim(),
       );
-      
-      // El AuthGate se encargará de redirigir
+      // El AuthGate se encargará de redirigir si el inicio de sesión es exitoso.
     } catch (e) {
-      if(mounted) {
+      if (mounted) {
        NotificationHelper.show(
-            context: context,
-            message: e.toString(),
+            message: e.toString().replaceFirst("Exception: ", ""),
             type: NotificationType.error,
           );
       }
     } finally {
       if (mounted) {
-        setState(() { _isLoading = false; });
+        setState(() => _isLoading = false);
       }
     }
   }
 
+  /// Valida el formulario e intenta registrar un nuevo usuario.
   Future<void> _signUp() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() { _isLoading = true; });
+    setState(() => _isLoading = true);
     try {
       await _authRepository.signUp(
         _emailController.text.trim(),
@@ -61,22 +60,20 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       if (mounted) {
         NotificationHelper.show(
-            context: context,
-            message: 'Registro exitoso! Revisa tu correo electronico',
+            message: 'Registro exitoso. Revisa tu correo para confirmar.',
             type: NotificationType.success,
           );
       }
     } catch (e) {
-      if(mounted) {
+      if (mounted) {
         NotificationHelper.show(
-            context: context,
-            message: e.toString(),
+            message: e.toString().replaceFirst("Exception: ", ""),
             type: NotificationType.error,
           );
       }
     } finally {
       if (mounted) {
-        setState(() { _isLoading = false; });
+        setState(() => _isLoading = false);
       }
     }
   }
@@ -87,6 +84,7 @@ class _LoginScreenState extends State<LoginScreen> {
     _passwordController.dispose();
     super.dispose();
   }
+
 
   @override
   Widget build(BuildContext context) {

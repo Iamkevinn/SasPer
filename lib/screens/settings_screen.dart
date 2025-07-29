@@ -3,47 +3,48 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:sasper/data/auth_repository.dart'; // Importamos el repositorio
+import 'package:sasper/main.dart'; // Para navigatorKey
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:sasper/data/auth_repository.dart'; // <-- ¡IMPORTANTE!
-
 class SettingsScreen extends StatefulWidget {
-  // Ahora requiere el AuthRepository
-  final AuthRepository authRepository;
-
-  const SettingsScreen({super.key, required this.authRepository});
+  // El constructor ahora es constante y no recibe parámetros.
+  const SettingsScreen({super.key});
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  // Accedemos a la única instancia (Singleton) del repositorio.
+  final AuthRepository _authRepository = AuthRepository.instance;
   User? _user;
 
   @override
   void initState() {
     super.initState();
-    // Obtenemos el usuario desde el repositorio, no directamente de Supabase
-    _user = widget.authRepository.currentUser;
+    // Obtenemos el usuario desde el Singleton.
+    _user = _authRepository.currentUser;
   }
 
+  /// Muestra un diálogo para confirmar el cierre de sesión.
   Future<void> _showLogoutConfirmationDialog() async {
     final bool? confirm = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) {
+      context: navigatorKey.currentContext!,
+      builder: (BuildContext dialogContext) {
         return AlertDialog(
-          title: Text('Confirmar Cierre de Sesión', style: GoogleFonts.poppins()),
+          title: Text('Confirmar Cierre de Sesión', style: GoogleFonts.poppins(textStyle: Theme.of(dialogContext).textTheme.titleLarge)),
           content: const Text('¿Estás seguro de que quieres cerrar tu sesión?'),
           actions: <Widget>[
             TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
+              onPressed: () => Navigator.of(dialogContext).pop(false),
               child: const Text('Cancelar'),
             ),
             TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: TextButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
+              style: TextButton.styleFrom(foregroundColor: Theme.of(dialogContext).colorScheme.error),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
               child: const Text('Cerrar Sesión'),
             ),
           ],
@@ -51,16 +52,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       },
     );
 
-    if (confirm == true && mounted) {
+    if (confirm == true) {
       try {
-        // --- ¡CAMBIO CLAVE! ---
-        // Usamos el método del repositorio para cerrar sesión.
-        await widget.authRepository.signOut();
-        // El AuthGate se encargará del resto.
+        // Usamos el Singleton para cerrar sesión.
+        await _authRepository.signOut();
+        // El AuthGate se encargará de redirigir a la pantalla de login.
       } catch (e) {
         if (mounted) {
           NotificationHelper.show(
-            context: context,
             message: 'Error al cerrar sesión: "${e.toString()}"',
             type: NotificationType.error,
           );
@@ -74,8 +73,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      // --- ¡NUEVO! ---
-      // Usamos un AppBar para una estructura más estándar.
       appBar: AppBar(
         title: Text('Ajustes', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
@@ -108,7 +105,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           
-          // --- SECCIÓN DE APARIENCIA (Ejemplo de extensibilidad) ---
+          // --- SECCIÓN DE APARIENCIA ---
           const SizedBox(height: 16),
           _buildSectionHeader('Apariencia'),
            Card(
@@ -119,10 +116,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               secondary: const Icon(Iconsax.moon),
               value: Theme.of(context).brightness == Brightness.dark,
               onChanged: (bool value) {
-                // Aquí iría la lógica para cambiar el tema de la app
-                // usando un ThemeProvider (ej. Riverpod, Provider, etc.)
                  NotificationHelper.show(
-                  context: context,
                   message: 'No se ha implementado esta función aún.',
                   type: NotificationType.error,
                 );
@@ -147,7 +141,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  // Widget auxiliar para los títulos de sección
+  /// Widget auxiliar para construir los encabezados de sección.
   Widget _buildSectionHeader(String title) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0, top: 8.0, left: 4.0),

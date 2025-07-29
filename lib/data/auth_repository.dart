@@ -1,19 +1,34 @@
 // lib/data/auth_repository.dart
+
 import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AuthRepository {
-  final SupabaseClient _client;
+  // 1. El cliente se declara como 'late final'.
+  late final SupabaseClient _client;
 
-  AuthRepository({SupabaseClient? client})
-      : _client = client ?? Supabase.instance.client;
+  // 2. Constructor privado.
+  AuthRepository._privateConstructor();
 
-  // Stream para que el AuthGate pueda escuchar cambios de estado.
+  // 3. La instancia estática que guarda el único objeto de esta clase.
+  static final AuthRepository instance = AuthRepository._privateConstructor();
+
+  // 4. Método público de inicialización. Se llama desde main.dart.
+  void initialize(SupabaseClient client) {
+    _client = client;
+  }
+
+  // --- MÉTODOS PÚBLICOS DEL REPOSITORIO ---
+
+  /// Devuelve un stream que emite eventos de cambio de estado de autenticación.
+  /// Ideal para ser usado por el AuthGate.
   Stream<AuthState> get authStateChanges => _client.auth.onAuthStateChange;
 
-  // Obtener el usuario actual
+  /// Devuelve el usuario actualmente autenticado, o null si no hay ninguno.
   User? get currentUser => _client.auth.currentUser;
 
+  /// Inicia sesión con correo y contraseña.
+  /// Lanza excepciones con mensajes claros para la UI en caso de error.
   Future<void> signInWithPassword(String email, String password) async {
     try {
       await _client.auth.signInWithPassword(
@@ -21,7 +36,7 @@ class AuthRepository {
         password: password,
       );
     } on AuthException catch (e) {
-      // Mapeamos errores comunes a mensajes más claros
+      // Mapeamos errores comunes a mensajes más amigables.
       if (e.message.contains('Invalid login credentials')) {
         throw 'Correo o contraseña incorrectos. Por favor, verifica tus datos.';
       }
@@ -31,6 +46,7 @@ class AuthRepository {
     }
   }
 
+  /// Registra un nuevo usuario con correo y contraseña.
   Future<void> signUp(String email, String password) async {
      try {
       await _client.auth.signUp(
@@ -47,6 +63,7 @@ class AuthRepository {
     }
   }
 
+  /// Cierra la sesión del usuario actual.
   Future<void> signOut() async {
     await _client.auth.signOut();
   }

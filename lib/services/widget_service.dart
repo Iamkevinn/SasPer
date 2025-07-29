@@ -1,39 +1,42 @@
-// lib/services/widget_service.dart (VERSIÓN FINAL CON GRÁFICO Y LEYENDA)
+// lib/services/widget_service.dart
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
-import 'dart:convert'; 
 import 'dart:ui' as ui;
-import 'package:flutter/material.dart'; // Ahora es crucial para TextPainter
+import 'package:flutter/material.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:sasper/data/analysis_repository.dart';
+import 'package:sasper/data/analysis_repository.dart'; // Importamos el repositorio
 import 'package:sasper/models/analysis_models.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:sasper/models/budget_models.dart'; // <-- IMPORTANTE
-import 'package:sasper/models/dashboard_data_model.dart'; // <-- IMPORTANTE
-import 'package:sasper/models/transaction_models.dart'; // <-- IMPORTANTE
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:sasper/models/dashboard_data_model.dart';
 
+/// Un servicio que maneja la lógica para actualizar los widgets de la pantalla de inicio.
+///
+/// Esta clase solo contiene métodos estáticos, por lo que no necesita ser instanciada.
 class WidgetService {
   
-  static Future<void> updateAllWidgetData({required DashboardData data,}) async {
+  /// Actualiza los datos de todos los widgets de la app.
+  ///
+  /// Obtiene los datos necesarios, genera una imagen del gráfico si es posible,
+  /// serializa la información y la envía al lado nativo usando `HomeWidget`.
+  static Future<void> updateAllWidgetData({required DashboardData data}) async {
     developer.log('🔄 [Service] Starting full widget update...', name: 'WidgetService');
     try {
       final formattedBalance = NumberFormat.currency(
         locale: 'es_CO', symbol: '', decimalDigits: 2,
       ).format(data.totalBalance);
 
-      final analysisRepo = AnalysisRepository(client: Supabase.instance.client);
+      // Usamos la instancia Singleton de AnalysisRepository.
+      final analysisRepo = AnalysisRepository.instance;
       final expenseData = await analysisRepo.getExpenseSummaryForWidget();
       
       String? chartPath;
       if (expenseData.isNotEmpty) {
-        // Generamos la imagen directamente desde los datos, sin widgets.
         final chartBytes = await _createChartImageFromData(expenseData);
         if (chartBytes != null) {
           final dir = await getApplicationSupportDirectory();
@@ -46,23 +49,23 @@ class WidgetService {
         developer.log('ℹ️ [Service] No expense data for chart.', name: 'WidgetService');
       }
 
-      // --- 3. SERIALIZAR LAS LISTAS A JSON ---
-      // Convertimos la lista de presupuestos destacados a un String JSON.
+      // Serializa las listas a JSON para pasarlas al widget nativo.
+      // Asegúrate de que tus modelos tengan un método `toJson()`.
       final budgetsJson = jsonEncode(
-        data.budgetsProgress.map((budget) => budget.toJson()).toList()
+        data.featuredBudgets.map((budget) => budget.toJson()).toList()
       );
-      // Convertimos la lista de transacciones recientes a un String JSON.
       final transactionsJson = jsonEncode(
         data.recentTransactions.take(3).map((tx) => tx.toJson()).toList()
       );
       
+      // Guarda todos los datos necesarios para los widgets.
       await HomeWidget.saveWidgetData<String>('total_balance', formattedBalance);
       await HomeWidget.saveWidgetData<String>('widget_chart_path', chartPath);
       await HomeWidget.saveWidgetData<String>('featured_budgets_json', budgetsJson);
       await HomeWidget.saveWidgetData<String>('recent_transactions_json', transactionsJson);
       await HomeWidget.saveWidgetData<String>('budgets_json', budgetsJson);
 
-
+      // Dispara la actualización para todos los providers de widgets.
       await HomeWidget.updateWidget(name: 'SasPerWidgetProvider');
       await HomeWidget.updateWidget(name: 'SasPerMediumWidgetProvider');
       await HomeWidget.updateWidget(name: 'SasPerLargeWidgetProvider');
@@ -74,6 +77,8 @@ class WidgetService {
   }
 
   /// Dibuja un gráfico de tarta con una leyenda manualmente en un Canvas.
+  ///
+  /// Este método es privado y solo es llamado por `updateAllWidgetData`.
   static Future<Uint8List?> _createChartImageFromData(List<ExpenseByCategory> data) async {
     try {
       final double width = 400;
@@ -81,7 +86,6 @@ class WidgetService {
       final recorder = ui.PictureRecorder();
       final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, width, height));
 
-      // Fondo transparente para la imagen PNG
       canvas.drawPaint(Paint()..color = Colors.transparent);
 
       final colors = [
@@ -90,17 +94,15 @@ class WidgetService {
       ];
       final total = data.fold<double>(0.0, (sum, e) => sum + e.totalSpent);
       
-      // --- DIBUJAR EL GRÁFICO (IZQUIERDA) ---
       final chartCenter = Offset(height / 2, height / 2);
-      final chartRadius = height / 2 * 0.85; // Un poco más grande
+      final chartRadius = height / 2 * 0.85;
       double startAngle = -pi / 2;
 
-      // Limitamos los datos a mostrar para que la leyenda sea legible
       final dataToShow = data.take(5).toList();
 
       for (var i = 0; i < dataToShow.length; i++) {
         final item = dataToShow[i];
-        if (item.totalSpent <= 0) continue; // No dibujar arcos de tamaño cero
+        if (item.totalSpent <= 0) continue;
         final sweepAngle = (item.totalSpent / total) * 2 * pi;
         final paint = Paint()..color = colors[i % colors.length];
         canvas.drawArc(
@@ -110,7 +112,6 @@ class WidgetService {
         startAngle += sweepAngle;
       }
       
-      // --- DIBUJAR LA LEYENDA (DERECHA) ---
       double legendY = 25.0;
       final double legendX = height + 15;
 
@@ -119,20 +120,14 @@ class WidgetService {
         if (item.totalSpent <= 0) continue;
         final pct = (item.totalSpent / total) * 100;
 
-        // Punto de color
         final colorPaint = Paint()..color = colors[i % colors.length];
         canvas.drawCircle(Offset(legendX, legendY), 6, colorPaint);
 
-        // Texto (Categoría y Porcentaje)
         final textStyle = const TextStyle(
-          color: Colors.black,
-          fontSize: 15,
-          fontWeight: FontWeight.w500,
+          color: Colors.black, fontSize: 15, fontWeight: FontWeight.w500,
         );
         final pctStyle = TextStyle(
-          color: Colors.grey[800],
-          fontSize: 14,
-          fontWeight: FontWeight.normal,
+          color: Colors.grey[800], fontSize: 14, fontWeight: FontWeight.normal,
         );
         
         final textSpan = TextSpan(

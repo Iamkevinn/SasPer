@@ -1,4 +1,4 @@
-// lib/screens/edit_transaction_screen.dart (VERSIÓN FINAL COMPLETA)
+// lib/screens/edit_transaction_screen.dart (VERSIÓN FINAL COMPLETA USANDO SINGLETONS)
 
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -8,19 +8,19 @@ import 'package:sasper/data/account_repository.dart';
 import 'package:sasper/data/transaction_repository.dart';
 import 'package:sasper/models/account_model.dart';
 import 'package:sasper/models/transaction_models.dart';
+import 'package:sasper/services/event_service.dart'; // Importamos EventService para la notificación global
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
+import 'dart:developer' as developer;
+import 'package:sasper/main.dart';
 
 class EditTransactionScreen extends StatefulWidget {
   final Transaction transaction;
-  final TransactionRepository transactionRepository;
-  final AccountRepository accountRepository;
 
+  // Los repositorios ya no se pasan en el constructor.
   const EditTransactionScreen({
     super.key,
     required this.transaction,
-    required this.transactionRepository,
-    required this.accountRepository,
   });
 
   @override
@@ -28,6 +28,10 @@ class EditTransactionScreen extends StatefulWidget {
 }
 
 class _EditTransactionScreenState extends State<EditTransactionScreen> {
+  // Accedemos a las únicas instancias (Singletons) de los repositorios.
+  final TransactionRepository _transactionRepository = TransactionRepository.instance;
+  final AccountRepository _accountRepository = AccountRepository.instance;
+
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _amountController;
   late final TextEditingController _descriptionController;
@@ -49,20 +53,26 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
   @override
   void initState() {
     super.initState();
-    // Usamos el valor absoluto para la UI, el signo se maneja al guardar.
     _amountController = TextEditingController(text: widget.transaction.amount.abs().toString());
     _descriptionController = TextEditingController(text: widget.transaction.description ?? '');
     _transactionType = widget.transaction.type;
     _selectedCategory = widget.transaction.category;
     _selectedAccountId = widget.transaction.accountId;
-    _accountsFuture = widget.accountRepository.getAccounts();
+    // Usamos la instancia singleton para cargar las cuentas.
+    _accountsFuture = _accountRepository.getAccounts();
+  }
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
   }
 
   Future<void> _updateTransaction() async {
     if (!_formKey.currentState!.validate() || _selectedCategory == null || _selectedAccountId == null) {
       NotificationHelper.show(
-            context: context,
-            message: 'Porfavor completa todos los campos requeridos.',
+            message: 'Por favor completa todos los campos requeridos.',
             type: NotificationType.error,
           );
       return;
@@ -71,7 +81,6 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
     setState(() => _isLoading = true);
 
     double amount = double.tryParse(_amountController.text.trim().replaceAll(',', '.')) ?? 0;
-    // Aseguramos que el monto sea negativo si es un gasto.
     if (_transactionType == 'Gasto') {
       amount = -amount.abs();
     } else {
@@ -79,7 +88,7 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
     }
 
     try {
-      await widget.transactionRepository.updateTransaction(
+      await _transactionRepository.updateTransaction(
         transactionId: widget.transaction.id,
         accountId: _selectedAccountId!,
         amount: amount,
@@ -90,21 +99,28 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
       );
 
       if (!mounted) return;
-      widget.accountRepository.forceRefresh();
-      NotificationHelper.show(
-            context: context,
+
+      // Disparamos el evento global para que el Dashboard y otras partes se enteren.
+      EventService.instance.fire(AppEvent.transactionUpdated);
+      
+      // Devolvemos 'true' para que la pantalla anterior (la lista) pueda refrescarse.
+      Navigator.of(context).pop(true);
+      
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        NotificationHelper.show(
             message: 'Transacción actualizada correctamente!',
             type: NotificationType.success,
           );
-      Navigator.of(context).pop(true);
+      });
 
     } catch (e) {
-      if (!mounted) return;
-      NotificationHelper.show(
-            context: context,
-            message: 'Error al actualizar la transacción.',
-            type: NotificationType.error,
-          );
+      developer.log('🔥 FALLO AL ACTUALIZAR TRANSACCIÓN: $e', name: 'EditTransactionScreen');
+      if (mounted) {
+        NotificationHelper.show(
+              message: 'Error al actualizar la transacción.',
+              type: NotificationType.error,
+            );
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -132,22 +148,32 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
     }
 
     final shouldDelete = await showDialog<bool>(
-      context: context,
-      builder: (context) => BackdropFilter(
+      // 1. Usamos el context del Navigator global.
+      context: navigatorKey.currentContext!,
+      
+      // 2. Usamos 'dialogContext' para el builder.
+      builder: (dialogContext) => BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
         child: AlertDialog(
-          backgroundColor: Theme.of(context).colorScheme.surface.withOpacity(0.85),
+          // 3. Usamos 'dialogContext' para obtener el tema.
+          backgroundColor: Theme.of(dialogContext).colorScheme.surface.withOpacity(0.85),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28.0)),
           title: const Text('Confirmar eliminación'),
           content: const Text('¿Estás seguro? Esta acción no se puede deshacer.'),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
+            // 4. Usamos 'dialogContext' para cerrar el diálogo.
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancelar')
+            ),
             FilledButton.tonal(
               style: FilledButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.errorContainer,
-                foregroundColor: Theme.of(context).colorScheme.onErrorContainer,
+                // 5. Usamos 'dialogContext' para el tema aquí también.
+                backgroundColor: Theme.of(dialogContext).colorScheme.errorContainer,
+                foregroundColor: Theme.of(dialogContext).colorScheme.onErrorContainer,
               ),
-              onPressed: () => Navigator.of(context).pop(true),
+              // 6. Y para cerrar el diálogo.
+              onPressed: () => Navigator.of(dialogContext).pop(true),
               child: const Text('Eliminar'),
             ),
           ],
@@ -158,33 +184,33 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
     if (shouldDelete == true) {
       setState(() => _isLoading = true);
       try {
-        await widget.transactionRepository.deleteTransaction(widget.transaction.id);
+        await _transactionRepository.deleteTransaction(widget.transaction.id);
         if (!mounted) return;
-        widget.accountRepository.forceRefresh();
-        NotificationHelper.show(
-            context: context,
+
+        // Disparamos el evento global
+        EventService.instance.fire(AppEvent.transactionDeleted);
+
+        // Devolvemos 'true' para el refresco inmediato
+        Navigator.of(context).pop(true);
+
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          NotificationHelper.show(
             message: 'Transacción eliminada correctamente.',
             type: NotificationType.success,
           );
-        Navigator.of(context).pop(true);
+        });
       } catch (e) {
-        if (!mounted) return;
-        NotificationHelper.show(
-            context: context,
+        developer.log('🔥 FALLO AL ELIMINAR TRANSACCIÓN: $e', name: 'EditTransactionScreen');
+        if (mounted) {
+         NotificationHelper.show(
             message: 'Error al eliminar la transacción.',
             type: NotificationType.error,
           );
+        }
       } finally {
         if (mounted) setState(() => _isLoading = false);
       }
     }
-  }
-
-  @override
-  void dispose() {
-    _amountController.dispose();
-    _descriptionController.dispose();
-    super.dispose();
   }
 
   @override
@@ -247,6 +273,11 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
                     return Text('Error: No se pudieron cargar las cuentas.', style: TextStyle(color: Theme.of(context).colorScheme.error));
                   }
                   final accounts = snapshot.data!;
+                  // Lógica para evitar errores si la cuenta asociada fue eliminada
+                  if (_selectedAccountId != null && !accounts.any((acc) => acc.id == _selectedAccountId)) {
+                    _selectedAccountId = null;
+                  }
+                  
                   return DropdownButtonFormField<String>(
                     value: _selectedAccountId,
                     items: accounts.map((account) {

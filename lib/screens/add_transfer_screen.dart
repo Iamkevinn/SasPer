@@ -3,24 +3,25 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
-
 import 'package:sasper/data/account_repository.dart';
 import 'package:sasper/models/account_model.dart';
 import 'package:sasper/services/event_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
+import 'dart:developer' as developer;
 
 class AddTransferScreen extends StatefulWidget {
-  // Ahora recibe el repositorio, siguiendo nuestra arquitectura.
-  final AccountRepository accountRepository;
-
-  const AddTransferScreen({super.key, required this.accountRepository});
+  // El constructor es constante y no recibe parámetros.
+  const AddTransferScreen({super.key});
 
   @override
   State<AddTransferScreen> createState() => _AddTransferScreenState();
 }
 
 class _AddTransferScreenState extends State<AddTransferScreen> {
+  // Accedemos a la única instancia (Singleton) del repositorio.
+  final AccountRepository _accountRepository = AccountRepository.instance;
+
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
   final _descriptionController = TextEditingController();
@@ -34,7 +35,8 @@ class _AddTransferScreenState extends State<AddTransferScreen> {
   @override
   void initState() {
     super.initState();
-    _accountsFuture = widget.accountRepository.getAccounts();
+    // Usamos la instancia singleton para cargar las cuentas.
+    _accountsFuture = _accountRepository.getAccounts();
   }
 
   @override
@@ -44,12 +46,12 @@ class _AddTransferScreenState extends State<AddTransferScreen> {
     super.dispose();
   }
 
+  /// Valida el formulario y llama al repositorio para crear la transferencia.
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
     
     if (_fromAccount == null || _toAccount == null) {
        NotificationHelper.show(
-            context: context,
             message: 'Debes seleccionar ambas cuentas.',
             type: NotificationType.error,
           );
@@ -57,7 +59,6 @@ class _AddTransferScreenState extends State<AddTransferScreen> {
     }
     if (_fromAccount!.id == _toAccount!.id) {
        NotificationHelper.show(
-            context: context,
             message: 'No puedes transferir a la misma cuenta.',
             type: NotificationType.error,
           );
@@ -67,33 +68,33 @@ class _AddTransferScreenState extends State<AddTransferScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await widget.accountRepository.createTransfer(
+      await _accountRepository.createTransfer(
         fromAccountId: _fromAccount!.id,
         toAccountId: _toAccount!.id,
-        amount: double.parse(_amountController.text),
+        amount: double.parse(_amountController.text.replaceAll(',', '.')),
         description: _descriptionController.text.trim(),
       );
 
       if (mounted) {
-        // --- ¡LA CLAVE DE LA REACTIVIDAD! ---
-        // Forzamos la actualización de los datos para ver los cambios inmediatamente.
-        await widget.accountRepository.forceRefresh();
-        
+        // Disparamos un evento global para que otras partes de la app se enteren.
         EventService.instance.fire(AppEvent.transactionsChanged);
+        
+        // Devolvemos 'true' para que la pantalla anterior sepa que la operación fue exitosa.
+        Navigator.of(context).pop(true);
 
-        NotificationHelper.show(
-            context: context,
-            message: 'Transacción realizada con exito!',
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          NotificationHelper.show(
+            message: 'Transferencia realizada con éxito!',
             type: NotificationType.success,
           );
-        Navigator.of(context).pop();
+        });
       }
 
     } catch (e) {
+      developer.log('🔥 FALLO AL CREAR TRANSFERENCIA: $e', name: 'AddTransferScreen');
       if (mounted) {
         NotificationHelper.show(
-            context: context,
-            message: 'Error al realizar la transacción.',
+            message: 'Error al realizar la transferencia: ${e.toString().replaceFirst("Exception: ", "")}',
             type: NotificationType.error,
           );
       }
@@ -116,7 +117,7 @@ class _AddTransferScreenState extends State<AddTransferScreen> {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (snapshot.hasError || !snapshot.hasData || snapshot.data!.length < 2) {
+          if (snapshot.hasError || !snapshot.hasData || (snapshot.data?.length ?? 0) < 2) {
             return const Center(child: Padding(
               padding: EdgeInsets.all(24.0),
               child: Text('Necesitas al menos dos cuentas para poder realizar una transferencia.', textAlign: TextAlign.center),
@@ -158,7 +159,7 @@ class _AddTransferScreenState extends State<AddTransferScreen> {
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     validator: (value) {
                       if (value == null || value.isEmpty) return 'El monto es obligatorio';
-                      final amount = double.tryParse(value);
+                      final amount = double.tryParse(value.replaceAll(',', '.'));
                       if (amount == null || amount <= 0) return 'Introduce un monto válido';
                       if (_fromAccount != null && amount > _fromAccount!.balance) return 'Saldo insuficiente en la cuenta de origen';
                       return null;
@@ -187,7 +188,7 @@ class _AddTransferScreenState extends State<AddTransferScreen> {
     );
   }
 
-  // Widget helper para el Dropdown, ahora usando el modelo Account
+  /// Widget helper para construir los Dropdowns de selección de cuenta.
   Widget _buildAccountDropdown({
     required String label,
     required Account? value,

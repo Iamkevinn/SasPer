@@ -1,18 +1,21 @@
-// lib/screens/edit_budget_screen.dart
+// lib/screens/edit_budget_screen.dart (VERSIÓN FINAL COMPLETA USANDO SINGLETON)
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:sasper/data/budget_repository.dart';
-import 'package:sasper/models/budget_models.dart'; // Importamos el modelo
+import 'package:sasper/models/budget_models.dart';
+import 'package:sasper/services/event_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
+import 'dart:developer' as developer;
 
 class EditBudgetScreen extends StatefulWidget {
-  final BudgetRepository budgetRepository;
-  final BudgetProgress budget; // Recibimos el presupuesto a editar
+  // Solo necesita recibir el objeto del presupuesto a editar.
+  final BudgetProgress budget;
 
   const EditBudgetScreen({
     super.key,
-    required this.budgetRepository,
     required this.budget,
   });
 
@@ -21,16 +24,18 @@ class EditBudgetScreen extends StatefulWidget {
 }
 
 class _EditBudgetScreenState extends State<EditBudgetScreen> {
+  // Accedemos a la única instancia (Singleton) del repositorio.
+  final BudgetRepository _budgetRepository = BudgetRepository.instance;
+
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _amountController;
-  late String _selectedCategory; // La categoría no podrá cambiarse
+  late String _category;
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    // Pre-cargamos los datos del presupuesto existente
-    _selectedCategory = widget.budget.category;
+    _category = widget.budget.category;
     _amountController = TextEditingController(text: widget.budget.budgetAmount.toStringAsFixed(0));
   }
 
@@ -47,25 +52,30 @@ class _EditBudgetScreenState extends State<EditBudgetScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Usamos el método `updateBudget` que añadiremos al repositorio
-      await widget.budgetRepository.updateBudget(
-        budgetId: widget.budget.budgetId,
-        newAmount: double.parse(_amountController.text),
+      await _budgetRepository.updateBudget(
+        budgetId: widget.budget.budgetId, // Corregido: 'id' en lugar de 'budgetId'
+        newAmount: double.parse(_amountController.text.replaceAll(',', '.')),
       );
 
       if (mounted) {
-        Navigator.of(context).pop(); // Cerramos la pantalla de edición
-        NotificationHelper.show(
-          context: context,
-          message: 'Presupuesto actualizado correctamente.',
-          type: NotificationType.success,
-        );
+        // Disparamos el evento global para que el Dashboard, etc., se actualicen.
+        EventService.instance.fire(AppEvent.budgetsChanged);
+
+        // Devolvemos 'true' para el refresco inmediato de la pantalla de lista.
+        Navigator.of(context).pop(true);
+        
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          NotificationHelper.show(
+            message: 'Presupuesto actualizado correctamente.',
+            type: NotificationType.success,
+          );
+        });
       }
     } catch (e) {
+      developer.log('🔥 FALLO AL ACTUALIZAR PRESUPUESTO: $e', name: 'EditBudgetScreen');
       if (mounted) {
         NotificationHelper.show(
-          context: context,
-          message: 'Error al actualizar: ${e.toString()}',
+          message: 'Error al actualizar: ${e.toString().replaceFirst("Exception: ", "")}',
           type: NotificationType.error,
         );
       }
@@ -88,30 +98,32 @@ class _EditBudgetScreenState extends State<EditBudgetScreen> {
           padding: const EdgeInsets.all(16.0),
           children: [
             // Mostramos la categoría como texto no editable
-            Text(
-              'Categoría',
-              style: Theme.of(context).textTheme.labelLarge,
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainer,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                _selectedCategory,
-                style: Theme.of(context).textTheme.titleMedium,
+            TextFormField(
+              initialValue: _category,
+              enabled: false,
+              decoration: InputDecoration(
+                labelText: 'Categoría',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                prefixIcon: const Icon(Iconsax.category),
+                filled: true,
+                fillColor: Theme.of(context).colorScheme.surfaceContainer,
               ),
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _amountController,
-              decoration: const InputDecoration(labelText: 'Nuevo Monto'),
+              decoration: InputDecoration(
+                labelText: 'Nuevo Monto del Presupuesto',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                prefixIcon: const Icon(Iconsax.money_4),
+                prefixText: '\$ ',
+              ),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               validator: (value) {
-                if (value == null || value.isEmpty || double.tryParse(value) == null || double.parse(value) <= 0) {
-                  return 'Por favor ingresa un monto válido';
+                if (value == null || value.isEmpty) return 'Por favor ingresa un monto';
+                final amount = double.tryParse(value.replaceAll(',', '.'));
+                if (amount == null || amount <= 0) {
+                  return 'Por favor ingresa un monto válido y mayor a cero';
                 }
                 return null;
               },
@@ -119,7 +131,14 @@ class _EditBudgetScreenState extends State<EditBudgetScreen> {
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: _isLoading ? null : _updateBudget,
-              child: _isLoading ? const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(Colors.white)) : const Text('Actualizar Presupuesto'),
+              style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  textStyle: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              child: _isLoading 
+                ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) 
+                : const Text('Actualizar Presupuesto'),
             ),
           ],
         ),

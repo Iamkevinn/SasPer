@@ -6,7 +6,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 
 // Importamos la arquitectura limpia
-import 'package:sasper/data/account_repository.dart';
 import 'package:sasper/data/debt_repository.dart';
 import 'package:sasper/models/debt_model.dart';
 import 'package:sasper/screens/add_debt_screen.dart';
@@ -15,15 +14,8 @@ import 'package:sasper/widgets/shared/empty_state_card.dart';
 import 'register_payment_screen.dart';
 
 class DebtsScreen extends StatefulWidget {
-  // Ahora recibe los repositorios que necesita.
-  final DebtRepository repository;
-  final AccountRepository accountRepository;
-
-  const DebtsScreen({
-    super.key,
-    required this.repository,
-    required this.accountRepository,
-  });
+  // El constructor ahora es simple y constante. No recibe ningún parámetro.
+  const DebtsScreen({super.key});
 
   @override
   State<DebtsScreen> createState() => _DebtsScreenState();
@@ -33,19 +25,29 @@ class _DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderStat
   late final TabController _tabController;
   late final Stream<List<Debt>> _debtsStream;
 
+  // Accedemos a la única instancia (Singleton) del repositorio.
+  final DebtRepository _repository = DebtRepository.instance;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    // Obtenemos el stream del repositorio que nos pasaron por el widget.
-    _debtsStream = widget.repository.getDebtsStream();
+    // Obtenemos el stream del Singleton.
+    _debtsStream = _repository.getDebtsStream();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
-    // Ya no hacemos dispose del repositorio aquí, lo hace MainScreen.
     super.dispose();
+  }
+
+  void _navigateToAddDebt() {
+    Navigator.of(context).push(MaterialPageRoute(
+      // La pantalla de "Añadir" tampoco necesita repositorios en el constructor.
+      // Ella misma obtendrá los Singletons que necesite.
+      builder: (_) => const AddDebtScreen(),
+    ));
   }
 
   @override
@@ -55,8 +57,6 @@ class _DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderStat
         title: Text('Deudas y Préstamos', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        // El botón para añadir ahora vive en el FAB de MainScreen,
-        // por lo que podemos simplificar el AppBar.
         bottom: TabBar(
           controller: _tabController,
           labelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w600),
@@ -67,7 +67,6 @@ class _DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderStat
           ],
         ),
         actions: [
-          // --- ¡BOTÓN AÑADIDO AQUÍ! ---
           IconButton(
             icon: const Icon(Iconsax.add_square, size: 28),
             tooltip: 'Añadir Deuda/Préstamo',
@@ -79,7 +78,7 @@ class _DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderStat
         stream: _debtsStream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator()); // Aquí podrías usar un Shimmer
+            return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
             return Center(child: Text('Error: ${snapshot.error}'));
@@ -104,16 +103,6 @@ class _DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderStat
     );
   }
 
-  // Este método maneja la navegación a la pantalla para añadir una nueva deuda.
-  void _navigateToAddDebt() {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => AddDebtScreen(
-        debtRepository: widget.repository,
-        accountRepository: widget.accountRepository,
-      ),
-    ));
-  }
-  
   Widget _buildDebtsList(List<Debt> debts, {required bool isMyDebt}) {
     if (debts.isEmpty) {
       return _buildEmptyStateForTab(isMyDebt: isMyDebt);
@@ -134,15 +123,11 @@ class _DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderStat
                 child: DebtCard(
                   debt: debt,
                   onTap: () {
-                    // Ahora pasamos los repositorios requeridos.
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => RegisterPaymentScreen(
-                          debt: debt,
-                          debtRepository: widget.repository,
-                          accountRepository: widget.accountRepository,
-                        ),
+                        // La pantalla de registro de pago ahora tampoco necesita repositorios.
+                        builder: (context) => RegisterPaymentScreen(debt: debt),
                       ),
                     );
                   },

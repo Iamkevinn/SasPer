@@ -194,17 +194,17 @@ class MonthlyCashflowChart extends StatelessWidget {
 }
 
 // Widget de leyenda, por consistencia, aunque aquí no sea estrictamente necesario
-class _LegendItem extends StatelessWidget {
-  final Color color;
-  final String text;
-  const _LegendItem({required this.color, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(children: [
-      Container(width: 12, height: 12, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3))),
-      const SizedBox(width: 8),
-      Text(text, style: Theme.of(context).textTheme.bodySmall),
-    ]);
-  }
-}
+//class _LegendItem extends StatelessWidget {
+//  final Color color;
+//  final String text;
+//  const _LegendItem({required this.color, required this.text});
+//
+//  @override
+//  Widget build(BuildContext context) {
+//    return Row(children: [
+//      Container(width: 12, height: 12, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3))),
+//      const SizedBox(width: 8),
+//      Text(text, style: Theme.of(context).textTheme.bodySmall),
+//    ]);
+//  }
+//}

@@ -1,32 +1,26 @@
 // lib/screens/register_payment_screen.dart
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart'; // Fuente consistente
+import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 
-import 'package:sasper/data/account_repository.dart'; // <-- Usamos el repo
-import 'package:sasper/data/debt_repository.dart';   // <-- Usamos el repo
+// Importa los repositorios, modelos y servicios necesarios.
+import 'package:sasper/data/account_repository.dart';
+import 'package:sasper/data/debt_repository.dart';
 import 'package:sasper/models/account_model.dart';
 import 'package:sasper/models/debt_model.dart';
 import 'package:sasper/services/event_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
-import 'package:sasper/widgets/shared/custom_notification_widget.dart'; // Para refrescar la UI global
+import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 
 class RegisterPaymentScreen extends StatefulWidget {
   final Debt debt;
-  
-  // --- ¡CAMBIO ARQUITECTÓNICO! ---
-  // Inyectamos las dependencias necesarias.
-  final DebtRepository debtRepository;
-  final AccountRepository accountRepository;
 
+  // El constructor ahora solo requiere el objeto 'debt'.
   const RegisterPaymentScreen({
     super.key,
     required this.debt,
-    // Hacemos que los repositorios sean requeridos.
-    required this.debtRepository,
-    required this.accountRepository,
   });
 
   @override
@@ -38,7 +32,9 @@ class _RegisterPaymentScreenState extends State<RegisterPaymentScreen> {
   final _amountController = TextEditingController();
   final _descriptionController = TextEditingController();
 
-  // El `_debtService` local se elimina.
+  // Accedemos a las únicas instancias (Singletons) de los repositorios.
+  final DebtRepository _debtRepository = DebtRepository.instance;
+  final AccountRepository _accountRepository = AccountRepository.instance;
   
   Account? _selectedAccount;
   bool _isLoading = false;
@@ -47,13 +43,10 @@ class _RegisterPaymentScreenState extends State<RegisterPaymentScreen> {
   @override
   void initState() {
     super.initState();
-    // --- ¡CAMBIO CLAVE! ---
-    // Usamos el repositorio inyectado para obtener las cuentas.
-    _accountsFuture = widget.accountRepository.getAccounts();
+    // Usamos el Singleton para obtener las cuentas.
+    _accountsFuture = _accountRepository.getAccounts();
     _amountController.text = widget.debt.currentBalance.toStringAsFixed(2);
   }
-
-  // El método `_getAccounts()` local se elimina.
 
   @override
   void dispose() {
@@ -72,9 +65,8 @@ class _RegisterPaymentScreenState extends State<RegisterPaymentScreen> {
     try {
       final paymentAmount = double.parse(_amountController.text);
       
-      // --- ¡CAMBIO CLAVE! ---
-      // Usamos el método del DebtRepository inyectado.
-      await widget.debtRepository.registerPayment(
+      // Usamos la instancia del Singleton para registrar el pago.
+      await _debtRepository.registerPayment(
         debtId: widget.debt.id,
         debtType: widget.debt.type,
         paymentAmount: paymentAmount,
@@ -86,25 +78,22 @@ class _RegisterPaymentScreenState extends State<RegisterPaymentScreen> {
 
       if (!mounted) return;
 
-      // --- ¡NUEVO! ---
       // Notificamos a toda la app que los datos han cambiado.
       EventService.instance.fire(AppEvent.debtsChanged);
       EventService.instance.fire(AppEvent.transactionsChanged);
 
       NotificationHelper.show(
-            context: context,
-            message: 'Operación registrada con exito!',
-            type: NotificationType.success,
-          );
-      Navigator.of(context).pop(); // Simplemente cerramos la pantalla
+        message: 'Operación registrada con éxito!',
+        type: NotificationType.success,
+      );
+      Navigator.of(context).pop();
 
     } catch (e) {
       if (!mounted) return;
       NotificationHelper.show(
-            context: context,
-            message: 'Error "${e.toString()}"',
-            type: NotificationType.error,
-          );
+        message: 'Error: ${e.toString().replaceFirst("Exception: ", "")}',
+        type: NotificationType.error,
+      );
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);

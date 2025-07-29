@@ -1,11 +1,10 @@
 // lib/screens/add_debt_screen.dart
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart'; // Para consistencia
+import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 
-// --- ¡CAMBIO CLAVE! ---
-// Solo importamos los repositorios y modelos, no los servicios.
+// Importa los repositorios, modelos y servicios necesarios.
 import 'package:sasper/data/account_repository.dart';
 import 'package:sasper/data/debt_repository.dart';
 import 'package:sasper/models/account_model.dart';
@@ -15,16 +14,8 @@ import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 
 class AddDebtScreen extends StatefulWidget {
-  // --- ¡CAMBIO CLAVE! ---
-  // Ahora requiere los repositorios en su constructor.
-  final DebtRepository debtRepository;
-  final AccountRepository accountRepository;
-
-  const AddDebtScreen({
-    super.key,
-    required this.debtRepository,
-    required this.accountRepository,
-  });
+  // El constructor ahora es simple y constante. No recibe ningún parámetro.
+  const AddDebtScreen({super.key});
 
   @override
   State<AddDebtScreen> createState() => _AddDebtScreenState();
@@ -36,7 +27,9 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
   final _entityController = TextEditingController();
   final _amountController = TextEditingController();
 
-  // Se eliminan las instancias locales de servicios/repositorios.
+  // Accedemos a las únicas instancias (Singletons) de los repositorios.
+  final DebtRepository _debtRepository = DebtRepository.instance;
+  final AccountRepository _accountRepository = AccountRepository.instance;
 
   DebtType _selectedDebtType = DebtType.debt;
   Account? _selectedAccount;
@@ -47,8 +40,8 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
   @override
   void initState() {
     super.initState();
-    // Usamos el repositorio que viene del widget.
-    _accountsFuture = widget.accountRepository.getAccounts(); 
+    // Usamos el Singleton para obtener las cuentas.
+    _accountsFuture = _accountRepository.getAccounts();
   }
 
   @override
@@ -63,19 +56,17 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedAccount == null) {
       NotificationHelper.show(
-            context: context,
-            message: 'Porfavor seleccionar una cuenta.',
-            type: NotificationType.error,
-          );
+        message: 'Por favor, selecciona una cuenta.',
+        type: NotificationType.error,
+      );
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
-      // --- ¡CAMBIO CLAVE! ---
-      // Usamos el repositorio inyectado.
-      await widget.debtRepository.addDebtAndInitialTransaction(
+      // Usamos el Singleton para añadir la deuda.
+      await _debtRepository.addDebtAndInitialTransaction(
         name: _nameController.text.trim(),
         type: _selectedDebtType,
         entityName: _entityController.text.trim().isNotEmpty ? _entityController.text.trim() : null,
@@ -86,24 +77,21 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
 
       if (!mounted) return;
 
-      // El stream del DebtRepository se encargará de notificar a la pantalla de deudas.
-      // Solo necesitamos notificar al Dashboard que las transacciones cambiaron.
+      // Disparamos un evento para que otras partes de la app (como el Dashboard) sepan que algo cambió.
       EventService.instance.fire(AppEvent.transactionsChanged);
 
       NotificationHelper.show(
-            context: context,
-            message: 'Operación guardada!',
-            type: NotificationType.success,
-          );
+        message: 'Operación guardada!',
+        type: NotificationType.success,
+      );
       Navigator.of(context).pop();
 
     } catch (e) {
       if (!mounted) return;
       NotificationHelper.show(
-            context: context,
-            message: 'Error al guardar la transacción.',
-            type: NotificationType.error,
-          );
+        message: 'Error al guardar: ${e.toString().replaceFirst("Exception: ", "")}',
+        type: NotificationType.error,
+      );
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -124,7 +112,6 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // El resto del build está perfecto, solo se ajusta la fuente.
               SegmentedButton<DebtType>(
                 segments: const <ButtonSegment<DebtType>>[
                   ButtonSegment<DebtType>(value: DebtType.debt, label: Text('Yo Debo'), icon: Icon(Iconsax.arrow_down)),
@@ -163,7 +150,7 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: LinearProgressIndicator());
                   if (snapshot.hasError) return Text('Error al cargar cuentas: ${snapshot.error}');
-                  if (!snapshot.hasData || snapshot.data!.isEmpty) return const Text('No se encontraron cuentas.');
+                  if (!snapshot.hasData || snapshot.data!.isEmpty) return const Text('No se encontraron cuentas. Añade una primero.');
                   
                   return DropdownButtonFormField<Account>(
                     value: _selectedAccount,
@@ -178,7 +165,7 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
               ListTile(
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: Theme.of(context).colorScheme.outline)),
                 leading: const Icon(Iconsax.calendar_1),
-                title: Text(_dueDate == null ? 'Fecha de Vencimiento (Opcional)' : 'Vence: ${DateFormat.yMMMd('ES_CO').format(_dueDate!)}'),
+                title: Text(_dueDate == null ? 'Fecha de Vencimiento (Opcional)' : 'Vence: ${DateFormat.yMMMd('es_CO').format(_dueDate!)}'),
                 trailing: const Icon(Iconsax.arrow_right_3),
                 onTap: () async {
                   final pickedDate = await showDatePicker(context: context, initialDate: _dueDate ?? DateTime.now(), firstDate: DateTime.now(), lastDate: DateTime(2100));

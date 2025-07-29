@@ -102,7 +102,7 @@ class CategoryComparisonChart extends StatelessWidget {
       barTouchData: BarTouchData(
         touchTooltipData: BarTouchTooltipData(
           getTooltipItem: (group, groupIndex, rod, rodIndex) {
-            final item = filteredData[group.x.toInt()];
+            //final item = filteredData[group.x.toInt()];
             final amount = rod.toY;
             final month = rodIndex == 0 ? "Este Mes" : "Mes Pasado";
             return BarTooltipItem(

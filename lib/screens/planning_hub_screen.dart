@@ -1,35 +1,20 @@
-// lib/screens/planning_hub_screen.dart (NUEVO ARCHIVO)
+// lib/screens/planning_hub_screen.dart (VERSIÓN FINAL REFACtoRIZADA CON SINGLETONS)
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:sasper/data/account_repository.dart';
-import 'package:sasper/data/budget_repository.dart';
-import 'package:sasper/data/debt_repository.dart';
-import 'package:sasper/data/transaction_repository.dart';
-import 'package:sasper/data/goal_repository.dart';
-  import 'package:sasper/screens/recurring_transactions_screen.dart'; 
+//import 'package:sasper/data/account_repository.dart';
+//import 'package:sasper/data/debt_repository.dart';
 import 'package:sasper/screens/accounts_screen.dart';
 import 'package:sasper/screens/analysis_screen.dart';
 import 'package:sasper/screens/budgets_screen.dart';
 import 'package:sasper/screens/debts_screen.dart';
 import 'package:sasper/screens/goals_screen.dart';
+import 'package:sasper/screens/recurring_transactions_screen.dart';
 
 class PlanningHubScreen extends StatelessWidget {
-  // Recibe todos los repositorios que sus sub-pantallas necesitarán
-  final BudgetRepository budgetRepository;
-  final GoalRepository goalRepository;
-  final DebtRepository debtRepository;
-  final AccountRepository accountRepository;
-  final TransactionRepository transactionRepository;
-  const PlanningHubScreen({
-    super.key,
-    required this.budgetRepository,
-    required this.goalRepository,
-    required this.debtRepository,
-    required this.accountRepository,
-    required this.transactionRepository,
-  });
+  // El constructor ahora es simple y constante. No recibe ningún parámetro.
+  const PlanningHubScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -40,16 +25,15 @@ class PlanningHubScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
-           _buildHubCard(
+          _buildHubCard(
             context,
-            icon: Iconsax.wallet_3, // ¡DEBERÍA ESTAR AQUÍ!
+            icon: Iconsax.wallet_3,
             title: 'Cuentas',
             subtitle: 'Administra tu efectivo, bancos y tarjetas.',
             onTap: () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => AccountsScreen(
-                  repository: accountRepository, 
-                  transactionRepository: transactionRepository,
-              ),
+              // Las pantallas de destino ahora son 'const', ya que no necesitan
+              // recibir ningún repositorio. Ellas mismas obtendrán los Singletons.
+              builder: (_) => const AccountsScreen(),
             )),
           ),
           _buildHubCard(
@@ -58,7 +42,7 @@ class PlanningHubScreen extends StatelessWidget {
             title: 'Presupuestos',
             subtitle: 'Controla tus gastos mensuales por categoría.',
             onTap: () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => BudgetsScreen(repository: budgetRepository),
+              builder: (_) => const BudgetsScreen(),
             )),
           ),
           _buildHubCard(
@@ -67,7 +51,7 @@ class PlanningHubScreen extends StatelessWidget {
             title: 'Metas de Ahorro',
             subtitle: 'Alcanza tus objetivos financieros a corto y largo plazo.',
             onTap: () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => GoalsScreen(repository: goalRepository),
+              builder: (_) => const GoalsScreen(),
             )),
           ),
           _buildHubCard(
@@ -76,7 +60,7 @@ class PlanningHubScreen extends StatelessWidget {
             title: 'Deudas y Préstamos',
             subtitle: 'Administra y liquida tus deudas de forma eficiente.',
             onTap: () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => DebtsScreen(repository: debtRepository, accountRepository: accountRepository),
+              builder: (_) => const DebtsScreen(),
             )),
           ),
           _buildHubCard(
@@ -94,9 +78,7 @@ class PlanningHubScreen extends StatelessWidget {
             title: 'Gastos Fijos',
             subtitle: 'Automatiza tus ingresos y gastos recurrentes.',
             onTap: () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => RecurringTransactionsScreen(
-                accountRepository: accountRepository, // Pasa el account repo también
-              ),
+              builder: (_) => const RecurringTransactionsScreen(),
             )),
           ),
         ],

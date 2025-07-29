@@ -1,32 +1,32 @@
 // lib/screens/add_goal_screen.dart
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart'; // Para consistencia de UI
+import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 import 'package:sasper/data/goal_repository.dart';
+import 'package:sasper/services/event_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
+import 'dart:developer' as developer;
 
 class AddGoalScreen extends StatefulWidget {
-  // --- ¡CAMBIO CLAVE! ---
-  // Ahora requiere el repositorio en su constructor.
-  final GoalRepository goalRepository;
-
-  const AddGoalScreen({super.key, required this.goalRepository});
+  // El constructor es constante y no recibe parámetros.
+  const AddGoalScreen({super.key});
 
   @override
   State<AddGoalScreen> createState() => _AddGoalScreenState();
 }
 
 class _AddGoalScreenState extends State<AddGoalScreen> {
+  // Accedemos a la única instancia (Singleton) del repositorio.
+  final GoalRepository _goalRepository = GoalRepository.instance;
+  
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _targetAmountController = TextEditingController();
   DateTime? _targetDate;
   bool _isLoading = false;
-
-  // Se elimina la instancia local: `final _goalRepository = GoalRepository();`
 
   @override
   void dispose() {
@@ -35,44 +35,52 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
     super.dispose();
   }
 
+  /// Muestra el selector de fecha.
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: _targetDate ?? DateTime.now().add(const Duration(days: 1)),
       firstDate: DateTime.now().add(const Duration(days: 1)),
       lastDate: DateTime(2101),
+      locale: const Locale('es'),
     );
     if (picked != null && picked != _targetDate) {
       setState(() => _targetDate = picked);
     }
   }
 
+  /// Valida el formulario y llama al repositorio para guardar la nueva meta.
   Future<void> _saveGoal() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
 
     try {
-      // --- ¡CAMBIO CLAVE! ---
-      // Usamos el repositorio que viene del widget.
-      await widget.goalRepository.addGoal(
+      await _goalRepository.addGoal(
         name: _nameController.text.trim(),
-        targetAmount: double.parse(_targetAmountController.text.trim()),
+        targetAmount: double.parse(_targetAmountController.text.trim().replaceAll(',', '.')),
         targetDate: _targetDate,
       );
 
       if (mounted) {
-        NotificationHelper.show(
-            context: context,
-            message: 'Meta creada con exito!',
+        // Disparamos el evento global para que otras pantallas se actualicen.
+        EventService.instance.fire(AppEvent.goalCreated);
+
+        // Devolvemos 'true' para que la pantalla anterior sepa que la operación fue exitosa.
+        Navigator.of(context).pop(true);
+
+        // Mostramos la notificación después de que la pantalla se cierre.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          NotificationHelper.show(
+            message: 'Meta creada con éxito!',
             type: NotificationType.success,
           );
-        Navigator.of(context).pop();
+        });
       }
     } catch (error) {
+      developer.log('🔥 FALLO AL CREAR META: $error', name: 'AddGoalScreen');
       if (mounted) {
         NotificationHelper.show(
-            context: context,
-            message: 'Error al crear meta.',
+            message: 'Error al crear la meta.',
             type: NotificationType.error,
           );
       }
@@ -96,30 +104,29 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // El resto del build es visualmente idéntico, está muy bien hecho.
-              // Solo se ajustan las fuentes para consistencia.
               TextFormField(
                 controller: _nameController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Nombre de la Meta',
                   hintText: 'Ej. Vacaciones, Portátil Nuevo',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Iconsax.flag),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  prefixIcon: const Icon(Iconsax.flag),
                 ),
                 validator: (value) => (value == null || value.trim().isEmpty) ? 'Por favor, introduce un nombre' : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _targetAmountController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Cantidad Objetivo',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Iconsax.dollar_circle),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  prefixIcon: const Icon(Iconsax.dollar_circle),
+                  prefixText: '\$ '
                 ),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 validator: (value) {
                   if (value == null || value.isEmpty) return 'Introduce una cantidad';
-                  final amount = double.tryParse(value);
+                  final amount = double.tryParse(value.replaceAll(',', '.'));
                   if (amount == null || amount <= 0) return 'Introduce un número válido mayor que cero';
                   return null;
                 },
@@ -127,12 +134,12 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
               const SizedBox(height: 16),
               ListTile(
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8.0),
+                  borderRadius: BorderRadius.circular(12.0),
                   side: BorderSide(color: Theme.of(context).dividerColor),
                 ),
                 leading: const Icon(Iconsax.calendar_1),
-                title: Text(_targetDate == null ? 'Fecha Límite (Opcional)' : 'Vence: ${DateFormat.yMMMd('ES_CO').format(_targetDate!)}'),
-                trailing: _targetDate != null ? IconButton(icon: const Icon(Iconsax.close_circle, size: 20), onPressed: () => setState(() => _targetDate = null)) : null,
+                title: Text(_targetDate == null ? 'Fecha Límite (Opcional)' : 'Vence: ${DateFormat.yMMMd('es_CO').format(_targetDate!)}'),
+                trailing: _targetDate != null ? IconButton(icon: const Icon(Iconsax.close_circle, size: 20), onPressed: () => setState(() => _targetDate = null)) : const Icon(Iconsax.arrow_right_3),
                 onTap: () => _selectDate(context),
               ),
               const SizedBox(height: 32),
@@ -143,6 +150,7 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   textStyle: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
                 ),
               ),
             ],

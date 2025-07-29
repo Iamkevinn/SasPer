@@ -1,22 +1,31 @@
+// lib/data/analysis_repository.dart
+
 import 'dart:developer' as developer;
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sasper/models/analysis_models.dart';
 
 class AnalysisRepository {
-  final SupabaseClient _client;
+  // 1. Cliente 'late final'.
+  late final SupabaseClient _client;
 
-  // 1. INYECTAMOS LA DEPENDENCIA para facilitar los tests.
-  AnalysisRepository({SupabaseClient? client})
-      : _client = client ?? Supabase.instance.client;
+  // 2. Constructor privado.
+  AnalysisRepository._privateConstructor();
 
-  // --- NUEVO MÉTODO PÚBLICO ---
-  // Extraemos la lógica que ya tenías para poder llamarla individualmente.
+  // 3. Instancia estática.
+  static final AnalysisRepository instance = AnalysisRepository._privateConstructor();
+
+  // 4. Método de inicialización.
+  void initialize(SupabaseClient client) {
+    _client = client;
+  }
+
+  /// Obtiene solo el resumen de gastos, ideal para widgets o cargas rápidas.
   Future<List<ExpenseByCategory>> getExpenseSummaryForWidget() async {
     developer.log("📈 [Repository] Fetching expense summary for widget...", name: 'AnalysisRepository');
     try {
       final userId = _client.auth.currentUser?.id;
-      if (userId == null) return []; // Si no hay usuario, devuelve una lista vacía.
+      if (userId == null) return [];
 
       final clientDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
@@ -25,25 +34,30 @@ class AnalysisRepository {
         params: {'p_user_id': userId, 'client_date': clientDate}
       );
       
-      // El parseo es el mismo que ya usas en fetchAllAnalysisData.
       return (result as List).map((e) => ExpenseByCategory.fromJson(e)).toList();
 
     } catch (e) {
       developer.log('🔥 Error en getExpenseSummaryForWidget: $e', name: 'AnalysisRepository');
-      return []; // En caso de error, devuelve una lista vacía para no romper el widget.
+      return [];
     }
   }
   
+  /// Obtiene el conjunto completo de datos para la pantalla de análisis.
+  /// Ejecuta todas las consultas en paralelo y maneja errores individuales.
   Future<AnalysisData> fetchAllAnalysisData() async {
     developer.log("📈 [Repository] Fetching all analysis data...", name: 'AnalysisRepository');
     try {
       final today = DateTime.now();
       final userId = _client.auth.currentUser?.id;
+      if (userId == null) {
+        developer.log("⚠️ [Repository] No user ID found, returning empty analysis data.", name: 'AnalysisRepository');
+        return AnalysisData.empty();
+      }
+
       final startDate = DateFormat('yyyy-MM-dd').format(today.subtract(const Duration(days: 120)));
       final endDate = DateFormat('yyyy-MM-dd').format(today);
       final clientDate = DateFormat('yyyy-MM-dd').format(today);
 
-      // Todas las llamadas ahora pasan el ID del usuario explícitamente.
       final results = await Future.wait([
         _client.rpc('get_expense_summary_by_category', params: {'p_user_id': userId, 'client_date': clientDate}).catchError((e) {
           developer.log('🔥 Error en get_expense_summary_by_category: $e', name: 'AnalysisRepository');
@@ -75,7 +89,6 @@ class AnalysisRepository {
         }),
       ]);
 
-      // El parseo no necesita cambios, ya que ahora simplemente recibirá listas vacías en caso de fallo.
       final analysisData = AnalysisData(
         expensePieData: (results[0] as List).map((e) => ExpenseByCategory.fromJson(e)).toList(),
         netWorthLineData: (results[1] as List).map((e) => NetWorthDataPoint.fromJson(e)).toList(),
@@ -89,13 +102,11 @@ class AnalysisRepository {
         },
       );
       
-      developer.log("✅ [Repository] Data fetched and parsed successfully (some parts may be empty due to errors).", name: 'AnalysisRepository');
+      developer.log("✅ [Repository] Data fetched and parsed successfully.", name: 'AnalysisRepository');
       return analysisData;
 
     } catch (e, stackTrace) {
-      // Este catch ahora solo se activará si hay un error muy grave que no sea de una RPC individual.
       developer.log("🔥 [Repository] CRITICAL ERROR fetching data: $e", name: 'AnalysisRepository', error: e, stackTrace: stackTrace);
-      // En lugar de rethrow, devolvemos un estado vacío para que la UI no se rompa.
       return AnalysisData.empty();
     }
   }

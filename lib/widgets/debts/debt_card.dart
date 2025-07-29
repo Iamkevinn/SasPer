@@ -15,7 +15,7 @@ class DebtCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final textTheme = theme.textTheme;
+    //final textTheme = theme.textTheme;
 
     // 1. Lógica de presentación basada en el tipo de deuda
     final isDebt = debt.type == DebtType.debt;

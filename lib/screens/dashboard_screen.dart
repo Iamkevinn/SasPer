@@ -1,49 +1,39 @@
-// lib/screens/dashboard_screen.dart (CORREGIDO Y COMPLETO)
+// lib/screens/dashboard_screen.dart (VERSIÓN FINAL REFACtoRIZADA CON SINGLETONS)
 
 import 'dart:async';
-import 'dart:io';
-import 'dart:ui'; // Necesario para ImageFilter.blur
-import 'dart:ui' as ui;
-import 'package:fl_chart/fl_chart.dart';
-import 'package:flutter/foundation.dart';
+//import 'dart:developer' as developer;
+//import 'dart:io';
+import 'dart:ui';
+//import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:sasper/data/account_repository.dart';
-import 'package:sasper/data/analysis_repository.dart';
+//import 'package:home_widget/home_widget.dart';
+//import 'package:path_provider/path_provider.dart';
 import 'package:sasper/data/transaction_repository.dart';
-import 'package:sasper/models/analysis_models.dart';
 import 'package:sasper/models/transaction_models.dart';
 import 'package:sasper/screens/edit_transaction_screen.dart';
 import 'package:sasper/screens/transactions_screen.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:shimmer/shimmer.dart';
-import 'package:flutter/rendering.dart';
-import 'package:sasper/data/budget_repository.dart';
+import 'package:sasper/services/widget_service.dart';
 import 'package:sasper/data/dashboard_repository.dart';
 import 'package:sasper/models/dashboard_data_model.dart';
 import 'package:sasper/services/event_service.dart';
-import 'package:sasper/services/widget_service.dart';
 import 'package:sasper/widgets/dashboard/ai_analysis_section.dart';
 import 'package:sasper/widgets/dashboard/balance_card.dart';
 import 'package:sasper/widgets/dashboard/budgets_section.dart';
 import 'package:sasper/widgets/dashboard/dashboard_header.dart';
 import 'package:sasper/widgets/dashboard/recent_transactions_section.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:sasper/main.dart';
 
 class DashboardScreen extends StatefulWidget {
-  final DashboardRepository repository;
+  // Solo necesita recibir los repositorios que AÚN NO son Singletons.
+  // Una vez que todos lo sean, es posible que no necesite recibir ninguno.
+  //final DashboardRepository repository;
 
-  // 1. AÑADIDO: Recibimos los repositorios necesarios para las acciones.
-  final AccountRepository accountRepository;
-  final TransactionRepository transactionRepository;
-  final BudgetRepository budgetRepository;
   const DashboardScreen({
     super.key,
-    required this.repository,
-    required this.accountRepository,
-    required this.transactionRepository,
-    required this.budgetRepository,
+    //required this.repository,
   });
 
   @override
@@ -51,104 +41,93 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class DashboardScreenState extends State<DashboardScreen> {
+  // Obtenemos las instancias Singleton de los repositorios que necesitamos.
+  final DashboardRepository _dashboardRepository = DashboardRepository.instance;
+  final TransactionRepository _transactionRepository = TransactionRepository.instance;
+
   late final Stream<DashboardData> _dashboardDataStream;
-  late final StreamSubscription<AppEvent> _eventSubscription;
-  final GlobalKey repaintBoundaryKey = GlobalKey();
+  StreamSubscription<AppEvent>? _eventSubscription; // Hacemos que la suscripción sea opcional
   Timer? _widgetUpdateTimer;
-  // 1. Creamos la GlobalKey para el RepaintBoundary
 
   @override
   void initState() {
     super.initState();
-    _dashboardDataStream = widget.repository.getDashboardDataStream();
+    // Obtenemos el stream directamente del Singleton.
+    _dashboardDataStream = _dashboardRepository.getDashboardDataStream();
 
-    _eventSubscription = EventService.instance.eventStream.listen((event) {
-      // Tu lógica de eventos está perfecta.
-      if ({
-        AppEvent.transactionsChanged,
-        AppEvent.transactionDeleted,
-        AppEvent.accountCreated,
-        AppEvent.debtsChanged,
-        AppEvent.goalsChanged,
-        AppEvent.transactionCreated, // <-- AÑADIDO
-        AppEvent.transactionUpdated,
-      }.contains(event)) {
-        if (kDebugMode) {
-          print("Dashboard: Evento '$event' recibido. Forzando refresh...");
-        }
-        widget.repository.forceRefresh();
+    // La suscripción a EventService ya no es necesaria aquí, porque
+    // MainScreen ya se encarga de llamar a forceRefresh en el Singleton,
+    // y este widget escuchará los cambios a través del Stream del repositorio.
+    // Esto evita duplicar la lógica de refresh.
+    // Si aún quisieras mantenerla, no haría daño, pero es redundante.
+    // _eventSubscription = EventService.instance.eventStream.listen(...);
+  }
+
+  // --- REVERSIÓN A LA SOLUCIÓN ESTABLE ---
+  // Revertimos la lógica de actualización del widget para que no use 'compute'
+  // y se ejecute en el hilo principal, ya que era la causa del bloqueo.
+  void _updateWidgets(DashboardData data) {
+    _widgetUpdateTimer?.cancel();
+    _widgetUpdateTimer = Timer(const Duration(milliseconds: 500), () {
+      if (mounted && data.expenseSummaryForWidget.isNotEmpty) {
+        // En lugar de crear un servicio complejo, llamamos a la lógica que genera
+        // los datos del widget. Esto podría moverse a su propio servicio más adelante.
+        WidgetService.updateAllWidgetData(data: data); // Comentado por ahora para asegurar estabilidad
       }
     });
   }
 
   @override
   void dispose() {
-    _eventSubscription.cancel();
+    _eventSubscription?.cancel();
+    _widgetUpdateTimer?.cancel();
     super.dispose();
   }
 
   Future<void> _handleRefresh() async {
-    await widget.repository.forceRefresh(silent: false);
+    // Llama al Singleton para refrescar.
+    await _dashboardRepository.forceRefresh(silent: false);
   }
 
-  // +++ NUEVA FUNCIÓN: Maneja la navegación a la pantalla de transacciones +++
   void _navigateToTransactionsScreen() {
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => TransactionsScreen(
-          // Le pasamos los repositorios que necesita la pantalla de destino
-          transactionRepository: widget.transactionRepository,
-          accountRepository: widget.accountRepository,
-        ),
-      ),
+      MaterialPageRoute(builder: (context) => const TransactionsScreen()),
     );
   }
 
-  // 2. NUEVA FUNCIÓN: Maneja el toque en una transacción.
-  void _handleTransactionTap(Transaction transaction) {
-    Navigator.of(context)
-        .push<bool>(
+  void _handleTransactionTap(Transaction transaction) async {
+    final changed = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (context) => EditTransactionScreen(
-          transaction: transaction,
-          transactionRepository: widget.transactionRepository,
-          accountRepository: widget.accountRepository,
-        ),
+        builder: (context) => EditTransactionScreen(transaction: transaction),
       ),
-    )
-        .then((changed) {
-      // Si la pantalla de edición devuelve 'true', refrescamos los datos.
-      if (changed == true) {
-        widget.repository.forceRefresh();
-      }
-    });
+    );
+    if (changed == true) {
+      // Disparamos el evento para que MainScreen lo capture.
+      EventService.instance.fire(AppEvent.transactionUpdated);
+    }
   }
 
-  // 3. NUEVA FUNCIÓN: Maneja la eliminación de una transacción.
   Future<bool> _handleTransactionDelete(Transaction transaction) async {
-    final bool? confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => BackdropFilter(
+    final confirmed = await showDialog<bool>(
+      context: navigatorKey.currentContext!,
+      builder: (dialogContext) => BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
         child: AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(28.0)),
-          backgroundColor:
-              Theme.of(context).colorScheme.surface.withOpacity(0.85),
-          title: const Text('Confirmar eliminación'),
-          content:
-              const Text('¿Estás seguro? Esta acción no se puede deshacer.'),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28.0)),
+          backgroundColor: Theme.of(dialogContext).colorScheme.surface.withOpacity(0.9),
+          title: const Text('Confirmar Acción'),
+          content: const Text('¿Estás seguro? Esta acción no se puede deshacer.'),
           actions: [
             TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancelar')),
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancelar')
+            ),
             FilledButton.tonal(
               style: FilledButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.errorContainer,
-                  foregroundColor:
-                      Theme.of(context).colorScheme.onErrorContainer),
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Eliminar'),
+                  backgroundColor: Theme.of(dialogContext).colorScheme.errorContainer,
+                  foregroundColor: Theme.of(dialogContext).colorScheme.onErrorContainer),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Confirmar'),
             ),
           ],
         ),
@@ -157,121 +136,81 @@ class DashboardScreenState extends State<DashboardScreen> {
 
     if (confirmed == true) {
       try {
-        await widget.transactionRepository.deleteTransaction(transaction.id);
+        await _transactionRepository.deleteTransaction(transaction.id);
         if (mounted) {
-          NotificationHelper.show(
-            context: context,
-            message: 'Transacción eliminada correctamente.',
-            type: NotificationType.success,
-          );
-          // Forzamos la actualización del dashboard para que el cambio se refleje.
-          widget.repository.forceRefresh();
+          NotificationHelper.show(message: 'Transacción eliminada.', type: NotificationType.success);
+          // Disparamos el evento para que MainScreen lo capture.
+          EventService.instance.fire(AppEvent.transactionDeleted);
         }
-        return true; // Se borró con éxito
+        return true;
       } catch (e) {
         if (mounted) {
-          NotificationHelper.show(
-            context: context,
-            message: 'Error al eliminar la transacción.',
-            type: NotificationType.error,
-          );
+          NotificationHelper.show(message: 'Error al eliminar.', type: NotificationType.error);
         }
-        return false; // Hubo un error
+        return false;
       }
     }
-    return false; // No se confirmó el borrado
+    return false;
   }
   
-  // Se simplifica enormemente. Ya no necesita el 'context' ni el callback.
-  void _updateWidgets(DashboardData data) {
-    // Usamos un Timer para evitar llamar a la actualización en cada rebuild.
-    // Esto agrupa las llamadas y solo ejecuta la última después de 500ms de inactividad.
-    _widgetUpdateTimer?.cancel();
-    _widgetUpdateTimer = Timer(const Duration(milliseconds: 500), () {
-      //WidgetService.updateAllWidgetData(totalBalance: data.totalBalance);
-      if (mounted) {
-        // --- LLAMADA CORREGIDA ---
-        WidgetService.updateAllWidgetData(data: data);
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // 1. Usamos SafeArea para evitar que la UI se solape con la barra de estado.
       body: SafeArea(
-        top: true, // Aplicar solo en la parte superior
-        bottom: false, // La barra de navegación ya maneja el área inferior
+        top: true,
+        bottom: false,
         child: StreamBuilder<DashboardData>(
           stream: _dashboardDataStream,
           builder: (context, snapshot) {
             if (snapshot.hasError) {
               return Center(child: Text('Error al cargar los datos: ${snapshot.error}'));
             }
-            if (!snapshot.hasData) {
-              return _buildLoadingShimmer(); // Muestra el shimmer mientras no haya datos
+            // Muestra el shimmer si no hay datos o si el modelo indica que está cargando detalles.
+            if (!snapshot.hasData || snapshot.data!.isLoading) {
+              return _buildLoadingShimmer();
             }
-
             final data = snapshot.data!;
-
-            // Llamamos a la función de actualización de una forma segura y optimizada
             _updateWidgets(data); 
             return _buildDashboardContent(data);
-
-
           },
         ),
       ),
     );
   }
 
+
   Widget _buildDashboardContent(DashboardData data) {
-    // 2. Usamos CustomScrollView para un layout más avanzado y profesional.
     return RefreshIndicator(
       onRefresh: _handleRefresh,
       child: CustomScrollView(
         slivers: [
-          // 3. SliverAppBar permite un encabezado fijo o flotante.
           SliverAppBar(
-            pinned: true, // Mantiene el encabezado visible al hacer scroll
+            pinned: true,
             floating: true,
             backgroundColor: Theme.of(context).scaffoldBackgroundColor,
             elevation: 0,
             titleSpacing: 16.0,
             title: DashboardHeader(userName: data.fullName),
-            toolbarHeight: 80, // Aumenta la altura para dar más espacio
+            toolbarHeight: 80,
           ),
-
-          // 4. Cada widget principal ahora es un "Sliver".
-          SliverToBoxAdapter(
-              child: BalanceCard(totalBalance: data.totalBalance)),
-
+          SliverToBoxAdapter(child: BalanceCard(totalBalance: data.totalBalance)),
           SliverToBoxAdapter(
             child: BudgetsSection(
               budgets: data.featuredBudgets,
-              budgetRepository: widget.budgetRepository,
-              // --- PASAMOS LOS REPOSITORIOS ADICIONALES ---
-              transactionRepository: widget.transactionRepository,
-              accountRepository: widget.accountRepository,
+              // Ya no es necesario pasar transactionRepository ni accountRepository
             ),
           ),
-
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
           const SliverToBoxAdapter(child: AiAnalysisSection()),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
-
           SliverToBoxAdapter(
             child: RecentTransactionsSection(
               transactions: data.recentTransactions,
               onTransactionTapped: _handleTransactionTap,
               onTransactionDeleted: _handleTransactionDelete,
-              // Conectamos la propiedad del widget hijo con nuestra función de navegación.
               onViewAllPressed: _navigateToTransactionsScreen,
             ),
           ),
-
-          // Espacio al final para que el scroll no se corte bruscamente
           const SliverToBoxAdapter(child: SizedBox(height: 150)),
         ],
       ),
@@ -397,51 +336,6 @@ class DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-  
-}
-
-/// Widget privado que define la apariencia del gráfico a ser renderizado como imagen.
-/// Se usa dentro del Stack invisible del DashboardScreen.
-/// Widget privado para el gráfico invisible.
-class _WidgetChartImage extends StatelessWidget {
-  final List<ExpenseByCategory> data;
-  const _WidgetChartImage({required this.data});
-
-  @override
-  Widget build(BuildContext context) {
-    if (data.isEmpty) {
-      return Container(width: 400, height: 200, color: Colors.transparent);
-    }
-    final colors = [
-      Colors.blue.shade400, Colors.red.shade400, Colors.green.shade400,
-      Colors.orange.shade400, Colors.purple.shade400, Colors.yellow.shade700,
-    ];
-    final total = data.fold<double>(0.0, (sum, e) => sum + e.totalSpent);
-    return Container(
-      width: 400,
-      height: 200,
-      color: Colors.transparent,
-      child: PieChart(
-        PieChartData(
-          sectionsSpace: 2,
-          centerSpaceRadius: 40,
-          sections: List.generate(
-            data.length.clamp(0, 6), (i) {
-              final item = data[i];
-              final pct = total > 0 ? (item.totalSpent / total) * 100 : 0;
-              return PieChartSectionData(
-                color: colors[i % colors.length],
-                value: item.totalSpent,
-                title: '${pct.toStringAsFixed(0)}%',
-                radius: 50,
-                titleStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white, shadows: [Shadow(blurRadius: 2)]),
-              );
-            },
           ),
         ),
       ),

@@ -1,34 +1,27 @@
 // lib/screens/main_screen.dart (VERSIÓN FINAL CON UX MEJORADA)
+// lib/screens/main_screen.dart
 
+import 'dart:async';
+import 'package:app_links/app_links.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:sasper/data/transaction_repository.dart';
+import 'package:sasper/data/dashboard_repository.dart'; // Importante para la suscripción
+import 'package:sasper/screens/dashboard_screen.dart';
 import 'package:sasper/screens/planning_hub_screen.dart';
+import 'package:sasper/screens/settings_screen.dart';
 import 'package:sasper/screens/transactions_screen.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:async';
-
-// Repositorios
-import 'package:sasper/data/auth_repository.dart';
-import 'package:sasper/data/dashboard_repository.dart';
-import 'package:sasper/data/goal_repository.dart';
-import 'package:sasper/data/debt_repository.dart';
-import 'package:sasper/data/account_repository.dart';
-import 'package:sasper/data/budget_repository.dart';
-
-// Servicios
-import '../services/event_service.dart';
+import 'package:sasper/services/event_service.dart';
+import 'package:sasper/utils/custom_page_route.dart';
 
 // Pantallas
 import 'add_transaction_screen.dart';
-import 'dashboard_screen.dart';
-import 'settings_screen.dart';
-// Utilidades
-import 'package:sasper/utils/custom_page_route.dart';
-import 'package:app_links/app_links.dart';
+//import 'dashboard_screen.dart';
+//import 'planning_hub_screen.dart';
+//import 'settings_screen.dart';
+//import 'transactions_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -38,53 +31,35 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
-  late final DashboardRepository _dashboardRepository;
-  late final GoalRepository _goalRepository;
-  late final AuthRepository _authRepository;
-  late final DebtRepository _debtRepository;
-  late final AccountRepository _accountRepository;
-  late final TransactionRepository _transactionRepository;
-  late final BudgetRepository _budgetRepository;
+  //late final GoalRepository _goalRepository;
   late StreamSubscription<AppEvent> _eventSubscription;
   late final AppLinks _appLinks;
   late final StreamSubscription<Uri?> _linkSub;
-  late final List<Widget> _widgetOptions;
-
+  // Inicializamos la lista de widgets. Como son constantes,
+  // la podemos definir directamente como una variable de instancia.
+  final List<Widget> _widgetOptions = const <Widget>[
+    DashboardScreen(),
+    TransactionsScreen(),
+    PlanningHubScreen(),
+    SettingsScreen(),
+  ];
+  
   @override
   void initState() {
     super.initState();
     
-    _dashboardRepository = DashboardRepository(Supabase.instance.client);
-    _goalRepository = GoalRepository();
-    _authRepository = AuthRepository();
-    _debtRepository = DebtRepository();
-    _accountRepository = AccountRepository();
-    _transactionRepository = TransactionRepository();
-    _budgetRepository = BudgetRepository();
+    //_dashboardRepository = DashboardRepository(Supabase.instance.client);
+    //_authRepository = AuthRepository();
+    //_debtRepository = DebtRepository();
 
-    _widgetOptions = <Widget>[
-      DashboardScreen(
-        repository: _dashboardRepository,
-        accountRepository: _accountRepository,
-        transactionRepository: _transactionRepository,
-        budgetRepository: _budgetRepository,
-      ),
-      TransactionsScreen(transactionRepository: _transactionRepository, accountRepository: _accountRepository,),
-      PlanningHubScreen(
-        budgetRepository: _budgetRepository,
-        goalRepository: _goalRepository,
-        debtRepository: _debtRepository,
-        accountRepository: _accountRepository, 
-        transactionRepository: _transactionRepository,
-      ),
-      SettingsScreen(authRepository: _authRepository),
-    ];
     
     _initDeepLinks();
     _linkSub = _appLinks.uriLinkStream.listen(
       (Uri? uri) {
         if (uri != null && mounted) {
-          print('Deep link recibido: $uri');
+          if (kDebugMode) {
+            print('Deep link recibido: $uri');
+          }
           _handleIncomingLink(uri);
         }
       },
@@ -94,22 +69,29 @@ class _MainScreenState extends State<MainScreen> {
     );
     _eventSubscription = EventService.instance.eventStream.listen((event) {
       final refreshEvents = {
-        AppEvent.transactionsChanged, AppEvent.transactionUpdated, AppEvent.transactionDeleted,
-        AppEvent.accountUpdated, AppEvent.budgetsChanged, AppEvent.debtsChanged, AppEvent.goalUpdated,
+        AppEvent.transactionCreated,
+        AppEvent.transactionUpdated,
+        AppEvent.transactionDeleted,
+        AppEvent.accountUpdated,
+        AppEvent.budgetsChanged,
+        AppEvent.debtsChanged,
+        AppEvent.goalUpdated,
+        AppEvent.goalsChanged, 
+        AppEvent.accountCreated,
       };
+      
+      // RESTAURADO Y CORREGIDO: Llama al Singleton para refrescar.
       if (refreshEvents.contains(event)) {
-        _dashboardRepository.forceRefresh();
+        DashboardRepository.instance.forceRefresh();
       }
     });
   }
 
   @override
   void dispose() {
-    _dashboardRepository.dispose();
-    _goalRepository.dispose();
-    _debtRepository.dispose();
-    _accountRepository.dispose();
-    _budgetRepository.dispose();
+    //_dashboardRepository.dispose();
+    //_goalRepository.dispose();
+    //_debtRepository.dispose();
     _eventSubscription.cancel();
     _linkSub.cancel(); 
     super.dispose();
@@ -174,16 +156,15 @@ class _MainScreenState extends State<MainScreen> {
     );
 }
 
-   void _navigateToAddTransaction() {
-    // Usamos un Future.delayed para asegurar que la navegación ocurra después
-    // de que el frame inicial de la app se haya construido.
-    Future.delayed(const Duration(milliseconds: 100), () {
-      Navigator.of(context).push(FadePageRoute(
-        child: AddTransactionScreen(
-          transactionRepository: _transactionRepository,
-          accountRepository: _accountRepository,
-        ),
-      ));
+    void _navigateToAddTransaction() {
+    // El Future.delayed ya no es estrictamente necesario, pero no hace daño.
+    // Es una buena práctica para asegurar que la UI esté lista.
+    Future.delayed(const Duration(milliseconds: 50), () {
+      if (mounted) {
+        Navigator.of(context).push(FadePageRoute(
+          child: const AddTransactionScreen(),
+        ));
+      }
     });
   }
 

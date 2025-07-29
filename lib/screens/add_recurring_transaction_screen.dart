@@ -1,32 +1,28 @@
-// lib/screens/add_recurring_transaction_screen.dart (VERSIÓN FINAL USANDO SINGLETON)
+// lib/screens/add_recurring_transaction_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 import 'package:sasper/data/account_repository.dart';
-import 'package:sasper/data/recurring_repository.dart'; // Importamos el repositorio
+import 'package:sasper/data/recurring_repository.dart';
 import 'package:sasper/models/account_model.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'dart:developer' as developer;
 
 class AddRecurringTransactionScreen extends StatefulWidget {
-  // El RecurringRepository ya no se pasa como parámetro.
-  final AccountRepository accountRepository;
-
-  const AddRecurringTransactionScreen({
-    super.key,
-    required this.accountRepository,
-  });
+  // El constructor ahora es simple y constante. No recibe ningún parámetro.
+  const AddRecurringTransactionScreen({super.key});
 
   @override
   State<AddRecurringTransactionScreen> createState() => _AddRecurringTransactionScreenState();
 }
 
 class _AddRecurringTransactionScreenState extends State<AddRecurringTransactionScreen> {
-  // Accedemos a la única instancia del repositorio directamente.
+  // Accedemos a las únicas instancias (Singletons) de los repositorios.
   final RecurringRepository _repository = RecurringRepository.instance;
+  final AccountRepository _accountRepository = AccountRepository.instance;
 
   final _formKey = GlobalKey<FormState>();
   final _descriptionController = TextEditingController();
@@ -38,10 +34,13 @@ class _AddRecurringTransactionScreenState extends State<AddRecurringTransactionS
   String? _selectedAccountId;
   late DateTime _startDate;
   final String _category = 'Gastos Fijos';
+  late Future<List<Account>> _accountsFuture;
 
   @override
   void initState() {
     super.initState();
+    // Usamos el Singleton para obtener las cuentas.
+    _accountsFuture = _accountRepository.getAccounts();
     _startDate = DateTime.now();
   }
 
@@ -55,7 +54,6 @@ class _AddRecurringTransactionScreenState extends State<AddRecurringTransactionS
   Future<void> _save() async {
     if (!_formKey.currentState!.validate() || _selectedAccountId == null) {
       NotificationHelper.show(
-        context: context,
         message: 'Por favor, completa todos los campos requeridos.',
         type: NotificationType.error,
       );
@@ -65,7 +63,7 @@ class _AddRecurringTransactionScreenState extends State<AddRecurringTransactionS
     setState(() => _isLoading = true);
 
     try {
-      // Usamos la instancia _repository para llamar al método.
+      // Usamos la instancia del Singleton para llamar al método.
       await _repository.addRecurringTransaction(
         description: _descriptionController.text.trim(),
         amount: double.parse(_amountController.text.replaceAll(',', '.')),
@@ -78,10 +76,11 @@ class _AddRecurringTransactionScreenState extends State<AddRecurringTransactionS
       );
 
       if (mounted) {
+        // Devolvemos 'true' para que la pantalla anterior sepa que hubo un cambio.
         Navigator.of(context).pop(true);
+        // Mostramos la notificación después de que la navegación haya terminado.
         WidgetsBinding.instance.addPostFrameCallback((_) {
           NotificationHelper.show(
-            context: Navigator.of(context).context, 
             message: 'Gasto fijo creado correctamente.',
             type: NotificationType.success,
           );
@@ -91,8 +90,7 @@ class _AddRecurringTransactionScreenState extends State<AddRecurringTransactionS
       developer.log('🔥 FALLO AL GUARDAR GASTO FIJO: $e', name: 'AddRecurringScreen');
       if (mounted) {
         NotificationHelper.show(
-          context: context,
-          message: 'Error al guardar. Revisa tu conexión o los permisos.',
+          message: 'Error al guardar: ${e.toString().replaceFirst("Exception: ", "")}',
           type: NotificationType.error,
         );
       }
@@ -149,6 +147,7 @@ class _AddRecurringTransactionScreenState extends State<AddRecurringTransactionS
               validator: (v) {
                 if (v == null || v.isEmpty) return 'El monto es requerido';
                 if (double.tryParse(v.replaceAll(',', '.')) == null) return 'Ingresa un monto válido';
+                if (double.parse(v.replaceAll(',', '.')) <= 0) return 'El monto debe ser mayor a cero';
                 return null;
               },
             ),
@@ -165,7 +164,8 @@ class _AddRecurringTransactionScreenState extends State<AddRecurringTransactionS
             ),
             const SizedBox(height: 16),
             FutureBuilder<List<Account>>(
-              future: widget.accountRepository.getAccounts(),
+              // Usamos el Future que inicializamos en initState.
+              future: _accountsFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) return const LinearProgressIndicator();
                 if (snapshot.hasError) return Text('Error: ${snapshot.error}');

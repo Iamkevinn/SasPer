@@ -56,6 +56,30 @@ class Account extends Equatable {
     }
   }
 
+  /// Constructor alternativo para parsear desde la tabla 'accounts' directamente,
+  /// que no siempre tiene el 'current_balance' calculado por la función RPC.
+  factory Account.fromMapSimple(Map<String, dynamic> map) {
+    try {
+      ArgumentError.checkNotNull(map['id'], 'id');
+      ArgumentError.checkNotNull(map['user_id'], 'user_id');
+
+      return Account(
+        id: map['id'].toString(),
+        userId: map['user_id'].toString(),
+        name: map['name'] as String? ?? 'Cuenta sin nombre',
+        type: map['type'] as String? ?? 'Sin tipo',
+        // Para el 'balance', usamos el que viene en la tabla, o el inicial como fallback.
+        balance: (map['balance'] as num? ?? map['initial_balance'] as num? ?? 0.0).toDouble(),
+        initialBalance: (map['initial_balance'] as num? ?? 0.0).toDouble(),
+        createdAt: DateTime.parse(map['created_at'] as String),
+        iconName: map['icon_name'] as String?,
+        color: map['color'] as String?,
+      );
+    } catch (e) {
+      throw FormatException('Error al parsear Account desde el mapa simple: $e', map);
+    }
+  }
+  
   // 3. Método `copyWith` para facilitar la creación de copias modificadas.
   Account copyWith({
     String? id,

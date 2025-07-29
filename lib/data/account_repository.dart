@@ -1,4 +1,4 @@
-// lib/data/account_repository.dart (COMPLETO Y FINAL)
+// lib/data/account_repository.dart
 
 import 'dart:async';
 import 'dart:developer' as developer;
@@ -7,63 +7,68 @@ import 'package:sasper/models/transaction_models.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AccountRepository {
-  final SupabaseClient _client;
-  final _accountsStreamController = StreamController<List<Account>>.broadcast();
-  RealtimeChannel? _subscriptionChannel;
+  // 1. El cliente se declara como 'late final'. Se inicializará una vez.
+  late final SupabaseClient _client;
 
-  AccountRepository({SupabaseClient? client}) : _client = client ?? Supabase.instance.client;
+  final _streamController = StreamController<List<Account>>.broadcast();
+  RealtimeChannel? _channel;
 
-  Stream<List<Account>> getAccountsWithBalanceStream() {
-    if (_subscriptionChannel == null) {
-      _setupRealtimeSubscriptions();
-    }
-    // La carga inicial se dispara desde la suscripción,
-    // pero la llamamos aquí también para asegurar datos inmediatos.
+  // 2. Constructor privado para evitar que se creen instancias desde fuera.
+  AccountRepository._privateConstructor();
+
+  // 3. La instancia estática que guarda el único objeto de esta clase.
+  static final AccountRepository instance = AccountRepository._privateConstructor();
+
+  // 4. Método público de inicialización. Se llama desde main.dart.
+  void initialize(SupabaseClient client) {
+    _client = client;
+    developer.log('✅ [Repo] AccountRepository Singleton Initialized and Client Injected.', name: 'AccountRepository');
+  }
+
+  /// Devuelve un stream con la lista de cuentas y sus balances.
+  /// La primera vez que se llama, configura las suscripciones en tiempo real.
+  Stream<List<Account>> getAccountsStream() {
+    _setupRealtimeSubscriptions();
     _fetchAccountsWithBalance();
-    return _accountsStreamController.stream;
+    return _streamController.stream;
   }
 
-  // ---- NUEVO MÉTODO PARA ACTUALIZAR ----
-  Future<void> updateAccount(Account account) async {
-    developer.log('🔄 [Repo] Updating account ${account.id}');
-    try {
-      await _client
-          .from('accounts')
-          .update({ 'name': account.name, 'type': account.type }) // Solo actualiza lo que puede cambiar
-          .eq('id', account.id); // La comparación String (uuid) vs uuid funciona
-      
-    } catch (e) {
-      developer.log('🔥 [Repo] Error updating account: $e');
-      throw Exception('No se pudo actualizar la cuenta.');
-    }
-  }
+  void _setupRealtimeSubscriptions() {
+    if (_channel != null) return;
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return;
 
-  // ---- NUEVO MÉTODO PARA BORRADO SEGURO ----
-  Future<void> deleteAccountSafely(String accountId) async {
-    developer.log('🗑️ [Repo] Safely deleting account with id $accountId');
-    try {
-      // No se necesita ninguna conversión. Pasamos el String (UUID) directamente.
-      final result = await _client.rpc(
-        'delete_account_safely',
-        params: {'account_id_to_delete': accountId},
-      ) as String;
-
-      if (result.startsWith('Error:')) {
-        throw Exception(result.replaceFirst('Error: ', ''));
-      }
-      
-      developer.log('✅ [Repo] Account safely deleted successfully.');
-    } catch (e) {
-      developer.log('🔥 [Repo] Error in RPC delete_account_safely: $e');
-      throw Exception(e.toString().replaceFirst('Exception: ', ''));
-    }
+    developer.log('📡 [Repo] Setting up realtime subscriptions for accounts & transactions...', name: 'AccountRepository');
+    _channel = _client
+        .channel('public:all_tables_for_accounts')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'accounts',
+          filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'user_id', value: userId),
+          callback: (payload) {
+            developer.log('🔔 [Repo] Realtime change detected in ACCOUNTS. Refetching balances...', name: 'AccountRepository');
+            _fetchAccountsWithBalance();
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'transactions',
+          filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'user_id', value: userId),
+          callback: (payload) {
+            developer.log('🔔 [Repo] Realtime change detected in TRANSACTIONS. Refetching account balances...', name: 'AccountRepository');
+            _fetchAccountsWithBalance();
+          },
+        )
+        .subscribe();
   }
 
   Future<void> _fetchAccountsWithBalance() async {
-    developer.log('🔄 [Repo] Fetching accounts with balance...');
+    developer.log('🔄 [Repo] Fetching accounts with balance...', name: 'AccountRepository');
     try {
       final userId = _client.auth.currentUser?.id;
-      if (userId == null) throw Exception('Usuario no autenticado');
+      if (userId == null) throw Exception('User not authenticated');
 
       final response = await _client.rpc(
         'get_accounts_with_balance', 
@@ -71,22 +76,93 @@ class AccountRepository {
       );
 
       final accounts = (response as List).map((data) => Account.fromMap(data)).toList();
-      if (!_accountsStreamController.isClosed) {
-        _accountsStreamController.add(accounts);
+      if (!_streamController.isClosed) {
+        _streamController.add(accounts);
+        developer.log('✅ [Repo] Pushed ${accounts.length} accounts to stream.', name: 'AccountRepository');
       }
     } catch (e, stackTrace) {
       developer.log('🔥 [Repo] Error fetching accounts with balance: $e', name: 'AccountRepository', error: e, stackTrace: stackTrace);
-      if (!_accountsStreamController.isClosed) {
-        _accountsStreamController.addError(e);
+      if (!_streamController.isClosed) {
+        _streamController.addError(e);
       }
     }
   }
   
-  Future<Account?> getAccountById(String accountId) async {
-    developer.log('ℹ️ [Repo] Fetching account by ID: $accountId...');
+  /// Fuerza una recarga manual de los datos de las cuentas.
+  Future<void> refreshData() async {
+    await _fetchAccountsWithBalance();
+  }
+
+  // --- MÉTODOS CRUD (AÑADIR, EDITAR, BORRAR) ---
+
+  Future<void> addAccount({
+    required String name,
+    required String type,
+    required double initialBalance,
+  }) async {
+    try {
+      await _client.from('accounts').insert({
+        'user_id': _client.auth.currentUser!.id,
+        'name': name,
+        'type': type,
+        'initial_balance': initialBalance,
+        'balance': initialBalance, 
+      });
+    } catch (e) {
+      developer.log('🔥 Error adding account: $e', name: 'AccountRepository');
+      throw Exception('No se pudo añadir la cuenta.');
+    }
+  }
+
+  Future<void> updateAccount(Account account) async {
+    try {
+      await _client
+          .from('accounts')
+          .update({ 'name': account.name, 'type': account.type })
+          .eq('id', account.id);
+    } catch (e) {
+      developer.log('🔥 Error updating account: $e', name: 'AccountRepository');
+      throw Exception('No se pudo actualizar la cuenta.');
+    }
+  }
+  
+  Future<void> deleteAccountSafely(String accountId) async {
+    try {
+      await _client.rpc(
+        'delete_account_safely',
+        params: {'account_id_to_delete': accountId},
+      );
+    } catch (e) {
+      developer.log('🔥 Error in RPC delete_account_safely: $e', name: 'AccountRepository');
+      throw Exception('No se pudo eliminar la cuenta. Asegúrate de que no tenga transacciones.');
+    }
+  }
+
+  // --- MÉTODOS DE CONSULTA ADICIONALES ---
+
+  Future<List<Account>> getAccounts() async {
     try {
       final userId = _client.auth.currentUser?.id;
-      if (userId == null) throw Exception('Usuario no autenticado');
+      if (userId == null) throw Exception('User not authenticated');
+
+      final response = await _client.from('accounts')
+        .select()
+        .eq('user_id', userId)
+        .order('name', ascending: true);
+      
+      // Asumiendo que tu modelo Account tiene un constructor `fromMap`. Si no, cámbialo.
+      return (response as List).map((data) => Account.fromMap(data)).toList();
+    } catch (e) {
+      developer.log('🔥 Error fetching simple accounts: $e', name: 'AccountRepository');
+      return [];
+    }
+  }
+
+  Future<Account?> getAccountById(String accountId) async {
+    developer.log('ℹ️ [Repo] Fetching account by ID: $accountId...', name: 'AccountRepository');
+    try {
+      final userId = _client.auth.currentUser?.id;
+      if (userId == null) throw Exception('User not authenticated');
 
       final response = await _client.rpc(
         'get_accounts_with_balance', 
@@ -101,16 +177,6 @@ class AccountRepository {
     }
   }
   
-  Future<List<Account>> getAccounts() async {
-    try {
-      final response = await _client.from('accounts').select().order('name', ascending: true);
-      return (response as List).map((data) => Account.fromMap(data)).toList();
-    } catch (e) {
-      developer.log('🔥 Error fetching accounts: $e', name: 'AccountRepository');
-      return [];
-    }
-  }
-
   Future<List<Transaction>> getTransactionsForAccount(String accountId) async {
     try {
       final response = await _client
@@ -125,29 +191,9 @@ class AccountRepository {
     }
   }
   
-  Future<void> addAccount({
-    required String name,
-    required String type,
-    required double initialBalance,
-  }) async {
-    try {
-      await _client.from('accounts').insert({
-        'user_id': _client.auth.currentUser!.id,
-        'name': name,
-        'type': type,
-        'initial_balance': initialBalance,
-        'balance': initialBalance,
-      });
-    } catch (e) {
-      developer.log('🔥 Error adding account: $e', name: 'AccountRepository');
-      throw Exception('No se pudo añadir la cuenta.');
-    }
-  }
-  
-  // Asegúrate de que los IDs se pasen como String
   Future<void> createTransfer({
-    required String fromAccountId, // Ya es String, ¡perfecto!
-    required String toAccountId,   // Ya es String, ¡perfecto!
+    required String fromAccountId,
+    required String toAccountId,
     required double amount,
     String? description,
   }) async {
@@ -164,7 +210,6 @@ class AccountRepository {
     }
   }
 
-
   Future<double> getAccountProjectionInDays(String accountId) async {
     try {
       final response = await _client.rpc(
@@ -172,54 +217,24 @@ class AccountRepository {
         params: {'account_id_param': accountId}
       );
 
-      // La respuesta de una función que devuelve TABLE es una Lista de Mapas
       if (response is List && response.isNotEmpty) {
-        // Accedemos al primer elemento de la lista (la primera fila)
         final firstRow = response.first as Map<String, dynamic>;
-        // Accedemos al valor dentro del mapa usando la clave que definimos en el SQL
         final projectionValue = (firstRow['projection_days'] as num? ?? 0.0).toDouble();
         return projectionValue;
       }
-      
-      // Si la respuesta está vacía, no hay proyección
       return 0.0;
-
     } catch (e, stackTrace) {
       developer.log('🔥 Error fetching projection for account $accountId: $e', name: 'AccountRepository', error: e, stackTrace: stackTrace);
-      return 0.0; // Devolvemos 0 en caso de error
+      return 0.0;
     }
   }
-
-  void _setupRealtimeSubscriptions() {
-    developer.log('📡 [Repo] Setting up realtime subscriptions for accounts & transactions...', name: 'AccountRepository');
-    _subscriptionChannel ??= _client
-        .channel('public:all_tables_for_accounts_screen')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'accounts',
-          callback: (payload) => _fetchAccountsWithBalance(),
-        )
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'transactions',
-          callback: (payload) => _fetchAccountsWithBalance(),
-        )
-        .subscribe();
-  }
-
-  Future<void> forceRefresh() async {
-    developer.log('🔄 [Repo] Manual refresh requested for accounts.');
-    await _fetchAccountsWithBalance();
-  }
-
+  
   void dispose() {
-    developer.log('❌ [Repo] Disposing AccountRepository resources.', name: 'AccountRepository');
-    if (_subscriptionChannel != null) {
-      _client.removeChannel(_subscriptionChannel!);
-      _subscriptionChannel = null;
+    developer.log('❌ [Repo] Disposing AccountRepository Singleton resources.', name: 'AccountRepository');
+    if (_channel != null) {
+      _client.removeChannel(_channel!);
+      _channel = null;
     }
-    _accountsStreamController.close();
+    _streamController.close();
   }
 }

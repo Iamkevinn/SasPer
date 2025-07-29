@@ -1,90 +1,90 @@
-// lib/screens/goals_screen.dart
-import 'dart:ui';
+// lib/screens/goals_screen.dart (VERSIÓN FINAL CON SINGLETON)
 
-import 'package:flutter/foundation.dart';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
+import 'package:sasper/data/goal_repository.dart';
+import 'package:sasper/models/goal_model.dart';
+import 'package:sasper/services/event_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:sasper/screens/add_goal_screen.dart';
-import 'package:sasper/data/goal_repository.dart';
-import 'package:sasper/models/goal_model.dart';
 import 'package:sasper/widgets/goals/contribute_to_goal_dialog.dart';
 import 'package:sasper/screens/edit_goal_screen.dart';
+import 'package:sasper/main.dart';
 
 class GoalsScreen extends StatefulWidget {
-  final GoalRepository repository;
-  const GoalsScreen({super.key, required this.repository});
+  // El repositorio ya no se pasa como parámetro en el constructor.
+  const GoalsScreen({super.key});
 
   @override
   State<GoalsScreen> createState() => _GoalsScreenState();
 }
 
 class _GoalsScreenState extends State<GoalsScreen> {
+  // Accedemos a la única instancia (Singleton) del repositorio.
+  final GoalRepository _repository = GoalRepository.instance;
   late final Stream<List<Goal>> _goalsStream;
 
   @override
   void initState() {
     super.initState();
-    _goalsStream = widget.repository.getGoalsStream();
+    // Obtenemos el stream del repositorio singleton.
+    _goalsStream = _repository.getGoalsStream();
   }
 
+  // El pull-to-refresh ahora llama al método de refresco del singleton.
   Future<void> _handleRefresh() async {
-    await Future.delayed(const Duration(milliseconds: 500));
+    await _repository.refreshData();
   }
 
-  void navigateToAddGoal() {
-    Navigator.of(context).push(MaterialPageRoute(
-    builder: (_) => AddGoalScreen(goalRepository: widget.repository),
-    ));
-  }
-  Future<void> _deleteGoal(String goalId, String goalName) async {
-    try {
-      await widget.repository.deleteGoal(goalId);
-      if (mounted) {
-        NotificationHelper.show(
-            context: context,
-            message: 'Meta "$goalName" eliminada.',
-            type: NotificationType.success,
-          );
-      }
-
-    } catch (e) {
-      if (mounted) {
-        NotificationHelper.show(
-            context: context,
-            message: 'Error al eliminar la meta: ${e.toString()}',
-            type: NotificationType.error,
-          );
-      }
+  void _navigateToAddGoal() async {
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const AddGoalScreen()),
+    );
+    // Si se creó una meta, le damos el "empujón" para refrescar.
+    if (result == true) {
+      _repository.refreshData();
     }
   }
 
-  // ---- NUEVA FUNCIÓN PARA NAVEGAR A EDITAR ----
-  void _navigateToEditGoal(Goal goal) {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => EditGoalScreen(goalRepository: widget.repository, goal: goal),
-    ));
+  void _navigateToEditGoal(Goal goal) async {
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => EditGoalScreen(goal: goal)),
+    );
+    // Si se editó la meta, refrescamos.
+    if (result == true) {
+      _repository.refreshData();
+    }
   }
 
-  // ---- FUNCIÓN DE BORRADO ACTUALIZADA PARA SER SEGURA ----
   Future<void> _handleDeleteGoal(Goal goal) async {
     final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => BackdropFilter(
+      // 1. Usamos el context del Navigator global.
+      context: navigatorKey.currentContext!,
+      
+      // 2. Usamos 'dialogContext' para el builder.
+      builder: (dialogContext) => BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
         child: AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
           title: const Text('Confirmar eliminación'),
           content: Text('¿Seguro que quieres eliminar la meta "${goal.name}"?'),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
+            // 3. Usamos 'dialogContext' para cerrar el diálogo.
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancelar')
+            ),
             FilledButton.tonal(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.errorContainer),
+              // 4. Usamos 'dialogContext' para obtener el tema.
+              style: FilledButton.styleFrom(backgroundColor: Theme.of(dialogContext).colorScheme.errorContainer),
+              // 5. Y para cerrar el diálogo.
+              onPressed: () => Navigator.of(dialogContext).pop(true),
               child: const Text('Eliminar'),
             ),
           ],
@@ -94,17 +94,18 @@ class _GoalsScreenState extends State<GoalsScreen> {
 
     if (confirmed == true && mounted) {
       try {
-        // Usamos la nueva función segura
-        await widget.repository.deleteGoalSafely(goal.id); 
+        await _repository.deleteGoalSafely(goal.id);
+        
+        _repository.refreshData(); // "Nudge" para asegurar inmediatez
+        EventService.instance.fire(AppEvent.goalsChanged);
+
         NotificationHelper.show(
-            context: context,
             message: 'Meta eliminada.',
             type: NotificationType.success,
         );
       } catch (e) {
         NotificationHelper.show(
-            context: context,
-            message: e.toString(), // El repo ya formatea el error
+            message: e.toString().replaceFirst("Exception: ", ""),
             type: NotificationType.error,
         );
       }
@@ -120,11 +121,10 @@ class _GoalsScreenState extends State<GoalsScreen> {
         elevation: 0,
         backgroundColor: Colors.transparent,
         actions: [
-          // --- ¡BOTÓN AÑADIDO AQUÍ! ---
           IconButton(
-          icon: const Icon(Iconsax.add_square),
-          tooltip: 'Añadir Meta',
-          onPressed: _navigateToAddGoal,
+            icon: const Icon(Iconsax.add_square),
+            tooltip: 'Añadir Meta',
+            onPressed: _navigateToAddGoal,
           ),
         ],
       ),
@@ -134,13 +134,11 @@ class _GoalsScreenState extends State<GoalsScreen> {
           if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
             return _buildLoadingShimmer();
           }
-
           if (snapshot.hasError) {
             return Center(child: Text('Error al cargar metas: ${snapshot.error}'));
           }
 
           final allGoals = snapshot.data ?? [];
-
           if (allGoals.isEmpty) {
             return _buildEmptyState();
           }
@@ -170,13 +168,6 @@ class _GoalsScreenState extends State<GoalsScreen> {
     );
   }
 
-  // --- ¡DEFINICIÓN AÑADIDA AQUÍ! ---
-  void _navigateToAddGoal() {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => AddGoalScreen(goalRepository: widget.repository),
-    ));
-  }
-
   Widget _buildGoalsList(List<Goal> goals, {bool isCompleted = false}) {
     return AnimationLimiter(
       child: ListView.builder(
@@ -189,12 +180,15 @@ class _GoalsScreenState extends State<GoalsScreen> {
             position: index,
             duration: const Duration(milliseconds: 375),
             child: FadeInAnimation(
-                // REEMPLAZAMOS EL DISMISSIBLE POR EL _GoalCard con acciones
                 child: _GoalCard(
                   goal: goal,
                   isCompleted: isCompleted,
-                  onEdit: isCompleted ? null : () => _navigateToEditGoal(goal), // No se puede editar si ya está completada
+                  onEdit: isCompleted ? null : () => _navigateToEditGoal(goal),
                   onDelete: () => _handleDeleteGoal(goal),
+                  onContributeSuccess: () {
+                    // "Nudge" para asegurar la actualización del progreso
+                    _repository.refreshData(); 
+                  },
                 ),
               ),
           );
@@ -230,37 +224,9 @@ class _GoalsScreenState extends State<GoalsScreen> {
         itemCount: 5,
         itemBuilder: (context, index) {
           return Card(
-            elevation: 0,
-            color: Theme.of(context).scaffoldBackgroundColor,
             margin: const EdgeInsets.only(bottom: 16),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: double.infinity,
-                    height: 24.0,
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Container(width: 120, height: 16, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8))),
-                      Container(width: 80, height: 16, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8))),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    width: double.infinity,
-                    height: 10,
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
-                  ),
-                ],
-              ),
-            ),
+            child: const SizedBox(height: 150),
           );
         },
       ),
@@ -293,30 +259,34 @@ class _GoalsScreenState extends State<GoalsScreen> {
   }
 }
 
+
+// --- WIDGET _GoalCard MODIFICADO ---
+
 class _GoalCard extends StatelessWidget {
   final Goal goal;
   final bool isCompleted;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  final VoidCallback onContributeSuccess;
 
   const _GoalCard({
     required this.goal, 
     this.isCompleted = false,
     this.onEdit,
     this.onDelete,
+    required this.onContributeSuccess,
   });
 
   @override
   Widget build(BuildContext context) {
-    final currencyFormat = NumberFormat.currency(locale: 'ES_CO', symbol: '\$');
+    final currencyFormat = NumberFormat.currency(locale: 'es_CO', symbol: '\$');
     final colorScheme = Theme.of(context).colorScheme;
-    final onSurfaceColor = Theme.of(context).colorScheme.onSurface;
-    final cardColor = isCompleted ? colorScheme.onSurfaceVariant : onSurfaceColor;
 
     return Opacity(
       opacity: isCompleted ? 0.75 : 1.0,
       child: Card(
-        elevation: isCompleted ? 0 : 2,
+        elevation: 0,
+        color: Theme.of(context).colorScheme.surfaceContainer,
         margin: const EdgeInsets.only(bottom: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Padding(
@@ -330,7 +300,6 @@ class _GoalCard extends StatelessWidget {
                   Flexible(
                     child: Text(goal.name, style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold)),
                   ),
-                  // Si no está completada, mostramos el menú de opciones
                   if (!isCompleted)
                     PopupMenuButton<String>(
                       onSelected: (value) {
@@ -353,10 +322,7 @@ class _GoalCard extends StatelessWidget {
                   Flexible(
                     child: Text(
                       'Ahorrado: ${currencyFormat.format(goal.currentAmount)}',
-                      style: TextStyle(
-                        color: isCompleted ? cardColor : colorScheme.primary,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w600),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -405,7 +371,7 @@ class _GoalCard extends StatelessWidget {
                         Icon(Iconsax.calendar_1, size: 14, color: colorScheme.onSurfaceVariant),
                         const SizedBox(width: 4),
                         Text(
-                          DateFormat.yMMMd('ES_CO').format(goal.targetDate!),
+                          DateFormat.yMMMd('es_CO').format(goal.targetDate!),
                           style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12),
                         ),
                       ],
@@ -414,7 +380,7 @@ class _GoalCard extends StatelessWidget {
                     const Spacer(),
                   Text(
                     '${(goal.progress * 100).toStringAsFixed(1)}%',
-                    style: TextStyle(fontWeight: FontWeight.bold, color: cardColor),
+                    style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.onSurface),
                   ),
                 ],
               ),
@@ -429,21 +395,12 @@ class _GoalCard extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: Theme.of(context).cardColor,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-          child: ContributeToGoalDialog(
-            goal: goal,
-            // --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
-            // Añadimos el callback `onSuccess` requerido por el constructor.
-            // No necesita hacer nada, ya que el stream se encarga de la UI.
-            onSuccess: () {
-              if (kDebugMode) {
-                print('Aportación exitosa. El diálogo se cerrará y el stream refrescará la lista.');
-              }
-            },
-          ),
+        return ContributeToGoalDialog(
+          goal: goal,
+          onSuccess: onContributeSuccess,
         );
       },
     );

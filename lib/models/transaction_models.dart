@@ -1,22 +1,26 @@
-// lib/models/transaction_models.dart (CORREGIDO)
+
+// lib/models/transaction_models.dart (VERSIÓN FINAL CORREGIDA)
+
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 
 class Transaction extends Equatable {
-  final int id; 
+  final int id; // ID de la transacción, es un bigint -> int
   final String userId;
-  final String? accountId; // UUID, correcto como String
+  final String? accountId; // UUID -> String
   final String type;
   final String? category;
   final String? description;
   final double amount;
   final DateTime transactionDate;
-
-  // --- CORRECCIÓN DE TIPOS DE DATOS ---
-  // Los IDs de otras tablas son numéricos (bigint), por lo tanto, 'int' en Dart.
-  final int? debtId;
-  final int? goalId;
-  final int? transferId;
+  
+  // --- CORRECCIÓN CRÍTICA DE TIPOS DE DATOS ---
+  // Las claves foráneas a otras tablas (goals, debts, transfers)
+  // son de tipo UUID en la base de datos, por lo tanto, deben ser String? en Dart.
+  final int? budgetId; // Este es bigint -> int?, estaba correcto.
+  final String? debtId; // UUID -> String?
+  final String? goalId; // UUID -> String?
+  final String? transferId; // UUID -> String?
 
   const Transaction({
     required this.id,
@@ -27,6 +31,7 @@ class Transaction extends Equatable {
     this.description,
     required this.amount,
     required this.transactionDate,
+    this.budgetId,
     this.debtId,
     this.goalId,
     this.transferId,
@@ -41,43 +46,33 @@ class Transaction extends Equatable {
 
   factory Transaction.fromMap(Map<String, dynamic> map) {
     try {
-      // Esta validación no es estrictamente necesaria si el catch es bueno, pero la mantenemos.
-      ArgumentError.checkNotNull(map['id'], 'id');
-      ArgumentError.checkNotNull(map['user_id'], 'user_id');
-      ArgumentError.checkNotNull(map['transaction_date'], 'transaction_date');
-
       return Transaction(
-        id: map['id'] as int, 
+        id: map['id'] as int,
         userId: map['user_id'] as String,
         accountId: map['account_id'] as String?,
-        type: map['type'] as String? ?? 'Gasto', 
+        type: map['type'] as String? ?? 'Gasto',
         category: map['category'] as String?,
         description: map['description'] as String?,
         amount: (map['amount'] as num? ?? 0.0).toDouble(),
         transactionDate: DateTime.parse(map['transaction_date'] as String),
 
         // --- CORRECCIÓN DE CASTEO ---
-        // Ahora casteamos a 'int?' para que coincida con el tipo de la propiedad.
-        debtId: map['debt_id'] as int?,
-        goalId: map['goal_id'] as int?,
-        transferId: map['transfer_id'] as int?,
+        // Ahora casteamos a los tipos correctos.
+        budgetId: map['budget_id'] as int?, // Correcto
+        debtId: map['debt_id'] as String?, // Corregido a String?
+        goalId: map['goal_id'] as String?, // Corregido a String?
+        transferId: map['transfer_id'] as String?, // Corregido a String?
       );
     } catch (e, stackTrace) {
-      // Un catch más informativo para depuración futura.
       if (kDebugMode) {
         print('🔥🔥🔥 ERROR FATAL al parsear Transaction: $e');
-      }
-      if (kDebugMode) {
         print('🔥🔥🔥 Mapa que causó el error: $map');
-      }
-      if (kDebugMode) {
         print('🔥🔥🔥 StackTrace: $stackTrace');
       }
       rethrow;
     }
   }
 
-  // El método copyWith también debe ser actualizado con los nuevos tipos.
   Transaction copyWith({
     int? id,
     String? userId,
@@ -87,9 +82,10 @@ class Transaction extends Equatable {
     String? description,
     double? amount,
     DateTime? transactionDate,
-    int? debtId, // <-- tipo corregido
-    int? goalId, // <-- tipo corregido
-    int? transferId, // <-- tipo corregido
+    int? budgetId,
+    String? debtId,
+    String? goalId,
+    String? transferId,
   }) {
     return Transaction(
       id: id ?? this.id,
@@ -100,6 +96,7 @@ class Transaction extends Equatable {
       description: description ?? this.description,
       amount: amount ?? this.amount,
       transactionDate: transactionDate ?? this.transactionDate,
+      budgetId: budgetId ?? this.budgetId,
       debtId: debtId ?? this.debtId,
       goalId: goalId ?? this.goalId,
       transferId: transferId ?? this.transferId,
@@ -116,6 +113,7 @@ class Transaction extends Equatable {
         description,
         amount,
         transactionDate,
+        budgetId,
         debtId,
         goalId,
         transferId,

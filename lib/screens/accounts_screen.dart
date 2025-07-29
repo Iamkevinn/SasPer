@@ -1,42 +1,37 @@
-// lib/screens/accounts_screen.dart (COMPLETO Y CORREGIDO)
+// lib/screens/accounts_screen.dart (VERSIÓN FINAL COMPLETA USANDO SINGLETONS)
 
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
-// Añade estos imports al inicio del archivo
-import 'dart:ui';
+import 'package:sasper/data/account_repository.dart';
+import 'package:sasper/models/account_model.dart';
+import 'package:sasper/services/event_service.dart';
+import 'package:sasper/screens/add_account_screen.dart';
+import 'package:sasper/screens/add_transfer_screen.dart';
+import 'package:sasper/screens/account_details_screen.dart';
 import 'package:sasper/screens/edit_account_screen.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
-
-import 'account_details_screen.dart';
-import 'package:sasper/data/account_repository.dart';
-import 'package:sasper/data/transaction_repository.dart';
-import 'package:sasper/models/account_model.dart';
-import 'add_account_screen.dart';
-import 'add_transfer_screen.dart';
 import 'package:sasper/widgets/accounts/projection_card.dart';
 import 'package:sasper/widgets/shared/empty_state_card.dart';
+import 'package:sasper/main.dart';
 
 class AccountsScreen extends StatefulWidget {
-  // Recibe las dependencias, no crea las suyas.
-  final AccountRepository repository;
-  final TransactionRepository transactionRepository;
-
-  const AccountsScreen({
-    super.key,
-    required this.repository,
-    required this.transactionRepository,
-  });
+  // Los repositorios ya no se pasan en el constructor.
+  const AccountsScreen({super.key});
 
   @override
   State<AccountsScreen> createState() => AccountsScreenState();
 }
 
 class AccountsScreenState extends State<AccountsScreen> {
+  // Accedemos a las únicas instancias (Singletons) de los repositorios.
+  final AccountRepository _accountRepository = AccountRepository.instance;
+
   late final Stream<List<Account>> _accountsStream;
 
   final Map<String, IconData> _accountIcons = {
@@ -51,54 +46,58 @@ class AccountsScreenState extends State<AccountsScreen> {
   @override
   void initState() {
     super.initState();
-    // Usamos el repositorio que llega a través del widget.
-    _accountsStream = widget.repository.getAccountsWithBalanceStream();
+    // Obtenemos el stream del repositorio singleton.
+    _accountsStream = _accountRepository.getAccountsStream();
   }
 
+  /// El "pull to refresh" ahora llama al método de refresco del singleton.
   Future<void> _handleRefresh() async {
-    await widget.repository.forceRefresh();
+    await _accountRepository.refreshData();
   }
 
-  void _navigateToAddTransfer() {
-    Navigator.of(context).push(
+  /// Navega a la pantalla de añadir transferencia.
+  void _navigateToAddTransfer() async {
+    final result = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (context) => AddTransferScreen(accountRepository: widget.repository),
+        builder: (context) => const AddTransferScreen(), // Ya no necesita el repo
       ),
     );
+    // Si la transferencia fue exitosa, refrescamos los datos de las cuentas.
+    if (result == true && mounted) {
+      _accountRepository.refreshData();
+    }
   }
 
-  void _navigateToAddAccount() {
-    Navigator.of(context).push(
+  /// Navega a la pantalla de añadir cuenta.
+  void _navigateToAddAccount() async {
+    final result = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (context) => AddAccountScreen(accountRepository: widget.repository),
+        builder: (context) => const AddAccountScreen(), // Ya no necesita el repo
       ),
     );
+    // Si se creó una cuenta, refrescamos la lista.
+    if (result == true && mounted) {
+      _accountRepository.refreshData();
+    }
   }
-
-  // ---- NUEVA FUNCIÓN PARA NAVEGAR A EDITAR ----
-  void _navigateToEditAccount(Account account) {
-    Navigator.of(context).push<bool>(
+  
+  /// Navega a la pantalla de edición de cuenta.
+  void _navigateToEditAccount(Account account) async {
+    final result = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (context) => EditAccountScreen(
-          accountRepository: widget.repository,
-          account: account,
-        ),
+        builder: (context) => EditAccountScreen(account: account), // Ya no necesita el repo
       ),
-    ).then((changed) {
-      // Si la pantalla de edición devuelve 'true', es una señal de que hubo un cambio.
-      // Aunque el stream ya lo hace, una actualización forzada es más rápida.
-      if (changed == true) {
-        widget.repository.forceRefresh();
-      }
-    });
+    );
+    // Si se editó la cuenta, refrescamos la lista.
+    if (result == true && mounted) {
+      _accountRepository.refreshData();
+    }
   }
 
-  // ---- NUEVA FUNCIÓN PARA MANEJAR EL BORRADO ----
+  /// Maneja la lógica de borrado de una cuenta.
   Future<void> _handleDeleteAccount(Account account) async {
-    // Primera validación en la UI para feedback instantáneo
     if (account.balance != 0) {
       NotificationHelper.show(
-        context: context,
         message: 'No se puede eliminar. La cuenta aún tiene saldo.',
         type: NotificationType.error,
       );
@@ -106,17 +105,26 @@ class AccountsScreenState extends State<AccountsScreen> {
     }
 
     final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => BackdropFilter(
+      // 1. Usamos el context del Navigator global.
+      context: navigatorKey.currentContext!,
+      
+      // 2. Usamos 'dialogContext' para el builder.
+      builder: (dialogContext) => BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
         child: AlertDialog(
           title: const Text('Confirmar eliminación'),
           content: Text('¿Seguro que quieres eliminar la cuenta "${account.name}"? Esta acción no se puede deshacer.'),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
+            // 3. Usamos 'dialogContext' para cerrar el diálogo.
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancelar')
+            ),
             FilledButton.tonal(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.errorContainer),
+              // 4. Usamos 'dialogContext' para obtener el tema.
+              style: FilledButton.styleFrom(backgroundColor: Theme.of(dialogContext).colorScheme.errorContainer),
+              // 5. Y para cerrar el diálogo.
+              onPressed: () => Navigator.of(dialogContext).pop(true),
               child: const Text('Eliminar'),
             ),
           ],
@@ -126,16 +134,20 @@ class AccountsScreenState extends State<AccountsScreen> {
 
     if (confirmed == true && mounted) {
       try {
-        await widget.repository.deleteAccountSafely(account.id);
+        await _accountRepository.deleteAccountSafely(account.id);
+        // El listener reactivo debería actuar, pero un "nudge" asegura inmediatez.
+        _accountRepository.refreshData();
+
+        // Disparamos el evento global para el Dashboard, etc.
+        EventService.instance.fire(AppEvent.accountUpdated);
+
         NotificationHelper.show(
-          context: context,
           message: 'Cuenta eliminada.',
           type: NotificationType.success,
         );
       } catch (e) {
         NotificationHelper.show(
-          context: context,
-          message: e.toString(), // El repositorio ya formatea el mensaje de error
+          message: e.toString().replaceFirst("Exception: ", ""),
           type: NotificationType.error,
         );
       }
@@ -212,7 +224,8 @@ class AccountsScreenState extends State<AccountsScreen> {
                         _buildAccountTile(account),
                         FutureBuilder<double>(
                           key: ValueKey(account.id),
-                          future: widget.repository.getAccountProjectionInDays(account.id),
+                          // Usamos la instancia singleton para obtener la proyección
+                          future: _accountRepository.getAccountProjectionInDays(account.id),
                           builder: (context, projectionSnapshot) {
                             if (projectionSnapshot.connectionState == ConnectionState.waiting) {
                               return ProjectionCard.buildShimmer(context);
@@ -234,8 +247,7 @@ class AccountsScreenState extends State<AccountsScreen> {
       ),
     );
   }
-
-  // ---- MODIFICAMOS EL WIDGET _buildAccountTile ----
+  
   Widget _buildAccountTile(Account account) {
     return Card(
       elevation: 0,
@@ -244,21 +256,19 @@ class AccountsScreenState extends State<AccountsScreen> {
       margin: EdgeInsets.zero,
       child: InkWell(
         onTap: () {
+          // La pantalla de detalles no necesita recibir los repositorios,
+          // ya que también los obtendrá de las instancias singleton.
           Navigator.of(context).push(MaterialPageRoute(
-            builder: (context) => AccountDetailsScreen(
-              account: account,
-              accountRepository: widget.repository,
-              transactionRepository: widget.transactionRepository,
-            ),
+            builder: (context) => AccountDetailsScreen(accountId: account.id),
           ));
         },
         borderRadius: const BorderRadius.all(Radius.circular(16)),
         child: ListTile(
-          contentPadding: const EdgeInsets.fromLTRB(20, 12, 8, 12), // Reducimos padding derecho
+          contentPadding: const EdgeInsets.fromLTRB(20, 12, 8, 12),
           leading: Icon(_accountIcons[account.type] ?? _accountIcons['default'], size: 30, color: Theme.of(context).colorScheme.primary),
           title: Text(account.name, style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
           subtitle: Text(account.type),
-          trailing: Row( // Usamos un Row para el saldo y el menú
+          trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
@@ -271,14 +281,8 @@ class AccountsScreenState extends State<AccountsScreen> {
                   if (value == 'delete') _handleDeleteAccount(account);
                 },
                 itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'edit',
-                    child: ListTile(leading: Icon(Iconsax.edit), title: Text('Editar')),
-                  ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: ListTile(leading: Icon(Iconsax.trash), title: Text('Eliminar')),
-                  ),
+                  const PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Iconsax.edit), title: Text('Editar'))),
+                  const PopupMenuItem(value: 'delete', child: ListTile(leading: Icon(Iconsax.trash), title: Text('Eliminar'))),
                 ],
                 icon: const Icon(Iconsax.more),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -290,9 +294,6 @@ class AccountsScreenState extends State<AccountsScreen> {
     );
   }
 
-  /// --- MÉTODO CORREGIDO ---
-  /// Este widget crea una animación de carga (shimmer) que imita la
-  /// apariencia de la lista de cuentas, proporcionando una mejor experiencia de usuario.
   Widget _buildLoadingShimmer() {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final baseColor = isDarkMode ? Colors.grey[850]! : Colors.grey[300]!;
@@ -307,20 +308,12 @@ class AccountsScreenState extends State<AccountsScreen> {
         itemCount: 5,
         itemBuilder: (_, __) => Padding(
           padding: const EdgeInsets.only(bottom: 16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Shimmer para el Tile de la cuenta (más alto)
-              Container(
-                height: 82, // Altura similar a la del ListTile
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: const BorderRadius.all(Radius.circular(16)),
-                ),
-              ),
-              // Shimmer para la tarjeta de proyección (más corto)
-              // No lo añadimos para que no se vea el hueco si no hay proyección
-            ],
+          child: Container(
+            height: 82,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: const BorderRadius.all(Radius.circular(16)),
+            ),
           ),
         ),
       ),
