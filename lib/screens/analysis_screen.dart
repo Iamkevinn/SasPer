@@ -31,7 +31,7 @@ class AnalysisScreen extends StatefulWidget {
 class AnalysisScreenState extends State<AnalysisScreen> {
   // Obtenemos la instancia del Singleton.
   final AnalysisRepository _repository = AnalysisRepository.instance;
-  
+
   late Future<AnalysisData> _analysisFuture;
   RealtimeChannel? _transactionsChannel;
 
@@ -42,11 +42,11 @@ class AnalysisScreenState extends State<AnalysisScreen> {
     _analysisFuture = _repository.fetchAllAnalysisData();
     _setupRealtimeSubscription();
   }
-  
+
   void _setupRealtimeSubscription() {
     // Obtenemos el cliente de Supabase una sola vez de forma segura.
     final client = Supabase.instance.client;
-    
+
     _transactionsChannel = client
         .channel('public:transactions:analysis')
         .onPostgresChanges(
@@ -75,7 +75,7 @@ class AnalysisScreenState extends State<AnalysisScreen> {
     }
     super.dispose();
   }
-  
+
   /// Dispara una recarga de los datos de análisis.
   /// Es llamado por el RefreshIndicator y la suscripción de Realtime.
   Future<void> _handleRefresh() async {
@@ -91,7 +91,8 @@ class AnalysisScreenState extends State<AnalysisScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Análisis Detallado', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+        title: Text('Análisis Detallado',
+            style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
         centerTitle: false,
         elevation: 0,
         backgroundColor: Colors.transparent,
@@ -99,7 +100,8 @@ class AnalysisScreenState extends State<AnalysisScreen> {
       body: FutureBuilder<AnalysisData>(
         future: _analysisFuture,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+          if (snapshot.connectionState == ConnectionState.waiting &&
+              !snapshot.hasData) {
             return _buildChartsShimmer();
           }
           if (snapshot.hasError) {
@@ -108,32 +110,33 @@ class AnalysisScreenState extends State<AnalysisScreen> {
                 padding: const EdgeInsets.all(16.0),
                 child: EmptyStateCard(
                   title: 'Ocurrió un Error',
-                  message: 'No se pudieron cargar los datos. Intenta refrescar la pantalla.\nError: ${snapshot.error}',
+                  message:
+                      'No se pudieron cargar los datos. Intenta refrescar la pantalla.\nError: ${snapshot.error}',
                   icon: Iconsax.warning_2,
                 ),
               ),
             );
           }
           if (!snapshot.hasData) {
-            return const Center(child: EmptyStateCard(
-                title: 'Sin Datos',
-                message: 'No hay suficientes datos para generar un análisis.',
-                icon: Iconsax.chart_21,
+            return const Center(
+                child: EmptyStateCard(
+              title: 'Sin Datos',
+              message: 'No hay suficientes datos para generar un análisis.',
+              icon: Iconsax.chart_21,
             ));
           }
 
           final analysisData = snapshot.data!;
 
           // Lógica para comprobar si TODOS los datos están vacíos
-          final bool hasDataToShow = 
-            analysisData.expensePieData.isNotEmpty ||
-            analysisData.cashflowBarData.isNotEmpty ||
-            analysisData.netWorthLineData.isNotEmpty ||
-            analysisData.categoryComparisonData.isNotEmpty ||
-            analysisData.incomePieData.isNotEmpty ||
-            analysisData.incomeExpenseBarData.isNotEmpty ||
-            analysisData.heatmapData.isNotEmpty;
-          
+          final bool hasDataToShow = analysisData.expensePieData.isNotEmpty ||
+              analysisData.cashflowBarData.isNotEmpty ||
+              analysisData.netWorthLineData.isNotEmpty ||
+              analysisData.categoryComparisonData.isNotEmpty ||
+              analysisData.incomePieData.isNotEmpty ||
+              analysisData.incomeExpenseBarData.isNotEmpty ||
+              analysisData.heatmapData.isNotEmpty;
+
           if (!hasDataToShow) {
             return RefreshIndicator(
               onRefresh: _handleRefresh,
@@ -143,7 +146,57 @@ class AnalysisScreenState extends State<AnalysisScreen> {
                   const Center(
                     child: EmptyStateCard(
                       title: 'Sin Datos Suficientes',
-                      message: 'Aún no hay suficientes transacciones para generar un análisis detallado.',
+                      message:
+                          'Aún no hay suficientes transacciones para generar un análisis detallado.',
+                      icon: Iconsax.chart_21,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          // 1. Define las fechas que usará el Heatmap.
+          final today = DateTime.now();
+          final heatmapStartDate =
+              today.subtract(const Duration(days: 119)); // Rango de 120 días
+
+          // Crea una lista con los widgets de los gráficos para organizar el código.
+          final List<Widget> chartWidgets = [
+            if (analysisData.heatmapData.isNotEmpty)
+              // 3. Pasa las fechas al constructor del widget.
+              HeatmapSection(
+                data: analysisData.heatmapData,
+                startDate: heatmapStartDate,
+                endDate: today,
+              ),
+            if (analysisData.cashflowBarData.isNotEmpty)
+              MonthlyCashflowChart(data: analysisData.cashflowBarData),
+            if (analysisData.netWorthLineData.isNotEmpty)
+              NetWorthTrendChart(data: analysisData.netWorthLineData),
+            if (analysisData.incomeExpenseBarData.isNotEmpty)
+              IncomeExpenseBarChart(data: analysisData.incomeExpenseBarData),
+            if (analysisData.categoryComparisonData.isNotEmpty)
+              CategoryComparisonChart(
+                  data: analysisData.categoryComparisonData),
+            if (analysisData.expensePieData.isNotEmpty)
+              ExpensePieChart(data: analysisData.expensePieData),
+            if (analysisData.incomePieData.isNotEmpty)
+              IncomePieChart(data: analysisData.incomePieData),
+          ];
+          // Si, después de filtrar, la lista de widgets está vacía,
+          // significa que no hay absolutamente nada que mostrar.
+          if (chartWidgets.isEmpty) {
+            return RefreshIndicator(
+              onRefresh: _handleRefresh,
+              child: Stack(
+                children: [
+                  ListView(), // Para que el RefreshIndicator funcione
+                  const Center(
+                    child: EmptyStateCard(
+                      title: 'Sin Datos Suficientes',
+                      message:
+                          'Aún no hay transacciones para generar un análisis detallado.',
                       icon: Iconsax.chart_21,
                     ),
                   ),
@@ -154,24 +207,17 @@ class AnalysisScreenState extends State<AnalysisScreen> {
 
           return RefreshIndicator(
             onRefresh: _handleRefresh,
-            child: ListView(
+            child: ListView.separated(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 150),
-              children: [
-                HeatmapSection(data: analysisData.heatmapData),
-                const SizedBox(height: 32),
-                MonthlyCashflowChart(data: analysisData.cashflowBarData),
-                const SizedBox(height: 32),
-                NetWorthTrendChart(data: analysisData.netWorthLineData),
-                const SizedBox(height: 32),
-                IncomeExpenseBarChart(data: analysisData.incomeExpenseBarData),
-                const SizedBox(height: 32),
-                CategoryComparisonChart(data: analysisData.categoryComparisonData),
-                const SizedBox(height: 32),
-                ExpensePieChart(data: analysisData.expensePieData),
-                const SizedBox(height: 32),
-                IncomePieChart(data: analysisData.incomePieData),
-                const SizedBox(height: 24),
-              ],
+              itemCount: chartWidgets.length,
+              itemBuilder: (context, index) {
+                // El builder solo se llama para los items visibles.
+                return chartWidgets[index];
+              },
+              separatorBuilder: (context, index) {
+                // Añade el espaciado entre los gráficos.
+                return const SizedBox(height: 32);
+              },
             ),
           );
         },
@@ -182,11 +228,12 @@ class AnalysisScreenState extends State<AnalysisScreen> {
   /// Construye el esqueleto de la UI mientras los datos cargan.
   Widget _buildChartsShimmer() {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final baseColor    = isDarkMode ? Colors.grey[800]! : Colors.grey[300]!;
+    final baseColor = isDarkMode ? Colors.grey[800]! : Colors.grey[300]!;
     final highlightColor = isDarkMode ? Colors.grey[700]! : Colors.grey[100]!;
 
     return ListView(
-      physics: const NeverScrollableScrollPhysics(), // Evita el scroll sobre el shimmer
+      physics:
+          const NeverScrollableScrollPhysics(), // Evita el scroll sobre el shimmer
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 150),
       children: [
         Shimmer.fromColors(

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:sasper/data/account_repository.dart';
+import 'package:sasper/data/goal_repository.dart';
 import 'package:sasper/models/account_model.dart';
 import 'package:sasper/models/goal_model.dart';
 import 'package:sasper/services/event_service.dart';
@@ -31,6 +32,7 @@ class ContributeToGoalDialog extends StatefulWidget {
 class _ContributeToGoalDialogState extends State<ContributeToGoalDialog> {
   // Accedemos a la única instancia (Singleton) del repositorio.
   final AccountRepository _accountRepo = AccountRepository.instance;
+  final GoalRepository _goalRepo = GoalRepository.instance;
 
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
@@ -60,18 +62,17 @@ class _ContributeToGoalDialogState extends State<ContributeToGoalDialog> {
     try {
       final amount = double.parse(_amountController.text.replaceAll(',', '.'));
       
-      // La llamada a la función RPC está bien, la mantenemos.
-      await Supabase.instance.client.rpc('add_contribution_to_goal', params: {
-        'goal_id_input': widget.goal.id,
-        'account_id_input': _selectedAccount!.id,
-        'amount_input': amount,
-      });
+      // Usamos el método del repositorio en lugar de una llamada RPC directa.
+      await _goalRepo.addContribution(
+        goalId: widget.goal.id,
+        accountId: _selectedAccount!.id,
+        amount: amount,
+      );
 
       if (mounted) {
-        // Disparamos eventos globales porque una contribución afecta a
-        // las metas, las transacciones y las cuentas.
-        EventService.instance.fire(AppEvent.goalUpdated);
-        EventService.instance.fire(AppEvent.transactionCreated);
+        // Los eventos ya no se disparan aquí, el repositorio puede hacerlo si es necesario,
+        // pero la arquitectura reactiva se encargará.
+        // EventService.instance.fire(...);
 
         Navigator.of(context).pop(); // Cerramos el diálogo
         widget.onSuccess(); // Llamamos al callback para refresco local

@@ -1,5 +1,6 @@
 // lib/screens/transactions_screen.dart (VERSIÓN FINAL REACTIVA CON STREAMBUILDER Y SINGLETONS)
 
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -32,6 +33,8 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   // Stream principal que escuchará el StreamBuilder
   late Stream<List<Transaction>> _transactionsStream;
 
+  StreamSubscription<AppEvent>? _eventSubscription;
+
   // Variables de estado para los filtros
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -48,25 +51,51 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
 
     // Listener para la búsqueda en tiempo real
     _searchController.addListener(_onSearchChanged);
+
+    // Nos suscribimos a los eventos de la app.
+    _eventSubscription = EventService.instance.eventStream.listen((event) {
+      final refreshEvents = {
+        AppEvent.transactionCreated,
+        AppEvent.transactionUpdated,
+        AppEvent.transactionDeleted,
+        AppEvent.transactionsChanged, // Evento genérico
+      };
+      // Si ocurre un evento relevante Y no estamos en modo filtro, refrescamos.
+      if (refreshEvents.contains(event) && !_isFilteringActive()) {
+        _transactionRepository.refreshData();
+      }
+    });
+    
   }
 
   @override
   void dispose() {
+     _eventSubscription?.cancel();
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
   }
   
+  // Pequeño helper para saber si hay filtros activos
+  bool _isFilteringActive() {
+    return _searchQuery.isNotEmpty || _selectedCategories.isNotEmpty || _selectedDateRange != null;
+  }
+
   /// Reemplaza el stream actual por uno nuevo basado en los filtros aplicados.
   void _applyFilters() {
-    developer.log('Applying filters: Query: $_searchQuery, Categories: $_selectedCategories, Dates: $_selectedDateRange', name: 'TransactionsScreen');
+    developer.log('Applying filters...', name: 'TransactionsScreen');
     setState(() {
-      // Creamos un nuevo stream a partir de la función de filtrado.
-      _transactionsStream = _transactionRepository.getFilteredTransactions(
-        searchQuery: _searchQuery,
-        categoryFilter: _selectedCategories,
-        dateRange: _selectedDateRange,
-      ).asStream(); // Convertimos el Future<List> a Stream<List>
+      // Si todos los filtros están limpios, vuelve al stream en tiempo real.
+      if (!_isFilteringActive()) {
+        _transactionsStream = _transactionRepository.getTransactionsStream();
+      } else {
+        // Si hay filtros, crea un stream a partir del Future.
+        _transactionsStream = _transactionRepository.getFilteredTransactions(
+          searchQuery: _searchQuery,
+          categoryFilter: _selectedCategories.isNotEmpty ? _selectedCategories : null,
+          dateRange: _selectedDateRange,
+        ).asStream();
+      }
     });
   }
   
@@ -97,6 +126,10 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   /// Vuelve al stream principal que escucha los cambios en tiempo real.
   void _resetToDefaultStream() {
     setState(() {
+      _searchQuery = '';
+      _searchController.clear();
+      _selectedCategories.clear();
+      _selectedDateRange = null;
       _transactionsStream = _transactionRepository.getTransactionsStream();
     });
   }
@@ -153,7 +186,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         await _transactionRepository.deleteTransaction(transaction.id);
         // El listener de Supabase debería actuar aquí, pero un "nudge" manual
         // asegura que la UI es 100% inmediata.
-        _transactionRepository.refreshData();
+        //_transactionRepository.refreshData();
         
         // Disparamos el evento global para el Dashboard, etc.
         EventService.instance.fire(AppEvent.transactionDeleted);

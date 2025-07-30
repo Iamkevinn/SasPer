@@ -15,6 +15,8 @@ class DashboardRepository {
   final _dashboardDataController = StreamController<DashboardData>.broadcast();
   RealtimeChannel? _subscriptionChannel;
 
+  bool _isInitialized = false;
+
   // 3. Constructor privado para prevenir la creación de instancias desde fuera.
   DashboardRepository._privateConstructor();
 
@@ -23,9 +25,17 @@ class DashboardRepository {
 
   // 5. El método de inicialización público. Se llamará desde main.dart.
   void initialize(SupabaseClient client) {
-    _client = client;
-    _setupRealtimeSubscription(); // Configuramos la suscripción en cuanto tenemos el cliente.
-  }
+      // Si ya ha sido inicializado, simplemente no hacemos nada.
+      if (_isInitialized) {
+        developer.log('DashboardRepository ya estaba inicializado, saltando.', name: 'DashboardRepository');
+        return;
+      }
+      _client = client;
+      _setupRealtimeSubscription();
+      _isInitialized = true; // Levantamos la bandera
+      developer.log('✅ DashboardRepository inicializado por primera vez.', name: 'DashboardRepository');
+    }
+
 
   // Ahora, los métodos del repositorio usan la variable de instancia `_client`.
   
@@ -98,6 +108,33 @@ class DashboardRepository {
       if (!_dashboardDataController.isClosed) {
         _dashboardDataController.addError(e);
       }
+    }
+  }
+
+  /// Obtiene los datos del dashboard una sola vez, sin usar streams.
+  /// Ideal para ser llamado desde un contexto de segundo plano como el widget.
+  Future<DashboardData?> fetchDataForWidget() async {
+    developer.log('🔄 [Repo-Widget] Fetching single snapshot for widget...', name: 'DashboardRepository');
+    try {
+      final userId = _client.auth.currentUser?.id;
+      if (userId == null) {
+        developer.log('⚠️ [Repo-Widget] No user ID for widget data fetch.', name: 'DashboardRepository');
+        return null;
+      }
+
+      final results = await Future.wait([
+        _client.rpc('get_dashboard_balance', params: {'p_user_id': userId}),
+        _client.rpc('get_dashboard_details', params: {'p_user_id': userId}),
+      ]);
+
+      final dashboardData = DashboardData.fromPartialMap(results[0])
+                                       .copyWithDetails(results[1]);
+      
+      developer.log('✅ [Repo-Widget] Fetched single snapshot successfully.', name: 'DashboardRepository');
+      return dashboardData;
+    } catch (e) {
+      developer.log('🔥 [Repo-Widget] Error fetching widget data: $e', name: 'DashboardRepository');
+      return null;
     }
   }
 

@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:sasper/data/analysis_repository.dart';
 import 'package:sasper/data/auth_repository.dart';
+import 'package:sasper/config/global_state.dart'; 
 import 'package:sasper/data/budget_repository.dart';
 import 'package:sasper/data/recurring_repository.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -13,6 +14,8 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
+import 'package:home_widget/home_widget.dart';
+import 'package:sasper/services/widget_service.dart';
 import 'package:sasper/config/app_config.dart';
 import 'package:sasper/data/account_repository.dart';
 import 'package:sasper/data/dashboard_repository.dart';
@@ -50,7 +53,9 @@ Future<void> main() async {
     url: AppConfig.supabaseUrl,
     anonKey: AppConfig.supabaseAnonKey,
   );
-
+  GlobalState.supabaseInitialized = true;
+  // Registra la función que se ejecutará en segundo plano.
+  HomeWidget.registerBackgroundCallback(backgroundCallback);
   // Asigna el handler de mensajes en segundo plano.
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
@@ -61,7 +66,7 @@ Future<void> main() async {
   // Inyectamos el cliente en cada uno de nuestros repositorios Singleton.
   // Esto asegura que todos estén listos para ser usados ANTES de que la UI los necesite.
   AccountRepository.instance.initialize(supabaseClient);
-  AnalysisRepository.instance.initialize(supabaseClient); // <-- AÑADIDO
+  //AnalysisRepository.instance.initialize(supabaseClient); // <-- AÑADIDO
   AuthRepository.instance.initialize(supabaseClient);     // <-- AÑADIDO
   BudgetRepository.instance.initialize(supabaseClient);
   DashboardRepository.instance.initialize(supabaseClient);

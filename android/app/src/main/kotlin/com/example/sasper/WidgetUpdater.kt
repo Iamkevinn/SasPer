@@ -1,4 +1,4 @@
-// WidgetUpdater.kt (VERSIÓN FINAL, COMPLETA Y CORREGIDA)
+// Archivo: C:\Proyectos\SasPer\android\app\src\main\kotlin\com\example\sasper\WidgetUpdater.kt
 
 package com.example.sasper
 
@@ -7,12 +7,12 @@ import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
-import android.content.res.ColorStateList // Se ha eliminado la importación duplicada
+import android.content.res.ColorStateList
 import android.graphics.BitmapFactory
 import android.graphics.Color
-import android.graphics.PorterDuff
 import android.net.Uri
 import android.os.Build
+import android.util.Log
 import android.util.TypedValue
 import android.view.View
 import android.widget.RemoteViews
@@ -22,12 +22,15 @@ import java.io.File
 import java.text.NumberFormat
 import java.util.Locale
 
+// Clases de datos para que Gson pueda parsear el JSON de Dart.
+// Asegúrate de que los nombres de las propiedades coincidan con los `toJson` de tus modelos en Dart.
+ 
 object WidgetUpdater {
 
     fun updateSmallWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int, widgetData: SharedPreferences) {
         val views = RemoteViews(context.packageName, R.layout.home_widget_layout).apply {
             applyDynamicColors(context)
-            val balance = widgetData.getString("total_balance", "€0,00") ?: "€0,00"
+            val balance = widgetData.getString("total_balance", "...") ?: "..."
             setTextViewText(R.id.widget_balance, balance)
             val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
             val pendingLaunch = PendingIntent.getActivity(context, widgetId * 10, launchIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
@@ -42,19 +45,42 @@ object WidgetUpdater {
     fun updateMediumWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int, widgetData: SharedPreferences) {
         val views = RemoteViews(context.packageName, R.layout.widget_medium_layout).apply {
             applyDynamicColors(context, isMediumWidget = true)
-            val balance = widgetData.getString("total_balance", "€0,00") ?: "€0,00"
+
+            val balance = widgetData.getString("total_balance", "...") ?: "..."
             setTextViewText(R.id.widget_medium_balance, balance)
+
             val chartPath = widgetData.getString("widget_chart_path", null)
-            if (chartPath != null && File(chartPath).exists()) {
-                val bitmap = BitmapFactory.decodeFile(File(chartPath).absolutePath)
-                setImageViewBitmap(R.id.widget_medium_chart, bitmap)
-                setViewVisibility(R.id.widget_medium_chart, View.VISIBLE)
+            Log.d("WidgetDebug", "[KOTLIN] Ruta leída: '$chartPath'")
+
+            if (chartPath != null && chartPath.isNotEmpty()) {
+                val chartFile = File(chartPath)
+                if (chartFile.exists()) {
+                    // Leemos el archivo y lo decodificamos en un Bitmap.
+                    // Este método es el más fiable para los widgets.
+                    try {
+                        val bitmap = BitmapFactory.decodeFile(chartFile.absolutePath)
+                        setImageViewBitmap(R.id.widget_medium_chart, bitmap)
+                        setViewVisibility(R.id.widget_medium_chart, View.VISIBLE)
+                        Log.d("WidgetDebug", "[KOTLIN] ¡ÉXITO! Se estableció la imagen como Bitmap.")
+                    } catch (e: Exception) {
+                        // Capturamos cualquier error al procesar la imagen.
+                        setViewVisibility(R.id.widget_medium_chart, View.GONE)
+                        Log.e("WidgetDebug", "[KOTLIN] FALLO: Error al decodificar el Bitmap.", e)
+                    }
+                } else {
+                    setViewVisibility(R.id.widget_medium_chart, View.GONE)
+                    Log.d("WidgetDebug", "[KOTLIN] FALLO: El archivo no fue encontrado en la ruta especificada.")
+                }
             } else {
                 setViewVisibility(R.id.widget_medium_chart, View.GONE)
+                Log.d("WidgetDebug", "[KOTLIN] FALLO: La ruta del gráfico es nula o vacía.")
             }
+
+            // Lógica para los intents/botones
             val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
             val pendingLaunch = PendingIntent.getActivity(context, widgetId * 10 + 2, launchIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             setOnClickPendingIntent(R.id.widget_medium_container, pendingLaunch)
+
             val addIntent = Intent(Intent.ACTION_VIEW, Uri.parse("sasper://add_transaction")).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
             val pendingAdd = PendingIntent.getActivity(context, widgetId * 10 + 3, addIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             setOnClickPendingIntent(R.id.widget_medium_add_button, pendingAdd)
@@ -92,11 +118,9 @@ object WidgetUpdater {
                 views.setProgressBar(R.id.budget_item_1_progress, 100, (it.progress * 100).toInt(), false)
                 views.setViewVisibility(R.id.budget_item_1, View.VISIBLE)
 
-                // APLICAR COLORES DINÁMICOS - VERSIÓN CORREGIDA
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     val primaryColor = context.getColor(android.R.color.system_accent1_600)
                     val progressBackgroundColor = context.getColor(android.R.color.system_accent1_200)
-                    // Se usa setColorStateList, no setInt
                     views.setColorStateList(R.id.budget_item_1_progress, "setProgressTintList", ColorStateList.valueOf(primaryColor))
                     views.setColorStateList(R.id.budget_item_1_progress, "setProgressBackgroundTintList", ColorStateList.valueOf(progressBackgroundColor))
                 }
@@ -107,18 +131,15 @@ object WidgetUpdater {
                 views.setProgressBar(R.id.budget_item_2_progress, 100, (it.progress * 100).toInt(), false)
                 views.setViewVisibility(R.id.budget_item_2, View.VISIBLE)
 
-                // APLICAR COLORES DINÁMICOS - VERSIÓN CORREGIDA
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     val primaryColor = context.getColor(android.R.color.system_accent1_600)
                     val progressBackgroundColor = context.getColor(android.R.color.system_accent1_200)
-                    // Se usa setColorStateList, no setInt
                     views.setColorStateList(R.id.budget_item_2_progress, "setProgressTintList", ColorStateList.valueOf(primaryColor))
                     views.setColorStateList(R.id.budget_item_2_progress, "setProgressBackgroundTintList", ColorStateList.valueOf(progressBackgroundColor))
                 }
             }
         }
 
-        // El resto de la función para transacciones y PendingIntents no necesita cambios
         val currencyFormat = NumberFormat.getCurrencyInstance(Locale("es", "ES"))
         transactions.getOrNull(0)?.let { tx ->
             val title = "${tx.category ?: "Transacción"}: ${tx.description ?: ""}"
@@ -188,8 +209,6 @@ object WidgetUpdater {
                 isLargeWidget -> {
                     setInt(R.id.widget_large_container, "setBackgroundColor", secondaryColor)
                     setTextColor(R.id.widget_large_title, onSecondaryColor)
-                    
-                    // Colorear el botón
                     setInt(R.id.widget_large_add_button, "setColorFilter", onPrimaryColor)
                     setInt(R.id.widget_large_add_button, "setBackgroundColor", primaryColor)
                 }
@@ -201,7 +220,7 @@ object WidgetUpdater {
                     setInt(R.id.widget_button, "setBackgroundColor", primaryColor)
                 }
             }
-        }else {
+        } else {
             val fallbackBg = Color.parseColor("#EFEFEF")
             val fallbackText = Color.BLACK
             if (isMediumWidget) {

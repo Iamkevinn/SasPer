@@ -6,30 +6,29 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sasper/models/analysis_models.dart';
 
 class AnalysisRepository {
-  // 1. Cliente 'late final'.
-  late final SupabaseClient _client;
+  // Ya no necesitamos un cliente inyectado ni el método initialize.
+  // Hacemos el constructor público de nuevo.
+  AnalysisRepository();
 
-  // 2. Constructor privado.
-  AnalysisRepository._privateConstructor();
-
-  // 3. Instancia estática.
-  static final AnalysisRepository instance = AnalysisRepository._privateConstructor();
-
-  // 4. Método de inicialización.
-  void initialize(SupabaseClient client) {
-    _client = client;
-  }
+  // Mantenemos la instancia estática para un acceso fácil, pero es opcional.
+  static final AnalysisRepository instance = AnalysisRepository();
 
   /// Obtiene solo el resumen de gastos, ideal para widgets o cargas rápidas.
   Future<List<ExpenseByCategory>> getExpenseSummaryForWidget() async {
     developer.log("📈 [Repository] Fetching expense summary for widget...", name: 'AnalysisRepository');
     try {
-      final userId = _client.auth.currentUser?.id;
-      if (userId == null) return [];
+      // --- CAMBIO CLAVE: Obtenemos el cliente directamente de Supabase ---
+      final client = Supabase.instance.client;
+      final userId = client.auth.currentUser?.id;
+      
+      if (userId == null) {
+        developer.log("⚠️ [Widget] No user ID, returning empty summary.", name: 'AnalysisRepository');
+        return [];
+      }
 
       final clientDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
-      final result = await _client.rpc(
+      final result = await client.rpc(
         'get_expense_summary_by_category', 
         params: {'p_user_id': userId, 'client_date': clientDate}
       );
@@ -43,53 +42,35 @@ class AnalysisRepository {
   }
   
   /// Obtiene el conjunto completo de datos para la pantalla de análisis.
-  /// Ejecuta todas las consultas en paralelo y maneja errores individuales.
   Future<AnalysisData> fetchAllAnalysisData() async {
     developer.log("📈 [Repository] Fetching all analysis data...", name: 'AnalysisRepository');
     try {
-      final today = DateTime.now();
-      final userId = _client.auth.currentUser?.id;
+      // --- CAMBIO CLAVE: Obtenemos el cliente directamente de Supabase ---
+      final client = Supabase.instance.client;
+      final userId = client.auth.currentUser?.id;
+
       if (userId == null) {
         developer.log("⚠️ [Repository] No user ID found, returning empty analysis data.", name: 'AnalysisRepository');
         return AnalysisData.empty();
       }
 
+      final today = DateTime.now();
       final startDate = DateFormat('yyyy-MM-dd').format(today.subtract(const Duration(days: 120)));
       final endDate = DateFormat('yyyy-MM-dd').format(today);
       final clientDate = DateFormat('yyyy-MM-dd').format(today);
 
+      // Usamos Future.wait para eficiencia, ya que ahora las llamadas son más estables.
       final results = await Future.wait([
-        _client.rpc('get_expense_summary_by_category', params: {'p_user_id': userId, 'client_date': clientDate}).catchError((e) {
-          developer.log('🔥 Error en get_expense_summary_by_category: $e', name: 'AnalysisRepository');
-          return [];
-        }),
-        _client.rpc('get_net_worth_trend', params: {'p_user_id': userId, 'client_date': clientDate}).catchError((e) {
-          developer.log('🔥 Error en get_net_worth_trend: $e', name: 'AnalysisRepository');
-          return [];
-        }),
-        _client.rpc('get_monthly_cash_flow', params: {'p_user_id': userId}).catchError((e) {
-          developer.log('🔥 Error en get_monthly_cash_flow: $e', name: 'AnalysisRepository');
-          return [];
-        }),
-        _client.rpc('get_category_spending_comparison', params: {'p_user_id': userId}).catchError((e) {
-          developer.log('🔥 Error en get_category_spending_comparison: $e', name: 'AnalysisRepository');
-          return [];
-        }),
-        _client.rpc('get_income_summary_by_category', params: {'p_user_id': userId, 'client_date': clientDate}).catchError((e) {
-          developer.log('🔥 Error en get_income_summary_by_category: $e', name: 'AnalysisRepository');
-          return [];
-        }),
-        _client.rpc('get_monthly_income_expense_summary', params: {'p_user_id': userId, 'client_date': clientDate}).catchError((e) {
-          developer.log('🔥 Error en get_monthly_income_expense_summary: $e', name: 'AnalysisRepository');
-          return [];
-        }),
-        _client.rpc('get_daily_net_flow', params: {'p_user_id': userId, 'start_date': startDate, 'end_date': endDate}).catchError((e) {
-          developer.log('🔥 Error en get_daily_net_flow: $e', name: 'AnalysisRepository');
-          return [];
-        }),
+        client.rpc('get_expense_summary_by_category', params: {'p_user_id': userId, 'client_date': clientDate}).catchError((e) => []),
+        client.rpc('get_net_worth_trend', params: {'p_user_id': userId, 'client_date': clientDate}).catchError((e) => []),
+        client.rpc('get_monthly_cash_flow', params: {'p_user_id': userId}).catchError((e) => []),
+        client.rpc('get_category_spending_comparison', params: {'p_user_id': userId}).catchError((e) => []),
+        client.rpc('get_income_summary_by_category', params: {'p_user_id': userId, 'client_date': clientDate}).catchError((e) => []),
+        client.rpc('get_monthly_income_expense_summary', params: {'p_user_id': userId, 'client_date': clientDate}).catchError((e) => []),
+        client.rpc('get_daily_net_flow', params: {'p_user_id': userId, 'start_date': startDate, 'end_date': endDate}).catchError((e) => []),
       ]);
 
-      final analysisData = AnalysisData(
+      return AnalysisData(
         expensePieData: (results[0] as List).map((e) => ExpenseByCategory.fromJson(e)).toList(),
         netWorthLineData: (results[1] as List).map((e) => NetWorthDataPoint.fromJson(e)).toList(),
         cashflowBarData: (results[2] as List).map((e) => MonthlyCashflowData.fromJson(e)).toList(),
@@ -102,9 +83,6 @@ class AnalysisRepository {
         },
       );
       
-      developer.log("✅ [Repository] Data fetched and parsed successfully.", name: 'AnalysisRepository');
-      return analysisData;
-
     } catch (e, stackTrace) {
       developer.log("🔥 [Repository] CRITICAL ERROR fetching data: $e", name: 'AnalysisRepository', error: e, stackTrace: stackTrace);
       return AnalysisData.empty();

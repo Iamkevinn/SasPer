@@ -73,6 +73,7 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
         amount: double.parse(_amountController.text),
         accountId: _selectedAccount!.id,
         dueDate: _dueDate,
+        transactionDate: DateTime.now()
       );
 
       if (!mounted) return;

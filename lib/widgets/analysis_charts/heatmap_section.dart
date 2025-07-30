@@ -1,27 +1,72 @@
 // lib/widgets/analysis_charts/heatmap_section.dart
 
-// Para encontrar el mínimo de forma eficiente
 import 'package:flutter/material.dart';
 import 'package:flutter_heatmap_calendar/flutter_heatmap_calendar.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 
 class HeatmapSection extends StatelessWidget {
-  // 1. LA NORMALIZACIÓN OCURRE EN EL CONSTRUCTOR
-  final Map<DateTime, int> datasets;
+  // Guardamos los datos completos (con ceros) para el SnackBar.
+  final Map<DateTime, int> originalDatasets;
+  // Pasamos al widget un mapa SIN los ceros para el coloreado correcto.
+  final Map<DateTime, int> datasetsForCalendar;
 
-  HeatmapSection({super.key, required Map<DateTime, int> data})
-      // El constructor procesa los datos una sola vez
-      : datasets = {
-          for (var entry in data.entries)
-            DateTime(entry.key.year, entry.key.month, entry.key.day): entry.value
-        };
+  final bool isEdgeCase;
 
+  HeatmapSection({
+    super.key,
+    required Map<DateTime, int> data,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) : originalDatasets = _createCompleteDataset(data, startDate, endDate),
+       // ¡LA SOLUCIÓN! Filtramos los ceros de los datos que verá el calendario.
+       datasetsForCalendar = _filterZeroValues(
+           _createCompleteDataset(data, startDate, endDate)
+       ),
+       isEdgeCase = _isEdgeCase(data);
+
+  // Detecta el caso borde que causa la división por cero.
+  static bool _isEdgeCase(Map<DateTime, int> data) {
+    final nonZeroValues = data.values.where((v) => v != 0);
+    if (nonZeroValues.isEmpty) {
+      return true;
+    }
+    return nonZeroValues.toSet().length <= 1;
+  }
+
+  // Crea un conjunto de datos con todos los días, rellenando con 0 los vacíos.
+  static Map<DateTime, int> _createCompleteDataset(Map<DateTime, int> originalData, DateTime start, DateTime end) {
+    final Map<DateTime, int> normalized = { for (var e in originalData.entries) DateTime(e.key.year, e.key.month, e.key.day): e.value };
+    final Map<DateTime, int> complete = {};
+    for (int i = 0; i <= end.difference(start).inDays; i++) {
+      final date = DateTime(start.year, start.month, start.day).add(Duration(days: i));
+      complete[date] = normalized[date] ?? 0;
+    }
+    return complete;
+  }
+  
+  // --- MÉTODO CLAVE AÑADIDO ---
+  // Este método elimina las entradas cuyo valor es 0.
+  static Map<DateTime, int> _filterZeroValues(Map<DateTime, int> data) {
+    final filteredData = <DateTime, int>{};
+    data.forEach((date, value) {
+      if (value != 0) {
+        filteredData[date] = value;
+      }
+    });
+    return filteredData;
+  }
+  
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     
+    // Para la configuración de colores, sí usamos los datos filtrados.
+    final Map<DateTime, int> displayData = isEdgeCase 
+        ? datasetsForCalendar.map((key, value) => MapEntry(key, value > 0 ? 1 : -1))
+        : datasetsForCalendar;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -35,23 +80,31 @@ class HeatmapSection extends StatelessWidget {
           ),
           child: Center(
             child: HeatMapCalendar(
-              datasets: datasets,
+              // Pasamos los datos SIN ceros.
+              datasets: displayData,
+              
               defaultColor: theme.brightness == Brightness.dark
                   ? Colors.grey.shade800
                   : Colors.grey.shade200,
-              // 2. Configuración de colores más robusta
-              colorsets: {
-                1: Colors.green.shade400, // Nivel 1 para valores positivos
-                -1: Colors.red.shade400,  // Nivel -1 para valores negativos
-              },
-              colorMode: ColorMode.color,
-              showColorTip: false,
+              
+              colorsets: isEdgeCase
+                  ? { // Configuración SEGURA
+                      1: Colors.green.shade400,
+                      -1: Colors.red.shade400,
+                    }
+                  : { // Configuración BONITA
+                      1: Colors.green[100]!, 2: Colors.green[300]!, 3: Colors.green[500]!, 4: Colors.green[700]!, 5: Colors.green[900]!,
+                      -1: Colors.red[100]!, -2: Colors.red[300]!, -3: Colors.red[500]!, -4: Colors.red[700]!, -5: Colors.red[900]!,
+                    },
+
+              colorMode: isEdgeCase ? ColorMode.color : ColorMode.opacity,
+              
               monthFontSize: 16,
               weekFontSize: 10,
               fontSize: 10,
               textColor: colorScheme.onSurface,
               onClick: (date) {
-                // 3. La lógica del onClick ahora está encapsulada
+                // El onClick sigue usando los datos originales, que sí tienen los ceros.
                 _showActivitySnackBar(context, date);
               },
             ),
@@ -61,43 +114,31 @@ class HeatmapSection extends StatelessWidget {
     );
   }
 
-  // --- WIDGETS Y MÉTODOS HELPER ---
-
   Widget _buildHeader(BuildContext context) {
     return Row(
       children: [
         const Icon(Iconsax.calendar_1, size: 20),
         const SizedBox(width: 8),
-        Text(
-          'Actividad Financiera Diaria',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-        ),
+        Text('Actividad Financiera Diaria', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
       ],
     );
   }
 
   void _showActivitySnackBar(BuildContext context, DateTime date) {
-    // La fecha del `onClick` ya viene normalizada (sin hora)
-    final value = datasets[date] ?? 0;
-    final currencyFmt = NumberFormat.currency(locale: 'es_CO', symbol: '\$');
+    // Buscamos el valor en el mapa de datos ORIGINAL.
+    final value = originalDatasets[date] ?? 0;
+    
+    final currencyFmt = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
     String message;
 
-    if (value > 0) {
+    if (value == 0) {
+      message = 'Sin movimientos registrados';
+    } else if (value > 0) {
       message = 'Flujo neto positivo de ${currencyFmt.format(value)}';
-    } else if (value < 0) {
-      // Usamos .abs() para mostrar siempre un número positivo
-      message = 'Flujo neto negativo de ${currencyFmt.format(value.abs())}';
     } else {
-      message = 'Sin actividad financiera registrada';
+      message = 'Flujo neto negativo de ${currencyFmt.format(value.abs())}';
     }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '${DateFormat.yMMMd('es_CO').format(date)}: $message',
-        ),
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${DateFormat.yMMMd('es_CO').format(date)}: $message'), duration: const Duration(seconds: 3)));
   }
 }
