@@ -7,10 +7,10 @@ import 'package:sasper/data/account_repository.dart';
 import 'package:sasper/data/goal_repository.dart';
 import 'package:sasper/models/account_model.dart';
 import 'package:sasper/models/goal_model.dart';
-import 'package:sasper/services/event_service.dart';
+//import 'package:sasper/services/event_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+//import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:developer' as developer;
 
 class ContributeToGoalDialog extends StatefulWidget {
