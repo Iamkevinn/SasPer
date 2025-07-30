@@ -39,6 +39,8 @@ dependencies:
   
   # Theming y colores dinámicos
   dynamic_color: ^1.7.0
+  flutter_iconpicker: ^3.2.2 # Para seleccionar iconos fácilmente
+  flutter_colorpicker: ^1.0.3 # Para seleccionar colores
   
   # Widget de la pantalla de inicio
   home_widget: ^0.8.0
@@ -51,6 +53,8 @@ dependencies:
   firebase_messaging: ^15.2.10
   connectivity_plus: ^6.0.3
   equatable: ^2.0.5
+  provider: ^6.1.5
+  shared_preferences: ^2.5.3
 
 # Dependencias que solo se usan durante el desarrollo.
 dev_dependencies:

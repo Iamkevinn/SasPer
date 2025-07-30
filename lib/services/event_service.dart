@@ -15,6 +15,7 @@ enum AppEvent {
   goalUpdated,
   goalsChanged,
   recurringTransactionChanged,
+  categoriesChanged,
 }
 
 class EventService {

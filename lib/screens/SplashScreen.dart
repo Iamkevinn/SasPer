@@ -16,6 +16,7 @@ import 'package:sasper/firebase_options.dart';
 import 'package:sasper/screens/auth_gate.dart';
 import 'package:sasper/services/widget_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:sasper/data/category_repository.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -56,7 +57,8 @@ class _SplashScreenState extends State<SplashScreen> {
       GoalRepository.instance.initialize(supabaseClient);
       RecurringRepository.instance.initialize(supabaseClient);
       TransactionRepository.instance.initialize(supabaseClient);
-      
+      CategoryRepository.instance.initialize(supabaseClient);
+
       // 3. Pequeña pausa para que la transición sea más suave (opcional)
       await Future.delayed(const Duration(milliseconds: 500));
 

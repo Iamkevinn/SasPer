@@ -3,6 +3,8 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:sasper/screens/SplashScreen.dart';
+import 'package:provider/provider.dart';
+import 'package:sasper/services/theme_provider.dart';
 
 // La GlobalKey sigue siendo una buena práctica.
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -16,7 +18,13 @@ Future<void> main() async {
   
   // 3. ¡Ejecuta la app INMEDIATAMENTE!
   //    Toda la carga pesada ahora está dentro de SplashScreen.
-  runApp(const MyApp());
+  runApp(
+    // Envolvemos la app con un ChangeNotifierProvider
+    ChangeNotifierProvider(
+      create: (_) => ThemeProvider(),
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -24,6 +32,9 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Consumimos el provider para obtener el themeMode
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
     return DynamicColorBuilder(
       builder: (ColorScheme? lightDynamic, ColorScheme? darkDynamic) {
         ColorScheme lightColorScheme;
@@ -38,6 +49,7 @@ class MyApp extends StatelessWidget {
         }
 
         return MaterialApp(
+          themeMode: themeProvider.themeMode, 
           title: 'Finanzas Personales IA',
           debugShowCheckedModeBanner: false,
           theme: ThemeData(
