@@ -5,11 +5,16 @@ import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 import 'package:sasper/models/debt_model.dart';
 
+enum DebtCardAction { registerPayment, edit, delete }
+
 class DebtCard extends StatelessWidget {
   final Debt debt;
-  final VoidCallback? onTap;
-
-  const DebtCard({super.key, required this.debt, this.onTap});
+  final Function(DebtCardAction) onActionSelected;
+  const DebtCard({
+    super.key,
+    required this.debt,
+    required this.onActionSelected,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +34,7 @@ class DebtCard extends StatelessWidget {
       color: colorScheme.surface.withAlpha(100),
       clipBehavior: Clip.antiAlias, // Asegura que el InkWell respete los bordes
       child: InkWell(
-        onTap: onTap,
+        onTap: () => onActionSelected(DebtCardAction.registerPayment),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
@@ -80,11 +85,34 @@ class DebtCard extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         // 3. Indicador visual del tipo de deuda
-        Icon(
-          isDebt ? Iconsax.arrow_down_2 : Iconsax.arrow_up_1,
-          color: isDebt ? colorScheme.error : Colors.green.shade400,
-          size: 20,
-        ),
+        PopupMenuButton<DebtCardAction>(
+          onSelected: onActionSelected,
+          icon: Icon(Iconsax.more, color: colorScheme.onSurfaceVariant),
+          itemBuilder: (BuildContext context) => <PopupMenuEntry<DebtCardAction>>[
+            const PopupMenuItem<DebtCardAction>(
+              value: DebtCardAction.registerPayment,
+              child: ListTile(
+                leading: Icon(Iconsax.wallet_add_1),
+                title: Text('Registrar Pago/Cobro'),
+              ),
+            ),
+            const PopupMenuItem<DebtCardAction>(
+              value: DebtCardAction.edit,
+              child: ListTile(
+                leading: Icon(Iconsax.edit),
+                title: Text('Editar Información'),
+              ),
+            ),
+            const PopupMenuDivider(),
+            const PopupMenuItem<DebtCardAction>(
+              value: DebtCardAction.delete,
+              child: ListTile(
+                leading: Icon(Iconsax.trash, color: Colors.red),
+                title: Text('Eliminar', style: TextStyle(color: Colors.red)),
+              ),
+            ),
+          ],
+        )
       ],
     );
   }

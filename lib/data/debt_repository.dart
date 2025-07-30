@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'dart:developer' as developer;
+import 'package:sasper/services/event_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sasper/models/debt_model.dart';
 
@@ -73,6 +74,51 @@ class DebtRepository {
     }
   }
 
+  // --- NUEVOS MÉTODOS PARA EL CRUD ---
+
+  /// Actualiza los datos de una deuda existente.
+  /// No permite cambiar montos, solo datos informativos.
+  Future<void> updateDebt({
+    required String debtId,
+    required String name,
+    String? entityName,
+    DateTime? dueDate,
+  }) async {
+    developer.log('🔄 [Repo] Updating debt: "$name"', name: 'DebtRepository');
+    try {
+      await _client.from('debts').update({
+        'name': name,
+        'entity_name': entityName,
+        'due_date': dueDate?.toIso8601String(),
+      }).eq('id', debtId);
+      
+      developer.log('✅ [Repo] Debt updated successfully.', name: 'DebtRepository');
+      // Disparamos un evento para notificar a la UI
+      EventService.instance.fire(AppEvent.debtsChanged);
+    } catch (e, stackTrace) {
+      developer.log('🔥 [Repo] Error updating debt: $e', name: 'DebtRepository', error: e, stackTrace: stackTrace);
+      throw Exception('No se pudo actualizar la deuda.');
+    }
+  }
+
+  /// Elimina una deuda.
+  /// IMPORTANTE: Esto no elimina las transacciones asociadas. Se recomienda
+  /// usar una función en Supabase (un trigger en ON DELETE) para archivar
+  /// o desvincular las transacciones relacionadas si es necesario.
+  Future<void> deleteDebt(String debtId) async {
+    developer.log('🗑️ [Repo] Deleting debt with id: $debtId', name: 'DebtRepository');
+    try {
+      await _client.from('debts').delete().eq('id', debtId);
+      
+      developer.log('✅ [Repo] Debt deleted successfully.', name: 'DebtRepository');
+      // Disparamos un evento para notificar a la UI
+      EventService.instance.fire(AppEvent.debtsChanged);
+    } catch (e, stackTrace) {
+      developer.log('🔥 [Repo] Error deleting debt: $e', name: 'DebtRepository', error: e, stackTrace: stackTrace);
+      throw Exception('No se pudo eliminar la deuda.');
+    }
+  }
+  
   /// Registra un pago o un cobro usando una RPC.
   Future<void> registerPayment({
     required String debtId,

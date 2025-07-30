@@ -9,9 +9,13 @@ import 'package:iconsax/iconsax.dart';
 import 'package:sasper/data/debt_repository.dart';
 import 'package:sasper/models/debt_model.dart';
 import 'package:sasper/screens/add_debt_screen.dart';
+import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/debts/debt_card.dart';
+import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:sasper/widgets/shared/empty_state_card.dart';
 import 'register_payment_screen.dart';
+import 'package:sasper/screens/edit_debt_screen.dart'; // NUEVO: Importamos la pantalla de edición
+import 'package:sasper/widgets/shared/custom_dialog.dart';
 
 class DebtsScreen extends StatefulWidget {
   // El constructor ahora es simple y constante. No recibe ningún parámetro.
@@ -103,6 +107,37 @@ class _DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderStat
     );
   }
 
+  // --- MÉTODOS PARA MANEJAR LAS ACCIONES ---
+
+  void _handleDebtAction(DebtCardAction action, Debt debt) {
+    switch (action) {
+      case DebtCardAction.registerPayment:
+        _navigateToRegisterPayment(debt);
+        break;
+      case DebtCardAction.edit:
+        _navigateToEdit(debt);
+        break;
+      case DebtCardAction.delete:
+        _handleDelete(debt);
+        break;
+    }
+  }
+
+
+  void _navigateToRegisterPayment(Debt debt) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => RegisterPaymentScreen(debt: debt)),
+    );
+  }
+
+  void _navigateToEdit(Debt debt) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => EditDebtScreen(debt: debt)),
+    );
+  }
+
   Widget _buildDebtsList(List<Debt> debts, {required bool isMyDebt}) {
     if (debts.isEmpty) {
       return _buildEmptyStateForTab(isMyDebt: isMyDebt);
@@ -122,21 +157,45 @@ class _DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderStat
               child: FadeInAnimation(
                 child: DebtCard(
                   debt: debt,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        // La pantalla de registro de pago ahora tampoco necesita repositorios.
-                        builder: (context) => RegisterPaymentScreen(debt: debt),
-                      ),
-                    );
-                  },
+                  // Conectamos el callback unificado al manejador de acciones.
+                  onActionSelected: (action) => _handleDebtAction(action, debt),
                 ),
               ),
             ),
           );
         },
       ),
+    );
+  }
+  
+  void _handleDelete(Debt debt) {
+    // Es una buena práctica pedir confirmación antes de una acción destructiva.
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return CustomDialog(
+          title: '¿Confirmar Eliminación?',
+          content: 'Estás a punto de eliminar "${debt.name}". Esta acción no se puede deshacer.',
+          confirmText: 'Sí, Eliminar',
+          onConfirm: () async {
+            try {
+              Navigator.of(dialogContext).pop(); // Cerrar el diálogo
+              await _repository.deleteDebt(debt.id);
+              if (!mounted) return;
+              NotificationHelper.show(
+                message: 'Deuda eliminada.',
+                type: NotificationType.success,
+              );
+            } catch (e) {
+              if (!mounted) return;
+              NotificationHelper.show(
+                message: e.toString().replaceFirst("Exception: ", ""),
+                type: NotificationType.error,
+              );
+            }
+          },
+        );
+      },
     );
   }
   
