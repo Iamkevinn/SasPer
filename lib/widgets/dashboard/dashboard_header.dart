@@ -7,12 +7,24 @@ class DashboardHeader extends StatelessWidget {
 
   const DashboardHeader({super.key, required this.userName});
 
-  // La lógica del saludo está perfecta, no necesita cambios.
   String _getGreeting() {
     final hour = DateTime.now().hour;
     if (hour < 12) return 'Buenos días';
-    if (hour < 19) return 'Buenas tardes'; // Ajustado a las 7 PM para ser más común
+    if (hour < 19) return 'Buenas tardes';
     return 'Buenas noches';
+  }
+
+  // --- CAMBIO CLAVE: Nuevo método para obtener solo el primer nombre ---
+  String _getFirstName(String fullName) {
+    // Si el nombre está vacío o solo son espacios, devolvemos un string vacío.
+    if (fullName.trim().isEmpty) {
+      return '';
+    }
+    // 1. Limpiamos los espacios de los extremos.
+    // 2. Dividimos el nombre por los espacios.
+    // 3. Tomamos el primer elemento de la lista resultante.
+    // El método .first es seguro aquí porque el chequeo anterior asegura que la lista no estará vacía.
+    return fullName.trim().split(' ').first;
   }
 
   @override
@@ -21,21 +33,23 @@ class DashboardHeader extends StatelessWidget {
     final textTheme = theme.textTheme;
     final colorScheme = theme.colorScheme;
     
+    // Obtenemos el primer nombre usando nuestro nuevo método.
+    final firstName = _getFirstName(userName);
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16), // Aumentamos el padding inferior
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             '${_getGreeting()},',
             style: textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w400, // Un peso un poco más ligero para el saludo
+                  fontWeight: FontWeight.w400,
                   color: colorScheme.onSurfaceVariant,
                 ),
           ),
-          const SizedBox(height: 4), // Un pequeño espaciador
+          const SizedBox(height: 4), 
           
-          // 1. ANIMATED SWITCHER para una transición suave al cargar el nombre
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 500),
             transitionBuilder: (Widget child, Animation<double> animation) {
@@ -45,14 +59,14 @@ class DashboardHeader extends StatelessWidget {
               );
             },
             child: Text(
-              // Usamos el nombre como Key para que el switcher detecte el cambio
-              key: ValueKey<String>(userName), 
-              userName,
-              maxLines: 1, // 2. Evita saltos de línea en nombres largos
-              overflow: TextOverflow.ellipsis, // Corta el nombre si es demasiado largo
+              // Usamos la variable 'firstName' en lugar de 'userName'
+              key: ValueKey<String>(firstName), 
+              firstName, // <-- ¡AQUÍ ESTÁ EL CAMBIO!
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.bold,
-                height: 1.2, // Ajusta la altura de línea para un mejor espaciado
+                height: 1.2,
               ),
             ),
           ),
