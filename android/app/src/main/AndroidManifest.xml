@@ -36,6 +36,17 @@
                     android:scheme="sasper"
                     android:host="add_transaction"/>
             </intent-filter>
+            <intent-filter>
+                <!-- Para reaccionar a la acción de "ver" un enlace -->
+                <action android:name="android.intent.action.VIEW" />
+                <!-- Categorías estándar para enlaces -->
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <!-- ¡Aquí está la magia! Le decimos que escuche nuestro esquema personalizado -->
+                <data
+                    android:scheme="sasper"
+                    android:host="login-callback" />
+            </intent-filter>
         </activity>
 
         <!-- =================================================================== -->

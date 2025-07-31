@@ -1,6 +1,7 @@
 // lib/data/auth_repository.dart
 
 import 'dart:async';
+import 'dart:developer' as developer;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AuthRepository {
@@ -27,6 +28,34 @@ class AuthRepository {
   /// Devuelve el usuario actualmente autenticado, o null si no hay ninguno.
   User? get currentUser => _client.auth.currentUser;
 
+  /// Registra un nuevo usuario con email y contraseña.
+  /// AHORA también acepta un nombre de usuario para pasarlo como metadato.
+  Future<void> signUp({
+    required String email,
+    required String password,
+    required String username,
+    String? fullName,
+  }) async {
+    try {
+      await _client.auth.signUp(
+        email: email,
+        password: password,
+        data: {
+          // Estos datos se guardan en 'raw_user_meta_data'
+          // y nuestra función SQL los usará para crear el perfil.
+          'username': username,
+          'full_name': fullName,
+        },
+      );
+    } on AuthException catch (e) {
+      developer.log('🔥 Error de registro: ${e.message}', name: 'AuthRepository');
+      throw Exception(e.message);
+    } catch (e) {
+      developer.log('🔥 Error inesperado en signUp: $e', name: 'AuthRepository');
+      throw Exception('Ocurrió un error inesperado.');
+    }
+  }
+  
   /// Inicia sesión con correo y contraseña.
   /// Lanza excepciones con mensajes claros para la UI en caso de error.
   Future<void> signInWithPassword(String email, String password) async {
@@ -41,23 +70,6 @@ class AuthRepository {
         throw 'Correo o contraseña incorrectos. Por favor, verifica tus datos.';
       }
       throw 'Error de autenticación: ${e.message}';
-    } catch (e) {
-      throw 'Ocurrió un error inesperado. Inténtalo de nuevo.';
-    }
-  }
-
-  /// Registra un nuevo usuario con correo y contraseña.
-  Future<void> signUp(String email, String password) async {
-     try {
-      await _client.auth.signUp(
-        email: email,
-        password: password,
-      );
-    } on AuthException catch (e) {
-      if (e.message.contains('User already registered')) {
-        throw 'Ya existe una cuenta con este correo electrónico.';
-      }
-      throw 'Error en el registro: ${e.message}';
     } catch (e) {
       throw 'Ocurrió un error inesperado. Inténtalo de nuevo.';
     }
