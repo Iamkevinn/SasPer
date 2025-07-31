@@ -114,8 +114,12 @@ class _CategoriesScreenState extends State<CategoriesScreen> with SingleTickerPr
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
+            print("DEBUG: StreamBuilder ha recibido un error: ${snapshot.error}");
             return Center(child: Text('Error: ${snapshot.error}'));
           }
+          if (snapshot.hasData) {
+          print("DEBUG: El tipo de dato en snapshot.data es: ${snapshot.data.runtimeType}");
+        }
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
             return const Center(child: EmptyStateCard(
                 title: 'Sin Categorías',

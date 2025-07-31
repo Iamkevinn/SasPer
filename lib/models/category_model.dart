@@ -1,3 +1,5 @@
+// lib/models/category_model.dart (CÓDIGO FINAL Y ROBUSTO)
+
 import 'package:flutter/material.dart';
 import 'package:equatable/equatable.dart';
 
@@ -26,15 +28,28 @@ class Category extends Equatable {
   List<Object?> get props => [id, name, icon, color, type];
 
   factory Category.fromMap(Map<String, dynamic> map) {
+    print('--- Parseando categoría: "${map['name']}" ---');
+    print('Datos recibidos del mapa: $map');
     IconData? parsedIcon;
-    if (map['icon_name'] != null) {
-      // Esta lógica convierte los datos del icono de Supabase a un IconData
-      parsedIcon = IconData(
-        int.parse(map['icon_name']), // El código del icono
-        fontFamily: map['icon_font_family'],
-        fontPackage: map['icon_font_package'],
-      );
-    }
+    if (map['icon_name'] != null && map['icon_name'].toString().isNotEmpty) {
+      try {
+        // =================================================================
+        //                       LA LÍNEA CORREGIDA
+        // .toString() convierte el dato a String sin importar si es int o String,
+        // permitiendo que int.parse() siempre funcione.
+        // =================================================================
+        parsedIcon = IconData(
+          int.parse(map['icon_name'].toString()), // <-- ESTA ES LA MAGIA
+          fontFamily: map['icon_font_family'],
+          fontPackage: map['icon_font_package'],
+        );
+        print('>>> ÉXITO: Icono parseado para "${map['name']}" es: $parsedIcon');
+      } catch (e) {
+        print('Error al parsear el icono para "${map['name']}": $e');
+      }
+    }else {
+    print('No se encontró icon_name para "${map['name']}", se asignará null.');
+  }
     
     return Category(
       id: map['id'],
@@ -47,7 +62,7 @@ class Category extends Equatable {
     );
   }
 
-  // Método para convertir de vuelta a un mapa para Supabase
+  // El método toMap no necesita cambios, ya está bien.
   Map<String, dynamic> toMap() {
     return {
       'name': name,
@@ -56,7 +71,6 @@ class Category extends Equatable {
       'icon_name': icon?.codePoint.toString(),
       'icon_font_family': icon?.fontFamily,
       'icon_font_package': icon?.fontPackage,
-      // user_id se establece en el repositorio
     };
   }
 }

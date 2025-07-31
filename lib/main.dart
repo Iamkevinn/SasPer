@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -5,14 +6,57 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:sasper/screens/SplashScreen.dart';
 import 'package:provider/provider.dart';
 import 'package:sasper/services/theme_provider.dart';
+import 'package:line_awesome_flutter/line_awesome_flutter.dart'; // ¡Asegúrate de importar el paquete!
+
+// =================================================================
+//                 SOLUCIÓN DEFINITIVA PARA TREE SHAKING
+//
+// Esta lista estática y sin usar se coloca aquí para asegurar que el compilador
+// de Flutter vea estas referencias a iconos durante el análisis y los conserve
+// en la compilación final de la app.
+// =================================================================
+final List<IconData> _usedIconsForTreeShaking = [
+  // Iconos de Gastos
+  LineAwesomeIcons.utensils,      // Comida
+  LineAwesomeIcons.bus,           // Transporte
+  LineAwesomeIcons.gamepad,       // Ocio
+  LineAwesomeIcons.home,          // Hogar
+  LineAwesomeIcons.shopping_cart, // Compras
+  LineAwesomeIcons.plug,          // Servicios
+  LineAwesomeIcons.heart,         // Salud
+  LineAwesomeIcons.grip_horizontal, // Otro (Gasto)
+
+  // Iconos de Ingresos
+  LineAwesomeIcons.money_bill, // Sueldo
+  LineAwesomeIcons.line_chart,      // Inversión
+  LineAwesomeIcons.briefcase,       // Freelance
+  LineAwesomeIcons.gift,            // Regalo
+  // 'Otro' (Ingreso) usa grip_horizontal, que ya está incluido.
+];
 
 // La GlobalKey sigue siendo una buena práctica.
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
+
+  print("--- CÓDIGOS PARA ICONOS DE GASTOS ---");
+  print('El código para "Comida" (utensils) es: ${LineAwesomeIcons.utensils.codePoint}');
+  print('El código para "Transporte" (bus) es: ${LineAwesomeIcons.bus.codePoint}');
+  print('El código para "Ocio" (gamepad) es: ${LineAwesomeIcons.gamepad.codePoint}');
+  print('El código para "Hogar" (home) es: ${LineAwesomeIcons.home.codePoint}');
+  print('El código para "Compras" (shopping_cart) es: ${LineAwesomeIcons.shopping_cart.codePoint}');
+  print('El código para "Servicios" (plug) es: ${LineAwesomeIcons.plug.codePoint}');
+  print('El código para "Salud" (heartbeat) es: ${LineAwesomeIcons.heartbeat.codePoint}');
+  print('El código para "Otro (Gasto)" (dot_circle) es: ${LineAwesomeIcons.dot_circle.codePoint}');
+  print('El código para "Sueldo" (money_bill_wave) es: ${LineAwesomeIcons.money_bill.codePoint}');
+  print('El código para "Inversión" (line_chart) es: ${LineAwesomeIcons.line_chart.codePoint}');
+  print('El código para "Freelance" (briefcase) es: ${LineAwesomeIcons.briefcase.codePoint}');
+  print('El código para "Regalo" (gift) es: ${LineAwesomeIcons.gift.codePoint}');
+  print('El código para "Otro (Ingreso)" (question_circle) es: ${LineAwesomeIcons.question_circle.codePoint}');
+  
   // 1. Asegura que los bindings de Flutter estén listos.
   WidgetsFlutterBinding.ensureInitialized();
-  
+  print('Forzando la inclusión de ${_usedIconsForTreeShaking.length} iconos predeterminados.');
   // 2. Inicializa la localización de fechas (es muy rápido).
   await initializeDateFormatting('es_CO', null);
   

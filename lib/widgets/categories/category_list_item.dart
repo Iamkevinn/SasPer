@@ -1,7 +1,7 @@
-// lib/widgets/categories/category_list_item.dart
+// Dentro de lib/widgets/categories/category_list_item.dart
 
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:line_awesome_flutter/line_awesome_flutter.dart'; // Asegúrate de importar esto
 import 'package:sasper/models/category_model.dart';
 
 class CategoryListItem extends StatelessWidget {
@@ -10,29 +10,43 @@ class CategoryListItem extends StatelessWidget {
   final VoidCallback onDelete;
 
   const CategoryListItem({
-    super.key,
+    Key? key,
     required this.category,
     required this.onEdit,
     required this.onDelete,
-  });
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      color: Theme.of(context).colorScheme.surfaceContainer.withOpacity(0.5),
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: ListTile(
-        onTap: onEdit,
-        leading: CircleAvatar(
-          backgroundColor: category.color.withOpacity(0.2),
-          child: Icon(category.icon ?? Iconsax.category, color: category.color),
-        ),
-        title: Text(category.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-        trailing: IconButton(
-          icon: Icon(Iconsax.trash, color: Theme.of(context).colorScheme.error),
-          onPressed: onDelete,
-        ),
+    // =================================================================
+    //                       DIAGNÓSTICO FINAL
+    // =================================================================
+    print('Construyendo item para "${category.name}". El objeto IconData es: ${category.icon}');
+    print(LineAwesomeIcons.utensils.codePoint);
+    // =================================================================
+
+    return ListTile(
+      leading: CircleAvatar(
+        backgroundColor: category.color,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Icono real desde la base de datos
+            if (category.icon != null)
+              Icon(category.icon, color: Colors.white, size: 20),
+
+            // Icono de prueba FIJO para comparar
+            // Icon(LineAwesomeIcons.pizza_slice, color: Colors.yellow, size: 10), 
+          ],
+        )
+      ),
+      title: Text(category.name),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(icon: Icon(Icons.edit), onPressed: onEdit),
+          IconButton(icon: Icon(Icons.delete), onPressed: onDelete),
+        ],
       ),
     );
   }

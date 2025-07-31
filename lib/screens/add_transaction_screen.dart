@@ -10,6 +10,8 @@ import 'package:sasper/data/transaction_repository.dart';
 import 'package:sasper/data/budget_repository.dart'; // Importamos para la lógica de presupuestos
 import 'package:sasper/models/account_model.dart';
 import 'package:sasper/models/budget_models.dart';
+import 'package:sasper/data/category_repository.dart';
+import 'package:sasper/models/category_model.dart';
 import 'package:sasper/services/event_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
@@ -29,23 +31,21 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   final TransactionRepository _transactionRepository = TransactionRepository.instance;
   final AccountRepository _accountRepository = AccountRepository.instance;
   final BudgetRepository _budgetRepository = BudgetRepository.instance;
+  final CategoryRepository _categoryRepository = CategoryRepository.instance;
 
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
   final _descriptionController = TextEditingController();
   
   String _transactionType = 'Gasto';
-  String? _selectedCategory;
+  Category? _selectedCategory;
   bool _isLoading = false;
   String? _selectedAccountId;
   int? _selectedBudgetId;
   
   late Future<List<Account>> _accountsFuture;
   late Future<List<BudgetProgress>> _budgetsFuture;
-
-  final Map<String, IconData> _expenseCategories = { 'Comida': Iconsax.cup, 'Transporte': Iconsax.bus, 'Ocio': Iconsax.gameboy, 'Salud': Iconsax.health, 'Hogar': Iconsax.home, 'Compras': Iconsax.shopping_bag, 'Servicios': Iconsax.flash_1, 'Otro': Iconsax.category };
-  final Map<String, IconData> _incomeCategories = { 'Sueldo': Iconsax.money_recive, 'Inversión': Iconsax.chart, 'Freelance': Iconsax.briefcase, 'Regalo': Iconsax.gift, 'Otro': Iconsax.category_2 };
-  Map<String, IconData> get _currentCategories => _transactionType == 'Gasto' ? _expenseCategories : _incomeCategories;
+  late Future<List<Category>> _categoriesFuture;
 
   @override
   void initState() {
@@ -53,6 +53,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     _accountsFuture = _accountRepository.getAccounts();
     // Cargamos los presupuestos del mes actual para poder vincularlos.
     _budgetsFuture = _budgetRepository.getBudgetsForCurrentMonth();
+    _categoriesFuture = _categoryRepository.getCategories();
   }
 
   @override
@@ -62,26 +63,21 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     super.dispose();
   }
 
-  void _onCategorySelected(String categoryName, List<BudgetProgress> budgets) {
+  void _onCategorySelected(Category category, List<BudgetProgress> budgets) {
     setState(() {
-      _selectedCategory = categoryName;
+      _selectedCategory = category;
       try {
-        final foundBudget = budgets.firstWhere((b) => b.category == categoryName);
+        final foundBudget = budgets.firstWhere((b) => b.category == category.name);
         _selectedBudgetId = foundBudget.budgetId;
-        developer.log('✅ Presupuesto encontrado para "$categoryName". ID: $_selectedBudgetId', name: 'AddTransactionScreen');
       } catch (e) {
         _selectedBudgetId = null;
-        developer.log('ℹ️ No hay presupuesto activo para "$categoryName".', name: 'AddTransactionScreen');
       }
     });
   }
 
   Future<void> _saveTransaction() async {
     if (!_formKey.currentState!.validate() || _selectedCategory == null || _selectedAccountId == null) {
-      NotificationHelper.show(
-            message: 'Porfavor rellena todos los campos!',
-            type: NotificationType.error,
-          );
+      NotificationHelper.show(message: 'Por favor rellena todos los campos!', type: NotificationType.error);
       return;
     }
     
@@ -99,7 +95,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         accountId: _selectedAccountId!,
         amount: amount,
         type: _transactionType,
-        category: _selectedCategory!,
+        category: _selectedCategory!.name, 
         description: _descriptionController.text.trim(),
         transactionDate: DateTime.now(),
         budgetId: _selectedBudgetId,
@@ -108,7 +104,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       if (mounted) {
         final userId = Supabase.instance.client.auth.currentUser?.id;
         if (_transactionType == 'Gasto' && userId != null && _selectedCategory != null) {
-            _checkBudgetOnBackend(userId: userId, categoryName: _selectedCategory!);
+            _checkBudgetOnBackend(userId: userId, categoryName: _selectedCategory!.name);
         }
 
         EventService.instance.fire(AppEvent.transactionCreated);
@@ -225,34 +221,60 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               Text('Categorías', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               
-              FutureBuilder<List<BudgetProgress>>(
-                future: _budgetsFuture,
-                builder: (context, snapshot) {
-                  final budgets = snapshot.data ?? [];
-                  return Wrap(
-                    spacing: 8.0,
-                    runSpacing: 8.0,
-                    children: _currentCategories.entries.map((entry) {
-                      return FilterChip(
-                        label: Text(entry.key, style: GoogleFonts.poppins()),
-                        avatar: Icon(entry.value, color: _selectedCategory == entry.key ? colorScheme.onSecondaryContainer : colorScheme.onSurfaceVariant),
-                        selected: _selectedCategory == entry.key,
-                        onSelected: (selected) {
-                           if (selected) {
-                             _onCategorySelected(entry.key, budgets);
-                           } else {
-                             setState(() {
-                               _selectedCategory = null;
-                               _selectedBudgetId = null;
-                             });
-                           }
-                        },
-                        selectedColor: colorScheme.secondaryContainer,
-                        checkmarkColor: colorScheme.onSecondaryContainer,
+              FutureBuilder<List<Category>>(
+                future: _categoriesFuture,
+                builder: (context, categorySnapshot) {
+                  if (categorySnapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: Padding(padding: EdgeInsets.all(8.0), child: CircularProgressIndicator()));
+                  }
+                  if (categorySnapshot.hasError) {
+                    return const Text('Error al cargar categorías.');
+                  }
+                  if (!categorySnapshot.hasData || categorySnapshot.data!.isEmpty) {
+                    return const Text('No tienes categorías. Créalas en Ajustes.');
+                  }
+                  // Filtramos las categorías del usuario según el tipo de transacción
+                  final allUserCategories = categorySnapshot.data!;
+                  // Filtramos las categorías del usuario según el tipo de transacción
+                  final expectedTypeName = _transactionType == 'Gasto' ? 'expense' : 'income';
+                  final currentCategories = allUserCategories
+                      .where((c) => c.type.name == expectedTypeName)
+                      .toList();
+
+                  // Usamos otro FutureBuilder anidado para los presupuestos
+                  return FutureBuilder<List<BudgetProgress>>(
+                    future: _budgetsFuture,
+                    builder: (context, budgetSnapshot) {
+                      final budgets = budgetSnapshot.data ?? [];
+                      return Wrap(
+                        spacing: 8.0,
+                        runSpacing: 8.0,
+                        children: currentCategories.map((category) {
+                          return FilterChip(
+                            label: Text(category.name, style: GoogleFonts.poppins()),
+                            avatar: Icon(
+                              category.icon ?? Iconsax.category, // Usamos el icono del objeto
+                              color: _selectedCategory == category ? Theme.of(context).colorScheme.onSecondaryContainer : category.color,
+                            ),
+                            selected: _selectedCategory == category,
+                            onSelected: (selected) {
+                              if (selected) {
+                                _onCategorySelected(category, budgets);
+                              } else {
+                                setState(() {
+                                  _selectedCategory = null;
+                                  _selectedBudgetId = null;
+                                });
+                              }
+                            },
+                            selectedColor: Theme.of(context).colorScheme.secondaryContainer,
+                            checkmarkColor: Theme.of(context).colorScheme.onSecondaryContainer,
+                          );
+                        }).toList(),
                       );
-                    }).toList(),
+                    },
                   );
-                }
+                },
               ),
               const SizedBox(height: 24),
               
