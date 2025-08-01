@@ -5,4 +5,6 @@
     <color name="widget_text_color">#1D1D1F</color>
     <color name="widget_button_background_color">#007AFF</color>
     <color name="widget_button_icon_color">#FFFFFF</color>
+    <color name="widget_positive_color">#388E3C</color> <!-- Verde -->
+    <color name="widget_negative_color">#D32F2F</color> <!-- Rojo -->
 </resources>
