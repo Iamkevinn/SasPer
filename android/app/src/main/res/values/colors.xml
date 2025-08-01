@@ -1,4 +1,8 @@
-<!-- android/app/src/main/res/values/colors.xml (CORREGIDO) -->
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="widget_fallback_background">#EFEFEF</color>
-</resources> <!-- Se corrigió '}' por '</resources>' -->
+    <!-- Colores de respaldo para MODO CLARO en Android < 12 -->
+    <color name="widget_background_color">#F1F1F1</color>
+    <color name="widget_text_color">#1D1D1F</color>
+    <color name="widget_button_background_color">#007AFF</color>
+    <color name="widget_button_icon_color">#FFFFFF</color>
+</resources>

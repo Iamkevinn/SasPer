@@ -1,52 +1,46 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 1. Eliminamos el android:theme de aquí -->
 <RelativeLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root_linear_layout"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="?attr/colorSurface"
+    android:padding="16dp"
+    android:theme="@style/Theme.AppWidget"
+    >
 
-    <!-- 2. Damos un ID a este LinearLayout para poder colorearlo desde Kotlin -->
     <LinearLayout
-        android:id="@+id/widget_root_linear_layout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:padding="16dp"
-        android:background="@drawable/widget_background" > <!-- 3. Usamos un fondo base simple -->
-
+        android:gravity="center_vertical">
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:orientation="vertical">
-
-            <!-- 4. Quitamos los colores de tema de los textos -->
             <TextView
                 android:id="@+id/widget_title"
+                style="@style/Widget.Text.Title"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Saldo Total"
-                android:textSize="14sp"
-                android:layout_marginBottom="4dp"/>
-
+                android:text="Saldo Total" />
             <TextView
                 android:id="@+id/widget_balance"
+                style="@style/Widget.Text.Balance"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="$0.00"
-                android:textSize="28sp"
-                android:textStyle="bold" />
+                android:text="$0.00" />
         </LinearLayout>
-
-        <!-- 5. Quitamos el tinte del botón, lo pondremos desde Kotlin -->
         <ImageButton
             android:id="@+id/widget_button"
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:layout_marginStart="16dp"
             android:background="@drawable/widget_button_background"
+            android:backgroundTint="?attr/colorPrimary"
             android:src="@drawable/ic_add"
+            android:tint="?attr/colorOnPrimary"
             android:contentDescription="Añadir Transacción"/>
     </LinearLayout>
 </RelativeLayout>

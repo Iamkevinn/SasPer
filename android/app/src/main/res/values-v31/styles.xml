@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 
+      Tema de Widget para Android 12+ (Material You).
+      Hereda de un tema DayNight para respetar el modo del sistema,
+      luego anula los atributos con los colores dinámicos de Material You.
+    -->
+    <style name="Theme.AppWidget" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Colores dinámicos del sistema -->
+        <item name="colorSurface">@android:color/system_neutral1_100</item>
+        <item name="colorOnSurface">@android:color/system_neutral1_900</item>
+        <item name="colorPrimary">@android:color/system_accent1_600</item>
+        <item name="colorOnPrimary">@android:color/system_neutral1_50</item>
+
+        <!-- 
+          Definimos aquí también nuestros colores personalizados, usando la paleta dinámica.
+          accent2 y accent3 suelen ser verde y rojo/naranja respectivamente.
+        -->
+        <item name="positiveColor">@android:color/system_accent2_600</item>
+        <item name="negativeColor">@android:color/system_accent3_400</item>
+    </style>
+</resources>

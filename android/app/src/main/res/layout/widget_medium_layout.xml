@@ -4,40 +4,40 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@drawable/widget_background"
-    android:padding="16dp">
+    android:background="?attr/colorSurface"
+    android:padding="16dp"
+    android:theme="@style/Theme.AppWidget"
+    >
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal">
-
-        <!-- Quitamos todo el estilo, solo dejamos el ID y el texto -->
         <TextView
             android:id="@+id/widget_medium_title"
+            style="@style/Widget.Text.Title"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Saldo Total" />
-
         <ImageButton
             android:id="@+id/widget_medium_add_button"
             android:layout_width="40dp"
             android:layout_height="40dp"
             android:background="@drawable/widget_button_background"
+            android:backgroundTint="?attr/colorPrimary"
             android:src="@drawable/ic_add"
+            android:tint="?attr/colorOnPrimary"
             android:importantForAccessibility="no" />
     </LinearLayout>
-
-    <!-- Quitamos todo el estilo, solo dejamos el ID y el texto -->
     <TextView
         android:id="@+id/widget_medium_balance"
+        style="@style/Widget.Text.Balance"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
         android:text="0,00" />
-    
     <ImageView
         android:id="@+id/widget_medium_chart"
         android:layout_width="match_parent"

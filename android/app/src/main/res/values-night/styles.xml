@@ -1,18 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Theme applied to the Android Window while the process is starting when the OS's Dark Mode setting is on -->
+    <!-- Tema de Lanzamiento para Modo Oscuro -->
     <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
-        <!-- Show a splash screen on the activity. Automatically removed when
-             the Flutter engine draws its first frame -->
         <item name="android:windowBackground">@drawable/launch_background</item>
     </style>
-    <!-- Theme applied to the Android Window as soon as the process has started.
-         This theme determines the color of the Android Window while your
-         Flutter UI initializes, as well as behind your Flutter UI while its
-         running.
-
-         This Theme is only used starting with V2 of Flutter's Android embedding. -->
+    
+    <!-- Tema Normal para Modo Oscuro -->
     <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
         <item name="android:windowBackground">?android:colorBackground</item>
     </style>
+
+    <!-- TEMA BASE PARA WIDGETS (VERSIÓN OSCURA) -->
+    <style name="Theme.AppWidget.Base" parent="Theme.Material3.Dark.NoActionBar">
+        <!-- Colores de respaldo que se tomarán de 'values-night/colors.xml' -->
+        <item name="colorSurface">@color/widget_background_color</item>
+        <item name="colorOnSurface">@color/widget_text_color</item>
+        <item name="colorPrimary">@color/widget_button_background_color</item>
+        <item name="colorOnPrimary">@color/widget_button_icon_color</item>
+        
+        <!-- Colores personalizados para modo oscuro (más brillantes) -->
+        <item name="positiveColor">#81C784</item> <!-- Verde claro -->
+        <item name="negativeColor">#E57373</item> <!-- Rojo claro -->
+    </style>
+    
+    <!-- TEMA FINAL PARA WIDGETS QUE HEREDA DEL BASE -->
+    <style name="Theme.AppWidget" parent="Theme.AppWidget.Base" />
 </resources>

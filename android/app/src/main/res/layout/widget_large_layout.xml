@@ -4,10 +4,10 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@drawable/widget_background"
-    android:padding="16dp">
-
-    <!-- Encabezado -->
+    android:background="?attr/colorSurface"
+    android:padding="16dp"
+    android:theme="@style/Theme.AppWidget"
+    >
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -15,41 +15,37 @@
         android:gravity="center_vertical">
         <TextView
             android:id="@+id/widget_large_title"
+            style="@style/Widget.Text.Title"
+            android:textSize="18sp"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Tu Resumen"
-            android:textColor="?android:attr/textColorPrimary"
-            android:textSize="18sp"
-            android:textStyle="bold"/>
-
+            android:text="Tu Resumen"/>
         <ImageButton
             android:id="@+id/widget_large_add_button"
             android:layout_width="40dp"
             android:layout_height="40dp"
             android:src="@drawable/ic_add"
             android:background="@drawable/widget_button_background"
+            android:backgroundTint="?attr/colorPrimary"
+            android:tint="?attr/colorOnPrimary"
             android:contentDescription="Añadir Transacción" />
     </LinearLayout>
-
-    <!-- Presupuestos -->
     <TextView
+        android:id="@+id/widget_large_budgets_title"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="PRESUPUESTOS"
         android:textColor="?android:attr/textColorSecondary"
         android:textSize="12sp"
         android:textStyle="bold"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="12dp"
         android:layout_marginBottom="2dp"/>
-    
     <LinearLayout
         android:id="@+id/widget_large_budgets_list"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical">
-
-        <!-- Slot 1 para Presupuesto -->
         <LinearLayout
             android:id="@+id/budget_item_1"
             android:layout_width="match_parent"
@@ -59,21 +55,19 @@
             android:visibility="gone">
             <TextView
                 android:id="@+id/budget_item_1_title"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="14sp"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Presupuesto 1"
-                android:textColor="?android:attr/textColorPrimary"
-                android:textSize="14sp" />
+                android:text="Presupuesto 1" />
             <ProgressBar
                 android:id="@+id/budget_item_1_progress"
                 style="?android:attr/progressBarStyleHorizontal"
                 android:layout_width="match_parent"
                 android:layout_height="6dp"
                 android:layout_marginTop="4dp"
-                android:progressDrawable="@drawable/widget_progress_bar" />
+                android:progressTint="?attr/colorPrimary"/>
         </LinearLayout>
-
-        <!-- Slot 2 para Presupuesto -->
         <LinearLayout
             android:id="@+id/budget_item_2"
             android:layout_width="match_parent"
@@ -83,39 +77,35 @@
             android:visibility="gone">
             <TextView
                 android:id="@+id/budget_item_2_title"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="14sp"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Presupuesto 2"
-                android:textColor="?android:attr/textColorPrimary"
-                android:textSize="14sp" />
+                android:text="Presupuesto 2" />
             <ProgressBar
                 android:id="@+id/budget_item_2_progress"
                 style="?android:attr/progressBarStyleHorizontal"
                 android:layout_width="match_parent"
                 android:layout_height="6dp"
                 android:layout_marginTop="4dp"
-                android:progressDrawable="@drawable/widget_progress_bar" />
+                android:progressTint="?attr/colorPrimary"/>
         </LinearLayout>
     </LinearLayout>
-
-    <!-- Transacciones -->
     <TextView
+        android:id="@+id/widget_large_transactions_title"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="ÚLTIMOS MOVIMIENTOS"
         android:textColor="?android:attr/textColorSecondary"
         android:textSize="12sp"
         android:textStyle="bold"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="12dp"
         android:layout_marginBottom="2dp"/>
-    
     <LinearLayout
         android:id="@+id/widget_large_transactions_list"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical">
-
-        <!-- Slot 1 para Transacción -->
         <LinearLayout
             android:id="@+id/transaction_item_1"
             android:layout_width="match_parent"
@@ -126,21 +116,18 @@
             android:visibility="gone">
             <TextView
                 android:id="@+id/transaction_item_1_title"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="14sp"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:textColor="?android:attr/textColorPrimary"
-                android:textSize="14sp" />
+                android:layout_weight="1" />
             <TextView
                 android:id="@+id/transaction_item_1_amount"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textColor="?android:attr/textColorSecondary"
                 android:textSize="14sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
         </LinearLayout>
-
-        <!-- Slot 2 para Transacción -->
         <LinearLayout
             android:id="@+id/transaction_item_2"
             android:layout_width="match_parent"
@@ -151,21 +138,18 @@
             android:visibility="gone">
             <TextView
                 android:id="@+id/transaction_item_2_title"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="14sp"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:textColor="?android:attr/textColorPrimary"
-                android:textSize="14sp" />
+                android:layout_weight="1" />
             <TextView
                 android:id="@+id/transaction_item_2_amount"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textColor="?android:attr/textColorSecondary"
                 android:textSize="14sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
         </LinearLayout>
-        
-        <!-- Slot 3 para Transacción -->
         <LinearLayout
             android:id="@+id/transaction_item_3"
             android:layout_width="match_parent"
@@ -176,18 +160,17 @@
             android:visibility="gone">
             <TextView
                 android:id="@+id/transaction_item_3_title"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="14sp"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:textColor="?android:attr/textColorPrimary"
-                android:textSize="14sp" />
+                android:layout_weight="1" />
             <TextView
                 android:id="@+id/transaction_item_3_amount"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textColor="?android:attr/textColorSecondary"
                 android:textSize="14sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>

@@ -6,6 +6,6 @@
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen"
     android:targetCellWidth="3"
-    android:targetCellHeight="1"
-    android:theme="@style/Theme.Material3.Widget.AppWidget"
+    android:targetCellHeight="1"     
+    android:theme="@style/Theme.AppWidget"
     android:previewImage="@drawable/home_widget" />

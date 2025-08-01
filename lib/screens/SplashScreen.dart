@@ -31,6 +31,7 @@ class _SplashScreenState extends State<SplashScreen> {
     super.initState();
     // Inicia el proceso de carga y navegación cuando la pantalla se construye
     _initializeAppAndNavigate();
+    WidgetService.listenToDashboardChanges();
   }
 
   Future<void> _initializeAppAndNavigate() async {
