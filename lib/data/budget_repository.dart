@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'dart:developer' as developer;
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sasper/models/budget_models.dart';
 
@@ -88,6 +89,17 @@ class BudgetRepository {
       if (userId == null) throw Exception("User not authenticated");
       
       final response = await _client.rpc('get_budgets_progress_for_user', params: {'p_user_id': userId});
+      // ===== ¡LÍNEA DE DEPURACIÓN CLAVE! =====
+      // Esto nos mostrará los nombres de las claves tal como llegan de Supabase.
+      if (response is List && response.isNotEmpty) {
+        if (kDebugMode) {
+          print('===== VERDAD ABSOLUTA DE SUPABASE =====');
+          print('Datos crudos del primer presupuesto: ${response.first}');
+          print('=======================================');
+        }
+
+      }
+      // ===========================================
       final budgetsProgress = (response as List)
           .map((data) => BudgetProgress.fromMap(data))
           .toList();

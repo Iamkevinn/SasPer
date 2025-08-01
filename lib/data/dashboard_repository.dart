@@ -2,6 +2,10 @@
 
 import 'dart:async';
 import 'dart:developer' as developer;
+import 'package:sasper/models/analysis_models.dart';
+import 'package:sasper/models/budget_models.dart';
+import 'package:sasper/models/goal_model.dart';
+import 'package:sasper/models/transaction_models.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sasper/models/dashboard_data_model.dart';
 
@@ -122,18 +126,52 @@ class DashboardRepository {
         return null;
       }
 
+      // 1. Ejecutamos las 3 llamadas en paralelo.
       final results = await Future.wait([
         _client.rpc('get_dashboard_balance', params: {'p_user_id': userId}),
         _client.rpc('get_dashboard_details', params: {'p_user_id': userId}),
+        _client.rpc('get_budgets_progress_for_user', params: {'p_user_id': userId}),
       ]);
 
-      final dashboardData = DashboardData.fromPartialMap(results[0])
-                                       .copyWithDetails(results[1]);
+      // 2. Extraemos los resultados de forma segura.
+      final balanceMap = results[0] as Map<String, dynamic>? ?? {};
+      final detailsMap = results[1] as Map<String, dynamic>? ?? {};
+      final budgetsData = results[2] as List<dynamic>? ?? [];
       
-      developer.log('✅ [Repo-Widget] Fetched single snapshot successfully.', name: 'DashboardRepository');
+      // 3. Parseamos cada lista de datos que necesitamos.
+      final List<Transaction> recentTransactions = (detailsMap['recent_transactions'] as List<dynamic>? ?? [])
+          .map((data) => Transaction.fromMap(data as Map<String, dynamic>))
+          .toList();
+      
+      final List<BudgetProgress> budgetsList = budgetsData
+          .map((data) => BudgetProgress.fromMap(data as Map<String, dynamic>))
+          .toList();
+
+      // NOTA: Asumimos que `get_dashboard_details` no devuelve metas o resúmenes de gastos.
+      // Si lo hace, necesitaríamos parsearlos aquí también.
+      final List<Goal> goalsList = []; 
+      final List<ExpenseByCategory> expenseSummary = [];
+
+      // ====> LA SOLUCIÓN FINAL Y DIRECTA <====
+      // 4. Creamos la instancia de DashboardData directamente con el constructor,
+      //    pasando todos los datos que hemos recopilado y parseado.
+      final dashboardData = DashboardData(
+        totalBalance: (balanceMap['total_balance'] as num? ?? 0).toDouble(),
+        // Asumo que 'full_name' viene en `detailsMap`. Si no, puedes poner un valor por defecto.
+        fullName: detailsMap['full_name'] as String? ?? 'Usuario', 
+        recentTransactions: recentTransactions,
+        budgetsProgress: budgetsList, // Se pasa la misma lista a ambas propiedades
+        featuredBudgets: budgetsList,
+        goals: goalsList, // Se pasa la lista vacía que creamos
+        expenseSummaryForWidget: expenseSummary, // Se pasa la lista vacía que creamos
+        isLoading: false,
+      );
+      
+      developer.log('✅ [Repo-Widget] Fetched single snapshot successfully. Budgets found: ${dashboardData.featuredBudgets.length}', name: 'DashboardRepository');
       return dashboardData;
-    } catch (e) {
-      developer.log('🔥 [Repo-Widget] Error fetching widget data: $e', name: 'DashboardRepository');
+      
+    } catch (e, stackTrace) {
+      developer.log('🔥 [Repo-Widget] Error fetching widget data: $e', name: 'DashboardRepository', stackTrace: stackTrace);
       return null;
     }
   }

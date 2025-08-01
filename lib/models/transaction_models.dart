@@ -1,26 +1,21 @@
-
-// lib/models/transaction_models.dart (VERSIÓN FINAL CORREGIDA)
+// lib/models/transaction_models.dart (VERSIÓN FINAL LIMPIA)
 
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 
 class Transaction extends Equatable {
-  final int id; // ID de la transacción, es un bigint -> int
+  final int id;
   final String userId;
-  final String? accountId; // UUID -> String
+  final String? accountId;
   final String type;
   final String? category;
   final String? description;
   final double amount;
   final DateTime transactionDate;
-  
-  // --- CORRECCIÓN CRÍTICA DE TIPOS DE DATOS ---
-  // Las claves foráneas a otras tablas (goals, debts, transfers)
-  // son de tipo UUID en la base de datos, por lo tanto, deben ser String? en Dart.
-  final int? budgetId; // Este es bigint -> int?, estaba correcto.
-  final String? debtId; // UUID -> String?
-  final String? goalId; // UUID -> String?
-  final String? transferId; // UUID -> String?
+  final int? budgetId;
+  final String? debtId;
+  final String? goalId;
+  final String? transferId;
 
   const Transaction({
     required this.id,
@@ -38,11 +33,11 @@ class Transaction extends Equatable {
   });
 
   Map<String, dynamic> toJson() => {
-     'description': description,
-     'amount': amount,
-     'type': type,
-     'category': category,
-   };
+        'description': description,
+        'amount': amount,
+        'type': type,
+        'category': category,
+      };
 
   factory Transaction.fromMap(Map<String, dynamic> map) {
     try {
@@ -55,13 +50,10 @@ class Transaction extends Equatable {
         description: map['description'] as String?,
         amount: (map['amount'] as num? ?? 0.0).toDouble(),
         transactionDate: DateTime.parse(map['transaction_date'] as String),
-
-        // --- CORRECCIÓN DE CASTEO ---
-        // Ahora casteamos a los tipos correctos.
-        budgetId: map['budget_id'] as int?, // Correcto
-        debtId: map['debt_id'] as String?, // Corregido a String?
-        goalId: map['goal_id'] as String?, // Corregido a String?
-        transferId: map['transfer_id'] as String?, // Corregido a String?
+        budgetId: map['budget_id'] as int?,
+        debtId: map['debt_id'] as String?,
+        goalId: map['goal_id'] as String?,
+        transferId: map['transfer_id'] as String?,
       );
     } catch (e, stackTrace) {
       if (kDebugMode) {

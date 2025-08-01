@@ -17,7 +17,9 @@ import 'package:sasper/config/app_config.dart';
 import 'package:sasper/data/analysis_repository.dart';
 import 'package:sasper/data/dashboard_repository.dart';
 import 'package:sasper/models/analysis_models.dart';
+import 'package:sasper/models/budget_models.dart';
 import 'package:sasper/models/dashboard_data_model.dart';
+import 'package:sasper/models/transaction_models.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 // Constante para el nombre del log
@@ -107,7 +109,7 @@ class WidgetService {
       if (dashboardData != null) {
         developer.log('✅ [WidgetService] ¡Nuevos datos recibidos del stream! Actualizando widgets...', name: _logName);
         // Llamamos a la función que ya teníamos.
-        updateAllWidgetData(data: dashboardData);
+        updateAllWidgetData();
       }
     }, onError: (e) {
         developer.log('🔥 [WidgetService] Error en el stream del dashboard: $e', name: _logName);
@@ -123,27 +125,60 @@ class WidgetService {
   }
   // =======================
 
-  static Future<void> updateAllWidgetData({required DashboardData data}) async {
+  static Future<void> updateAllWidgetData({DashboardData? data}) async {
     developer.log('[Service] 7. Guardando datos para todos los widgets...', name: _logName);
     try {
+      // ====> LA NUEVA LÓGICA DIRECTA <====
+
+      // 1. Obtenemos el cliente de Supabase.
+      final client = Supabase.instance.client;
+      final userId = client.auth.currentUser?.id;
+
+      if (userId == null) {
+        developer.log('⚠️ [Service] No hay usuario para actualizar el widget. Abortando.', name: _logName);
+        return;
+      }
+
+      // 2. Ejecutamos las llamadas RPC directamente desde aquí.
+      final results = await Future.wait([
+        client.rpc('get_dashboard_balance', params: {'p_user_id': userId}),
+        client.rpc('get_budgets_progress_for_user', params: {'p_user_id': userId}),
+        client.rpc('get_dashboard_details', params: {'p_user_id': userId}), // Para las transacciones
+      ]);
+
+      // 3. Parseamos los datos directamente.
+      final balanceMap = results[0] as Map<String, dynamic>? ?? {};
+      final budgetsData = results[1] as List<dynamic>? ?? [];
+      final detailsMap = results[2] as Map<String, dynamic>? ?? {};
+
+      final totalBalance = (balanceMap['total_balance'] as num? ?? 0).toDouble();
+      
+      final featuredBudgets = budgetsData
+          .map((item) => BudgetProgress.fromMap(item as Map<String, dynamic>))
+          .toList();
+      
+      final recentTransactions = (detailsMap['recent_transactions'] as List<dynamic>? ?? [])
+          .map((item) => Transaction.fromMap(item as Map<String, dynamic>))
+          .toList();
+
+      developer.log('✅ [Service] Datos obtenidos directamente. Presupuestos: ${featuredBudgets.length}, Transacciones: ${recentTransactions.length}', name: _logName);
+
+      // 4. Formateamos y guardamos los datos (lógica existente).
       final formattedBalance = NumberFormat.currency(
         locale: 'es_CO',
         symbol: '\$',
         decimalDigits: 0,
-      ).format(data.totalBalance);
+      ).format(totalBalance);
 
-      // ===== CAMBIO CLAVE: DETECTAR EL TEMA DEL SISTEMA =====
-      // HomeWidget puede darnos el brillo actual del sistema.
       final brightness = SchedulerBinding.instance.platformDispatcher.platformBrightness;
       final isDarkMode = brightness == Brightness.dark;
       developer.log('ℹ️ [Service] 8a. Modo oscuro detectado: $isDarkMode', name: _logName);
 
+      // (El código para generar el gráfico no necesita cambios)
       final analysisRepo = AnalysisRepository();
       final expenseData = await analysisRepo.getExpenseSummaryForWidget();
-
       String? chartPath;
       if (expenseData.isNotEmpty) {
-        // Le pasamos el estado del modo oscuro al generador de gráficos.
         final chartBytes = await _createChartImageFromData(expenseData, isDarkMode: isDarkMode);
         if (chartBytes != null) {
           final dir = await getApplicationSupportDirectory();
@@ -153,22 +188,20 @@ class WidgetService {
           chartPath = file.path;
           developer.log('✅ [Service] 8b. Imagen de gráfico guardada en: $path', name: _logName);
         }
-      } else {
-        developer.log('ℹ️ [Service] 8c. No hay datos de gastos para el gráfico.', name: _logName);
       }
 
-      // Codificación a JSON (tu código ya era correcto)
-      final budgetsJson = jsonEncode(data.featuredBudgets.map((b) => b.toJson()).toList());
-      final transactionsJson = jsonEncode(data.recentTransactions.take(3).map((tx) => tx.toJson()).toList());
+      // 5. Codificamos a JSON los datos que acabamos de obtener.
+      final budgetsJson = jsonEncode(featuredBudgets.map((b) => b.toJson()).toList());
+      final transactionsJson = jsonEncode(recentTransactions.take(3).map((tx) => tx.toJson()).toList());
 
-      // Guardado de datos
+      // 6. Guardamos los datos en el widget.
       await HomeWidget.saveWidgetData<String>('total_balance', formattedBalance);
       await HomeWidget.saveWidgetData<String>('widget_chart_path', chartPath ?? "");
       await HomeWidget.saveWidgetData<String>('featured_budgets_json', budgetsJson);
+      await HomeWidget.saveWidgetData<String>('budgets_json', budgetsJson); // Clave duplicada por seguridad
       await HomeWidget.saveWidgetData<String>('recent_transactions_json', transactionsJson);
-      await HomeWidget.saveWidgetData<String>('budgets_json', budgetsJson);
 
-      // Actualización de los widgets
+      // 7. Actualizamos los widgets.
       await HomeWidget.updateWidget(name: 'SasPerWidgetProvider');
       await HomeWidget.updateWidget(name: 'SasPerMediumWidgetProvider');
       await HomeWidget.updateWidget(name: 'SasPerLargeWidgetProvider');

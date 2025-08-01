@@ -18,17 +18,13 @@ import java.util.Locale
 
 class WidgetListFactory(private val context: Context, private val intent: Intent) : RemoteViewsService.RemoteViewsFactory {
     
-    // ===== CAMBIO 1: AÑADIMOS TAG PARA LOGS Y VARIABLES DE COLOR =====
     private val TAG = "WidgetListFactory"
     private var items: List<Any> = emptyList()
     private val listType = intent.getStringExtra("LIST_TYPE") ?: "UNKNOWN"
     
-    // Almacenamos los colores una vez para no tener que buscarlos en cada `getViewAt`
     @ColorInt private var positiveColor: Int = 0
     @ColorInt private var negativeColor: Int = 0
 
-    // ===== CAMBIO 2: HELPER PARA OBTENER COLORES DEL TEMA =====
-    // Reutilizamos la misma función para obtener colores del tema actual.
     @ColorInt
     private fun getThemeColor(@AttrRes colorAttr: Int): Int {
         val typedValue = TypedValue()
@@ -48,16 +44,16 @@ class WidgetListFactory(private val context: Context, private val intent: Intent
         val widgetData = HomeWidgetPlugin.getData(context)
         val gson = Gson()
         
-        // ===== CAMBIO 3: PARSEO DE JSON SEGURO Y A PRUEBA DE CRASHES =====
-        // Envolvemos todo en un bloque try-catch para evitar crashes si el JSON es inválido.
         try {
             items = if (listType == "BUDGETS") {
                 val budgetsJson = widgetData.getString("featured_budgets_json", "[]")
                 Log.d(TAG, "JSON de presupuestos: $budgetsJson")
+                // Asegura que los datos nulos resulten en una lista vacía
                 gson.fromJson<List<BudgetWidgetItem>>(budgetsJson, object : TypeToken<List<BudgetWidgetItem>>() {}.type) ?: emptyList()
             } else if (listType == "TRANSACTIONS") {
                 val transactionsJson = widgetData.getString("recent_transactions_json", "[]")
                 Log.d(TAG, "JSON de transacciones: $transactionsJson")
+                // Asegura que los datos nulos resulten en una lista vacía
                 gson.fromJson<List<TransactionWidgetItem>>(transactionsJson, object : TypeToken<List<TransactionWidgetItem>>() {}.type) ?: emptyList()
             } else {
                 Log.w(TAG, "Tipo de lista desconocido: $listType")
@@ -83,23 +79,32 @@ class WidgetListFactory(private val context: Context, private val intent: Intent
             return null
         }
 
-        // ===== CAMBIO 4: LÓGICA DE VISTAS MÁS SEGURA Y CON COLORES DINÁMICOS =====
         // Usamos un `when` con `is` para un casteo de tipos seguro y evitar ClassCastException.
         return when (val item = items[position]) {
             is BudgetWidgetItem -> {
                 RemoteViews(context.packageName, R.layout.widget_budget_item_layout).apply {
-                    setTextViewText(R.id.widget_item_budget_title, "🍔 ${item.category}")
-                    setProgressBar(R.id.widget_item_budget_progress, 100, (item.progress * 100).toInt(), false)
+                    setTextViewText(R.id.widget_item_budget_title, item.category)
+                    
+                    // CORRECCIÓN: Se calcula el progreso a partir del valor decimal (0.0 a 1.0)
+                    val progressInt = (item.progress * 100).toInt()
+                    setProgressBar(R.id.widget_item_budget_progress, 100, progressInt, false)
                 }
             }
             is TransactionWidgetItem -> {
+                // ===== LOG DE DEPURACIÓN 2 =====
+                Log.d(TAG, "VERDAD ABSOLUTA (Objeto Transacción Parseado): description=${item.description}, amount=${item.amount}, category=${item.category}")
+                // =================================
                 RemoteViews(context.packageName, R.layout.widget_transaction_item_layout).apply {
                     setTextViewText(R.id.widget_item_transaction_title, item.description ?: "Transacción")
                     
-                    val currencyFormat = NumberFormat.getCurrencyInstance(Locale("es", "ES"))
+                    // ===== CORRECCIÓN CLAVE =====
+                    // Se establece el texto para el TextView de la categoría que añadimos en el XML.
+                    setTextViewText(R.id.widget_item_transaction_category, item.category ?: "Sin categoría")
+
+                    // Se formatea el monto y se establece el color dinámicamente
+                    val currencyFormat = NumberFormat.getCurrencyInstance(Locale("es", "CO"))
                     setTextViewText(R.id.widget_item_transaction_amount, currencyFormat.format(item.amount))
                     
-                    // ¡Usamos los colores del tema que cargamos en onCreate!
                     val color = if (item.amount < 0) negativeColor else positiveColor
                     setTextColor(R.id.widget_item_transaction_amount, color)
                 }
@@ -112,12 +117,12 @@ class WidgetListFactory(private val context: Context, private val intent: Intent
         }
     }
 
-    override fun getLoadingView(): RemoteViews? {
-        // Puedes opcionalmente devolver una vista de "cargando..." aquí.
-        return null
+    override fun getLoadingView(): RemoteViews {
+        // Devolvemos una vista de carga simple para una mejor experiencia de usuario
+        return RemoteViews(context.packageName, R.layout.widget_loading_layout)
     }
 
-    override fun getViewTypeCount(): Int = 2 // Ahora tenemos 2 tipos de vista: budget y transaction
+    override fun getViewTypeCount(): Int = 2 // 2 tipos de vista: budget y transaction
     override fun getItemId(position: Int): Long = position.toLong()
     override fun hasStableIds(): Boolean = true
 }

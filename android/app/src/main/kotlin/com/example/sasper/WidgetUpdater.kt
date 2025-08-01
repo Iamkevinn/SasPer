@@ -1,5 +1,3 @@
-// Archivo: app/src/main/kotlin/com/example/sasper/WidgetUpdater.kt
-
 package com.example.sasper
 
 import android.app.PendingIntent
@@ -23,13 +21,8 @@ import java.util.Locale
 
 object WidgetUpdater {
 
-    // ===== CAMBIO 1: AÑADIMOS UN TAG PARA LOGS DE DEPURACIÓN =====
-    // Esto nos permitirá filtrar los mensajes en Logcat y ver solo los de nuestros widgets.
     private const val TAG = "WidgetDebug"
 
-    // ===== CAMBIO 2: HELPER PARA OBTENER COLORES DEL TEMA ACTUAL =====
-    // Esta función nos permite obtener colores dinámicos (para modo claro/oscuro)
-    // usando los atributos del tema, en lugar de colores fijos.
     @ColorInt
     private fun getThemeColor(context: Context, @AttrRes colorAttr: Int): Int {
         val typedValue = TypedValue()
@@ -72,8 +65,6 @@ object WidgetUpdater {
                 Log.d(TAG, "Intentando decodificar el gráfico desde: $chartPath")
                 try {
                     val bitmap = BitmapFactory.decodeFile(chartFile.absolutePath)
-                    // ===== CAMBIO 3: MANEJO DE BITMAP NULO =====
-                    // BitmapFactory.decodeFile puede devolver nulo si el archivo está corrupto.
                     if (bitmap != null) {
                         views.setImageViewBitmap(R.id.widget_medium_chart, bitmap)
                         views.setViewVisibility(R.id.widget_medium_chart, View.VISIBLE)
@@ -83,7 +74,6 @@ object WidgetUpdater {
                         views.setViewVisibility(R.id.widget_medium_chart, View.GONE)
                     }
                 } catch (e: Exception) {
-                    // Si algo falla (ej. OutOfMemoryError), lo capturamos y lo registramos.
                     Log.e(TAG, "Excepción al cargar el bitmap del gráfico: ${e.message}", e)
                     views.setViewVisibility(R.id.widget_medium_chart, View.GONE)
                 }
@@ -113,34 +103,41 @@ object WidgetUpdater {
         val views = RemoteViews(context.packageName, R.layout.widget_large_layout)
         
         val gson = Gson()
-        val currencyFormat = NumberFormat.getCurrencyInstance(Locale("es", "ES"))
+        // Usamos es_CO para consistencia con el resto de la app.
+        val currencyFormat = NumberFormat.getCurrencyInstance(Locale("es", "CO"))
+        currencyFormat.maximumFractionDigits = 0
 
+        // ===== CORRECCIÓN #1: LEER DE LA CLAVE CORRECTA =====
+        // Los datos se guardan en 'featured_budgets_json', no en 'budgets_json'.
         val budgets: List<BudgetWidgetItem> = try {
-            val budgetsJson = widgetData.getString("budgets_json", "[]")
+            val budgetsJson = widgetData.getString("featured_budgets_json", "[]")
+            Log.d(TAG, "JSON de Presupuestos recibido: $budgetsJson")
             gson.fromJson(budgetsJson, object : TypeToken<List<BudgetWidgetItem>>() {}.type) ?: emptyList()
         } catch (e: Exception) {
-            Log.e(TAG, "Error al parsear budgets_json: ${e.message}", e)
+            Log.e(TAG, "Error al parsear featured_budgets_json: ${e.message}", e)
             emptyList()
         }
         
         Log.d(TAG, "Presupuestos parseados. Total: ${budgets.size}")
 
+        // Ocultamos los items por defecto para evitar que se muestre texto de ejemplo.
         views.setViewVisibility(R.id.budget_item_1, View.GONE)
         views.setViewVisibility(R.id.budget_item_2, View.GONE)
 
         budgets.getOrNull(0)?.let {
-            views.setTextViewText(R.id.budget_item_1_title, "🍔 ${it.category}")
+            views.setTextViewText(R.id.budget_item_1_title, it.category ?: "Presupuesto")
             views.setProgressBar(R.id.budget_item_1_progress, 100, (it.progress * 100).toInt(), false)
             views.setViewVisibility(R.id.budget_item_1, View.VISIBLE)
         }
         budgets.getOrNull(1)?.let {
-            views.setTextViewText(R.id.budget_item_2_title, "🚗 ${it.category}")
+            views.setTextViewText(R.id.budget_item_2_title, it.category ?: "Presupuesto")
             views.setProgressBar(R.id.budget_item_2_progress, 100, (it.progress * 100).toInt(), false)
             views.setViewVisibility(R.id.budget_item_2, View.VISIBLE)
         }
 
         val transactions: List<TransactionWidgetItem> = try {
             val transactionsJson = widgetData.getString("recent_transactions_json", "[]")
+            Log.d(TAG, "JSON de Transacciones recibido: $transactionsJson")
             gson.fromJson(transactionsJson, object : TypeToken<List<TransactionWidgetItem>>() {}.type) ?: emptyList()
         } catch (e: Exception) {
             Log.e(TAG, "Error al parsear recent_transactions_json: ${e.message}", e)
@@ -149,6 +146,7 @@ object WidgetUpdater {
         
         Log.d(TAG, "Transacciones parseadas. Total: ${transactions.size}")
 
+        // Ocultamos los items por defecto
         views.setViewVisibility(R.id.transaction_item_1, View.GONE)
         views.setViewVisibility(R.id.transaction_item_2, View.GONE)
         views.setViewVisibility(R.id.transaction_item_3, View.GONE)
@@ -157,30 +155,30 @@ object WidgetUpdater {
         val negativeColor = getThemeColor(context, R.attr.negativeColor)
 
         transactions.getOrNull(0)?.let { tx ->
-            // ===== CORRECCIÓN AQUÍ =====
-            val title = tx.description?.trim() ?: "Transacción"
-            views.setTextViewText(R.id.transaction_item_1_title, title)
-            views.setTextViewText(R.id.transaction_item_1_amount, currencyFormat.format(tx.amount))
+            views.setTextViewText(R.id.transaction_item_1_title, tx.description?.trim() ?: "Transacción")
+            views.setTextViewText(R.id.transaction_item_1_category, tx.category ?: "")
+            // ===== CORRECCIÓN DE VISUALIZACIÓN =====
+            // Mostramos el monto como un String simple para máxima compatibilidad.
+            views.setTextViewText(R.id.transaction_item_1_amount, "%.2f".format(tx.amount))
             views.setTextColor(R.id.transaction_item_1_amount, if (tx.amount < 0) negativeColor else positiveColor)
             views.setViewVisibility(R.id.transaction_item_1, View.VISIBLE)
         }
         transactions.getOrNull(1)?.let { tx ->
-            // ===== CORRECCIÓN AQUÍ =====
-            val title = tx.description?.trim() ?: "Transacción"
-            views.setTextViewText(R.id.transaction_item_2_title, title)
-            views.setTextViewText(R.id.transaction_item_2_amount, currencyFormat.format(tx.amount))
+            views.setTextViewText(R.id.transaction_item_2_title, tx.description?.trim() ?: "Transacción")
+            views.setTextViewText(R.id.transaction_item_2_category, tx.category ?: "")
+            views.setTextViewText(R.id.transaction_item_2_amount, "%.2f".format(tx.amount))
             views.setTextColor(R.id.transaction_item_2_amount, if (tx.amount < 0) negativeColor else positiveColor)
             views.setViewVisibility(R.id.transaction_item_2, View.VISIBLE)
         }
         transactions.getOrNull(2)?.let { tx ->
-            // ===== CORRECCIÓN AQUÍ =====
-            val title = tx.description?.trim() ?: "Transacción"
-            views.setTextViewText(R.id.transaction_item_3_title, title)
-            views.setTextViewText(R.id.transaction_item_3_amount, currencyFormat.format(tx.amount))
+            views.setTextViewText(R.id.transaction_item_3_title, tx.description?.trim() ?: "Transacción")
+            views.setTextViewText(R.id.transaction_item_3_category, tx.category ?: "")
+            views.setTextViewText(R.id.transaction_item_3_amount, "%.2f".format(tx.amount))
             views.setTextColor(R.id.transaction_item_3_amount, if (tx.amount < 0) negativeColor else positiveColor)
             views.setViewVisibility(R.id.transaction_item_3, View.VISIBLE)
         }
 
+        // Intents para hacer el widget clickeable
         val uniqueRequestCode = widgetId * 10
         val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
         val launchPendingIntent = PendingIntent.getActivity(context, uniqueRequestCode, launchIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
