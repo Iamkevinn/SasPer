@@ -1,7 +1,7 @@
 // Dentro de lib/widgets/categories/category_list_item.dart
 
 import 'package:flutter/material.dart';
-import 'package:line_awesome_flutter/line_awesome_flutter.dart'; // Asegúrate de importar esto
+//import 'package:line_awesome_flutter/line_awesome_flutter.dart'; // Asegúrate de importar esto
 import 'package:sasper/models/category_model.dart';
 
 class CategoryListItem extends StatelessWidget {
@@ -21,8 +21,8 @@ class CategoryListItem extends StatelessWidget {
     // =================================================================
     //                       DIAGNÓSTICO FINAL
     // =================================================================
-    print('Construyendo item para "${category.name}". El objeto IconData es: ${category.icon}');
-    print(LineAwesomeIcons.utensils.codePoint);
+    //print('Construyendo item para "${category.name}". El objeto IconData es: ${category.icon}');
+    //print(LineAwesomeIcons.utensils.codePoint);
     // =================================================================
 
     return ListTile(

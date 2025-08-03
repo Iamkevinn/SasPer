@@ -1,5 +1,7 @@
 // lib/utils/notification_helper.dart (VERSIÓN FINAL Y CORRECTA)
 
+// ignore_for_file: file_names
+
 import 'package:flutter/material.dart';
 import 'package:sasper/main.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';

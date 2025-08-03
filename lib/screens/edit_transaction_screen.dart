@@ -46,27 +46,6 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
 
   late Future<List<Account>> _accountsFuture;
   late Future<List<Category>> _categoriesFuture;
-  final Map<String, IconData> _expenseCategories = {
-    'Comida': Iconsax.cup,
-    'Transporte': Iconsax.bus,
-    'Ocio': Iconsax.gameboy,
-    'Salud': Iconsax.health,
-    'Hogar': Iconsax.home,
-    'Compras': Iconsax.shopping_bag,
-    'Servicios': Iconsax.flash_1,
-    'Deudas y Préstamos': Iconsax.money_change,
-    'Otro': Iconsax.category
-  };
-  final Map<String, IconData> _incomeCategories = {
-    'Sueldo': Iconsax.money_recive,
-    'Inversión': Iconsax.chart,
-    'Freelance': Iconsax.briefcase,
-    'Regalo': Iconsax.gift,
-    'Deudas y Préstamos': Iconsax.money_send,
-    'Otro': Iconsax.category_2
-  };
-  Map<String, IconData> get _currentCategories =>
-      _transactionType == 'Gasto' ? _expenseCategories : _incomeCategories;
 
   @override
   void initState() {

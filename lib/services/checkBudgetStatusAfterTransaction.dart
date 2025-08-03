@@ -1,5 +1,7 @@
 // lib/services/budget_service.dart (NUEVO ARCHIVO Y NOMBRE)
 
+// ignore_for_file: file_names
+
 import 'dart:developer' as developer;
 import 'package:supabase_flutter/supabase_flutter.dart';
 

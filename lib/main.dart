@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -38,24 +39,29 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
 
-  print("--- CÓDIGOS PARA ICONOS DE GASTOS ---");
-  print('El código para "Comida" (utensils) es: ${LineAwesomeIcons.utensils.codePoint}');
-  print('El código para "Transporte" (bus) es: ${LineAwesomeIcons.bus.codePoint}');
-  print('El código para "Ocio" (gamepad) es: ${LineAwesomeIcons.gamepad.codePoint}');
-  print('El código para "Hogar" (home) es: ${LineAwesomeIcons.home.codePoint}');
-  print('El código para "Compras" (shopping_cart) es: ${LineAwesomeIcons.shopping_cart.codePoint}');
-  print('El código para "Servicios" (plug) es: ${LineAwesomeIcons.plug.codePoint}');
-  print('El código para "Salud" (heartbeat) es: ${LineAwesomeIcons.heartbeat.codePoint}');
-  print('El código para "Otro (Gasto)" (dot_circle) es: ${LineAwesomeIcons.dot_circle.codePoint}');
-  print('El código para "Sueldo" (money_bill_wave) es: ${LineAwesomeIcons.money_bill.codePoint}');
-  print('El código para "Inversión" (line_chart) es: ${LineAwesomeIcons.line_chart.codePoint}');
-  print('El código para "Freelance" (briefcase) es: ${LineAwesomeIcons.briefcase.codePoint}');
-  print('El código para "Regalo" (gift) es: ${LineAwesomeIcons.gift.codePoint}');
-  print('El código para "Otro (Ingreso)" (question_circle) es: ${LineAwesomeIcons.question_circle.codePoint}');
+  if (kDebugMode) {
+    print("--- CÓDIGOS PARA ICONOS DE GASTOS ---");
+    print('El código para "Comida" (utensils) es: ${LineAwesomeIcons.utensils.codePoint}');
+    print('El código para "Transporte" (bus) es: ${LineAwesomeIcons.bus.codePoint}');
+    print('El código para "Ocio" (gamepad) es: ${LineAwesomeIcons.gamepad.codePoint}');
+    print('El código para "Hogar" (home) es: ${LineAwesomeIcons.home.codePoint}');
+    print('El código para "Compras" (shopping_cart) es: ${LineAwesomeIcons.shopping_cart.codePoint}');
+    print('El código para "Servicios" (plug) es: ${LineAwesomeIcons.plug.codePoint}');
+    print('El código para "Salud" (heartbeat) es: ${LineAwesomeIcons.heartbeat.codePoint}');
+    print('El código para "Otro (Gasto)" (dot_circle) es: ${LineAwesomeIcons.dot_circle.codePoint}');
+    print('El código para "Sueldo" (money_bill_wave) es: ${LineAwesomeIcons.money_bill.codePoint}');
+    print('El código para "Inversión" (line_chart) es: ${LineAwesomeIcons.line_chart.codePoint}');
+    print('El código para "Freelance" (briefcase) es: ${LineAwesomeIcons.briefcase.codePoint}');
+    print('El código para "Regalo" (gift) es: ${LineAwesomeIcons.gift.codePoint}');
+    print('El código para "Otro (Ingreso)" (question_circle) es: ${LineAwesomeIcons.question_circle.codePoint}');
+  }
+
   
   // 1. Asegura que los bindings de Flutter estén listos.
   WidgetsFlutterBinding.ensureInitialized();
-  print('Forzando la inclusión de ${_usedIconsForTreeShaking.length} iconos predeterminados.');
+  if (kDebugMode) {
+    print('Forzando la inclusión de ${_usedIconsForTreeShaking.length} iconos predeterminados.');
+  }
   // 2. Inicializa la localización de fechas (es muy rápido).
   await initializeDateFormatting('es_CO', null);
   

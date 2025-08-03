@@ -179,22 +179,22 @@ class WidgetService {
   }
 
   // Función de ejemplo para calcular la próxima fecha. Deberás ajustarla a tu lógica.
-  DateTime _calculateNextDueDate(DateTime startDate, String frequency) {
-    DateTime now = DateTime.now();
-    DateTime nextDate = startDate;
-
-    if (frequency == 'monthly') {
-      while (nextDate.isBefore(now)) {
-        nextDate = DateTime(nextDate.year, nextDate.month + 1, nextDate.day);
-      }
-    } else if (frequency == 'weekly') {
-      while (nextDate.isBefore(now)) {
-        nextDate = nextDate.add(const Duration(days: 7));
-      }
-    }
-    // Añadir más lógicas para 'daily', 'yearly', etc.
-    return nextDate;
-  }
+//  DateTime _calculateNextDueDate(DateTime startDate, String frequency) {
+//    DateTime now = DateTime.now();
+//    DateTime nextDate = startDate;
+//
+//    if (frequency == 'monthly') {
+//      while (nextDate.isBefore(now)) {
+//        nextDate = DateTime(nextDate.year, nextDate.month + 1, nextDate.day);
+//      }
+//    } else if (frequency == 'weekly') {
+//      while (nextDate.isBefore(now)) {
+//        nextDate = nextDate.add(const Duration(days: 7));
+//      }
+//    }
+//    // Añadir más lógicas para 'daily', 'yearly', etc.
+//    return nextDate;
+//  }
 
   // ¡NUEVO MÉTODO PARA ACTUALIZAR ESTE WIDGET ESPECÍFICO!
   Future<void> updateUpcomingPaymentsWidget() async {

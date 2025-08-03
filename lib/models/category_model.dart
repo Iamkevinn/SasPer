@@ -1,5 +1,6 @@
 // lib/models/category_model.dart (CÓDIGO FINAL Y ROBUSTO)
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:equatable/equatable.dart';
 
@@ -28,8 +29,10 @@ class Category extends Equatable {
   List<Object?> get props => [id, name, icon, color, type];
 
   factory Category.fromMap(Map<String, dynamic> map) {
-    print('--- Parseando categoría: "${map['name']}" ---');
-    print('Datos recibidos del mapa: $map');
+    if (kDebugMode) {
+      print('--- Parseando categoría: "${map['name']}" ---');
+      print('Datos recibidos del mapa: $map');
+    }
     IconData? parsedIcon;
     if (map['icon_name'] != null && map['icon_name'].toString().isNotEmpty) {
       try {
@@ -43,12 +46,18 @@ class Category extends Equatable {
           fontFamily: map['icon_font_family'],
           fontPackage: map['icon_font_package'],
         );
-        print('>>> ÉXITO: Icono parseado para "${map['name']}" es: $parsedIcon');
+        if (kDebugMode) {
+          print('>>> ÉXITO: Icono parseado para "${map['name']}" es: $parsedIcon');
+        }
       } catch (e) {
-        print('Error al parsear el icono para "${map['name']}": $e');
+        if (kDebugMode) {
+          print('Error al parsear el icono para "${map['name']}": $e');
+        }
       }
     }else {
-    print('No se encontró icon_name para "${map['name']}", se asignará null.');
+    if (kDebugMode) {
+      print('No se encontró icon_name para "${map['name']}", se asignará null.');
+    }
   }
     
     return Category(
