@@ -10,48 +10,52 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sasper/models/dashboard_data_model.dart';
 
 class DashboardRepository {
-  // 1. La variable del cliente es 'late final'. 'late' significa que
-  // prometemos inicializarla antes de usarla, y 'final' que solo
-  // se le asignará un valor una vez.
-  late final SupabaseClient _client;
+  // --- INICIO DE LOS CAMBIOS CRUCIALES ---
 
-  // 2. El StreamController y el canal de Realtime ahora son parte del Singleton.
+  // 1. El cliente ahora es privado y nullable. No más 'late final'.
+  SupabaseClient? _supabase;
+
+  // 2. Un getter público que PROTEGE el acceso al cliente.
+  SupabaseClient get client {
+    if (_supabase == null) {
+      // Si algo intenta usar el repositorio antes de tiempo, obtendremos un error claro
+      // en lugar de un 'LateInitializationError' ambiguo.
+      throw Exception("¡ERROR! DashboardRepository no ha sido inicializado. Llama a .initialize() en SplashScreen.");
+    }
+    return _supabase!;
+  }
+  
+  // --- FIN DE LOS CAMBIOS CRUCIALES ---
+
   final _dashboardDataController = StreamController<DashboardData>.broadcast();
   RealtimeChannel? _subscriptionChannel;
-
   bool _isInitialized = false;
 
-  // 3. Constructor privado para prevenir la creación de instancias desde fuera.
   DashboardRepository._privateConstructor();
-
-  // 4. La instancia estática y final que guarda el único objeto de esta clase.
   static final DashboardRepository instance = DashboardRepository._privateConstructor();
 
-  // 5. El método de inicialización público. Se llamará desde main.dart.
-  void initialize(SupabaseClient client) {
-      // Si ya ha sido inicializado, simplemente no hacemos nada.
+  void initialize(SupabaseClient supabaseClient) {
       if (_isInitialized) {
         developer.log('DashboardRepository ya estaba inicializado, saltando.', name: 'DashboardRepository');
         return;
       }
-      _client = client;
+      // Ahora inicializamos nuestra variable nullable _supabase
+      _supabase = supabaseClient; 
       _setupRealtimeSubscription();
-      _isInitialized = true; // Levantamos la bandera
+      _isInitialized = true;
       developer.log('✅ DashboardRepository inicializado por primera vez.', name: 'DashboardRepository');
-    }
+  }
 
-
-  // Ahora, los métodos del repositorio usan la variable de instancia `_client`.
+  // Ahora, TODOS los métodos que usaban `_client` ahora usarán el getter `client`
   
   Stream<DashboardData> getDashboardDataStream() {
-    // La primera vez que alguien pida el stream, forzamos la carga inicial.
     forceRefresh();
     return _dashboardDataController.stream;
   }
 
-  // Hemos movido la lógica de la suscripción a su propio método para más claridad.
   void _setupRealtimeSubscription() {
-    _subscriptionChannel = _client
+    // Usamos el getter `client`
+    _subscriptionChannel = client 
         .channel('public:all_tables_for_dashboard')
         .onPostgresChanges(
             event: PostgresChangeEvent.all,
@@ -80,13 +84,14 @@ class DashboardRepository {
     developer.log('🔄 [Repo] Starting staged dashboard fetch...', name: 'DashboardRepository');
     
     try {
-      final userId = _client.auth.currentUser?.id;
+      // Usamos el getter `client`
+      final userId = client.auth.currentUser?.id; 
       if (userId == null) {
         throw Exception('Usuario no autenticado.');
       }
 
       // --- ETAPA 1: Carga lo esencial y más rápido ---
-      final balanceDataMap = await _client.rpc(
+      final balanceDataMap = await client.rpc(
         'get_dashboard_balance',
         params: {'p_user_id': userId},
       );
@@ -97,7 +102,7 @@ class DashboardRepository {
       }
 
       // --- ETAPA 2: Carga los detalles más pesados ---
-      final detailsDataMap = await _client.rpc(
+      final detailsDataMap = await client.rpc(
         'get_dashboard_details',
         params: {'p_user_id': userId},
       );
@@ -115,12 +120,11 @@ class DashboardRepository {
     }
   }
 
-  /// Obtiene los datos del dashboard una sola vez, sin usar streams.
-  /// Ideal para ser llamado desde un contexto de segundo plano como el widget.
   Future<DashboardData?> fetchDataForWidget() async {
     developer.log('🔄 [Repo-Widget] Fetching single snapshot for widget...', name: 'DashboardRepository');
     try {
-      final userId = _client.auth.currentUser?.id;
+      // Usamos el getter `client`
+      final userId = client.auth.currentUser?.id;
       if (userId == null) {
         developer.log('⚠️ [Repo-Widget] No user ID for widget data fetch.', name: 'DashboardRepository');
         return null;
@@ -128,9 +132,9 @@ class DashboardRepository {
 
       // 1. Ejecutamos las 3 llamadas en paralelo.
       final results = await Future.wait([
-        _client.rpc('get_dashboard_balance', params: {'p_user_id': userId}),
-        _client.rpc('get_dashboard_details', params: {'p_user_id': userId}),
-        _client.rpc('get_budgets_progress_for_user', params: {'p_user_id': userId}),
+        client.rpc('get_dashboard_balance', params: {'p_user_id': userId}),
+        client.rpc('get_dashboard_details', params: {'p_user_id': userId}),
+        client.rpc('get_budgets_progress_for_user', params: {'p_user_id': userId}),
       ]);
 
       // 2. Extraemos los resultados de forma segura.
@@ -147,23 +151,18 @@ class DashboardRepository {
           .map((data) => BudgetProgress.fromMap(data as Map<String, dynamic>))
           .toList();
 
-      // NOTA: Asumimos que `get_dashboard_details` no devuelve metas o resúmenes de gastos.
-      // Si lo hace, necesitaríamos parsearlos aquí también.
       final List<Goal> goalsList = []; 
       final List<ExpenseByCategory> expenseSummary = [];
 
-      // ====> LA SOLUCIÓN FINAL Y DIRECTA <====
-      // 4. Creamos la instancia de DashboardData directamente con el constructor,
-      //    pasando todos los datos que hemos recopilado y parseado.
+      // 4. Creamos la instancia de DashboardData directamente con el constructor.
       final dashboardData = DashboardData(
         totalBalance: (balanceMap['total_balance'] as num? ?? 0).toDouble(),
-        // Asumo que 'full_name' viene en `detailsMap`. Si no, puedes poner un valor por defecto.
         fullName: detailsMap['full_name'] as String? ?? 'Usuario', 
         recentTransactions: recentTransactions,
-        budgetsProgress: budgetsList, // Se pasa la misma lista a ambas propiedades
+        budgetsProgress: budgetsList,
         featuredBudgets: budgetsList,
-        goals: goalsList, // Se pasa la lista vacía que creamos
-        expenseSummaryForWidget: expenseSummary, // Se pasa la lista vacía que creamos
+        goals: goalsList,
+        expenseSummaryForWidget: expenseSummary,
         isLoading: false,
       );
       
@@ -175,14 +174,12 @@ class DashboardRepository {
       return null;
     }
   }
-
-  // Aunque el Singleton vive para siempre, es una buena práctica tener
-  // un método para limpiar recursos si la app lo necesitara en un futuro.
-  // Por ahora, no lo llamaremos desde ningún sitio.
+  
   void dispose() {
     developer.log('❌ [Repo] Disposing DashboardRepository resources.', name: 'DashboardRepository');
     if (_subscriptionChannel != null) {
-      _client.removeChannel(_subscriptionChannel!);
+      // Usamos el getter `client`
+      client.removeChannel(_subscriptionChannel!);
       _subscriptionChannel = null;
     }
     _dashboardDataController.close();

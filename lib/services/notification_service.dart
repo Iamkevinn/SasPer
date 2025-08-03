@@ -2,31 +2,58 @@
 
 import 'dart:convert';
 import 'dart:developer' as developer;
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:sasper/main.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/data/latest_all.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
+import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:permission_handler/permission_handler.dart'; // <-- AÑADE ESTA DEPENDENCIA
 
-// Asumimos que tienes un archivo de config para la URL base de tu API
-import 'package:sasper/config/app_config.dart'; 
+// --- Tus importaciones existentes ---
+import 'package:sasper/config/app_config.dart';
 import 'package:sasper/firebase_options.dart';
+import 'package:sasper/models/recurring_transaction_model.dart';
 
-// La función de background handler se mantiene igual.
+// --- HANDLERS DE RESPUESTA PARA NOTIFICACIONES LOCALES ---
+void onDidReceiveNotificationResponse(NotificationResponse resp) {
+  developer.log(
+    '🔔 onDidReceiveNotificationResponse (payload: ${resp.payload})',
+    name: 'NotificationService-Callback',
+  );
+}
+
+void onDidReceiveBackgroundNotificationResponse(NotificationResponse resp) {
+  developer.log(
+    '🔔 onDidReceiveBackgroundNotificationResponse (payload: ${resp.payload})',
+    name: 'NotificationService-Callback',
+  );
+}
+
+// FUNCION DE BACKGROUND PARA FCM
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  developer.log("Handling a background message: ${message.messageId}", name: 'BackgroundMessageHandler');
+  developer.log(
+    '📥 Handling background FCM message: ${message.messageId}',
+    name: 'NotificationService-BackgroundFCM',
+  );
 }
 
 class NotificationService {
+  // Dependencias
   final SupabaseClient _supabase;
   final FirebaseMessaging _firebaseMessaging;
   final http.Client _httpClient;
+  final FlutterLocalNotificationsPlugin _localNotifier =
+      FlutterLocalNotificationsPlugin();
 
-  // 1. Singleton para un acceso fácil y único en toda la app.
+  // Singleton
   static final NotificationService instance = NotificationService._internal();
-
-  // 2. Constructor privado con inyección de dependencias para tests.
   NotificationService._internal({
     SupabaseClient? supabaseClient,
     FirebaseMessaging? firebaseMessaging,
@@ -35,101 +62,296 @@ class NotificationService {
         _firebaseMessaging = firebaseMessaging ?? FirebaseMessaging.instance,
         _httpClient = httpClient ?? http.Client();
 
-  /// Método principal para configurar todo el sistema de notificaciones.
-  /// Se debe llamar una vez al inicio de la app (ej. en main.dart).
+  /// Inicializa FCM (push) y notific. locales (channels & scheduled).
   Future<void> initialize() async {
-    developer.log('🚀 Initializing Notification Service...', name: 'NotificationService');
+    developer.log('🚀 [NotificationService] Starting initialize()', name: 'NotificationService');
+
+    // ---- 1. PUSH REMOTAS (FCM) ----
     try {
+      developer.log('① Configurando background FCM handler...', name: 'NotificationService');
       FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-      await _firebaseMessaging.requestPermission();
+      developer.log('① Solicitando permisos FCM...', name: 'NotificationService');
+      final settings = await _firebaseMessaging.requestPermission();
+      developer.log(
+        '① Permisos FCM: auth=${settings.authorizationStatus}',
+        name: 'NotificationService',
+      );
 
       await _updateAndSaveToken();
-
       _firebaseMessaging.onTokenRefresh.listen((token) {
-        developer.log('🔄 FCM Token refreshed. Saving new token...', name: 'NotificationService');
+        developer.log('🔄 FCM Token refreshed: $token', name: 'NotificationService');
         _saveTokenToSupabase(token);
       });
 
       _setupMessageListeners();
+      developer.log('✅ FCM initialized.', name: 'NotificationService');
+    } catch (e, st) {
+      developer.log('🔥 Error initializing FCM: $e', name: 'NotificationService', stackTrace: st);
+    }
 
-      developer.log('✅ Notification service initialized successfully.', name: 'NotificationService');
-    } catch (e, stackTrace) {
-      developer.log("🔥 Error initializing notification service: $e", name: 'NotificationService', stackTrace: stackTrace);
+    // ---- 2. LOCALES PROGRAMADAS ----
+    try {
+      developer.log('② Inicializando TZ & canales...', name: 'NotificationService');
+      await _initializeLocalNotifications();
+
+      // Estado de permisos Android 13+
+      final notifPerm = await Permission.notification.status;
+      developer.log('② Permiso NOTIFICATION: $notifPerm', name: 'NotificationService');
+      if (notifPerm.isDenied) {
+        developer.log('② Solicitando POST_NOTIFICATIONS...', name: 'NotificationService');
+        await Permission.notification.request();
+      }
+
+      final alarmPerm = await Permission.scheduleExactAlarm.status;
+      developer.log('② Permiso SCHEDULE_EXACT_ALARM: $alarmPerm', name: 'NotificationService');
+      if (alarmPerm.isDenied) {
+        developer.log('② Solicitando SCHEDULE_EXACT_ALARM...', name: 'NotificationService');
+        await Permission.scheduleExactAlarm.request();
+      }
+
+      developer.log('✅ Local notifications initialized.', name: 'NotificationService');
+    } catch (e, st) {
+      developer.log('🔥 Error initializing local notifications: $e', name: 'NotificationService', stackTrace: st);
     }
   }
 
-  /// Obtiene el token actual y lo guarda en Supabase.
+  /// Prueba inmediata: programa una notificación a 10s y muestra SnackBars.
+  Future<void> testImmediateNotification() async {
+    _showSnackbar('🔔 Test: iniciando prueba de notificación...');
+
+    try {
+      // Verifica permisos otra vez
+      var notifStatus = await Permission.notification.status;
+      developer.log('🔍 testImmediate notifStatus: $notifStatus', name: 'NotificationService');
+      if (!notifStatus.isGranted) {
+        _showSnackbar('Solicitando permiso NOTIFICATION...');
+        notifStatus = await Permission.notification.request();
+      }
+      if (!notifStatus.isGranted) {
+        _showSnackbar('❌ NOTIFICATION no concedido.', isError: true);
+        return;
+      }
+
+      var alarmStatus = await Permission.scheduleExactAlarm.status;
+      developer.log('🔍 testImmediate alarmStatus: $alarmStatus', name: 'NotificationService');
+      if (!alarmStatus.isGranted) {
+        _showSnackbar('Solicitando permiso ALARM...');
+        alarmStatus = await Permission.scheduleExactAlarm.request();
+      }
+      if (!alarmStatus.isGranted) {
+        _showSnackbar('❌ ALARM no concedido.', isError: true);
+        return;
+      }
+
+      // Todo OK: programamos
+      final when = tz.TZDateTime.now(tz.local).add(const Duration(seconds: 10));
+      _showSnackbar('✅ Programando para ${when.toLocal()}...');
+      await _localNotifier.zonedSchedule(
+        999,
+        '🎉 Prueba Exitosa',
+        'Si ves esto, tu sistema de notificaciones funciona.',
+        when,
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            'test_channel',
+            'Notificaciones de Prueba',
+            channelDescription: 'Canal para pruebas de desarrollo.',
+            importance: Importance.max,
+            priority: Priority.high,
+            visibility: NotificationVisibility.public,
+            playSound: true,
+            enableVibration: true,
+          ),
+          iOS: DarwinNotificationDetails(presentSound: true),
+        ),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+      );
+      _showSnackbar('⏳ Notificación agendada. Revisa en 10s.');
+      developer.log('✅ testImmediateNotification zonedSchedule called', name: 'NotificationService');
+    } catch (e, st) {
+      _showSnackbar('🔥 Error en testImmediate: $e', isError: true);
+      developer.log('🔥 Exception in testImmediateNotification: $e', name: 'NotificationService', stackTrace: st);
+    }
+  }
+
+  // ------------------------------------------------------------
+  //  Helpers privados
+  // ------------------------------------------------------------
+
   Future<void> _updateAndSaveToken() async {
-    final String? fcmToken = await _firebaseMessaging.getToken();
-    if (fcmToken != null) {
-      developer.log("Firebase Messaging Token: $fcmToken", name: 'NotificationService');
-      await _saveTokenToSupabase(fcmToken);
+    final token = await _firebaseMessaging.getToken();
+    if (token != null) {
+      developer.log('🔑 FCM token: $token', name: 'NotificationService');
+      await _saveTokenToSupabase(token);
     } else {
-      developer.log("⚠️ Could not get FCM token.", name: 'NotificationService');
+      developer.log('⚠️ No se obtuvo FCM token.', name: 'NotificationService');
     }
   }
 
   void _setupMessageListeners() {
-    // Para manejar notificaciones cuando la app está en primer plano.
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      developer.log('🔔 Message received in foreground!', name: 'NotificationService');
-      if (message.notification != null) {
-        developer.log('Notification: ${message.notification!.title} - ${message.notification!.body}', name: 'NotificationService');
-        // Aquí podrías mostrar una notificación o un diálogo en la app.
+    FirebaseMessaging.onMessage.listen((msg) {
+      developer.log('📲 onMessage: ${msg.messageId}', name: 'NotificationService');
+      if (msg.notification != null) {
+        developer.log('   title=${msg.notification!.title}, body=${msg.notification!.body}', name: 'NotificationService');
       }
     });
-
-    // Para manejar cuando el usuario toca la notificación y abre la app.
-    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      developer.log('📲 Notification tapped, app opened from background.', name: 'NotificationService');
-      // Aquí puedes navegar a una pantalla específica basada en message.data
+    FirebaseMessaging.onMessageOpenedApp.listen((msg) {
+      developer.log('📂 onMessageOpenedApp: ${msg.messageId}', name: 'NotificationService');
     });
+  }
+
+  Future<void> _initializeLocalNotifications() async {
+    // Timezones
+    tz.initializeTimeZones();
+    final tzName = await FlutterTimezone.getLocalTimezone();
+    tz.setLocalLocation(tz.getLocation(tzName));
+    developer.log('   Timezone set: $tzName', name: 'NotificationService');
+
+    // Init plugin
+    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const iosInit = DarwinInitializationSettings();
+    final settings = InitializationSettings(android: androidInit, iOS: iosInit);
+
+    await _localNotifier.initialize(
+      settings,
+      onDidReceiveNotificationResponse: onDidReceiveNotificationResponse,
+      onDidReceiveBackgroundNotificationResponse: onDidReceiveBackgroundNotificationResponse,
+    );
+    developer.log('   FlutterLocalNotificationsPlugin initialized', name: 'NotificationService');
+
+    // Crear canales Android
+    final androidImpl = _localNotifier
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    await androidImpl?.createNotificationChannel(
+      const AndroidNotificationChannel(
+        'recurring_payments_channel',
+        'Recordatorios de Pagos',
+        description: 'Notificaciones sobre pagos recurrentes próximos.',
+        importance: Importance.max,
+      ),
+    );
+    await androidImpl?.createNotificationChannel(
+      const AndroidNotificationChannel(
+        'test_channel',
+        'Notificaciones de Prueba',
+        description: 'Canal usado para pruebas de desarrollo.',
+        importance: Importance.max,
+      ),
+    );
+    developer.log('   Notification channels created', name: 'NotificationService');
+
+    // iOS permissions
+    await _localNotifier
+        .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
+        ?.requestPermissions(alert: true, sound: true, badge: true);
   }
 
   Future<void> _saveTokenToSupabase(String token) async {
-    final userId = _supabase.auth.currentUser?.id;
-    if (userId != null) {
-      try {
-        await _supabase
-            .from('profiles')
-            .update({'fcm_token': token})
-            .eq('id', userId);
-        developer.log("✅ FCM Token saved/updated in Supabase.", name: 'NotificationService');
-      } catch (e, stackTrace) {
-        developer.log("🔥 Error saving token to Supabase: $e", name: 'NotificationService', stackTrace: stackTrace);
+    final uid = _supabase.auth.currentUser?.id;
+    if (uid == null) {
+      developer.log('❌ No hay usuario logueado, no guardo token.', name: 'NotificationService');
+      return;
+    }
+    try {
+      await _supabase.from('profiles').update({'fcm_token': token}).eq('id', uid);
+      developer.log('✅ Token guardado en Supabase', name: 'NotificationService');
+    } catch (e, st) {
+      developer.log('🔥 Error guardando token Supabase: $e', name: 'NotificationService', stackTrace: st);
+    }
+  }
+
+  void _showSnackbar(String msg, {bool isError = false}) {
+    final ctx = navigatorKey.currentState?.context;
+    if (ctx != null && ctx.mounted) {
+      ScaffoldMessenger.of(ctx)
+        ..removeCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            backgroundColor: isError ? Colors.red.shade700 : Colors.green.shade700,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+    }
+  }
+
+  // ------------------------------------------------------------
+  //  Métodos públicos de notificaciones programadas
+  // ------------------------------------------------------------
+
+  Future<void> scheduleRecurringReminders(RecurringTransaction tx) async {
+    if (!await Permission.scheduleExactAlarm.isGranted) {
+      developer.log(
+        '⚠️ scheduleRecurringReminders: permiso ALARM no concedido para ${tx.description}',
+        name: 'NotificationService',
+      );
+      return;
+    }
+    final baseId = tx.id.hashCode & 0x7FFFFFFF;
+    final now = tz.TZDateTime.now(tz.local);
+    for (var i = 0; i < 12; i++) {
+      final due = tz.TZDateTime(tz.local, tx.nextDueDate.year, tx.nextDueDate.month + i, tx.nextDueDate.day);
+      final remindAt = due.subtract(const Duration(days: 3));
+      if (remindAt.isAfter(now)) {
+        final nid = baseId + i;
+        await _localNotifier.zonedSchedule(
+          nid,
+          'Recordatorio: ${tx.description}',
+          'Tu pago vence en 3 días.',
+          remindAt,
+          NotificationDetails(
+            android: AndroidNotificationDetails(
+              'recurring_payments_channel',
+              'Recordatorios de Pagos',
+              importance: Importance.high,
+              priority: Priority.high,
+            ),
+            iOS: DarwinNotificationDetails(presentSound: true),
+          ),
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+        );
+        developer.log('⏰ Scheduled notification #$nid at $remindAt', name: 'NotificationService');
       }
     }
   }
-  
-  /// Dispara una notificación llamando a un endpoint en el backend de Render.
-  /// Este es el método que otros servicios (como BudgetService) llamarán.
+
+  Future<void> cancelRecurringReminders(String txId) async {
+    final baseId = txId.hashCode & 0x7FFFFFFF;
+    for (var i = 0; i < 12; i++) {
+      await _localNotifier.cancel(baseId + i);
+    }
+    developer.log('🗑️ Cancelled recurring reminders for ID $txId', name: 'NotificationService');
+  }
+
+  Future<void> refreshAllSchedules(List<RecurringTransaction> list) async {
+    await _localNotifier.cancelAll();
+    developer.log('🗑️ Cancelled all notifications to refresh', name: 'NotificationService');
+    for (var tx in list) {
+      await scheduleRecurringReminders(tx);
+    }
+    developer.log('🔄 Refreshed and rescheduled ${list.length} reminders', name: 'NotificationService');
+  }
+
   Future<void> triggerBudgetNotification({
     required String userId,
     required String categoryName,
   }) async {
-    developer.log('📲 Triggering budget check via Render backend for category "$categoryName"', name: 'NotificationService');
-    
-    // Asumimos que tienes este endpoint en tu backend de Python
+    developer.log('📲 triggerBudgetNotification for $categoryName (user $userId)', name: 'NotificationService');
     final url = Uri.parse('${AppConfig.renderBackendBaseUrl}/check-budget-on-transaction');
-
     try {
-      final response = await _httpClient.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'user_id': userId,
-          'category': categoryName,
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        developer.log('✅ Budget check successfully triggered on backend.', name: 'NotificationService');
+      final res = await _httpClient.post(url,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'user_id': userId, 'category': categoryName}));
+      if (res.statusCode == 200) {
+        developer.log('✅ Budget trigger successful', name: 'NotificationService');
       } else {
-        developer.log('🔥 Error from Render backend: ${response.statusCode} - ${response.body}', name: 'NotificationService');
+        developer.log('🔥 Budget trigger error ${res.statusCode}: ${res.body}', name: 'NotificationService');
       }
-    } catch (e) {
-      developer.log('🔥 Error calling Render backend for budget check: $e', name: 'NotificationService');
+    } catch (e, st) {
+      developer.log('🔥 Error triggering budget notification: $e', name: 'NotificationService', stackTrace: st);
     }
   }
 }

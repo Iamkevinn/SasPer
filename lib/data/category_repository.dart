@@ -1,4 +1,4 @@
-// lib/data/category_repository.dart (CÓDIGO CON TIPADO FORZADO Y CORRECTO)
+// lib/data/category_repository.dart
 
 import 'dart:async';
 import 'package:sasper/models/category_model.dart';
@@ -6,32 +6,43 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:developer' as developer;
 
 class CategoryRepository {
-  late final SupabaseClient _client;
+  // --- INICIO DE LOS CAMBIOS CRUCIALES ---
+  
+  // 1. El cliente ahora es privado y nullable.
+  SupabaseClient? _supabase;
+
+  // 2. Un getter público que PROTEGE el acceso al cliente.
+  SupabaseClient get client {
+    if (_supabase == null) {
+      throw Exception("¡ERROR! CategoryRepository no ha sido inicializado. Llama a .initialize() en SplashScreen.");
+    }
+    return _supabase!;
+  }
+
+  // --- FIN DE LOS CAMBIOS CRUCIALES ---
   
   CategoryRepository._privateConstructor();
   static final CategoryRepository instance = CategoryRepository._privateConstructor();
+  bool _isInitialized = false;
 
-  void initialize(SupabaseClient client) {
-    _client = client;
+  void initialize(SupabaseClient supabaseClient) {
+    if (_isInitialized) return;
+    _supabase = supabaseClient;
+    _isInitialized = true;
     developer.log('✅ [Repo] CategoryRepository Initialized', name: 'CategoryRepository');
   }
 
-  /// Obtiene un stream de las categorías del usuario usando una función RPC.
+  // Ahora, todos los métodos usan el getter `client` en lugar de `_client`
+
   Stream<List<Category>> getCategoriesStream() {
     try {
-      // 1. Obtenemos el stream crudo que devuelve List<dynamic>
-      final rawStream = _client.rpc('get_user_categories').asStream();
+      final rawStream = client.rpc('get_user_categories').asStream();
 
-      // 2. Usamos .asyncMap para transformar el tipo de manera segura.
-      // Esto crea un nuevo stream con el tipo de dato correcto.
       return rawStream.map((dynamicRawList) {
-        
-        // Se asegura de que la lista no sea nula.
         if (dynamicRawList == null || dynamicRawList is! List) {
           return <Category>[];
         }
 
-        // Convierte la List<dynamic> a List<Category>
         final List<Category> categoryList = dynamicRawList
             .map((item) => Category.fromMap(item as Map<String, dynamic>))
             .toList();
@@ -47,11 +58,9 @@ class CategoryRepository {
     }
   }
 
-
-  /// Obtiene una lista única de categorías usando una función RPC.
   Future<List<Category>> getCategories() async {
     try {
-      final data = await _client.rpc('get_user_categories');
+      final data = await client.rpc('get_user_categories');
       final categories = (data as List)
           .map((item) => Category.fromMap(item as Map<String, dynamic>))
           .toList();
@@ -63,13 +72,11 @@ class CategoryRepository {
     }
   }
   
-  // --- El resto de los métodos no cambian ---
-
   Future<void> addCategory(Category category) async {
     try {
       final data = category.toMap();
-      data['user_id'] = _client.auth.currentUser!.id;
-      await _client.from('categories').insert(data);
+      data['user_id'] = client.auth.currentUser!.id;
+      await client.from('categories').insert(data);
     } catch (e, st) {
       developer.log('🔥 Error al añadir categoría', name: 'CategoryRepository', error: e, stackTrace: st);
       throw Exception('No se pudo crear la categoría.');
@@ -78,7 +85,7 @@ class CategoryRepository {
 
   Future<void> updateCategory(Category category) async {
     try {
-      await _client.from('categories').update(category.toMap()).eq('id', category.id);
+      await client.from('categories').update(category.toMap()).eq('id', category.id);
     } catch (e, st) {
       developer.log('🔥 Error al actualizar categoría', name: 'CategoryRepository', error: e, stackTrace: st);
       throw Exception('No se pudo actualizar la categoría.');
@@ -87,7 +94,7 @@ class CategoryRepository {
 
   Future<void> deleteCategory(String categoryId) async {
     try {
-      await _client.from('categories').delete().eq('id', categoryId);
+      await client.from('categories').delete().eq('id', categoryId);
     } catch (e, st) {
       developer.log('🔥 Error al eliminar categoría', name: 'CategoryRepository', error: e, stackTrace: st);
       throw Exception('No se pudo eliminar la categoría.');

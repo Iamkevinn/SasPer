@@ -7,8 +7,10 @@ import 'package:intl/intl.dart';
 import 'package:sasper/data/account_repository.dart';
 import 'package:sasper/data/recurring_repository.dart';
 import 'package:sasper/models/account_model.dart';
+import 'package:sasper/services/notification_service.dart'; 
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
+
 import 'dart:developer' as developer;
 
 class AddRecurringTransactionScreen extends StatefulWidget {
@@ -63,6 +65,22 @@ class _AddRecurringTransactionScreenState extends State<AddRecurringTransactionS
     setState(() => _isLoading = true);
 
     try {
+      // 2. AHORA CAPTURAMOS EL RESULTADO DE LA LLAMADA AL REPOSITORIO
+      final newTransaction = await _repository.addRecurringTransaction(
+        description: _descriptionController.text.trim(),
+        amount: double.parse(_amountController.text.replaceAll(',', '.')),
+        type: _type,
+        category: _category,
+        accountId: _selectedAccountId!,
+        frequency: _frequency,
+        interval: 1,
+        startDate: _startDate,
+      );
+
+      // 3. PASAMOS LA NUEVA TRANSACCIÓN AL SERVICIO DE NOTIFICACIONES
+      await NotificationService.instance.scheduleRecurringReminders(newTransaction);
+      developer.log('✅ Notificaciones programadas para: ${newTransaction.description}', name: 'AddRecurringScreen');
+      
       // Usamos la instancia del Singleton para llamar al método.
       await _repository.addRecurringTransaction(
         description: _descriptionController.text.trim(),

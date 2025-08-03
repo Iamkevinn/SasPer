@@ -1,0 +1,1 @@
+com.whelksoft.flutter_native_timezone

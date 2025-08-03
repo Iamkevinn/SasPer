@@ -279,8 +279,9 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
                 ),
                 validator: (v) {
                   if (v == null || v.isEmpty) return 'Ingresa un monto';
-                  if (double.tryParse(v.replaceAll(',', '.')) == null)
+                  if (double.tryParse(v.replaceAll(',', '.')) == null) {
                     return 'Ingresa un monto válido';
+                  }
                   return null;
                 },
               ),

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="widget_background_color">#1C1C1E</color>
+    <color name="widget_button_background_color">#0A84FF</color>
+    <color name="widget_button_icon_color">#FFFFFF</color>
+    <color name="widget_text_color">#F1F1F1</color>
+    <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+    </style>
+    <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <item name="android:windowBackground">?android:colorBackground</item>
+    </style>
+    <style name="Theme.AppWidget" parent="Theme.AppWidget.Base"/>
+    <style name="Theme.AppWidget.Base" parent="Theme.Material3.Dark.NoActionBar">
+        
+        <item name="colorSurface">@color/widget_background_color</item>
+        <item name="colorOnSurface">@color/widget_text_color</item>
+        <item name="colorPrimary">@color/widget_button_background_color</item>
+        <item name="colorOnPrimary">@color/widget_button_icon_color</item>
+        
+        
+        <item name="positiveColor">#81C784</item> 
+        <item name="negativeColor">#E57373</item> 
+    </style>
+</resources>

@@ -7,27 +7,38 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sasper/models/debt_model.dart';
 
 class DebtRepository {
-  // 1. El cliente se declara como 'late final'.
-  late final SupabaseClient _client;
+  // --- INICIO DE LOS CAMBIOS CRUCIALES ---
   
-  // 2. Constructor privado.
+  // 1. El cliente ahora es privado y nullable.
+  SupabaseClient? _supabase;
+
+  // 2. Un getter público que PROTEGE el acceso al cliente.
+  SupabaseClient get client {
+    if (_supabase == null) {
+      throw Exception("¡ERROR! DebtRepository no ha sido inicializado. Llama a .initialize() en SplashScreen.");
+    }
+    return _supabase!;
+  }
+
+  // --- FIN DE LOS CAMBIOS CRUCIALES ---
+  
   DebtRepository._privateConstructor();
-
-  // 3. La instancia estática.
   static final DebtRepository instance = DebtRepository._privateConstructor();
+  bool _isInitialized = false;
 
-  // 4. El método de inicialización.
-  void initialize(SupabaseClient client) {
-    _client = client;
+  void initialize(SupabaseClient supabaseClient) {
+    if (_isInitialized) return;
+    _supabase = supabaseClient;
+    _isInitialized = true;
     developer.log('✅ [Repo] DebtRepository Singleton Initialized and Client Injected.', name: 'DebtRepository');
   }
 
-  /// Devuelve un Stream en tiempo real de la lista de deudas del usuario.
+  // Ahora, todos los métodos usan el getter `client` en lugar de `_client`
+
   Stream<List<Debt>> getDebtsStream() {
     developer.log('📡 [Repo] Subscribing to debts stream...', name: 'DebtRepository');
     try {
-      // La seguridad se maneja con RLS en Supabase.
-      final stream = _client
+      final stream = client
           .from('debts')
           .stream(primaryKey: ['id'])
           .order('due_date', ascending: true)
@@ -46,7 +57,6 @@ class DebtRepository {
     }
   }
 
-  /// Añade una nueva deuda y su transacción inicial asociada usando una RPC.
   Future<void> addDebtAndInitialTransaction({
     required String name,
     required DebtType type,
@@ -58,7 +68,7 @@ class DebtRepository {
   }) async {
     developer.log('➕ [Repo] Adding new debt: "$name"', name: 'DebtRepository');
     try {
-      await _client.rpc('create_debt_and_transaction', params: {
+      await client.rpc('create_debt_and_transaction', params: {
         'p_name': name,
         'p_type': type.name,
         'p_entity_name': entityName,
@@ -74,10 +84,6 @@ class DebtRepository {
     }
   }
 
-  // --- NUEVOS MÉTODOS PARA EL CRUD ---
-
-  /// Actualiza los datos de una deuda existente.
-  /// No permite cambiar montos, solo datos informativos.
   Future<void> updateDebt({
     required String debtId,
     required String name,
@@ -86,14 +92,13 @@ class DebtRepository {
   }) async {
     developer.log('🔄 [Repo] Updating debt: "$name"', name: 'DebtRepository');
     try {
-      await _client.from('debts').update({
+      await client.from('debts').update({
         'name': name,
         'entity_name': entityName,
         'due_date': dueDate?.toIso8601String(),
       }).eq('id', debtId);
       
       developer.log('✅ [Repo] Debt updated successfully.', name: 'DebtRepository');
-      // Disparamos un evento para notificar a la UI
       EventService.instance.fire(AppEvent.debtsChanged);
     } catch (e, stackTrace) {
       developer.log('🔥 [Repo] Error updating debt: $e', name: 'DebtRepository', error: e, stackTrace: stackTrace);
@@ -101,17 +106,12 @@ class DebtRepository {
     }
   }
 
-  /// Elimina una deuda.
-  /// IMPORTANTE: Esto no elimina las transacciones asociadas. Se recomienda
-  /// usar una función en Supabase (un trigger en ON DELETE) para archivar
-  /// o desvincular las transacciones relacionadas si es necesario.
   Future<void> deleteDebt(String debtId) async {
     developer.log('🗑️ [Repo] Deleting debt with id: $debtId', name: 'DebtRepository');
     try {
-      await _client.from('debts').delete().eq('id', debtId);
+      await client.from('debts').delete().eq('id', debtId);
       
       developer.log('✅ [Repo] Debt deleted successfully.', name: 'DebtRepository');
-      // Disparamos un evento para notificar a la UI
       EventService.instance.fire(AppEvent.debtsChanged);
     } catch (e, stackTrace) {
       developer.log('🔥 [Repo] Error deleting debt: $e', name: 'DebtRepository', error: e, stackTrace: stackTrace);
@@ -119,7 +119,6 @@ class DebtRepository {
     }
   }
   
-  /// Registra un pago o un cobro usando una RPC.
   Future<void> registerPayment({
     required String debtId,
     required DebtType debtType,
@@ -130,7 +129,7 @@ class DebtRepository {
   }) async {
     developer.log('💸 [Repo] Registering payment of $paymentAmount for debt $debtId', name: 'DebtRepository');
     try {
-      await _client.rpc('register_debt_payment', params: {
+      await client.rpc('register_debt_payment', params: {
         'p_debt_id': debtId,
         'p_payment_amount': paymentAmount,
         'p_account_id': fromAccountId,
@@ -145,14 +144,9 @@ class DebtRepository {
     }
   }
   
-  // El método 'dispose' se puede mantener para la limpieza de recursos si es
-  // necesario en un futuro, pero no se llamará desde los widgets.
-  // Podría ser útil si tienes una lógica de "cierre de sesión" que
-  // necesite desuscribirse de todos los streams.
   void dispose() {
-    developer.log('❌ [Repo] Disposing DebtRepository resources. (Realtime channels might not be cleaned up with this pattern).', name: 'DebtRepository');
-    // La limpieza de los streams de Supabase (`.from().stream()`) es un poco más compleja
-    // y generalmente se maneja cancelando la suscripción al Stream en el widget que lo consume.
-    // Para este patrón, la lógica de 'dispose' es menos crítica.
+    developer.log('❌ [Repo] Disposing DebtRepository resources.', name: 'DebtRepository');
+    // La limpieza de los streams de Supabase con .stream() se maneja mejor
+    // cancelando la suscripción al Stream en el widget que lo consume.
   }
 }

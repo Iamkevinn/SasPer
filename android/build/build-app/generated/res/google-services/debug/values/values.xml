@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="gcm_defaultSenderId" translatable="false">379964520338</string>
+    <string name="google_api_key" translatable="false">AIzaSyA1-DFxSeEttgWjc7Rlu192ldkWX_esXjo</string>
+    <string name="google_app_id" translatable="false">1:379964520338:android:758b6ab9f4d390362a334b</string>
+    <string name="google_crash_reporting_api_key" translatable="false">AIzaSyA1-DFxSeEttgWjc7Rlu192ldkWX_esXjo</string>
+    <string name="google_storage_bucket" translatable="false">sasper-6fc6c.firebasestorage.app</string>
+    <string name="project_id" translatable="false">sasper-6fc6c</string>
+</resources>

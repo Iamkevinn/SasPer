@@ -6,25 +6,37 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:developer' as developer;
 
 class RecurringRepository {
-  // 1. Cliente 'late final'.
-  late final SupabaseClient _client;
+  // --- INICIO DE LOS CAMBIOS CRUCIALES ---
+  
+  // 1. El cliente ahora es privado y nullable.
+  SupabaseClient? _supabase;
+
+  // 2. Un getter público que PROTEGE el acceso al cliente.
+  SupabaseClient get client {
+    if (_supabase == null) {
+      throw Exception("¡ERROR! RecurringRepository no ha sido inicializado. Llama a .initialize() en SplashScreen.");
+    }
+    return _supabase!;
+  }
+
+  // --- FIN DE LOS CAMBIOS CRUCIALES ---
   
   final _streamController = StreamController<List<RecurringTransaction>>.broadcast();
   RealtimeChannel? _channel;
+  bool _isInitialized = false;
 
-  // 2. Constructor privado.
   RecurringRepository._privateConstructor();
-
-  // 3. Instancia estática.
   static final RecurringRepository instance = RecurringRepository._privateConstructor();
 
-  // 4. Método de inicialización.
-  void initialize(SupabaseClient client) {
-    _client = client;
+  void initialize(SupabaseClient supabaseClient) {
+    if (_isInitialized) return;
+    _supabase = supabaseClient;
+    _isInitialized = true;
     developer.log('✅ [Repo] RecurringRepository Singleton Initialized and Client Injected.', name: 'RecurringRepository');
   }
 
-  /// Devuelve un stream con la lista de transacciones recurrentes del usuario.
+  // Ahora, todos los métodos usan el getter `client` en lugar de `_client`
+
   Stream<List<RecurringTransaction>> getRecurringTransactionsStream() {
     _setupRealtimeSubscription();
     _fetchAndPushData();
@@ -33,11 +45,11 @@ class RecurringRepository {
 
   void _setupRealtimeSubscription() {
     if (_channel != null) return;
-    final userId = _client.auth.currentUser?.id;
+    final userId = client.auth.currentUser?.id;
     if (userId == null) return;
 
     developer.log('📡 [Repo] Setting up realtime subscription for recurring_transactions...', name: 'RecurringRepository');
-    _channel = _client
+    _channel = client
         .channel('public:recurring_transactions')
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
@@ -55,12 +67,12 @@ class RecurringRepository {
   Future<void> _fetchAndPushData() async {
     developer.log('🔄 [Repo] Fetching recurring transactions...', name: 'RecurringRepository');
     try {
-      final userId = _client.auth.currentUser?.id;
+      final userId = client.auth.currentUser?.id;
       if (userId == null) {
         throw Exception("Usuario no autenticado.");
       }
       
-      final data = await _client
+      final data = await client
           .from('recurring_transactions')
           .select()
           .eq('user_id', userId)
@@ -80,15 +92,36 @@ class RecurringRepository {
     }
   }
   
-  /// Fuerza una recarga manual de los datos.
+  /// Nuevo método: devuelve la lista completa de transacciones recurrentes
+  Future<List<RecurringTransaction>> getAll() async {
+    developer.log('🔄 [Repo] getAll(): fetching all recurring transactions...', name: 'RecurringRepository');
+    final userId = client.auth.currentUser?.id;
+    if (userId == null) throw Exception('Usuario no autenticado.');
+
+    final data = await client
+        .from('recurring_transactions')
+        .select()
+        .eq('user_id', userId)
+        .order('next_due_date', ascending: true);
+
+    final list = (data as List)
+        .map((e) => RecurringTransaction.fromMap(e))
+        .toList();
+
+    developer.log(
+      '✅ [Repo] getAll(): fetched ${list.length} transactions.',
+      name: 'RecurringRepository',
+    );
+    return list;
+  }
+
   Future<void> refreshData() async {
     developer.log('🔄 [Repo] Manual refresh requested.', name: 'RecurringRepository');
     await _fetchAndPushData();
   }
 
-  // --- MÉTODOS CRUD (Lógica sin cambios) ---
-
-  Future<void> addRecurringTransaction({
+  // Ahora devuelve Future<RecurringTransaction> en lugar de Future<void>
+  Future<RecurringTransaction> addRecurringTransaction({
     required String description,
     required double amount,
     required String type,
@@ -100,8 +133,8 @@ class RecurringRepository {
     DateTime? endDate,
   }) async {
     try {
-      await _client.from('recurring_transactions').insert({
-        'user_id': _client.auth.currentUser!.id,
+      final newTransactionData = {
+        'user_id': client.auth.currentUser!.id,
         'description': description,
         'amount': amount,
         'type': type,
@@ -112,17 +145,28 @@ class RecurringRepository {
         'start_date': startDate.toIso8601String(),
         'next_due_date': startDate.toIso8601String(),
         'end_date': endDate?.toIso8601String(),
-      });
+      };
+
+      // Usamos .insert() y .select() para que Supabase nos devuelva el registro que acaba de crear
+      final response = await client
+          .from('recurring_transactions')
+          .insert(newTransactionData)
+          .select()
+          .single(); // .single() convierte la lista de un solo elemento en un solo objeto
+
+      // Parseamos el mapa devuelto por Supabase y lo retornamos
+      return RecurringTransaction.fromMap(response);
+
     } catch (e) {
       developer.log('🔥 Error añadiendo transacción recurrente: $e', name: 'RecurringRepository');
       throw Exception('No se pudo crear el gasto fijo.');
     }
   }
 
+
   Future<void> updateRecurringTransaction(RecurringTransaction transaction) async {
     try {
-      // Asumiendo que RecurringTransaction tiene un método toJson()
-      await _client
+      await client
         .from('recurring_transactions')
         .update(transaction.toJson()) 
         .eq('id', transaction.id);
@@ -134,7 +178,7 @@ class RecurringRepository {
   
   Future<void> deleteRecurringTransaction(String id) async {
     try {
-      await _client.from('recurring_transactions').delete().eq('id', id);
+      await client.from('recurring_transactions').delete().eq('id', id);
     } catch (e) {
       developer.log('🔥 Error eliminando transacción recurrente: $e', name: 'RecurringRepository');
       throw Exception('No se pudo eliminar el gasto fijo.');
@@ -144,7 +188,7 @@ class RecurringRepository {
   void dispose() {
     developer.log('❌ [Repo] Disposing RecurringRepository Singleton resources.', name: 'RecurringRepository');
     if (_channel != null) {
-      _client.removeChannel(_channel!);
+      client.removeChannel(_channel!);
       _channel = null;
     }
     _streamController.close();

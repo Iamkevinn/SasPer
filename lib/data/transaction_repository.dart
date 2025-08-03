@@ -7,23 +7,36 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:developer' as developer;
 
 class TransactionRepository {
-  // 1. Cliente 'late final'.
-  late final SupabaseClient _client;
+  // --- INICIO DE LOS CAMBIOS CRUCIALES ---
+  
+  // 1. El cliente ahora es privado y nullable.
+  SupabaseClient? _supabase;
+
+  // 2. Un getter público que PROTEGE el acceso al cliente.
+  SupabaseClient get client {
+    if (_supabase == null) {
+      throw Exception("¡ERROR! TransactionRepository no ha sido inicializado. Llama a .initialize() en SplashScreen.");
+    }
+    return _supabase!;
+  }
+
+  // --- FIN DE LOS CAMBIOS CRUCIALES ---
   
   final _streamController = StreamController<List<Transaction>>.broadcast();
   RealtimeChannel? _channel;
+  bool _isInitialized = false;
 
-  // 2. Constructor privado.
   TransactionRepository._privateConstructor();
-
-  // 3. Instancia estática.
   static final TransactionRepository instance = TransactionRepository._privateConstructor();
 
-  // 4. Método de inicialización.
-  void initialize(SupabaseClient client) {
-    _client = client;
+  void initialize(SupabaseClient supabaseClient) {
+    if (_isInitialized) return;
+    _supabase = supabaseClient;
+    _isInitialized = true;
     developer.log('✅ [Repo] TransactionRepository Singleton Initialized and Client Injected.', name: 'TransactionRepository');
   }
+
+  // Ahora, todos los métodos usan el getter `client` en lugar de `_client`
 
   Stream<List<Transaction>> getTransactionsStream() {
     _setupRealtimeSubscription();
@@ -33,11 +46,11 @@ class TransactionRepository {
 
   void _setupRealtimeSubscription() {
     if (_channel != null) return;
-    final userId = _client.auth.currentUser?.id;
+    final userId = client.auth.currentUser?.id;
     if (userId == null) return;
 
     developer.log('📡 [Repo] Setting up realtime subscription for transactions...', name: 'TransactionRepository');
-    _channel = _client
+    _channel = client
         .channel('public:transactions')
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
@@ -55,10 +68,10 @@ class TransactionRepository {
   Future<void> _fetchAndPushTransactions() async {
     developer.log('🔄 [Repo] Fetching all transactions...', name: 'TransactionRepository');
     try {
-      final userId = _client.auth.currentUser?.id;
+      final userId = client.auth.currentUser?.id;
       if (userId == null) throw Exception("User not authenticated");
       
-      final data = await _client
+      final data = await client
           .from('transactions')
           .select()
           .eq('user_id', userId)
@@ -78,12 +91,10 @@ class TransactionRepository {
     }
   }
 
-  /// Fuerza una recarga manual de las transacciones.
   Future<void> refreshData() async {
     await _fetchAndPushTransactions();
   }
   
-  /// Añade una nueva transacción a la base de datos.
   Future<void> addTransaction({
     required String accountId,
     required double amount,
@@ -94,8 +105,8 @@ class TransactionRepository {
     int? budgetId,
   }) async {
     try {
-      await _client.from('transactions').insert({
-        'user_id': _client.auth.currentUser!.id,
+      await client.from('transactions').insert({
+        'user_id': client.auth.currentUser!.id,
         'account_id': accountId,
         'amount': amount, 
         'type': type,
@@ -110,7 +121,6 @@ class TransactionRepository {
     }
   }
 
-  /// Actualiza una transacción existente.
   Future<void> updateTransaction({
     required int transactionId,
     required String accountId,
@@ -121,7 +131,7 @@ class TransactionRepository {
     required DateTime transactionDate,
   }) async {
     try {
-      await _client.from('transactions').update({
+      await client.from('transactions').update({
         'account_id': accountId,
         'amount': amount,
         'type': type,
@@ -135,23 +145,20 @@ class TransactionRepository {
     }
   }
 
-  /// Elimina una transacción.
   Future<void> deleteTransaction(int transactionId) async {
     try {
-      await _client.from('transactions').delete().eq('id', transactionId);
+      await client.from('transactions').delete().eq('id', transactionId);
     } catch (e) {
       developer.log('🔥 Error deleting transaction: $e', name: 'TransactionRepository');
       throw Exception('No se pudo eliminar la transacción.');
     }
   }
 
-  // --- MÉTODOS DE CONSULTA ADICIONALES ---
-  
   Future<List<Transaction>> getTransactionsForBudget(String budgetId) async {
     developer.log('🔄 [Repo] Fetching transactions for budget ID: $budgetId', name: 'TransactionRepository');
     try {
       final int budgetIdAsInt = int.parse(budgetId);
-      final response = await _client
+      final response = await client
           .from('transactions')
           .select()
           .eq('budget_id', budgetIdAsInt)
@@ -173,7 +180,7 @@ class TransactionRepository {
     List<String>? categoryFilter,
     DateTimeRange? dateRange,
   }) async {
-    var query = _client.from('transactions').select().eq('user_id', _client.auth.currentUser!.id);
+    var query = client.from('transactions').select().eq('user_id', client.auth.currentUser!.id);
     
     if (searchQuery != null && searchQuery.isNotEmpty) {
       final queryFilter = '%$searchQuery%';
@@ -196,7 +203,7 @@ class TransactionRepository {
 
   Future<Transaction?> getTransactionById(int transactionId) async {
     try {
-      final response = await _client
+      final response = await client
           .from('transactions')
           .select()
           .eq('id', transactionId)
@@ -211,7 +218,7 @@ class TransactionRepository {
   void dispose() {
     developer.log('❌ [Repo] Disposing TransactionRepository Singleton resources.', name: 'TransactionRepository');
     if (_channel != null) {
-      _client.removeChannel(_channel!);
+      client.removeChannel(_channel!);
       _channel = null;
     }
     _streamController.close();

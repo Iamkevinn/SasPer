@@ -12,7 +12,9 @@ import 'package:sasper/screens/edit_recurring_transaction_screen.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:sasper/widgets/shared/empty_state_card.dart';
+import 'package:sasper/services/notification_service.dart'; 
 import 'package:sasper/main.dart'; // Para navigatorKey
+import 'dart:developer' as developer; // Para logging
 
 enum RecurringStatus { due, upcoming, scheduled }
 
@@ -84,6 +86,13 @@ class _RecurringTransactionsScreenState extends State<RecurringTransactionsScree
 
     if (confirmed == true && mounted) {
       try {
+        // 2. Primero, eliminamos la transacción de la base de datos
+        await _repository.deleteRecurringTransaction(item.id);
+
+        // 3. LUEGO, CANCELAMOS SUS NOTIFICACIONES PROGRAMADAS
+        await NotificationService.instance.cancelRecurringReminders(item.id);
+        developer.log('✅ Notificaciones canceladas para: ${item.description}', name: 'RecurringScreen');
+
         await _repository.deleteRecurringTransaction(item.id);
         _repository.refreshData(); // Asegura que la UI se actualice
         NotificationHelper.show(

@@ -2,7 +2,10 @@
     xmlns:tools="http://schemas.android.com/tools"
     package="com.example.sasper">
 
+    <!-- Permisos necesarios -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
     <application
         android:label="sasper"
@@ -10,6 +13,7 @@
         android:icon="@mipmap/ic_launcher"
         android:enableOnBackInvokedCallback="true">
 
+        <!-- Activity principal -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -18,7 +22,7 @@
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
-            
+
             <meta-data
                 android:name="io.flutter.embedding.android.NormalTheme"
                 android:resource="@style/NormalTheme" />
@@ -27,38 +31,35 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-            
+
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:scheme="sasper"
-                    android:host="add_transaction"/>
+                <data android:scheme="sasper" android:host="add_transaction"/>
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:scheme="sasper"
-                    android:host="login-callback" />
+                <data android:scheme="sasper" android:host="login-callback" />
             </intent-filter>
         </activity>
 
-        <!-- Configuración de home_widget (sin cambios, está correcta) -->
-        <receiver android:name="es.antonborri.home_widget.HomeWidgetBackgroundReceiver"
+        <!-- home_widget -->
+        <receiver
+            android:name="es.antonborri.home_widget.HomeWidgetBackgroundReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="es.antonborri.home_widget.action.BACKGROUND" />
             </intent-filter>
         </receiver>
-
-        <service android:name="es.antonborri.home_widget.HomeWidgetBackgroundService"
+        <service
+            android:name="es.antonborri.home_widget.HomeWidgetBackgroundService"
             android:permission="android.permission.BIND_JOB_SERVICE"
             android:exported="true"/>
-        
-        <!-- Providers para tus 3 tamaños de widgets (sin cambios, están correctos) -->
+
+        <!-- App Widgets -->
         <receiver
             android:name=".SasPerWidgetProvider"
             android:exported="true"
@@ -73,55 +74,50 @@
                 android:resource="@xml/home_widget_info" />
         </receiver>
 
-        <receiver android:name=".SasPerMediumWidgetProvider" 
-            android:exported="true" 
-            tools:replace="android:exported" 
+        <receiver
+            android:name=".SasPerMediumWidgetProvider"
+            android:exported="true"
+            tools:replace="android:exported"
             android:label="SasPer Gráfico">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
-            <meta-data android:name="android.appwidget.provider"
+            <meta-data
+                android:name="android.appwidget.provider"
                 android:resource="@xml/widget_medium_info" />
         </receiver>
-        
-        <receiver android:name=".SasPerLargeWidgetProvider" 
-            android:exported="true" 
-            tools:replace="android:exported" 
+
+        <receiver
+            android:name=".SasPerLargeWidgetProvider"
+            android:exported="true"
+            tools:replace="android:exported"
             android:label="SasPer Detallado">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
-            <meta-data android:name="android.appwidget.provider"
+            <meta-data
+                android:name="android.appwidget.provider"
                 android:resource="@xml/widget_large_info" />
         </receiver>
 
-
-        <!-- ===== CAMBIO 1: SERVICIO ELIMINADO ===== -->
-        <!-- Se ha eliminado por completo la declaración de 'WidgetUpdateService', ya no es necesaria. -->
-        
-
-        <!-- ===== CAMBIO 2: RECEPTOR CORREGIDO Y SIMPLIFICADO ===== -->
-        <!-- Ahora el receptor se declara para ser "exportado", lo que le permite recibir broadcasts del sistema. -->
-        <!-- El sistema operativo se encargará de activarlo cuando sea necesario. -->
+        <!-- Receptor para cambios de wallpaper y boot -->
         <receiver
             android:name=".WallpaperChangeReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.WALLPAPER_CHANGED"/>
                 <action android:name="android.intent.action.CONFIGURATION_CHANGED"/>
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
             </intent-filter>
         </receiver>
-        
+
+        <!-- Servicio de RemoteViews (widgets) -->
         <service
             android:name=".WidgetListService"
             android:permission="android.permission.BIND_REMOTEVIEWS"
             android:exported="false" />
 
-
-        <!-- FileProvider (sin cambios, está correcto) -->
+        <!-- FileProvider -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.provider"
@@ -131,11 +127,27 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/provider_paths" />
         </provider>
-        
-        <!-- Metadatos de Flutter (sin cambios) -->
+
+        <!-- flutterEmbedding meta -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- Para que zonedSchedule() funcione tras reboot o reinstalación -->
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+            </intent-filter>
+        </receiver>
+
+        <!-- El receptor que dispara las notificaciones programadas -->
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
+            android:exported="false"/>
+
     </application>
 
     <queries>

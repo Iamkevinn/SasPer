@@ -5,31 +5,38 @@ import 'dart:developer' as developer;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AuthRepository {
-  // 1. El cliente se declara como 'late final'.
-  late final SupabaseClient _client;
+  // --- INICIO DE LOS CAMBIOS CRUCIALES ---
+  
+  // 1. El cliente ahora es privado y nullable.
+  SupabaseClient? _supabase;
 
-  // 2. Constructor privado.
-  AuthRepository._privateConstructor();
-
-  // 3. La instancia estática que guarda el único objeto de esta clase.
-  static final AuthRepository instance = AuthRepository._privateConstructor();
-
-  // 4. Método público de inicialización. Se llama desde main.dart.
-  void initialize(SupabaseClient client) {
-    _client = client;
+  // 2. Un getter público que PROTEGE el acceso al cliente.
+  SupabaseClient get client {
+    if (_supabase == null) {
+      throw Exception("¡ERROR! AuthRepository no ha sido inicializado. Llama a .initialize() en SplashScreen.");
+    }
+    return _supabase!;
   }
 
-  // --- MÉTODOS PÚBLICOS DEL REPOSITORIO ---
+  // --- FIN DE LOS CAMBIOS CRUCIALES ---
 
-  /// Devuelve un stream que emite eventos de cambio de estado de autenticación.
-  /// Ideal para ser usado por el AuthGate.
-  Stream<AuthState> get authStateChanges => _client.auth.onAuthStateChange;
+  AuthRepository._privateConstructor();
+  static final AuthRepository instance = AuthRepository._privateConstructor();
+  bool _isInitialized = false;
 
-  /// Devuelve el usuario actualmente autenticado, o null si no hay ninguno.
-  User? get currentUser => _client.auth.currentUser;
+  void initialize(SupabaseClient supabaseClient) {
+    if (_isInitialized) return;
+    _supabase = supabaseClient;
+    _isInitialized = true;
+    developer.log('✅ [Repo] AuthRepository Singleton Initialized and Client Injected.', name: 'AuthRepository');
+  }
 
-  /// Registra un nuevo usuario con email y contraseña.
-  /// AHORA también acepta un nombre de usuario para pasarlo como metadato.
+  // Ahora, todos los métodos usan el getter `client` en lugar de `_client`
+
+  Stream<AuthState> get authStateChanges => client.auth.onAuthStateChange;
+
+  User? get currentUser => client.auth.currentUser;
+
   Future<void> signUp({
     required String email,
     required String password,
@@ -37,12 +44,10 @@ class AuthRepository {
     String? fullName,
   }) async {
     try {
-      await _client.auth.signUp(
+      await client.auth.signUp(
         email: email,
         password: password,
         data: {
-          // Estos datos se guardan en 'raw_user_meta_data'
-          // y nuestra función SQL los usará para crear el perfil.
           'username': username,
           'full_name': fullName,
         },
@@ -56,16 +61,13 @@ class AuthRepository {
     }
   }
   
-  /// Inicia sesión con correo y contraseña.
-  /// Lanza excepciones con mensajes claros para la UI en caso de error.
   Future<void> signInWithPassword(String email, String password) async {
     try {
-      await _client.auth.signInWithPassword(
+      await client.auth.signInWithPassword(
         email: email,
         password: password,
       );
     } on AuthException catch (e) {
-      // Mapeamos errores comunes a mensajes más amigables.
       if (e.message.contains('Invalid login credentials')) {
         throw 'Correo o contraseña incorrectos. Por favor, verifica tus datos.';
       }
@@ -75,8 +77,7 @@ class AuthRepository {
     }
   }
 
-  /// Cierra la sesión del usuario actual.
   Future<void> signOut() async {
-    await _client.auth.signOut();
+    await client.auth.signOut();
   }
 }

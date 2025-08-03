@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingVertical="6dp">
+
+    <!-- Contenedor para Título y Categoría -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <!-- Título de la transacción -->
+        <TextView
+            android:id="@+id/widget_item_transaction_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Supermercado"
+            android:textColor="?android:attr/textColorPrimary"
+            android:textSize="14sp"
+            android:maxLines="1"
+            android:ellipsize="end"/>
+
+        <!-- NUEVO: TextView para la Categoría -->
+        <TextView
+            android:id="@+id/widget_item_transaction_category"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Comida"
+            android:textColor="?android:attr/textColorSecondary"
+            android:textSize="12sp"
+            android:maxLines="1"
+            android:ellipsize="end"/>
+
+    </LinearLayout>
+
+    <!-- Monto de la transacción (sin cambios) -->
+    <TextView
+        android:id="@+id/widget_item_transaction_amount"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="-50.25"
+        android:layout_marginStart="8dp"
+        android:textColor="?android:attr/textColorSecondary"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+
+</LinearLayout>

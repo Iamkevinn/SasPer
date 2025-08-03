@@ -106,12 +106,10 @@ class WidgetService {
     // Asumo que tu repositorio tiene un stream llamado 'dashboardStream' o similar.
     // ¡Ajusta el nombre si es diferente!
     _dashboardSubscription = DashboardRepository.instance.getDashboardDataStream().listen((dashboardData) {
-      if (dashboardData != null) {
-        developer.log('✅ [WidgetService] ¡Nuevos datos recibidos del stream! Actualizando widgets...', name: _logName);
-        // Llamamos a la función que ya teníamos.
-        updateAllWidgetData();
-      }
-    }, onError: (e) {
+      developer.log('✅ [WidgetService] ¡Nuevos datos recibidos del stream! Actualizando widgets...', name: _logName);
+      // Llamamos a la función que ya teníamos.
+      updateAllWidgetData();
+        }, onError: (e) {
         developer.log('🔥 [WidgetService] Error en el stream del dashboard: $e', name: _logName);
     });
 

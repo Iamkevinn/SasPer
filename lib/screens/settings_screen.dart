@@ -4,6 +4,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
 import 'package:sasper/data/auth_repository.dart';
 import 'package:sasper/screens/categories_screen.dart'; // Asegúrate de que este archivo exista
+import 'package:sasper/services/notification_service.dart';
 import 'package:sasper/services/theme_provider.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
@@ -161,7 +162,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           ),
-          
+          // AÑADE ESTE BOTÓN DE PRUEBA
+    ListTile(
+      leading: const Icon(Icons.science_outlined),
+      title: const Text('Probar Notificación Inmediata'),
+      subtitle: const Text('Recibirás una notificación en 5 segundos'),
+      onTap: () {
+        NotificationService.instance.testImmediateNotification();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Notificación de prueba programada para 5 segundos...')),
+        );
+      },
+    ),
           // --- SECCIÓN DE PERSONALIZACIÓN ---
           const SizedBox(height: 16),
           _buildSectionHeader('Personalización'),

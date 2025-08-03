@@ -6,25 +6,37 @@ import 'dart:async';
 import 'package:sasper/models/goal_model.dart';
 
 class GoalRepository {
-  // 1. Cliente 'late final'.
-  late final SupabaseClient _client;
+  // --- INICIO DE LOS CAMBIOS CRUCIALES ---
+  
+  // 1. El cliente ahora es privado y nullable.
+  SupabaseClient? _supabase;
+
+  // 2. Un getter público que PROTEGE el acceso al cliente.
+  SupabaseClient get client {
+    if (_supabase == null) {
+      throw Exception("¡ERROR! GoalRepository no ha sido inicializado. Llama a .initialize() en SplashScreen.");
+    }
+    return _supabase!;
+  }
+
+  // --- FIN DE LOS CAMBIOS CRUCIALES ---
 
   final _streamController = StreamController<List<Goal>>.broadcast();
   RealtimeChannel? _channel;
+  bool _isInitialized = false;
 
-  // 2. Constructor privado.
   GoalRepository._privateConstructor();
-  
-  // 3. Instancia estática.
   static final GoalRepository instance = GoalRepository._privateConstructor();
   
-  // 4. Método de inicialización.
-  void initialize(SupabaseClient client) {
-    _client = client;
+  void initialize(SupabaseClient supabaseClient) {
+    if (_isInitialized) return;
+    _supabase = supabaseClient;
+    _isInitialized = true;
     developer.log('✅ [Repo] GoalRepository Singleton Initialized and Client Injected.', name: 'GoalRepository');
   }
 
-  /// Devuelve un stream con la lista de metas del usuario.
+  // Ahora, todos los métodos usan el getter `client` en lugar de `_client`
+
   Stream<List<Goal>> getGoalsStream() {
     _setupRealtimeSubscription();
     _fetchAndPushData();
@@ -33,11 +45,11 @@ class GoalRepository {
   
   void _setupRealtimeSubscription() {
     if (_channel != null) return;
-    final userId = _client.auth.currentUser?.id;
+    final userId = client.auth.currentUser?.id;
     if (userId == null) return;
 
     developer.log('📡 [Repo] Setting up realtime subscription for goals...', name: 'GoalRepository');
-    _channel = _client
+    _channel = client
         .channel('public:goals')
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
@@ -55,10 +67,10 @@ class GoalRepository {
   Future<void> _fetchAndPushData() async {
     developer.log('🔄 [Repo] Fetching all goals...', name: 'GoalRepository');
     try {
-      final userId = _client.auth.currentUser?.id;
+      final userId = client.auth.currentUser?.id;
       if (userId == null) throw Exception("User not authenticated");
       
-      final data = await _client
+      final data = await client
           .from('goals')
           .select()
           .eq('user_id', userId)
@@ -78,13 +90,10 @@ class GoalRepository {
     }
   }
 
-  /// Fuerza una recarga manual de los datos de las metas.
   Future<void> refreshData() async {
     await _fetchAndPushData();
   }
   
-  // --- MÉTODOS CRUD (NO NECESITAN CAMBIOS) ---
-
   Future<void> addGoal({
     required String name,
     required double targetAmount,
@@ -92,8 +101,8 @@ class GoalRepository {
     String? iconName,
   }) async {
     try {
-      final userId = _client.auth.currentUser!.id;
-      await _client.from('goals').insert({
+      final userId = client.auth.currentUser!.id;
+      await client.from('goals').insert({
         'user_id': userId,
         'name': name,
         'target_amount': targetAmount,
@@ -111,7 +120,7 @@ class GoalRepository {
 
   Future<void> updateGoal(Goal goal) async {
     try {
-      await _client
+      await client
           .from('goals')
           .update({
             'name': goal.name,
@@ -129,7 +138,7 @@ class GoalRepository {
   
   Future<void> deleteGoalSafely(String goalId) async {
     try {
-      await _client.rpc(
+      await client.rpc(
         'delete_goal_safely',
         params: {'goal_id_to_delete': goalId},
       );
@@ -145,7 +154,7 @@ class GoalRepository {
     required double amount,
   }) async {
     try {
-      await _client.rpc('add_contribution_to_goal', params: {
+      await client.rpc('add_contribution_to_goal', params: {
         'goal_id_input': goalId,
         'account_id_input': accountId,
         'amount_input': amount,
@@ -160,7 +169,7 @@ class GoalRepository {
   void dispose() {
     developer.log('❌ [Repo] Disposing GoalRepository resources.', name: 'GoalRepository');
     if (_channel != null) {
-      _client.removeChannel(_channel!);
+      client.removeChannel(_channel!);
       _channel = null;
     }
     _streamController.close();

@@ -14,7 +14,6 @@ import 'package:sasper/widgets/categories/category_list_item.dart';
 import 'package:sasper/widgets/shared/custom_dialog.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:sasper/widgets/shared/empty_state_card.dart';
-import 'package:sasper/services/event_service.dart'; 
 
 class CategoriesScreen extends StatefulWidget {
   const CategoriesScreen({super.key});

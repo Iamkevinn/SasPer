@@ -7,26 +7,37 @@ import 'package:sasper/models/transaction_models.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AccountRepository {
-  // 1. El cliente se declara como 'late final'. Se inicializará una vez.
-  late final SupabaseClient _client;
+  // --- INICIO DE LOS CAMBIOS CRUCIALES ---
+  
+  // 1. El cliente ahora es privado y nullable. No más 'late final'.
+  SupabaseClient? _supabase;
+
+  // 2. Un getter público que PROTEGE el acceso al cliente.
+  SupabaseClient get client {
+    if (_supabase == null) {
+      throw Exception("¡ERROR! AccountRepository no ha sido inicializado. Llama a .initialize() en SplashScreen.");
+    }
+    return _supabase!;
+  }
+
+  // --- FIN DE LOS CAMBIOS CRUCIALES ---
 
   final _streamController = StreamController<List<Account>>.broadcast();
   RealtimeChannel? _channel;
+  bool _isInitialized = false;
 
-  // 2. Constructor privado para evitar que se creen instancias desde fuera.
   AccountRepository._privateConstructor();
-
-  // 3. La instancia estática que guarda el único objeto de esta clase.
   static final AccountRepository instance = AccountRepository._privateConstructor();
 
-  // 4. Método público de inicialización. Se llama desde main.dart.
-  void initialize(SupabaseClient client) {
-    _client = client;
+  void initialize(SupabaseClient supabaseClient) {
+    if (_isInitialized) return;
+    _supabase = supabaseClient;
+    _isInitialized = true;
     developer.log('✅ [Repo] AccountRepository Singleton Initialized and Client Injected.', name: 'AccountRepository');
   }
 
-  /// Devuelve un stream con la lista de cuentas y sus balances.
-  /// La primera vez que se llama, configura las suscripciones en tiempo real.
+  // Ahora, todos los métodos usan el getter `client` en lugar de `_client`
+
   Stream<List<Account>> getAccountsStream() {
     _setupRealtimeSubscriptions();
     _fetchAccountsWithBalance();
@@ -35,11 +46,11 @@ class AccountRepository {
 
   void _setupRealtimeSubscriptions() {
     if (_channel != null) return;
-    final userId = _client.auth.currentUser?.id;
+    final userId = client.auth.currentUser?.id;
     if (userId == null) return;
 
     developer.log('📡 [Repo] Setting up realtime subscriptions for accounts & transactions...', name: 'AccountRepository');
-    _channel = _client
+    _channel = client
         .channel('public:all_tables_for_accounts')
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
@@ -67,10 +78,10 @@ class AccountRepository {
   Future<void> _fetchAccountsWithBalance() async {
     developer.log('🔄 [Repo] Fetching accounts with balance...', name: 'AccountRepository');
     try {
-      final userId = _client.auth.currentUser?.id;
+      final userId = client.auth.currentUser?.id;
       if (userId == null) throw Exception('User not authenticated');
 
-      final response = await _client.rpc(
+      final response = await client.rpc(
         'get_accounts_with_balance', 
         params: {'p_user_id': userId}
       );
@@ -88,12 +99,9 @@ class AccountRepository {
     }
   }
   
-  /// Fuerza una recarga manual de los datos de las cuentas.
   Future<void> refreshData() async {
     await _fetchAccountsWithBalance();
   }
-
-  // --- MÉTODOS CRUD (AÑADIR, EDITAR, BORRAR) ---
 
   Future<void> addAccount({
     required String name,
@@ -101,8 +109,8 @@ class AccountRepository {
     required double initialBalance,
   }) async {
     try {
-      await _client.from('accounts').insert({
-        'user_id': _client.auth.currentUser!.id,
+      await client.from('accounts').insert({
+        'user_id': client.auth.currentUser!.id,
         'name': name,
         'type': type,
         'initial_balance': initialBalance,
@@ -116,7 +124,7 @@ class AccountRepository {
 
   Future<void> updateAccount(Account account) async {
     try {
-      await _client
+      await client
           .from('accounts')
           .update({ 'name': account.name, 'type': account.type })
           .eq('id', account.id);
@@ -128,7 +136,7 @@ class AccountRepository {
   
   Future<void> deleteAccountSafely(String accountId) async {
     try {
-      await _client.rpc(
+      await client.rpc(
         'delete_account_safely',
         params: {'account_id_to_delete': accountId},
       );
@@ -138,19 +146,16 @@ class AccountRepository {
     }
   }
 
-  // --- MÉTODOS DE CONSULTA ADICIONALES ---
-
   Future<List<Account>> getAccounts() async {
     try {
-      final userId = _client.auth.currentUser?.id;
+      final userId = client.auth.currentUser?.id;
       if (userId == null) throw Exception('User not authenticated');
 
-      final response = await _client.from('accounts')
+      final response = await client.from('accounts')
         .select()
         .eq('user_id', userId)
         .order('name', ascending: true);
       
-      // Asumiendo que tu modelo Account tiene un constructor `fromMap`. Si no, cámbialo.
       return (response as List).map((data) => Account.fromMap(data)).toList();
     } catch (e) {
       developer.log('🔥 Error fetching simple accounts: $e', name: 'AccountRepository');
@@ -161,10 +166,10 @@ class AccountRepository {
   Future<Account?> getAccountById(String accountId) async {
     developer.log('ℹ️ [Repo] Fetching account by ID: $accountId...', name: 'AccountRepository');
     try {
-      final userId = _client.auth.currentUser?.id;
+      final userId = client.auth.currentUser?.id;
       if (userId == null) throw Exception('User not authenticated');
 
-      final response = await _client.rpc(
+      final response = await client.rpc(
         'get_accounts_with_balance', 
         params: {'p_user_id': userId}
       );
@@ -179,7 +184,7 @@ class AccountRepository {
   
   Future<List<Transaction>> getTransactionsForAccount(String accountId) async {
     try {
-      final response = await _client
+      final response = await client
           .from('transactions')
           .select()
           .eq('account_id', accountId)
@@ -198,7 +203,7 @@ class AccountRepository {
     String? description,
   }) async {
     try {
-      await _client.rpc('create_transfer', params: {
+      await client.rpc('create_transfer', params: {
         'from_account_id': fromAccountId,
         'to_account_id': toAccountId,
         'transfer_amount': amount,
@@ -212,7 +217,7 @@ class AccountRepository {
 
   Future<double> getAccountProjectionInDays(String accountId) async {
     try {
-      final response = await _client.rpc(
+      final response = await client.rpc(
         'get_burn_rate_projection', 
         params: {'account_id_param': accountId}
       );
@@ -232,7 +237,7 @@ class AccountRepository {
   void dispose() {
     developer.log('❌ [Repo] Disposing AccountRepository Singleton resources.', name: 'AccountRepository');
     if (_channel != null) {
-      _client.removeChannel(_channel!);
+      client.removeChannel(_channel!);
       _channel = null;
     }
     _streamController.close();

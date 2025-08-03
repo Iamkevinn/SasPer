@@ -1,0 +1,875 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.example.sasper"
+4    android:versionCode="1"
+5    android:versionName="1.0.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="21"
+9        android:targetSdkVersion="35" />
+10
+11    <uses-permission android:name="android.permission.INTERNET" />
+11-->C:\Proyectos\SasPer\android\app\src\debug\AndroidManifest.xml:24:5-66
+11-->C:\Proyectos\SasPer\android\app\src\debug\AndroidManifest.xml:24:22-64
+12    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+12-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:5:5-81
+12-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:5:22-78
+13
+14    <queries>
+14-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:141:5-146:15
+15        <intent>
+15-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:142:9-145:18
+16            <action android:name="android.intent.action.PROCESS_TEXT" />
+16-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:143:13-72
+16-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:143:21-70
+17
+18            <data android:mimeType="text/plain" />
+18-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:144:13-50
+18-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:144:19-48
+19        </intent>
+20    </queries>
+21
+22    <uses-permission android:name="android.permission.WAKE_LOCK" />
+22-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:8:5-68
+22-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:8:22-65
+23    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" /> <!-- Permissions options for the `notification` group -->
+23-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:9:5-79
+23-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:9:22-76
+24    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" /> <!-- Required by older versions of Google Play services to create IID tokens -->
+24-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:11:5-77
+24-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:11:22-74
+25    <uses-permission android:name="com.google.android.c2dm.permission.RECEIVE" />
+25-->[com.google.firebase:firebase-messaging:24.1.2] C:\Users\ASUS\.gradle\caches\8.12\transforms\c95ae3c98f04ae3ba5404e4143eadeb9\transformed\jetified-firebase-messaging-24.1.2\AndroidManifest.xml:26:5-82
+25-->[com.google.firebase:firebase-messaging:24.1.2] C:\Users\ASUS\.gradle\caches\8.12\transforms\c95ae3c98f04ae3ba5404e4143eadeb9\transformed\jetified-firebase-messaging-24.1.2\AndroidManifest.xml:26:22-79
+26    <uses-permission android:name="android.permission.VIBRATE" />
+26-->[:flutter_local_notifications] C:\Proyectos\SasPer\android\build\build-flutter_local_notifications\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:7:5-66
+26-->[:flutter_local_notifications] C:\Proyectos\SasPer\android\build\build-flutter_local_notifications\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:7:22-63
+27    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+27-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:28:5-77
+27-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:28:22-74
+28
+29    <permission
+29-->[androidx.core:core:1.13.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\62e42733fc48d7e4200114b93a9c82fb\transformed\core-1.13.1\AndroidManifest.xml:22:5-24:47
+30        android:name="com.example.sasper.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+30-->[androidx.core:core:1.13.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\62e42733fc48d7e4200114b93a9c82fb\transformed\core-1.13.1\AndroidManifest.xml:23:9-81
+31        android:protectionLevel="signature" />
+31-->[androidx.core:core:1.13.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\62e42733fc48d7e4200114b93a9c82fb\transformed\core-1.13.1\AndroidManifest.xml:24:9-44
+32
+33    <uses-permission android:name="com.example.sasper.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+33-->[androidx.core:core:1.13.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\62e42733fc48d7e4200114b93a9c82fb\transformed\core-1.13.1\AndroidManifest.xml:26:5-97
+33-->[androidx.core:core:1.13.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\62e42733fc48d7e4200114b93a9c82fb\transformed\core-1.13.1\AndroidManifest.xml:26:22-94
+34    <!--
+35 The INTERNET permission is required for development. Specifically,
+36         the Flutter tool needs it to communicate with the running application
+37         to allow setting breakpoints, to provide hot reload, etc.
+38    -->
+39    <application
+40        android:name="android.app.Application"
+40-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:9:9-42
+41        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+41-->[androidx.core:core:1.13.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\62e42733fc48d7e4200114b93a9c82fb\transformed\core-1.13.1\AndroidManifest.xml:28:18-86
+42        android:debuggable="true"
+43        android:enableOnBackInvokedCallback="true"
+43-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:11:9-51
+44        android:extractNativeLibs="true"
+45        android:icon="@mipmap/ic_launcher"
+45-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:10:9-43
+46        android:label="sasper"
+46-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:8:9-31
+47        android:theme="@style/AppTheme" >
+47-->C:\Proyectos\SasPer\android\app\src\debug\AndroidManifest.xml:7:9-40
+48
+49        <!-- … otras entradas … -->
+50
+51        <receiver
+51-->C:\Proyectos\SasPer\android\app\src\debug\AndroidManifest.xml:11:9-21:20
+52            android:name="com.example.sasper.SasPerWidgetProvider"
+52-->C:\Proyectos\SasPer\android\app\src\debug\AndroidManifest.xml:12:13-67
+53            android:enabled="true"
+53-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:66:13-35
+54            android:exported="true"
+54-->C:\Proyectos\SasPer\android\app\src\debug\AndroidManifest.xml:13:13-36
+55            android:label="SasPer Resumen" >
+55-->C:\Proyectos\SasPer\android\app\src\debug\AndroidManifest.xml:14:13-43
+56            <intent-filter>
+56-->C:\Proyectos\SasPer\android\app\src\debug\AndroidManifest.xml:15:9-17:25
+57                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+57-->C:\Proyectos\SasPer\android\app\src\debug\AndroidManifest.xml:16:13-79
+57-->C:\Proyectos\SasPer\android\app\src\debug\AndroidManifest.xml:16:21-77
+58            </intent-filter>
+59
+60            <meta-data
+60-->C:\Proyectos\SasPer\android\app\src\debug\AndroidManifest.xml:18:9-20:56
+61                android:name="android.appwidget.provider"
+61-->C:\Proyectos\SasPer\android\app\src\debug\AndroidManifest.xml:19:13-54
+62                android:resource="@xml/home_widget_info" />
+62-->C:\Proyectos\SasPer\android\app\src\debug\AndroidManifest.xml:20:13-53
+63        </receiver>
+64
+65        <activity
+65-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:13:9-47:20
+66            android:name="com.example.sasper.MainActivity"
+66-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:14:13-41
+67            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+67-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:18:13-163
+68            android:exported="true"
+68-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:15:13-36
+69            android:hardwareAccelerated="true"
+69-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:19:13-47
+70            android:launchMode="singleTop"
+70-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:16:13-43
+71            android:theme="@style/LaunchTheme"
+71-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:17:13-47
+72            android:windowSoftInputMode="adjustResize" >
+72-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:20:13-55
+73            <meta-data
+73-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:22:13-24:57
+74                android:name="io.flutter.embedding.android.NormalTheme"
+74-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:23:17-72
+75                android:resource="@style/NormalTheme" />
+75-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:24:17-54
+76
+77            <intent-filter>
+77-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:26:13-29:29
+78                <action android:name="android.intent.action.MAIN" />
+78-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:27:17-68
+78-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:27:25-66
+79
+80                <category android:name="android.intent.category.LAUNCHER" />
+80-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:28:17-76
+80-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:28:27-74
+81            </intent-filter>
+82            <intent-filter>
+82-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:31:13-38:29
+83                <action android:name="android.intent.action.VIEW" />
+83-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:32:17-69
+83-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:32:25-66
+84
+85                <category android:name="android.intent.category.DEFAULT" />
+85-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:33:17-76
+85-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:33:27-73
+86                <category android:name="android.intent.category.BROWSABLE" />
+86-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:34:17-78
+86-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:34:27-75
+87
+88                <data
+88-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:144:13-50
+89                    android:host="add_transaction"
+90                    android:scheme="sasper" />
+91            </intent-filter>
+92            <intent-filter>
+92-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:39:13-46:29
+93                <action android:name="android.intent.action.VIEW" />
+93-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:32:17-69
+93-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:32:25-66
+94
+95                <category android:name="android.intent.category.DEFAULT" />
+95-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:33:17-76
+95-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:33:27-73
+96                <category android:name="android.intent.category.BROWSABLE" />
+96-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:34:17-78
+96-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:34:27-75
+97
+98                <data
+98-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:144:13-50
+99                    android:host="login-callback"
+100                    android:scheme="sasper" />
+101            </intent-filter>
+102        </activity> <!-- Configuración de home_widget (sin cambios, está correcta) -->
+103        <receiver
+103-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:50:9-55:20
+104            android:name="es.antonborri.home_widget.HomeWidgetBackgroundReceiver"
+104-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:50:19-88
+105            android:exported="true" >
+105-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:51:13-36
+106            <intent-filter>
+106-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:52:13-54:29
+107                <action android:name="es.antonborri.home_widget.action.BACKGROUND" />
+107-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:53:17-86
+107-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:53:25-83
+108            </intent-filter>
+109        </receiver>
+110
+111        <service
+111-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:57:9-59:38
+112            android:name="es.antonborri.home_widget.HomeWidgetBackgroundService"
+112-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:57:18-86
+113            android:exported="true"
+113-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:59:13-36
+114            android:permission="android.permission.BIND_JOB_SERVICE" />
+114-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:58:13-69
+115
+116        <receiver
+116-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:76:9-85:20
+117            android:name="com.example.sasper.SasPerMediumWidgetProvider"
+117-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:76:19-61
+118            android:exported="true"
+118-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:77:13-36
+119            android:label="SasPer Gráfico" >
+119-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:79:13-43
+120            <intent-filter>
+120-->C:\Proyectos\SasPer\android\app\src\debug\AndroidManifest.xml:15:9-17:25
+121                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+121-->C:\Proyectos\SasPer\android\app\src\debug\AndroidManifest.xml:16:13-79
+121-->C:\Proyectos\SasPer\android\app\src\debug\AndroidManifest.xml:16:21-77
+122            </intent-filter>
+123
+124            <meta-data
+124-->C:\Proyectos\SasPer\android\app\src\debug\AndroidManifest.xml:18:9-20:56
+125                android:name="android.appwidget.provider"
+125-->C:\Proyectos\SasPer\android\app\src\debug\AndroidManifest.xml:19:13-54
+126                android:resource="@xml/widget_medium_info" />
+126-->C:\Proyectos\SasPer\android\app\src\debug\AndroidManifest.xml:20:13-53
+127        </receiver>
+128        <receiver
+128-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:87:9-96:20
+129            android:name="com.example.sasper.SasPerLargeWidgetProvider"
+129-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:87:19-60
+130            android:exported="true"
+130-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:88:13-36
+131            android:label="SasPer Detallado" >
+131-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:90:13-45
+132            <intent-filter>
+132-->C:\Proyectos\SasPer\android\app\src\debug\AndroidManifest.xml:15:9-17:25
+133                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+133-->C:\Proyectos\SasPer\android\app\src\debug\AndroidManifest.xml:16:13-79
+133-->C:\Proyectos\SasPer\android\app\src\debug\AndroidManifest.xml:16:21-77
+134            </intent-filter>
+135
+136            <meta-data
+136-->C:\Proyectos\SasPer\android\app\src\debug\AndroidManifest.xml:18:9-20:56
+137                android:name="android.appwidget.provider"
+137-->C:\Proyectos\SasPer\android\app\src\debug\AndroidManifest.xml:19:13-54
+138                android:resource="@xml/widget_large_info" />
+138-->C:\Proyectos\SasPer\android\app\src\debug\AndroidManifest.xml:20:13-53
+139        </receiver> <!-- ===== CAMBIO 1: SERVICIO ELIMINADO ===== -->
+140        <!-- Se ha eliminado por completo la declaración de 'WidgetUpdateService', ya no es necesaria. -->
+141        <!-- ===== CAMBIO 2: RECEPTOR CORREGIDO Y SIMPLIFICADO ===== -->
+142        <!-- Ahora el receptor se declara para ser "exportado", lo que le permite recibir broadcasts del sistema. -->
+143        <!-- El sistema operativo se encargará de activarlo cuando sea necesario. -->
+144        <receiver
+144-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:106:9-116:20
+145            android:name="com.example.sasper.WallpaperChangeReceiver"
+145-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:107:13-52
+146            android:exported="true" >
+146-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:108:13-36
+147            <intent-filter>
+147-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:109:13-112:29
+148                <action android:name="android.intent.action.WALLPAPER_CHANGED" />
+148-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:110:17-81
+148-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:110:25-79
+149                <action android:name="android.intent.action.CONFIGURATION_CHANGED" />
+149-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:111:17-85
+149-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:111:25-83
+150            </intent-filter>
+151            <intent-filter>
+151-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:113:13-115:29
+152                <action android:name="android.intent.action.BOOT_COMPLETED" />
+152-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:114:17-79
+152-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:114:25-76
+153            </intent-filter>
+154        </receiver>
+155
+156        <service
+156-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:118:9-121:40
+157            android:name="com.example.sasper.WidgetListService"
+157-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:119:13-46
+158            android:exported="false"
+158-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:121:13-37
+159            android:permission="android.permission.BIND_REMOTEVIEWS" /> <!-- FileProvider (sin cambios, está correcto) -->
+159-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:120:13-69
+160        <provider
+161            android:name="androidx.core.content.FileProvider"
+162            android:authorities="com.example.sasper.provider"
+163            android:exported="false"
+164            android:grantUriPermissions="true" >
+165            <meta-data
+166                android:name="android.support.FILE_PROVIDER_PATHS"
+167                android:resource="@xml/provider_paths" />
+168        </provider> <!-- Metadatos de Flutter (sin cambios) -->
+169        <meta-data
+169-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:136:9-138:33
+170            android:name="flutterEmbedding"
+170-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:137:13-44
+171            android:value="2" />
+171-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:138:13-30
+172        <!--
+173          Any addition to or deletion of the components below should also have a corresponding
+174          change to the GlanceComponents class, so that alternate subclasses of these components may
+175          be specified by Glance users. Please also add a release note so that users of the
+176          multiprocess library will know if they need to add another manifest entry.
+177        -->
+178        <activity
+178-->[androidx.glance:glance-appwidget:1.2.0-alpha01] C:\Users\ASUS\.gradle\caches\8.12\transforms\a82c025c0bb70bcb12a9f9761994ff75\transformed\jetified-glance-appwidget-1.2.0-alpha01\AndroidManifest.xml:30:9-35:62
+179            android:name="androidx.glance.appwidget.action.ActionTrampolineActivity"
+179-->[androidx.glance:glance-appwidget:1.2.0-alpha01] C:\Users\ASUS\.gradle\caches\8.12\transforms\a82c025c0bb70bcb12a9f9761994ff75\transformed\jetified-glance-appwidget-1.2.0-alpha01\AndroidManifest.xml:31:13-85
+180            android:enabled="true"
+180-->[androidx.glance:glance-appwidget:1.2.0-alpha01] C:\Users\ASUS\.gradle\caches\8.12\transforms\a82c025c0bb70bcb12a9f9761994ff75\transformed\jetified-glance-appwidget-1.2.0-alpha01\AndroidManifest.xml:32:13-35
+181            android:excludeFromRecents="true"
+181-->[androidx.glance:glance-appwidget:1.2.0-alpha01] C:\Users\ASUS\.gradle\caches\8.12\transforms\a82c025c0bb70bcb12a9f9761994ff75\transformed\jetified-glance-appwidget-1.2.0-alpha01\AndroidManifest.xml:33:13-46
+182            android:exported="false"
+182-->[androidx.glance:glance-appwidget:1.2.0-alpha01] C:\Users\ASUS\.gradle\caches\8.12\transforms\a82c025c0bb70bcb12a9f9761994ff75\transformed\jetified-glance-appwidget-1.2.0-alpha01\AndroidManifest.xml:34:13-37
+183            android:theme="@android:style/Theme.NoDisplay" />
+183-->[androidx.glance:glance-appwidget:1.2.0-alpha01] C:\Users\ASUS\.gradle\caches\8.12\transforms\a82c025c0bb70bcb12a9f9761994ff75\transformed\jetified-glance-appwidget-1.2.0-alpha01\AndroidManifest.xml:35:13-59
+184        <activity
+184-->[androidx.glance:glance-appwidget:1.2.0-alpha01] C:\Users\ASUS\.gradle\caches\8.12\transforms\a82c025c0bb70bcb12a9f9761994ff75\transformed\jetified-glance-appwidget-1.2.0-alpha01\AndroidManifest.xml:36:9-43:81
+185            android:name="androidx.glance.appwidget.action.InvisibleActionTrampolineActivity"
+185-->[androidx.glance:glance-appwidget:1.2.0-alpha01] C:\Users\ASUS\.gradle\caches\8.12\transforms\a82c025c0bb70bcb12a9f9761994ff75\transformed\jetified-glance-appwidget-1.2.0-alpha01\AndroidManifest.xml:37:13-94
+186            android:enabled="true"
+186-->[androidx.glance:glance-appwidget:1.2.0-alpha01] C:\Users\ASUS\.gradle\caches\8.12\transforms\a82c025c0bb70bcb12a9f9761994ff75\transformed\jetified-glance-appwidget-1.2.0-alpha01\AndroidManifest.xml:38:13-35
+187            android:exported="false"
+187-->[androidx.glance:glance-appwidget:1.2.0-alpha01] C:\Users\ASUS\.gradle\caches\8.12\transforms\a82c025c0bb70bcb12a9f9761994ff75\transformed\jetified-glance-appwidget-1.2.0-alpha01\AndroidManifest.xml:39:13-37
+188            android:launchMode="singleInstance"
+188-->[androidx.glance:glance-appwidget:1.2.0-alpha01] C:\Users\ASUS\.gradle\caches\8.12\transforms\a82c025c0bb70bcb12a9f9761994ff75\transformed\jetified-glance-appwidget-1.2.0-alpha01\AndroidManifest.xml:40:13-48
+189            android:noHistory="true"
+189-->[androidx.glance:glance-appwidget:1.2.0-alpha01] C:\Users\ASUS\.gradle\caches\8.12\transforms\a82c025c0bb70bcb12a9f9761994ff75\transformed\jetified-glance-appwidget-1.2.0-alpha01\AndroidManifest.xml:41:13-37
+190            android:taskAffinity="androidx.glance.appwidget.ListAdapterCallbackTrampoline"
+190-->[androidx.glance:glance-appwidget:1.2.0-alpha01] C:\Users\ASUS\.gradle\caches\8.12\transforms\a82c025c0bb70bcb12a9f9761994ff75\transformed\jetified-glance-appwidget-1.2.0-alpha01\AndroidManifest.xml:42:13-91
+191            android:theme="@style/Widget.Glance.AppWidget.CallbackTrampoline" />
+191-->[androidx.glance:glance-appwidget:1.2.0-alpha01] C:\Users\ASUS\.gradle\caches\8.12\transforms\a82c025c0bb70bcb12a9f9761994ff75\transformed\jetified-glance-appwidget-1.2.0-alpha01\AndroidManifest.xml:43:13-78
+192
+193        <receiver
+193-->[androidx.glance:glance-appwidget:1.2.0-alpha01] C:\Users\ASUS\.gradle\caches\8.12\transforms\a82c025c0bb70bcb12a9f9761994ff75\transformed\jetified-glance-appwidget-1.2.0-alpha01\AndroidManifest.xml:45:9-48:40
+194            android:name="androidx.glance.appwidget.action.ActionCallbackBroadcastReceiver"
+194-->[androidx.glance:glance-appwidget:1.2.0-alpha01] C:\Users\ASUS\.gradle\caches\8.12\transforms\a82c025c0bb70bcb12a9f9761994ff75\transformed\jetified-glance-appwidget-1.2.0-alpha01\AndroidManifest.xml:46:13-92
+195            android:enabled="true"
+195-->[androidx.glance:glance-appwidget:1.2.0-alpha01] C:\Users\ASUS\.gradle\caches\8.12\transforms\a82c025c0bb70bcb12a9f9761994ff75\transformed\jetified-glance-appwidget-1.2.0-alpha01\AndroidManifest.xml:47:13-35
+196            android:exported="false" />
+196-->[androidx.glance:glance-appwidget:1.2.0-alpha01] C:\Users\ASUS\.gradle\caches\8.12\transforms\a82c025c0bb70bcb12a9f9761994ff75\transformed\jetified-glance-appwidget-1.2.0-alpha01\AndroidManifest.xml:48:13-37
+197        <receiver
+197-->[androidx.glance:glance-appwidget:1.2.0-alpha01] C:\Users\ASUS\.gradle\caches\8.12\transforms\a82c025c0bb70bcb12a9f9761994ff75\transformed\jetified-glance-appwidget-1.2.0-alpha01\AndroidManifest.xml:49:9-52:40
+198            android:name="androidx.glance.appwidget.UnmanagedSessionReceiver"
+198-->[androidx.glance:glance-appwidget:1.2.0-alpha01] C:\Users\ASUS\.gradle\caches\8.12\transforms\a82c025c0bb70bcb12a9f9761994ff75\transformed\jetified-glance-appwidget-1.2.0-alpha01\AndroidManifest.xml:50:13-78
+199            android:enabled="true"
+199-->[androidx.glance:glance-appwidget:1.2.0-alpha01] C:\Users\ASUS\.gradle\caches\8.12\transforms\a82c025c0bb70bcb12a9f9761994ff75\transformed\jetified-glance-appwidget-1.2.0-alpha01\AndroidManifest.xml:51:13-35
+200            android:exported="false" />
+200-->[androidx.glance:glance-appwidget:1.2.0-alpha01] C:\Users\ASUS\.gradle\caches\8.12\transforms\a82c025c0bb70bcb12a9f9761994ff75\transformed\jetified-glance-appwidget-1.2.0-alpha01\AndroidManifest.xml:52:13-37
+201        <receiver
+201-->[androidx.glance:glance-appwidget:1.2.0-alpha01] C:\Users\ASUS\.gradle\caches\8.12\transforms\a82c025c0bb70bcb12a9f9761994ff75\transformed\jetified-glance-appwidget-1.2.0-alpha01\AndroidManifest.xml:53:9-60:20
+202            android:name="androidx.glance.appwidget.MyPackageReplacedReceiver"
+202-->[androidx.glance:glance-appwidget:1.2.0-alpha01] C:\Users\ASUS\.gradle\caches\8.12\transforms\a82c025c0bb70bcb12a9f9761994ff75\transformed\jetified-glance-appwidget-1.2.0-alpha01\AndroidManifest.xml:54:13-79
+203            android:enabled="true"
+203-->[androidx.glance:glance-appwidget:1.2.0-alpha01] C:\Users\ASUS\.gradle\caches\8.12\transforms\a82c025c0bb70bcb12a9f9761994ff75\transformed\jetified-glance-appwidget-1.2.0-alpha01\AndroidManifest.xml:55:13-35
+204            android:exported="false" >
+204-->[androidx.glance:glance-appwidget:1.2.0-alpha01] C:\Users\ASUS\.gradle\caches\8.12\transforms\a82c025c0bb70bcb12a9f9761994ff75\transformed\jetified-glance-appwidget-1.2.0-alpha01\AndroidManifest.xml:56:13-37
+205            <intent-filter>
+205-->[androidx.glance:glance-appwidget:1.2.0-alpha01] C:\Users\ASUS\.gradle\caches\8.12\transforms\a82c025c0bb70bcb12a9f9761994ff75\transformed\jetified-glance-appwidget-1.2.0-alpha01\AndroidManifest.xml:57:13-59:29
+206                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+206-->[androidx.glance:glance-appwidget:1.2.0-alpha01] C:\Users\ASUS\.gradle\caches\8.12\transforms\a82c025c0bb70bcb12a9f9761994ff75\transformed\jetified-glance-appwidget-1.2.0-alpha01\AndroidManifest.xml:58:17-84
+206-->[androidx.glance:glance-appwidget:1.2.0-alpha01] C:\Users\ASUS\.gradle\caches\8.12\transforms\a82c025c0bb70bcb12a9f9761994ff75\transformed\jetified-glance-appwidget-1.2.0-alpha01\AndroidManifest.xml:58:25-81
+207            </intent-filter>
+208        </receiver>
+209
+210        <service
+210-->[androidx.glance:glance-appwidget:1.2.0-alpha01] C:\Users\ASUS\.gradle\caches\8.12\transforms\a82c025c0bb70bcb12a9f9761994ff75\transformed\jetified-glance-appwidget-1.2.0-alpha01\AndroidManifest.xml:62:9-65:72
+211            android:name="androidx.glance.appwidget.GlanceRemoteViewsService"
+211-->[androidx.glance:glance-appwidget:1.2.0-alpha01] C:\Users\ASUS\.gradle\caches\8.12\transforms\a82c025c0bb70bcb12a9f9761994ff75\transformed\jetified-glance-appwidget-1.2.0-alpha01\AndroidManifest.xml:63:13-78
+212            android:exported="true"
+212-->[androidx.glance:glance-appwidget:1.2.0-alpha01] C:\Users\ASUS\.gradle\caches\8.12\transforms\a82c025c0bb70bcb12a9f9761994ff75\transformed\jetified-glance-appwidget-1.2.0-alpha01\AndroidManifest.xml:64:13-36
+213            android:permission="android.permission.BIND_REMOTEVIEWS" />
+213-->[androidx.glance:glance-appwidget:1.2.0-alpha01] C:\Users\ASUS\.gradle\caches\8.12\transforms\a82c025c0bb70bcb12a9f9761994ff75\transformed\jetified-glance-appwidget-1.2.0-alpha01\AndroidManifest.xml:65:13-69
+214        <service
+214-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:14:9-17:72
+215            android:name="io.flutter.plugins.firebase.messaging.FlutterFirebaseMessagingBackgroundService"
+215-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:15:13-107
+216            android:exported="false"
+216-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:16:13-37
+217            android:permission="android.permission.BIND_JOB_SERVICE" />
+217-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:17:13-69
+218        <service
+218-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:18:9-24:19
+219            android:name="io.flutter.plugins.firebase.messaging.FlutterFirebaseMessagingService"
+219-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:19:13-97
+220            android:exported="false" >
+220-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:20:13-37
+221            <intent-filter>
+221-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:21:13-23:29
+222                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+222-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:22:17-78
+222-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:22:25-75
+223            </intent-filter>
+224        </service>
+225
+226        <receiver
+226-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:26:9-33:20
+227            android:name="io.flutter.plugins.firebase.messaging.FlutterFirebaseMessagingReceiver"
+227-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:27:13-98
+228            android:exported="true"
+228-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:28:13-36
+229            android:permission="com.google.android.c2dm.permission.SEND" >
+229-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:29:13-73
+230            <intent-filter>
+230-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:30:13-32:29
+231                <action android:name="com.google.android.c2dm.intent.RECEIVE" />
+231-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:31:17-81
+231-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:31:25-78
+232            </intent-filter>
+233        </receiver>
+234
+235        <service
+235-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:35:9-39:19
+236            android:name="com.google.firebase.components.ComponentDiscoveryService"
+236-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:35:18-89
+237            android:directBootAware="true"
+237-->[com.google.firebase:firebase-common:21.0.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\884eaa981a9fa4a373408d1fac13a2b7\transformed\jetified-firebase-common-21.0.0\AndroidManifest.xml:32:13-43
+238            android:exported="false" >
+238-->[com.google.firebase:firebase-messaging:24.1.2] C:\Users\ASUS\.gradle\caches\8.12\transforms\c95ae3c98f04ae3ba5404e4143eadeb9\transformed\jetified-firebase-messaging-24.1.2\AndroidManifest.xml:56:13-37
+239            <meta-data
+239-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:36:13-38:85
+240                android:name="com.google.firebase.components:io.flutter.plugins.firebase.messaging.FlutterFirebaseAppRegistrar"
+240-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:37:17-128
+241                android:value="com.google.firebase.components.ComponentRegistrar" />
+241-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:38:17-82
+242            <meta-data
+242-->[:firebase_core] C:\Proyectos\SasPer\android\build\build-firebase_core\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:9:13-11:85
+243                android:name="com.google.firebase.components:io.flutter.plugins.firebase.core.FlutterFirebaseCoreRegistrar"
+243-->[:firebase_core] C:\Proyectos\SasPer\android\build\build-firebase_core\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:10:17-124
+244                android:value="com.google.firebase.components.ComponentRegistrar" />
+244-->[:firebase_core] C:\Proyectos\SasPer\android\build\build-firebase_core\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:11:17-82
+245            <meta-data
+245-->[com.google.firebase:firebase-messaging:24.1.2] C:\Users\ASUS\.gradle\caches\8.12\transforms\c95ae3c98f04ae3ba5404e4143eadeb9\transformed\jetified-firebase-messaging-24.1.2\AndroidManifest.xml:57:13-59:85
+246                android:name="com.google.firebase.components:com.google.firebase.messaging.FirebaseMessagingKtxRegistrar"
+246-->[com.google.firebase:firebase-messaging:24.1.2] C:\Users\ASUS\.gradle\caches\8.12\transforms\c95ae3c98f04ae3ba5404e4143eadeb9\transformed\jetified-firebase-messaging-24.1.2\AndroidManifest.xml:58:17-122
+247                android:value="com.google.firebase.components.ComponentRegistrar" />
+247-->[com.google.firebase:firebase-messaging:24.1.2] C:\Users\ASUS\.gradle\caches\8.12\transforms\c95ae3c98f04ae3ba5404e4143eadeb9\transformed\jetified-firebase-messaging-24.1.2\AndroidManifest.xml:59:17-82
+248            <meta-data
+248-->[com.google.firebase:firebase-messaging:24.1.2] C:\Users\ASUS\.gradle\caches\8.12\transforms\c95ae3c98f04ae3ba5404e4143eadeb9\transformed\jetified-firebase-messaging-24.1.2\AndroidManifest.xml:60:13-62:85
+249                android:name="com.google.firebase.components:com.google.firebase.messaging.FirebaseMessagingRegistrar"
+249-->[com.google.firebase:firebase-messaging:24.1.2] C:\Users\ASUS\.gradle\caches\8.12\transforms\c95ae3c98f04ae3ba5404e4143eadeb9\transformed\jetified-firebase-messaging-24.1.2\AndroidManifest.xml:61:17-119
+250                android:value="com.google.firebase.components.ComponentRegistrar" />
+250-->[com.google.firebase:firebase-messaging:24.1.2] C:\Users\ASUS\.gradle\caches\8.12\transforms\c95ae3c98f04ae3ba5404e4143eadeb9\transformed\jetified-firebase-messaging-24.1.2\AndroidManifest.xml:62:17-82
+251            <meta-data
+251-->[com.google.firebase:firebase-installations:18.0.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\7eeaae32b0fa89aa38f29989197139b4\transformed\jetified-firebase-installations-18.0.0\AndroidManifest.xml:15:13-17:85
+252                android:name="com.google.firebase.components:com.google.firebase.installations.FirebaseInstallationsKtxRegistrar"
+252-->[com.google.firebase:firebase-installations:18.0.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\7eeaae32b0fa89aa38f29989197139b4\transformed\jetified-firebase-installations-18.0.0\AndroidManifest.xml:16:17-130
+253                android:value="com.google.firebase.components.ComponentRegistrar" />
+253-->[com.google.firebase:firebase-installations:18.0.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\7eeaae32b0fa89aa38f29989197139b4\transformed\jetified-firebase-installations-18.0.0\AndroidManifest.xml:17:17-82
+254            <meta-data
+254-->[com.google.firebase:firebase-installations:18.0.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\7eeaae32b0fa89aa38f29989197139b4\transformed\jetified-firebase-installations-18.0.0\AndroidManifest.xml:18:13-20:85
+255                android:name="com.google.firebase.components:com.google.firebase.installations.FirebaseInstallationsRegistrar"
+255-->[com.google.firebase:firebase-installations:18.0.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\7eeaae32b0fa89aa38f29989197139b4\transformed\jetified-firebase-installations-18.0.0\AndroidManifest.xml:19:17-127
+256                android:value="com.google.firebase.components.ComponentRegistrar" />
+256-->[com.google.firebase:firebase-installations:18.0.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\7eeaae32b0fa89aa38f29989197139b4\transformed\jetified-firebase-installations-18.0.0\AndroidManifest.xml:20:17-82
+257            <meta-data
+257-->[com.google.firebase:firebase-common-ktx:21.0.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\9f6c3a36cd709297faeeb405e0f97f0c\transformed\jetified-firebase-common-ktx-21.0.0\AndroidManifest.xml:12:13-14:85
+258                android:name="com.google.firebase.components:com.google.firebase.ktx.FirebaseCommonLegacyRegistrar"
+258-->[com.google.firebase:firebase-common-ktx:21.0.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\9f6c3a36cd709297faeeb405e0f97f0c\transformed\jetified-firebase-common-ktx-21.0.0\AndroidManifest.xml:13:17-116
+259                android:value="com.google.firebase.components.ComponentRegistrar" />
+259-->[com.google.firebase:firebase-common-ktx:21.0.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\9f6c3a36cd709297faeeb405e0f97f0c\transformed\jetified-firebase-common-ktx-21.0.0\AndroidManifest.xml:14:17-82
+260            <meta-data
+260-->[com.google.firebase:firebase-common:21.0.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\884eaa981a9fa4a373408d1fac13a2b7\transformed\jetified-firebase-common-21.0.0\AndroidManifest.xml:35:13-37:85
+261                android:name="com.google.firebase.components:com.google.firebase.FirebaseCommonKtxRegistrar"
+261-->[com.google.firebase:firebase-common:21.0.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\884eaa981a9fa4a373408d1fac13a2b7\transformed\jetified-firebase-common-21.0.0\AndroidManifest.xml:36:17-109
+262                android:value="com.google.firebase.components.ComponentRegistrar" />
+262-->[com.google.firebase:firebase-common:21.0.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\884eaa981a9fa4a373408d1fac13a2b7\transformed\jetified-firebase-common-21.0.0\AndroidManifest.xml:37:17-82
+263            <meta-data
+263-->[com.google.firebase:firebase-datatransport:18.2.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\70ae3badc0785fb84bbcebaccea9c92b\transformed\jetified-firebase-datatransport-18.2.0\AndroidManifest.xml:25:13-27:85
+264                android:name="com.google.firebase.components:com.google.firebase.datatransport.TransportRegistrar"
+264-->[com.google.firebase:firebase-datatransport:18.2.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\70ae3badc0785fb84bbcebaccea9c92b\transformed\jetified-firebase-datatransport-18.2.0\AndroidManifest.xml:26:17-115
+265                android:value="com.google.firebase.components.ComponentRegistrar" />
+265-->[com.google.firebase:firebase-datatransport:18.2.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\70ae3badc0785fb84bbcebaccea9c92b\transformed\jetified-firebase-datatransport-18.2.0\AndroidManifest.xml:27:17-82
+266        </service>
+267
+268        <provider
+268-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:41:9-45:38
+269            android:name="io.flutter.plugins.firebase.messaging.FlutterFirebaseMessagingInitProvider"
+269-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:42:13-102
+270            android:authorities="com.example.sasper.flutterfirebasemessaginginitprovider"
+270-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:43:13-88
+271            android:exported="false"
+271-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:44:13-37
+272            android:initOrder="99" />
+272-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:45:13-35
+273
+274        <receiver
+274-->[com.google.firebase:firebase-messaging:24.1.2] C:\Users\ASUS\.gradle\caches\8.12\transforms\c95ae3c98f04ae3ba5404e4143eadeb9\transformed\jetified-firebase-messaging-24.1.2\AndroidManifest.xml:29:9-40:20
+275            android:name="com.google.firebase.iid.FirebaseInstanceIdReceiver"
+275-->[com.google.firebase:firebase-messaging:24.1.2] C:\Users\ASUS\.gradle\caches\8.12\transforms\c95ae3c98f04ae3ba5404e4143eadeb9\transformed\jetified-firebase-messaging-24.1.2\AndroidManifest.xml:30:13-78
+276            android:exported="true"
+276-->[com.google.firebase:firebase-messaging:24.1.2] C:\Users\ASUS\.gradle\caches\8.12\transforms\c95ae3c98f04ae3ba5404e4143eadeb9\transformed\jetified-firebase-messaging-24.1.2\AndroidManifest.xml:31:13-36
+277            android:permission="com.google.android.c2dm.permission.SEND" >
+277-->[com.google.firebase:firebase-messaging:24.1.2] C:\Users\ASUS\.gradle\caches\8.12\transforms\c95ae3c98f04ae3ba5404e4143eadeb9\transformed\jetified-firebase-messaging-24.1.2\AndroidManifest.xml:32:13-73
+278            <intent-filter>
+278-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:30:13-32:29
+279                <action android:name="com.google.android.c2dm.intent.RECEIVE" />
+279-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:31:17-81
+279-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:31:25-78
+280            </intent-filter>
+281
+282            <meta-data
+282-->[com.google.firebase:firebase-messaging:24.1.2] C:\Users\ASUS\.gradle\caches\8.12\transforms\c95ae3c98f04ae3ba5404e4143eadeb9\transformed\jetified-firebase-messaging-24.1.2\AndroidManifest.xml:37:13-39:40
+283                android:name="com.google.android.gms.cloudmessaging.FINISHED_AFTER_HANDLED"
+283-->[com.google.firebase:firebase-messaging:24.1.2] C:\Users\ASUS\.gradle\caches\8.12\transforms\c95ae3c98f04ae3ba5404e4143eadeb9\transformed\jetified-firebase-messaging-24.1.2\AndroidManifest.xml:38:17-92
+284                android:value="true" />
+284-->[com.google.firebase:firebase-messaging:24.1.2] C:\Users\ASUS\.gradle\caches\8.12\transforms\c95ae3c98f04ae3ba5404e4143eadeb9\transformed\jetified-firebase-messaging-24.1.2\AndroidManifest.xml:39:17-37
+285        </receiver>
+286        <!--
+287             FirebaseMessagingService performs security checks at runtime,
+288             but set to not exported to explicitly avoid allowing another app to call it.
+289        -->
+290        <service
+290-->[com.google.firebase:firebase-messaging:24.1.2] C:\Users\ASUS\.gradle\caches\8.12\transforms\c95ae3c98f04ae3ba5404e4143eadeb9\transformed\jetified-firebase-messaging-24.1.2\AndroidManifest.xml:46:9-53:19
+291            android:name="com.google.firebase.messaging.FirebaseMessagingService"
+291-->[com.google.firebase:firebase-messaging:24.1.2] C:\Users\ASUS\.gradle\caches\8.12\transforms\c95ae3c98f04ae3ba5404e4143eadeb9\transformed\jetified-firebase-messaging-24.1.2\AndroidManifest.xml:47:13-82
+292            android:directBootAware="true"
+292-->[com.google.firebase:firebase-messaging:24.1.2] C:\Users\ASUS\.gradle\caches\8.12\transforms\c95ae3c98f04ae3ba5404e4143eadeb9\transformed\jetified-firebase-messaging-24.1.2\AndroidManifest.xml:48:13-43
+293            android:exported="false" >
+293-->[com.google.firebase:firebase-messaging:24.1.2] C:\Users\ASUS\.gradle\caches\8.12\transforms\c95ae3c98f04ae3ba5404e4143eadeb9\transformed\jetified-firebase-messaging-24.1.2\AndroidManifest.xml:49:13-37
+294            <intent-filter android:priority="-500" >
+294-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:21:13-23:29
+295                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+295-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:22:17-78
+295-->[:firebase_messaging] C:\Proyectos\SasPer\android\build\build-firebase_messaging\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:22:25-75
+296            </intent-filter>
+297        </service>
+298
+299        <activity
+299-->[:url_launcher_android] C:\Proyectos\SasPer\android\build\build-url_launcher_android\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:8:9-11:74
+300            android:name="io.flutter.plugins.urllauncher.WebViewActivity"
+300-->[:url_launcher_android] C:\Proyectos\SasPer\android\build\build-url_launcher_android\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:9:13-74
+301            android:exported="false"
+301-->[:url_launcher_android] C:\Proyectos\SasPer\android\build\build-url_launcher_android\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:10:13-37
+302            android:theme="@android:style/Theme.NoTitleBar.Fullscreen" />
+302-->[:url_launcher_android] C:\Proyectos\SasPer\android\build\build-url_launcher_android\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:11:13-71
+303
+304        <uses-library
+304-->[androidx.window:window:1.2.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\5519fbbac70289e20ed689cd5c7a916a\transformed\jetified-window-1.2.0\AndroidManifest.xml:23:9-25:40
+305            android:name="androidx.window.extensions"
+305-->[androidx.window:window:1.2.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\5519fbbac70289e20ed689cd5c7a916a\transformed\jetified-window-1.2.0\AndroidManifest.xml:24:13-54
+306            android:required="false" />
+306-->[androidx.window:window:1.2.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\5519fbbac70289e20ed689cd5c7a916a\transformed\jetified-window-1.2.0\AndroidManifest.xml:25:13-37
+307        <uses-library
+307-->[androidx.window:window:1.2.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\5519fbbac70289e20ed689cd5c7a916a\transformed\jetified-window-1.2.0\AndroidManifest.xml:26:9-28:40
+308            android:name="androidx.window.sidecar"
+308-->[androidx.window:window:1.2.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\5519fbbac70289e20ed689cd5c7a916a\transformed\jetified-window-1.2.0\AndroidManifest.xml:27:13-51
+309            android:required="false" />
+309-->[androidx.window:window:1.2.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\5519fbbac70289e20ed689cd5c7a916a\transformed\jetified-window-1.2.0\AndroidManifest.xml:28:13-37
+310
+311        <service
+311-->[androidx.core:core-remoteviews:1.1.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\53e89d45f572c5fbcec60a7e0e5d2d43\transformed\jetified-core-remoteviews-1.1.0\AndroidManifest.xml:24:9-27:63
+312            android:name="androidx.core.widget.RemoteViewsCompatService"
+312-->[androidx.core:core-remoteviews:1.1.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\53e89d45f572c5fbcec60a7e0e5d2d43\transformed\jetified-core-remoteviews-1.1.0\AndroidManifest.xml:25:13-73
+313            android:permission="android.permission.BIND_REMOTEVIEWS" />
+313-->[androidx.core:core-remoteviews:1.1.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\53e89d45f572c5fbcec60a7e0e5d2d43\transformed\jetified-core-remoteviews-1.1.0\AndroidManifest.xml:26:13-69
+314
+315        <provider
+315-->[com.google.firebase:firebase-common:21.0.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\884eaa981a9fa4a373408d1fac13a2b7\transformed\jetified-firebase-common-21.0.0\AndroidManifest.xml:23:9-28:39
+316            android:name="com.google.firebase.provider.FirebaseInitProvider"
+316-->[com.google.firebase:firebase-common:21.0.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\884eaa981a9fa4a373408d1fac13a2b7\transformed\jetified-firebase-common-21.0.0\AndroidManifest.xml:24:13-77
+317            android:authorities="com.example.sasper.firebaseinitprovider"
+317-->[com.google.firebase:firebase-common:21.0.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\884eaa981a9fa4a373408d1fac13a2b7\transformed\jetified-firebase-common-21.0.0\AndroidManifest.xml:25:13-72
+318            android:directBootAware="true"
+318-->[com.google.firebase:firebase-common:21.0.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\884eaa981a9fa4a373408d1fac13a2b7\transformed\jetified-firebase-common-21.0.0\AndroidManifest.xml:26:13-43
+319            android:exported="false"
+319-->[com.google.firebase:firebase-common:21.0.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\884eaa981a9fa4a373408d1fac13a2b7\transformed\jetified-firebase-common-21.0.0\AndroidManifest.xml:27:13-37
+320            android:initOrder="100" />
+320-->[com.google.firebase:firebase-common:21.0.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\884eaa981a9fa4a373408d1fac13a2b7\transformed\jetified-firebase-common-21.0.0\AndroidManifest.xml:28:13-36
+321
+322        <activity
+322-->[com.google.android.gms:play-services-base:18.1.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\61d3d4fe2dd837d40b39785170a0ad2d\transformed\jetified-play-services-base-18.1.0\AndroidManifest.xml:20:9-22:45
+323            android:name="com.google.android.gms.common.api.GoogleApiActivity"
+323-->[com.google.android.gms:play-services-base:18.1.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\61d3d4fe2dd837d40b39785170a0ad2d\transformed\jetified-play-services-base-18.1.0\AndroidManifest.xml:20:19-85
+324            android:exported="false"
+324-->[com.google.android.gms:play-services-base:18.1.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\61d3d4fe2dd837d40b39785170a0ad2d\transformed\jetified-play-services-base-18.1.0\AndroidManifest.xml:22:19-43
+325            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+325-->[com.google.android.gms:play-services-base:18.1.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\61d3d4fe2dd837d40b39785170a0ad2d\transformed\jetified-play-services-base-18.1.0\AndroidManifest.xml:21:19-78
+326
+327        <provider
+327-->[androidx.emoji2:emoji2:1.2.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\a0f8f6cd1008fbbc847091c5fd8225b2\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:24:9-32:20
+328            android:name="androidx.startup.InitializationProvider"
+328-->[androidx.emoji2:emoji2:1.2.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\a0f8f6cd1008fbbc847091c5fd8225b2\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:25:13-67
+329            android:authorities="com.example.sasper.androidx-startup"
+329-->[androidx.emoji2:emoji2:1.2.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\a0f8f6cd1008fbbc847091c5fd8225b2\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:26:13-68
+330            android:exported="false" >
+330-->[androidx.emoji2:emoji2:1.2.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\a0f8f6cd1008fbbc847091c5fd8225b2\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:27:13-37
+331            <meta-data
+331-->[androidx.emoji2:emoji2:1.2.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\a0f8f6cd1008fbbc847091c5fd8225b2\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:29:13-31:52
+332                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+332-->[androidx.emoji2:emoji2:1.2.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\a0f8f6cd1008fbbc847091c5fd8225b2\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:30:17-75
+333                android:value="androidx.startup" />
+333-->[androidx.emoji2:emoji2:1.2.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\a0f8f6cd1008fbbc847091c5fd8225b2\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:31:17-49
+334            <meta-data
+334-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:36:13-38:52
+335                android:name="androidx.work.WorkManagerInitializer"
+335-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:37:17-68
+336                android:value="androidx.startup" />
+336-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:38:17-49
+337            <meta-data
+337-->[androidx.lifecycle:lifecycle-process:2.7.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\70db1f4abc282be2ad518e7752b359ea\transformed\jetified-lifecycle-process-2.7.0\AndroidManifest.xml:29:13-31:52
+338                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+338-->[androidx.lifecycle:lifecycle-process:2.7.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\70db1f4abc282be2ad518e7752b359ea\transformed\jetified-lifecycle-process-2.7.0\AndroidManifest.xml:30:17-78
+339                android:value="androidx.startup" />
+339-->[androidx.lifecycle:lifecycle-process:2.7.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\70db1f4abc282be2ad518e7752b359ea\transformed\jetified-lifecycle-process-2.7.0\AndroidManifest.xml:31:17-49
+340            <meta-data
+340-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\0a4ce766192662351bcd27c214df34d0\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:29:13-31:52
+341                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
+341-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\0a4ce766192662351bcd27c214df34d0\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:30:17-85
+342                android:value="androidx.startup" />
+342-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\0a4ce766192662351bcd27c214df34d0\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:31:17-49
+343        </provider>
+344
+345        <service
+345-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:41:9-46:35
+346            android:name="androidx.work.impl.background.systemalarm.SystemAlarmService"
+346-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:42:13-88
+347            android:directBootAware="false"
+347-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:43:13-44
+348            android:enabled="@bool/enable_system_alarm_service_default"
+348-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:44:13-72
+349            android:exported="false" />
+349-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:45:13-37
+350        <service
+350-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:47:9-53:35
+351            android:name="androidx.work.impl.background.systemjob.SystemJobService"
+351-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:48:13-84
+352            android:directBootAware="false"
+352-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:49:13-44
+353            android:enabled="@bool/enable_system_job_service_default"
+353-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:50:13-70
+354            android:exported="true"
+354-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:51:13-36
+355            android:permission="android.permission.BIND_JOB_SERVICE" />
+355-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:52:13-69
+356        <service
+356-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:54:9-59:35
+357            android:name="androidx.work.impl.foreground.SystemForegroundService"
+357-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:55:13-81
+358            android:directBootAware="false"
+358-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:56:13-44
+359            android:enabled="@bool/enable_system_foreground_service_default"
+359-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:57:13-77
+360            android:exported="false" />
+360-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:58:13-37
+361
+362        <receiver
+362-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:61:9-66:35
+363            android:name="androidx.work.impl.utils.ForceStopRunnable$BroadcastReceiver"
+363-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:62:13-88
+364            android:directBootAware="false"
+364-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:63:13-44
+365            android:enabled="true"
+365-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:64:13-35
+366            android:exported="false" />
+366-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:65:13-37
+367        <receiver
+367-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:67:9-77:20
+368            android:name="androidx.work.impl.background.systemalarm.ConstraintProxy$BatteryChargingProxy"
+368-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:68:13-106
+369            android:directBootAware="false"
+369-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:69:13-44
+370            android:enabled="false"
+370-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:70:13-36
+371            android:exported="false" >
+371-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:71:13-37
+372            <intent-filter>
+372-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:73:13-76:29
+373                <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
+373-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:74:17-87
+373-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:74:25-84
+374                <action android:name="android.intent.action.ACTION_POWER_DISCONNECTED" />
+374-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:75:17-90
+374-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:75:25-87
+375            </intent-filter>
+376        </receiver>
+377        <receiver
+377-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:78:9-88:20
+378            android:name="androidx.work.impl.background.systemalarm.ConstraintProxy$BatteryNotLowProxy"
+378-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:79:13-104
+379            android:directBootAware="false"
+379-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:80:13-44
+380            android:enabled="false"
+380-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:81:13-36
+381            android:exported="false" >
+381-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:82:13-37
+382            <intent-filter>
+382-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:84:13-87:29
+383                <action android:name="android.intent.action.BATTERY_OKAY" />
+383-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:85:17-77
+383-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:85:25-74
+384                <action android:name="android.intent.action.BATTERY_LOW" />
+384-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:86:17-76
+384-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:86:25-73
+385            </intent-filter>
+386        </receiver>
+387        <receiver
+387-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:89:9-99:20
+388            android:name="androidx.work.impl.background.systemalarm.ConstraintProxy$StorageNotLowProxy"
+388-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:90:13-104
+389            android:directBootAware="false"
+389-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:91:13-44
+390            android:enabled="false"
+390-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:92:13-36
+391            android:exported="false" >
+391-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:93:13-37
+392            <intent-filter>
+392-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:95:13-98:29
+393                <action android:name="android.intent.action.DEVICE_STORAGE_LOW" />
+393-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:96:17-83
+393-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:96:25-80
+394                <action android:name="android.intent.action.DEVICE_STORAGE_OK" />
+394-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:97:17-82
+394-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:97:25-79
+395            </intent-filter>
+396        </receiver>
+397        <receiver
+397-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:100:9-109:20
+398            android:name="androidx.work.impl.background.systemalarm.ConstraintProxy$NetworkStateProxy"
+398-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:101:13-103
+399            android:directBootAware="false"
+399-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:102:13-44
+400            android:enabled="false"
+400-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:103:13-36
+401            android:exported="false" >
+401-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:104:13-37
+402            <intent-filter>
+402-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:106:13-108:29
+403                <action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
+403-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:107:17-79
+403-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:107:25-76
+404            </intent-filter>
+405        </receiver>
+406        <receiver
+406-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:110:9-121:20
+407            android:name="androidx.work.impl.background.systemalarm.RescheduleReceiver"
+407-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:111:13-88
+408            android:directBootAware="false"
+408-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:112:13-44
+409            android:enabled="false"
+409-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:113:13-36
+410            android:exported="false" >
+410-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:114:13-37
+411            <intent-filter>
+411-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:116:13-120:29
+412                <action android:name="android.intent.action.BOOT_COMPLETED" />
+412-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:114:17-79
+412-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:114:25-76
+413                <action android:name="android.intent.action.TIME_SET" />
+413-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:118:17-73
+413-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:118:25-70
+414                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+414-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:119:17-81
+414-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:119:25-78
+415            </intent-filter>
+416        </receiver>
+417        <receiver
+417-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:122:9-131:20
+418            android:name="androidx.work.impl.background.systemalarm.ConstraintProxyUpdateReceiver"
+418-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:123:13-99
+419            android:directBootAware="false"
+419-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:124:13-44
+420            android:enabled="@bool/enable_system_alarm_service_default"
+420-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:125:13-72
+421            android:exported="false" >
+421-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:126:13-37
+422            <intent-filter>
+422-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:128:13-130:29
+423                <action android:name="androidx.work.impl.background.systemalarm.UpdateProxies" />
+423-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:129:17-98
+423-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:129:25-95
+424            </intent-filter>
+425        </receiver>
+426        <receiver
+426-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:132:9-142:20
+427            android:name="androidx.work.impl.diagnostics.DiagnosticsReceiver"
+427-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:133:13-78
+428            android:directBootAware="false"
+428-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:134:13-44
+429            android:enabled="true"
+429-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:135:13-35
+430            android:exported="true"
+430-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:136:13-36
+431            android:permission="android.permission.DUMP" >
+431-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:137:13-57
+432            <intent-filter>
+432-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:139:13-141:29
+433                <action android:name="androidx.work.diagnostics.REQUEST_DIAGNOSTICS" />
+433-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:140:17-88
+433-->[androidx.work:work-runtime:2.7.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\99a7839176b3ef23924cb39c9f2538b4\transformed\work-runtime-2.7.1\AndroidManifest.xml:140:25-85
+434            </intent-filter>
+435        </receiver>
+436
+437        <meta-data
+437-->[com.google.android.gms:play-services-basement:18.3.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\906adeab1fc54800ccbfe1f925d79fc0\transformed\jetified-play-services-basement-18.3.0\AndroidManifest.xml:21:9-23:69
+438            android:name="com.google.android.gms.version"
+438-->[com.google.android.gms:play-services-basement:18.3.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\906adeab1fc54800ccbfe1f925d79fc0\transformed\jetified-play-services-basement-18.3.0\AndroidManifest.xml:22:13-58
+439            android:value="@integer/google_play_services_version" />
+439-->[com.google.android.gms:play-services-basement:18.3.0] C:\Users\ASUS\.gradle\caches\8.12\transforms\906adeab1fc54800ccbfe1f925d79fc0\transformed\jetified-play-services-basement-18.3.0\AndroidManifest.xml:23:13-66
+440
+441        <receiver
+441-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\0a4ce766192662351bcd27c214df34d0\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:34:9-52:20
+442            android:name="androidx.profileinstaller.ProfileInstallReceiver"
+442-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\0a4ce766192662351bcd27c214df34d0\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:35:13-76
+443            android:directBootAware="false"
+443-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\0a4ce766192662351bcd27c214df34d0\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:36:13-44
+444            android:enabled="true"
+444-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\0a4ce766192662351bcd27c214df34d0\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:37:13-35
+445            android:exported="true"
+445-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\0a4ce766192662351bcd27c214df34d0\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:38:13-36
+446            android:permission="android.permission.DUMP" >
+446-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\0a4ce766192662351bcd27c214df34d0\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:39:13-57
+447            <intent-filter>
+447-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\0a4ce766192662351bcd27c214df34d0\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:40:13-42:29
+448                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
+448-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\0a4ce766192662351bcd27c214df34d0\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:41:17-91
+448-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\0a4ce766192662351bcd27c214df34d0\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:41:25-88
+449            </intent-filter>
+450            <intent-filter>
+450-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\0a4ce766192662351bcd27c214df34d0\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:43:13-45:29
+451                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
+451-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\0a4ce766192662351bcd27c214df34d0\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:44:17-85
+451-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\0a4ce766192662351bcd27c214df34d0\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:44:25-82
+452            </intent-filter>
+453            <intent-filter>
+453-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\0a4ce766192662351bcd27c214df34d0\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:46:13-48:29
+454                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
+454-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\0a4ce766192662351bcd27c214df34d0\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:47:17-88
+454-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\0a4ce766192662351bcd27c214df34d0\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:47:25-85
+455            </intent-filter>
+456            <intent-filter>
+456-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\0a4ce766192662351bcd27c214df34d0\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:49:13-51:29
+457                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
+457-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\0a4ce766192662351bcd27c214df34d0\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:50:17-95
+457-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.12\transforms\0a4ce766192662351bcd27c214df34d0\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:50:25-92
+458            </intent-filter>
+459        </receiver>
+460
+461        <service
+461-->[androidx.room:room-runtime:2.2.5] C:\Users\ASUS\.gradle\caches\8.12\transforms\ec26da83ad86efe0396f439f951d03ea\transformed\room-runtime-2.2.5\AndroidManifest.xml:25:9-28:40
+462            android:name="androidx.room.MultiInstanceInvalidationService"
+462-->[androidx.room:room-runtime:2.2.5] C:\Users\ASUS\.gradle\caches\8.12\transforms\ec26da83ad86efe0396f439f951d03ea\transformed\room-runtime-2.2.5\AndroidManifest.xml:26:13-74
+463            android:directBootAware="true"
+463-->[androidx.room:room-runtime:2.2.5] C:\Users\ASUS\.gradle\caches\8.12\transforms\ec26da83ad86efe0396f439f951d03ea\transformed\room-runtime-2.2.5\AndroidManifest.xml:27:13-43
+464            android:exported="false" />
+464-->[androidx.room:room-runtime:2.2.5] C:\Users\ASUS\.gradle\caches\8.12\transforms\ec26da83ad86efe0396f439f951d03ea\transformed\room-runtime-2.2.5\AndroidManifest.xml:28:13-37
+465        <service
+465-->[com.google.android.datatransport:transport-backend-cct:3.1.9] C:\Users\ASUS\.gradle\caches\8.12\transforms\01b4bdea3ac0c05d2b011556d8dc7fb4\transformed\jetified-transport-backend-cct-3.1.9\AndroidManifest.xml:28:9-34:19
+466            android:name="com.google.android.datatransport.runtime.backends.TransportBackendDiscovery"
+466-->[com.google.android.datatransport:transport-backend-cct:3.1.9] C:\Users\ASUS\.gradle\caches\8.12\transforms\01b4bdea3ac0c05d2b011556d8dc7fb4\transformed\jetified-transport-backend-cct-3.1.9\AndroidManifest.xml:29:13-103
+467            android:exported="false" >
+467-->[com.google.android.datatransport:transport-backend-cct:3.1.9] C:\Users\ASUS\.gradle\caches\8.12\transforms\01b4bdea3ac0c05d2b011556d8dc7fb4\transformed\jetified-transport-backend-cct-3.1.9\AndroidManifest.xml:30:13-37
+468            <meta-data
+468-->[com.google.android.datatransport:transport-backend-cct:3.1.9] C:\Users\ASUS\.gradle\caches\8.12\transforms\01b4bdea3ac0c05d2b011556d8dc7fb4\transformed\jetified-transport-backend-cct-3.1.9\AndroidManifest.xml:31:13-33:39
+469                android:name="backend:com.google.android.datatransport.cct.CctBackendFactory"
+469-->[com.google.android.datatransport:transport-backend-cct:3.1.9] C:\Users\ASUS\.gradle\caches\8.12\transforms\01b4bdea3ac0c05d2b011556d8dc7fb4\transformed\jetified-transport-backend-cct-3.1.9\AndroidManifest.xml:32:17-94
+470                android:value="cct" />
+470-->[com.google.android.datatransport:transport-backend-cct:3.1.9] C:\Users\ASUS\.gradle\caches\8.12\transforms\01b4bdea3ac0c05d2b011556d8dc7fb4\transformed\jetified-transport-backend-cct-3.1.9\AndroidManifest.xml:33:17-36
+471        </service>
+472        <service
+472-->[com.google.android.datatransport:transport-runtime:3.1.9] C:\Users\ASUS\.gradle\caches\8.12\transforms\7cafe25f1f5eae414dd1b066a95fe170\transformed\jetified-transport-runtime-3.1.9\AndroidManifest.xml:26:9-30:19
+473            android:name="com.google.android.datatransport.runtime.scheduling.jobscheduling.JobInfoSchedulerService"
+473-->[com.google.android.datatransport:transport-runtime:3.1.9] C:\Users\ASUS\.gradle\caches\8.12\transforms\7cafe25f1f5eae414dd1b066a95fe170\transformed\jetified-transport-runtime-3.1.9\AndroidManifest.xml:27:13-117
+474            android:exported="false"
+474-->[com.google.android.datatransport:transport-runtime:3.1.9] C:\Users\ASUS\.gradle\caches\8.12\transforms\7cafe25f1f5eae414dd1b066a95fe170\transformed\jetified-transport-runtime-3.1.9\AndroidManifest.xml:28:13-37
+475            android:permission="android.permission.BIND_JOB_SERVICE" >
+475-->[com.google.android.datatransport:transport-runtime:3.1.9] C:\Users\ASUS\.gradle\caches\8.12\transforms\7cafe25f1f5eae414dd1b066a95fe170\transformed\jetified-transport-runtime-3.1.9\AndroidManifest.xml:29:13-69
+476        </service>
+477
+478        <receiver
+478-->[com.google.android.datatransport:transport-runtime:3.1.9] C:\Users\ASUS\.gradle\caches\8.12\transforms\7cafe25f1f5eae414dd1b066a95fe170\transformed\jetified-transport-runtime-3.1.9\AndroidManifest.xml:32:9-34:40
+479            android:name="com.google.android.datatransport.runtime.scheduling.jobscheduling.AlarmManagerSchedulerBroadcastReceiver"
+479-->[com.google.android.datatransport:transport-runtime:3.1.9] C:\Users\ASUS\.gradle\caches\8.12\transforms\7cafe25f1f5eae414dd1b066a95fe170\transformed\jetified-transport-runtime-3.1.9\AndroidManifest.xml:33:13-132
+480            android:exported="false" />
+480-->[com.google.android.datatransport:transport-runtime:3.1.9] C:\Users\ASUS\.gradle\caches\8.12\transforms\7cafe25f1f5eae414dd1b066a95fe170\transformed\jetified-transport-runtime-3.1.9\AndroidManifest.xml:34:13-37
+481    </application>
+482
+483</manifest>

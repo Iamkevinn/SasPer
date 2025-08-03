@@ -10,5 +10,7 @@ uvicorn
 httpx
 google-generativeai>=0.4.1
 supabase
+requests
+supabase-py
 python-dotenv>=1.0.0
 firebase-admin>=6.0.0

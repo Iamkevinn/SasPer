@@ -7,26 +7,37 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sasper/models/budget_models.dart';
 
 class BudgetRepository {
-  // 1. El cliente se declara como 'late final'. Se inicializará una vez.
-  late final SupabaseClient _client;
+  // --- INICIO DE LOS CAMBIOS CRUCIALES ---
+
+  // 1. El cliente ahora es privado y nullable.
+  SupabaseClient? _supabase;
+
+  // 2. Un getter público que PROTEGE el acceso al cliente.
+  SupabaseClient get client {
+    if (_supabase == null) {
+      throw Exception("¡ERROR! BudgetRepository no ha sido inicializado. Llama a .initialize() en SplashScreen.");
+    }
+    return _supabase!;
+  }
+
+  // --- FIN DE LOS CAMBIOS CRUCIALES ---
 
   final _streamController = StreamController<List<BudgetProgress>>.broadcast();
   RealtimeChannel? _channel;
+  bool _isInitialized = false;
 
-  // 2. Constructor privado para evitar que se creen instancias desde fuera.
   BudgetRepository._privateConstructor();
-
-  // 3. La instancia estática que guarda el único objeto de esta clase.
   static final BudgetRepository instance = BudgetRepository._privateConstructor();
 
-  // 4. Método público de inicialización. Se llama desde main.dart.
-  void initialize(SupabaseClient client) {
-    _client = client;
+  void initialize(SupabaseClient supabaseClient) {
+    if (_isInitialized) return;
+    _supabase = supabaseClient;
+    _isInitialized = true;
     developer.log('✅ [Repo] BudgetRepository Singleton Initialized and Client Injected.', name: 'BudgetRepository');
   }
 
-  /// Devuelve un stream con el progreso de los presupuestos del mes actual.
-  /// Se actualiza en tiempo real cuando cambian los presupuestos o las transacciones.
+  // Ahora, todos los métodos usan el getter `client` en lugar de `_client`
+
   Stream<List<BudgetProgress>> getBudgetsStream() {
     _setupRealtimeSubscription();
     _fetchAndPushData();
@@ -35,11 +46,11 @@ class BudgetRepository {
 
   void _setupRealtimeSubscription() {
     if (_channel != null) return;
-    final userId = _client.auth.currentUser?.id;
+    final userId = client.auth.currentUser?.id;
     if (userId == null) return;
 
     developer.log('📡 [Repo] Setting up realtime subscription for budgets & transactions...', name: 'BudgetRepository');
-    _channel = _client
+    _channel = client
         .channel('public:budgets_and_transactions_for_budgets')
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
@@ -78,28 +89,25 @@ class BudgetRepository {
     }
   }
 
-  /// Fuerza una recarga manual de los datos de los presupuestos.
   Future<void> refreshData() async {
     await _fetchAndPushData();
   }
 
   Future<List<BudgetProgress>> _fetchBudgetsProgress() async {
     try {
-      final userId = _client.auth.currentUser?.id;
+      final userId = client.auth.currentUser?.id;
       if (userId == null) throw Exception("User not authenticated");
       
-      final response = await _client.rpc('get_budgets_progress_for_user', params: {'p_user_id': userId});
-      // ===== ¡LÍNEA DE DEPURACIÓN CLAVE! =====
-      // Esto nos mostrará los nombres de las claves tal como llegan de Supabase.
+      final response = await client.rpc('get_budgets_progress_for_user', params: {'p_user_id': userId});
+      
       if (response is List && response.isNotEmpty) {
         if (kDebugMode) {
           print('===== VERDAD ABSOLUTA DE SUPABASE =====');
           print('Datos crudos del primer presupuesto: ${response.first}');
           print('=======================================');
         }
-
       }
-      // ===========================================
+
       final budgetsProgress = (response as List)
           .map((data) => BudgetProgress.fromMap(data))
           .toList();
@@ -111,7 +119,6 @@ class BudgetRepository {
     }
   }
 
-  /// Obtiene los presupuestos para el mes y año actual. Ideal para la pantalla de añadir transacción.
   Future<List<BudgetProgress>> getBudgetsForCurrentMonth() async {
     return await _fetchBudgetsProgress();
   }
@@ -123,9 +130,9 @@ class BudgetRepository {
     required int year,
   }) async {
     developer.log('💾 [Repo] Adding budget for "$category" with amount $amount', name: 'BudgetRepository');
-    final userId = _client.auth.currentUser!.id;
+    final userId = client.auth.currentUser!.id;
     try {
-      await _client.from('budgets').upsert({
+      await client.from('budgets').upsert({
         'user_id': userId,
         'category': category,
         'month': month,
@@ -142,7 +149,7 @@ class BudgetRepository {
   Future<void> updateBudget({required int budgetId, required double newAmount}) async {
     developer.log('🔄 [Repo] Updating budget $budgetId with new amount $newAmount', name: 'BudgetRepository');
     try {
-      await _client
+      await client
           .from('budgets')
           .update({'amount': newAmount})
           .eq('id', budgetId);
@@ -156,7 +163,7 @@ class BudgetRepository {
   Future<void> deleteBudgetSafely(int budgetId) async {
     developer.log('🗑️ [Repo] Safely deleting budget with id $budgetId', name: 'BudgetRepository');
     try {
-      await _client.rpc(
+      await client.rpc(
         'delete_budget_safely',
         params: {'budget_id_to_delete': budgetId},
       );
@@ -169,7 +176,7 @@ class BudgetRepository {
   void dispose() {
     developer.log('❌ [Repo] Disposing BudgetRepository resources.', name: 'BudgetRepository');
     if (_channel != null) {
-      _client.removeChannel(_channel!);
+      client.removeChannel(_channel!);
       _channel = null;
     }
     _streamController.close();

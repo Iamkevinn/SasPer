@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Define el color de fondo de la barra -->
+    <item android:id="@android:id/background">
+        <shape>
+            <corners android:radius="4dp" />
+            <!-- Un color de fondo más oscuro que el por defecto -->
+            <solid android:color="#4DFFFFFF" /> 
+        </shape>
+    </item>
+    
+    <!-- Define el color del progreso -->
+    <item android:id="@android:id/progress">
+        <clip>
+            <shape>
+                <corners android:radius="4dp" />
+                <solid android:color="?attr/colorPrimary" />
+            </shape>
+        </clip>
+    </item>
+</layer-list>

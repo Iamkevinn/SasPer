@@ -26,6 +26,8 @@ dependencies:
   intl: ^0.20.2
   http: ^1.2.1
   app_links: ^6.4.0 
+  permission_handler: ^11.3.1 # O la última versión
+
 
   # UI y Gráficos
   fl_chart: ^1.0.0 
@@ -56,6 +58,9 @@ dependencies:
   equatable: ^2.0.5
   provider: ^6.1.5
   shared_preferences: ^2.5.3
+  flutter_local_notifications: ^18.0.1 # O la última versión estable
+  timezone: ^0.10.0
+  flutter_timezone: ^1.0.8
 
 # Dependencias que solo se usan durante el desarrollo.
 dev_dependencies:

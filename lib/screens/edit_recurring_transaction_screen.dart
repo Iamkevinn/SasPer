@@ -11,6 +11,7 @@ import 'package:sasper/models/recurring_transaction_model.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'dart:developer' as developer;
+import 'package:sasper/services/notification_service.dart'; // <-- 1. IMPORTAMOS EL SERVICIO
 
 class EditRecurringTransactionScreen extends StatefulWidget {
   final RecurringTransaction transaction;
@@ -78,6 +79,13 @@ class _EditRecurringTransactionScreenState extends State<EditRecurringTransactio
       // Usamos el Singleton para actualizar la transacción.
       await _repository.updateRecurringTransaction(updatedTransaction);
 
+      // 3. CANCELAMOS las notificaciones antiguas asociadas al ID original
+      await NotificationService.instance.cancelRecurringReminders(widget.transaction.id);
+      
+      // 4. PROGRAMAMOS las nuevas notificaciones con los datos actualizados
+      await NotificationService.instance.scheduleRecurringReminders(updatedTransaction);
+      developer.log('✅ Notificaciones reprogramadas para: ${updatedTransaction.description}', name: 'EditRecurringScreen');
+
       if (mounted) {
         // Devolvemos 'true' para que la pantalla anterior sepa que hubo un cambio.
         Navigator.of(context).pop(true);
@@ -85,7 +93,7 @@ class _EditRecurringTransactionScreenState extends State<EditRecurringTransactio
         // Mostramos la notificación después de que la navegación haya terminado.
         WidgetsBinding.instance.addPostFrameCallback((_) {
           NotificationHelper.show(
-            message: 'Gasto fijo actualizado.',
+            message: 'Gasto fijo actualizado y recordatorios reprogramados.',
             type: NotificationType.success,
           );
         });
