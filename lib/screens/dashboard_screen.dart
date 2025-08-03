@@ -5,6 +5,7 @@ import 'dart:async';
 //import 'dart:io';
 import 'dart:ui';
 //import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 //import 'package:home_widget/home_widget.dart';
 //import 'package:path_provider/path_provider.dart';
@@ -48,6 +49,8 @@ class DashboardScreenState extends State<DashboardScreen> {
   late final Stream<DashboardData> _dashboardDataStream;
   StreamSubscription<AppEvent>? _eventSubscription; // Hacemos que la suscripción sea opcional
   Timer? _widgetUpdateTimer;
+  
+  //get widgetService => null;
 
   @override
   void initState() {
@@ -68,14 +71,26 @@ class DashboardScreenState extends State<DashboardScreen> {
   // y se ejecute en el hilo principal, ya que era la causa del bloqueo.
   void _updateWidgets(DashboardData data) {
     _widgetUpdateTimer?.cancel();
-    _widgetUpdateTimer = Timer(const Duration(milliseconds: 500), () {
+    _widgetUpdateTimer = Timer(const Duration(milliseconds: 500), () async {
       if (mounted && data.expenseSummaryForWidget.isNotEmpty) {
-        // En lugar de crear un servicio complejo, llamamos a la lógica que genera
-        // los datos del widget. Esto podría moverse a su propio servicio más adelante.
-        WidgetService.updateAllWidgetData(data: data); // Comentado por ahora para asegurar estabilidad
+        
+        // Actualiza los widgets principales existentes
+        WidgetService.updateAllWidgetData(data: data);
+
+        // ========== INICIO DE LA CORRECCIÓN ==========
+
+        // AHORA (Correcto): Creamos una instancia de WidgetService antes de usarla.
+        // También lo hacemos sin 'await' para no bloquear el hilo de la UI.
+        if (kDebugMode) {
+          print("🔄 Dashboard: Los datos cambiaron, actualizando widget de próximos pagos.");
+        }
+        WidgetService().updateUpcomingPaymentsWidget();
+
+        // ========== FIN DE LA CORRECCIÓN ==========
       }
     });
   }
+
 
   @override
   void dispose() {

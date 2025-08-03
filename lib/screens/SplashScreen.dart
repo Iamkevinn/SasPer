@@ -1,5 +1,6 @@
 // lib/screens/SplashScreen.dart
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -10,6 +11,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sasper/config/app_config.dart';
 import 'package:sasper/config/global_state.dart';
 import 'package:sasper/firebase_options.dart';
+import 'package:dynamic_color/dynamic_color.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // --- Pantallas y Servicios ---
 import 'package:sasper/screens/auth_gate.dart';
@@ -26,6 +29,20 @@ import 'package:sasper/data/debt_repository.dart';
 import 'package:sasper/data/goal_repository.dart';
 import 'package:sasper/data/recurring_repository.dart';
 import 'package:sasper/data/transaction_repository.dart';
+
+Future<void> saveMaterialYouColors() async {
+    final corePalette = await DynamicColorPlugin.getCorePalette();
+    if (corePalette != null) {
+        final prefs = await SharedPreferences.getInstance();
+        // Guardamos los colores que nos interesan como enteros (ARGB)
+        await prefs.setInt('m3_primary', corePalette.primary.get(100)); // Usamos el tono 100
+        await prefs.setInt('m3_surface', corePalette.neutral.get(100));
+        await prefs.setInt('m3_onSurface', corePalette.neutralVariant.get(0));
+        if (kDebugMode) {
+          print("🎨 Colores de Material You guardados en SharedPreferences.");
+        }
+    }
+}
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -76,6 +93,16 @@ class _SplashScreenState extends State<SplashScreen> {
       await NotificationService.instance.refreshAllSchedules(allRecurring);
       
       WidgetService.listenToDashboardChanges(); // ¡Ahora esta llamada es segura!
+      // 3a. Guardamos los colores de Material You para que los widgets los usen.
+      await saveMaterialYouColors();
+
+      // 3b. Lanzamos la primera actualización para el widget de "Próximos Pagos".
+      // Lo hacemos sin 'await' para no bloquear la navegación, se ejecutará en segundo plano.
+      if (kDebugMode) {
+        print("🚀 SplashScreen: Solicitando actualización inicial del widget de próximos pagos.");
+      }
+      WidgetService().updateUpcomingPaymentsWidget();
+
 
       // 4. Configuración de callbacks en segundo plano.
       GlobalState.supabaseInitialized = true;

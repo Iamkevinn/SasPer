@@ -99,6 +99,21 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_large_info" />
         </receiver>
+        
+        <!-- =============================================================== -->
+        <!-- NUEVO WIDGET: Provider para los Próximos Pagos                   -->
+        <!-- =============================================================== -->
+        <receiver
+            android:name=".UpcomingPaymentsWidgetProvider"
+            android:exported="true"
+            android:label="Próximos Pagos">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/upcoming_payments_widget_info" />
+        </receiver>
 
         <!-- Receptor para cambios de wallpaper y boot -->
         <receiver
@@ -116,6 +131,15 @@
             android:name=".WidgetListService"
             android:permission="android.permission.BIND_REMOTEVIEWS"
             android:exported="false" />
+        
+        <!-- =============================================================== -->
+        <!-- NUEVO WIDGET: Servicio para la lista de Próximos Pagos          -->
+        <!-- =============================================================== -->
+        <service
+            android:name=".UpcomingPaymentsListService"
+            android:permission="android.permission.BIND_REMOTEVIEWS"
+            android:exported="false" />
+        <!-- =============================================================== -->
 
         <!-- FileProvider -->
         <provider

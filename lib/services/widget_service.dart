@@ -16,10 +16,13 @@ import 'package:path_provider/path_provider.dart';
 import 'package:sasper/config/app_config.dart';
 import 'package:sasper/data/analysis_repository.dart';
 import 'package:sasper/data/dashboard_repository.dart';
+import 'package:sasper/data/debt_repository.dart';
+import 'package:sasper/data/recurring_repository.dart';
 import 'package:sasper/models/analysis_models.dart';
 import 'package:sasper/models/budget_models.dart';
 import 'package:sasper/models/dashboard_data_model.dart';
 import 'package:sasper/models/transaction_models.dart';
+import 'package:sasper/models/upcoming_payment_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 // Constante para el nombre del log
@@ -123,6 +126,94 @@ class WidgetService {
   }
   // =======================
 
+  Future<List<UpcomingPayment>> getUpcomingPayments() async {
+    final List<UpcomingPayment> upcomingPayments = [];
+
+    // 1. Obtener deudas activas
+    final debts = await DebtRepository.instance.getActiveDebts(); // Asumo que tienes un método así
+    for (var debt in debts) {
+      // Lógica para determinar la próxima fecha de pago de la deuda si es recurrente
+      // Por ahora, usaremos 'due_date' como ejemplo
+      if (debt.dueDate != null && debt.dueDate!.isAfter(DateTime.now())) {
+        
+        upcomingPayments.add(UpcomingPayment(
+          id: debt.id,
+          concept: debt.name,
+          
+          // AHORA (Correcto): Usamos el saldo actual de la deuda.
+          amount: debt.currentBalance, 
+          
+          // AHORA (Correcto): Usamos '!' porque ya comprobamos que no es nulo.
+          nextDueDate: debt.dueDate!, 
+          
+          type: UpcomingPaymentType.debt,
+          iconName: 'debt_icon', 
+        ));
+      }
+    }
+
+    // 2. Obtener transacciones recurrentes
+    final recurringTxs = await RecurringRepository.instance.getAll(); // Asumo un método así
+    for (var tx in recurringTxs) {
+      // *** LÓGICA CRÍTICA ***
+      // Aquí debes calcular la próxima fecha de vencimiento real basada en la frecuencia (tx.frequency)
+      // y la última fecha de pago. Esto es lo más complejo.
+      //final DateTime nextDate = _calculateNextDueDate(tx.startDate, tx.frequency);
+
+    if (tx.nextDueDate.isAfter(DateTime.now())) {
+          upcomingPayments.add(UpcomingPayment(
+          id: tx.id,
+          concept: tx.description,
+          amount: tx.amount,
+          nextDueDate: tx.nextDueDate, // ¡Mucho más simple!
+          type: UpcomingPaymentType.recurring,
+          // iconName: tx.categoryIcon, // Puedes añadir esto si tu modelo lo tiene
+        ));
+      }
+    }
+
+    // 3. Ordenar por fecha más próxima
+    upcomingPayments.sort((a, b) => a.nextDueDate.compareTo(b.nextDueDate));
+
+    return upcomingPayments;
+  }
+
+  // Función de ejemplo para calcular la próxima fecha. Deberás ajustarla a tu lógica.
+  DateTime _calculateNextDueDate(DateTime startDate, String frequency) {
+    DateTime now = DateTime.now();
+    DateTime nextDate = startDate;
+
+    if (frequency == 'monthly') {
+      while (nextDate.isBefore(now)) {
+        nextDate = DateTime(nextDate.year, nextDate.month + 1, nextDate.day);
+      }
+    } else if (frequency == 'weekly') {
+      while (nextDate.isBefore(now)) {
+        nextDate = nextDate.add(const Duration(days: 7));
+      }
+    }
+    // Añadir más lógicas para 'daily', 'yearly', etc.
+    return nextDate;
+  }
+
+  // ¡NUEVO MÉTODO PARA ACTUALIZAR ESTE WIDGET ESPECÍFICO!
+  Future<void> updateUpcomingPaymentsWidget() async {
+      try {
+        final payments = await getUpcomingPayments();
+        // Serializamos la lista completa a un string JSON
+        final jsonString = jsonEncode(payments.map((p) => p.toJson()).toList());
+
+        // Guardamos usando una clave única para este widget
+        await HomeWidget.saveWidgetData<String>('upcoming_payments_data', jsonString);
+        await HomeWidget.updateWidget(
+          name: 'UpcomingPaymentsWidgetProvider', // Usaremos este nombre en Kotlin
+          androidName: 'UpcomingPaymentsWidgetProvider',
+        );
+      } catch (e) {
+        // Manejar errores
+      }
+  }
+  
   static Future<void> updateAllWidgetData({DashboardData? data}) async {
     developer.log('[Service] 7. Guardando datos para todos los widgets...', name: _logName);
     try {

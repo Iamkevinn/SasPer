@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+
+    <!-- Usamos un recurso de dimensión explícito para las esquinas.
+         Esto es más seguro que un atributo de tema en un drawable. -->
+    <corners android:radius="@android:dimen/system_app_widget_background_radius" />
+
+    <!-- Usamos un color explícito del sistema para el fondo.
+         Esto se adaptará al modo claro/oscuro automáticamente. -->
+    <solid android:color="@android:color/system_accent1_50" />
+
+</shape>

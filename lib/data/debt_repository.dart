@@ -57,6 +57,43 @@ class DebtRepository {
     }
   }
 
+  // ===============================================================
+  /// Obtiene una lista de todas las deudas y préstamos que no están marcados como 'paid'.
+  /// Este método es ideal para operaciones en segundo plano como la actualización de widgets,
+  /// ya que no es un stream y se ejecuta una sola vez.
+  Future<List<Debt>> getActiveDebts() async {
+    developer.log('⏳ [Repo] Fetching active debts...', name: 'DebtRepository');
+    try {
+      // ========== INICIO DE LA CORRECCIÓN DE LÓGICA ==========
+
+      // AHORA (Correcto): Buscamos explícitamente las deudas cuyo estado es 'active'.
+      final response = await client
+          .from('debts')
+          .select()
+          .eq('status', 'active'); // Cambiado de .neq a .eq
+
+      // ========== FIN DE LA CORRECCIÓN DE LÓGICA ==========
+
+      final debts = (response as List)
+          .map((data) => Debt.fromMap(data))
+          .toList();
+      
+      developer.log('✅ [Repo] Fetched ${debts.length} active debts.', name: 'DebtRepository');
+      return debts;
+
+    } catch (e, stackTrace) {
+      developer.log(
+        '🔥 [Repo] Error fetching active debts: $e', 
+        name: 'DebtRepository', 
+        error: e, 
+        stackTrace: stackTrace
+      );
+      // Devuelve una lista vacía en caso de error para no romper el widget
+      return []; 
+    }
+  }
+  // ===============================================================
+
   Future<void> addDebtAndInitialTransaction({
     required String name,
     required DebtType type,
