@@ -1,13 +1,12 @@
-// Archivo: lib/services/widget_service.dart
-
 import 'dart:async';
+
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:io';
 import 'dart:math';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:home_widget/home_widget.dart';
@@ -25,76 +24,92 @@ import 'package:sasper/models/transaction_models.dart';
 import 'package:sasper/models/upcoming_payment_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-// Constante para el nombre del log
+
+// --- FUNCIONES DE ALTO NIVEL PARA CALLBACKS ---
+
 const String _logName = 'WidgetService';
 
-/// Callback para ejecución en segundo plano.
+/// Callback para ejecución en segundo plano cuando el widget necesita actualizarse.
 @pragma('vm:entry-point')
 Future<void> backgroundCallback(Uri? uri) async {
-  developer.log('🚀 [BACKGROUND] 1. Callback INICIADO.', name: _logName);
+  developer.log('🚀 [BACKGROUND] Callback de HomeWidget iniciado.', name: _logName);
+  // Esta función ahora puede llamar a la lógica de actualización en segundo plano.
+  // Es una buena práctica crear un payload "vacío" o especial para este caso.
+  // Por ahora, la dejamos simple. La lógica principal de actualización
+  // vendrá de la app cuando esté abierta.
+}
+
+
+/// Un objeto de transferencia de datos para pasar la información necesaria
+/// desde el hilo principal al Isolate de fondo.
+class WidgetUpdatePayload {
+  final DashboardData data;
+  final String chartImagePath;
+  final bool isDarkMode;
+
+  WidgetUpdatePayload({
+    required this.data,
+    required this.chartImagePath,
+    required this.isDarkMode,
+  });
+}
+
+/// TAREA PESADA QUE SE EJECUTA EN UN ISOLATE (SEGUNDO PLANO).
+@pragma('vm:entry-point')
+Future<void> updateWidgetsInBackground(WidgetUpdatePayload payload) async {
+  const String logNameBG = 'WidgetServiceBG';
+  developer.log('🚀 [BACKGROUND] Iniciando actualización de widgets...', name: logNameBG);
 
   try {
-    // PASO 1: INICIALIZACIÓN SEGURA Y ROBUSTA DE SUPABASE
+    // 1. Inicialización de servicios DENTRO del Isolate.
     await Supabase.initialize(
       url: AppConfig.supabaseUrl,
       anonKey: AppConfig.supabaseAnonKey,
     );
-    developer.log('ℹ️ [BACKGROUND] 2. Supabase inicializado.', name: _logName);
+    AnalysisRepository.instance.initialize(Supabase.instance.client);
+    developer.log('✅ [BACKGROUND] Servicios inicializados.', name: logNameBG);
 
-    final client = Supabase.instance.client;
+    final data = payload.data;
 
-    // PASO 2: VERIFICACIÓN Y RECUPERACIÓN DE SESIÓN
-    // En lugar de solo comprobar, escuchamos el estado de autenticación.
-    // Esto asegura que esperamos a que la sesión se restaure si es necesario.
-    final completer = Completer<User?>();
-    final authSubscription = client.auth.onAuthStateChange.listen((data) {
-      final session = data.session;
-      if (session != null && !completer.isCompleted) {
-        developer.log('✅ [BACKGROUND] 3. Sesión de usuario VÁLIDA. User ID: ${session.user.id}', name: _logName);
-        completer.complete(session.user);
-      } else if (!completer.isCompleted) {
-        developer.log('ℹ️ [BACKGROUND] 3b. Esperando sesión...', name: _logName);
+    // 2. Formateo de datos.
+    final formattedBalance = NumberFormat.currency(
+      locale: 'es_CO', symbol: '\$', decimalDigits: 0,
+    ).format(data.totalBalance);
+
+    // 3. Tareas de Red, CPU y Disco.
+    final analysisRepo = AnalysisRepository.instance;
+    final expenseData = await analysisRepo.getExpenseSummaryForWidget();
+    
+    String? finalChartPath;
+    if (expenseData.isNotEmpty) {
+      final chartBytes = await WidgetService._createChartImageFromData(
+        expenseData, isDarkMode: payload.isDarkMode,
+      );
+      if (chartBytes != null) {
+        final file = File(payload.chartImagePath);
+        await file.writeAsBytes(chartBytes);
+        finalChartPath = file.path;
+        developer.log('✅ [BACKGROUND] Imagen de gráfico guardada.', name: logNameBG);
       }
-    });
-
-    // Si ya hay un usuario, completamos inmediatamente.
-    if (client.auth.currentUser != null) {
-      if (!completer.isCompleted) {
-         developer.log('✅ [BACKGROUND] 3a. Sesión de usuario ya estaba disponible.', name: _logName);
-         completer.complete(client.auth.currentUser);
-      }
     }
 
-    // Esperamos un máximo de 5 segundos por la sesión.
-    final user = await completer.future.timeout(const Duration(seconds: 5), onTimeout: () {
-      developer.log('⚠️ [BACKGROUND] ERROR CRÍTICO: Timeout esperando la sesión de usuario.', name: _logName);
-      return null;
-    });
+    // 4. Serialización JSON.
+    final budgetsJson = jsonEncode(data.featuredBudgets.map((b) => b.toJson()).toList());
+    final transactionsJson = jsonEncode(data.recentTransactions.take(3).map((tx) => tx.toJson()).toList());
 
-    authSubscription.cancel();
+    // 5. Actualización del widget nativo.
+    await HomeWidget.saveWidgetData<String>('total_balance', formattedBalance);
+    await HomeWidget.saveWidgetData<String>('widget_chart_path', finalChartPath ?? "");
+    await HomeWidget.saveWidgetData<String>('featured_budgets_json', budgetsJson);
+    await HomeWidget.saveWidgetData<String>('recent_transactions_json', transactionsJson);
 
-    if (user == null) {
-      return; // No podemos continuar sin un usuario.
-    }
+    await HomeWidget.updateWidget(name: 'SasPerMediumWidgetProvider');
+    await HomeWidget.updateWidget(name: 'SasPerLargeWidgetProvider');
+    
+    developer.log('✅ [BACKGROUND] Actualización de widgets completada.', name: logNameBG);
 
-    // PASO 3: OBTENER Y ACTUALIZAR DATOS
-    developer.log('[BACKGROUND] 4. Obteniendo datos del dashboard...', name: _logName);
-    DashboardRepository.instance.initialize(client);
-    final dashboardData = await DashboardRepository.instance.fetchDataForWidget();
-
-    if (dashboardData != null) {
-      developer.log('[BACKGROUND] 5a. Datos obtenidos con ÉXITO. Balance: ${dashboardData.totalBalance}', name: _logName);
-      await WidgetService.updateAllWidgetData(data: dashboardData);
-    } else {
-      developer.log('⚠️ [BACKGROUND] 5b. Los datos del dashboard son NULL.', name: _logName);
-    }
-
-  } catch (e, stackTrace) {
-    developer.log(
-        '🔥🔥🔥 [BACKGROUND] 6. ERROR FATAL INESPERADO en el callback: $e',
-        name: _logName,
-        error: e,
-        stackTrace: stackTrace);
+  } catch (e, st) {
+    developer.log('🔥🔥🔥 [BACKGROUND] ERROR FATAL en actualización de widget: $e', name: logNameBG, error: e, stackTrace: st);
   }
 }
 
@@ -264,7 +279,7 @@ class WidgetService {
       developer.log('ℹ️ [Service] 8a. Modo oscuro detectado: $isDarkMode', name: _logName);
 
       // (El código para generar el gráfico no necesita cambios)
-      final analysisRepo = AnalysisRepository();
+      final analysisRepo = AnalysisRepository.instance;
       final expenseData = await analysisRepo.getExpenseSummaryForWidget();
       String? chartPath;
       if (expenseData.isNotEmpty) {
@@ -385,3 +400,4 @@ class WidgetService {
     }
   }
 }
+

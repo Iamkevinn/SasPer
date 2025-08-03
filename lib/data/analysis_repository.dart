@@ -6,29 +6,30 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sasper/models/analysis_models.dart';
 
 class AnalysisRepository {
-  // Ya no necesitamos un cliente inyectado ni el método initialize.
-  // Hacemos el constructor público de nuevo.
-  AnalysisRepository();
+  // 1. Mantenemos el cliente 'late final' para una inicialización segura.
+  late final SupabaseClient _client;
 
-  // Mantenemos la instancia estática para un acceso fácil, pero es opcional.
-  static final AnalysisRepository instance = AnalysisRepository();
+  // 2. Constructor privado.
+  AnalysisRepository._privateConstructor();
+
+  // 3. Instancia estática.
+  static final AnalysisRepository instance = AnalysisRepository._privateConstructor();
+
+  // 4. Método de inicialización, igual que en los otros repositorios.
+  void initialize(SupabaseClient client) {
+    _client = client;
+  }
 
   /// Obtiene solo el resumen de gastos, ideal para widgets o cargas rápidas.
   Future<List<ExpenseByCategory>> getExpenseSummaryForWidget() async {
     developer.log("📈 [Repository] Fetching expense summary for widget...", name: 'AnalysisRepository');
     try {
-      // --- CAMBIO CLAVE: Obtenemos el cliente directamente de Supabase ---
-      final client = Supabase.instance.client;
-      final userId = client.auth.currentUser?.id;
-      
-      if (userId == null) {
-        developer.log("⚠️ [Widget] No user ID, returning empty summary.", name: 'AnalysisRepository');
-        return [];
-      }
+      final userId = _client.auth.currentUser?.id;
+      if (userId == null) return [];
 
       final clientDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
-      final result = await client.rpc(
+      final result = await _client.rpc(
         'get_expense_summary_by_category', 
         params: {'p_user_id': userId, 'client_date': clientDate}
       );
@@ -45,12 +46,8 @@ class AnalysisRepository {
   Future<AnalysisData> fetchAllAnalysisData() async {
     developer.log("📈 [Repository] Fetching all analysis data...", name: 'AnalysisRepository');
     try {
-      // --- CAMBIO CLAVE: Obtenemos el cliente directamente de Supabase ---
-      final client = Supabase.instance.client;
-      final userId = client.auth.currentUser?.id;
-
+      final userId = _client.auth.currentUser?.id;
       if (userId == null) {
-        developer.log("⚠️ [Repository] No user ID found, returning empty analysis data.", name: 'AnalysisRepository');
         return AnalysisData.empty();
       }
 
@@ -59,27 +56,37 @@ class AnalysisRepository {
       final endDate = DateFormat('yyyy-MM-dd').format(today);
       final clientDate = DateFormat('yyyy-MM-dd').format(today);
 
-      // Usamos Future.wait para eficiencia, ya que ahora las llamadas son más estables.
+      // Usamos Future.wait para eficiencia.
+      // El parseo ahora es seguro gracias a la corrección en la pantalla.
       final results = await Future.wait([
-        client.rpc('get_expense_summary_by_category', params: {'p_user_id': userId, 'client_date': clientDate}).catchError((e) => []),
-        client.rpc('get_net_worth_trend', params: {'p_user_id': userId, 'client_date': clientDate}).catchError((e) => []),
-        client.rpc('get_monthly_cash_flow', params: {'p_user_id': userId}).catchError((e) => []),
-        client.rpc('get_category_spending_comparison', params: {'p_user_id': userId}).catchError((e) => []),
-        client.rpc('get_income_summary_by_category', params: {'p_user_id': userId, 'client_date': clientDate}).catchError((e) => []),
-        client.rpc('get_monthly_income_expense_summary', params: {'p_user_id': userId, 'client_date': clientDate}).catchError((e) => []),
-        client.rpc('get_daily_net_flow', params: {'p_user_id': userId, 'start_date': startDate, 'end_date': endDate}).catchError((e) => []),
+        _client.rpc('get_expense_summary_by_category', params: {'p_user_id': userId, 'client_date': clientDate}).catchError((e) => []),
+        _client.rpc('get_net_worth_trend', params: {'p_user_id': userId, 'client_date': clientDate}).catchError((e) => []),
+        _client.rpc('get_monthly_cash_flow', params: {'p_user_id': userId}).catchError((e) => []),
+        _client.rpc('get_category_spending_comparison', params: {'p_user_id': userId}).catchError((e) => []),
+        _client.rpc('get_income_summary_by_category', params: {'p_user_id': userId, 'client_date': clientDate}).catchError((e) => []),
+        _client.rpc('get_monthly_income_expense_summary', params: {'p_user_id': userId, 'client_date': clientDate}).catchError((e) => []),
+        _client.rpc('get_daily_net_flow', params: {'p_user_id': userId, 'start_date': startDate, 'end_date': endDate}).catchError((e) => []),
       ]);
+      
+      // Parseo seguro (asumiendo que la UI ya comprueba si las listas están vacías)
+      List<T> _parseResult<T>(int index, T Function(Map<String, dynamic>) fromJson) {
+        if (index < results.length && results[index] is List) {
+          return (results[index] as List).map((e) => fromJson(e as Map<String, dynamic>)).toList();
+        }
+        return [];
+      }
 
       return AnalysisData(
-        expensePieData: (results[0] as List).map((e) => ExpenseByCategory.fromJson(e)).toList(),
-        netWorthLineData: (results[1] as List).map((e) => NetWorthDataPoint.fromJson(e)).toList(),
-        cashflowBarData: (results[2] as List).map((e) => MonthlyCashflowData.fromJson(e)).toList(),
-        categoryComparisonData: (results[3] as List).map((e) => CategorySpendingComparisonData.fromJson(e)).toList(),
-        incomePieData: (results[4] as List).map((e) => IncomeByCategory.fromJson(e)).toList(),
-        incomeExpenseBarData: (results[5] as List).map((e) => MonthlyIncomeExpenseSummaryData.fromJson(e)).toList(),
+        expensePieData: _parseResult(0, ExpenseByCategory.fromJson),
+        netWorthLineData: _parseResult(1, NetWorthDataPoint.fromJson),
+        cashflowBarData: _parseResult(2, MonthlyCashflowData.fromJson),
+        categoryComparisonData: _parseResult(3, CategorySpendingComparisonData.fromJson),
+        incomePieData: _parseResult(4, IncomeByCategory.fromJson),
+        incomeExpenseBarData: _parseResult(5, MonthlyIncomeExpenseSummaryData.fromJson),
         heatmapData: {
-          for (var item in (results[6] as List))
-            DateTime.parse(item['day']): (item['net_amount'] as num).toInt()
+          if (6 < results.length && results[6] is List)
+            for (var item in (results[6] as List))
+              DateTime.parse(item['day']): (item['net_amount'] as num).toInt()
         },
       );
       

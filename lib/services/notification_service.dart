@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:sasper/data/recurring_repository.dart';
 import 'package:sasper/main.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -46,74 +47,95 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 class NotificationService {
   // Dependencias
-  final SupabaseClient _supabase;
-  final FirebaseMessaging _firebaseMessaging;
-  final http.Client _httpClient;
-  final FlutterLocalNotificationsPlugin _localNotifier =
-      FlutterLocalNotificationsPlugin();
+  late final SupabaseClient _supabase;
+  late final FirebaseMessaging _firebaseMessaging;
+  late final http.Client _httpClient;
+  
+  final FlutterLocalNotificationsPlugin _localNotifier = FlutterLocalNotificationsPlugin();
 
-  // Singleton
-  static final NotificationService instance = NotificationService._internal();
-  NotificationService._internal({
-    SupabaseClient? supabaseClient,
-    FirebaseMessaging? firebaseMessaging,
+  // El constructor privado ahora está vacío.
+  NotificationService._privateConstructor();
+
+  // La instancia estática se mantiene igual.
+  static final NotificationService instance = NotificationService._privateConstructor();
+  
+  // Se llamará desde SplashScreen para inyectar las dependencias.
+  void initializeDependencies({
+    required SupabaseClient supabaseClient,
+    required FirebaseMessaging firebaseMessaging,
     http.Client? httpClient,
-  })  : _supabase = supabaseClient ?? Supabase.instance.client,
-        _firebaseMessaging = firebaseMessaging ?? FirebaseMessaging.instance,
-        _httpClient = httpClient ?? http.Client();
+  }) {
+    _supabase = supabaseClient;
+    _firebaseMessaging = firebaseMessaging;
+    _httpClient = httpClient ?? http.Client();
+    developer.log('✅ [NotificationService] Dependencies Injected.', name: 'NotificationService');
+  }
 
   /// Inicializa FCM (push) y notific. locales (channels & scheduled).
+//  Future<void> initialize() async {
+//    developer.log('🚀 [NotificationService] Starting initialize()', name: 'NotificationService');
+//
+//    // ---- 1. PUSH REMOTAS (FCM) ----
+//    try {
+//      developer.log('① Configurando background FCM handler...', name: 'NotificationService');
+//      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+//
+//      developer.log('① Solicitando permisos FCM...', name: 'NotificationService');
+//      final settings = await _firebaseMessaging.requestPermission();
+//      developer.log(
+//        '① Permisos FCM: auth=${settings.authorizationStatus}',
+//        name: 'NotificationService',
+//      );
+//
+//      await _updateAndSaveToken();
+//      _firebaseMessaging.onTokenRefresh.listen((token) {
+//        developer.log('🔄 FCM Token refreshed: $token', name: 'NotificationService');
+//        _saveTokenToSupabase(token);
+//      });
+//
+//      _setupMessageListeners();
+//      developer.log('✅ FCM initialized.', name: 'NotificationService');
+//    } catch (e, st) {
+//      developer.log('🔥 Error initializing FCM: $e', name: 'NotificationService', stackTrace: st);
+//    }
+//
+//    // ---- 2. LOCALES PROGRAMADAS ----
+//    try {
+//      developer.log('② Inicializando TZ & canales...', name: 'NotificationService');
+//      await _initializeLocalNotifications();
+//
+//      // Estado de permisos Android 13+
+//      final notifPerm = await Permission.notification.status;
+//      developer.log('② Permiso NOTIFICATION: $notifPerm', name: 'NotificationService');
+//      if (notifPerm.isDenied) {
+//        developer.log('② Solicitando POST_NOTIFICATIONS...', name: 'NotificationService');
+//        await Permission.notification.request();
+//      }
+//
+//      final alarmPerm = await Permission.scheduleExactAlarm.status;
+//      developer.log('② Permiso SCHEDULE_EXACT_ALARM: $alarmPerm', name: 'NotificationService');
+//      if (alarmPerm.isDenied) {
+//        developer.log('② Solicitando SCHEDULE_EXACT_ALARM...', name: 'NotificationService');
+//        await Permission.scheduleExactAlarm.request();
+//      }
+//
+//      developer.log('✅ Local notifications initialized.', name: 'NotificationService');
+//    } catch (e, st) {
+//      developer.log('🔥 Error initializing local notifications: $e', name: 'NotificationService', stackTrace: st);
+//    }
+//  }
+
+
   Future<void> initialize() async {
-    developer.log('🚀 [NotificationService] Starting initialize()', name: 'NotificationService');
-
-    // ---- 1. PUSH REMOTAS (FCM) ----
-    try {
-      developer.log('① Configurando background FCM handler...', name: 'NotificationService');
-      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
-      developer.log('① Solicitando permisos FCM...', name: 'NotificationService');
-      final settings = await _firebaseMessaging.requestPermission();
-      developer.log(
-        '① Permisos FCM: auth=${settings.authorizationStatus}',
-        name: 'NotificationService',
-      );
-
-      await _updateAndSaveToken();
-      _firebaseMessaging.onTokenRefresh.listen((token) {
-        developer.log('🔄 FCM Token refreshed: $token', name: 'NotificationService');
-        _saveTokenToSupabase(token);
-      });
-
-      _setupMessageListeners();
-      developer.log('✅ FCM initialized.', name: 'NotificationService');
-    } catch (e, st) {
-      developer.log('🔥 Error initializing FCM: $e', name: 'NotificationService', stackTrace: st);
-    }
-
-    // ---- 2. LOCALES PROGRAMADAS ----
-    try {
-      developer.log('② Inicializando TZ & canales...', name: 'NotificationService');
-      await _initializeLocalNotifications();
-
-      // Estado de permisos Android 13+
-      final notifPerm = await Permission.notification.status;
-      developer.log('② Permiso NOTIFICATION: $notifPerm', name: 'NotificationService');
-      if (notifPerm.isDenied) {
-        developer.log('② Solicitando POST_NOTIFICATIONS...', name: 'NotificationService');
-        await Permission.notification.request();
-      }
-
-      final alarmPerm = await Permission.scheduleExactAlarm.status;
-      developer.log('② Permiso SCHEDULE_EXACT_ALARM: $alarmPerm', name: 'NotificationService');
-      if (alarmPerm.isDenied) {
-        developer.log('② Solicitando SCHEDULE_EXACT_ALARM...', name: 'NotificationService');
-        await Permission.scheduleExactAlarm.request();
-      }
-
-      developer.log('✅ Local notifications initialized.', name: 'NotificationService');
-    } catch (e, st) {
-      developer.log('🔥 Error initializing local notifications: $e', name: 'NotificationService', stackTrace: st);
-    }
+    developer.log('🚀 [NotificationService] Starting QUICK initialize()', name: 'NotificationService');
+    
+    // Configura FCM, pide permisos y actualiza el token.
+    // Estas operaciones son relativamente rápidas.
+    await _initializeFcm();
+    
+    // Configura los canales y permisos de notificaciones locales.
+    // Esto también es rápido.
+    await _initializeLocalNotifications();
   }
 
   /// Prueba inmediata: programa una notificación a 10s y muestra SnackBars.
@@ -179,6 +201,20 @@ class NotificationService {
   // ------------------------------------------------------------
   //  Helpers privados
   // ------------------------------------------------------------
+
+  Future<void> _initializeFcm() async {
+    try {
+      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+      final settings = await _firebaseMessaging.requestPermission();
+      developer.log('① Permisos FCM: auth=${settings.authorizationStatus}', name: 'NotificationService');
+      await _updateAndSaveToken();
+      _firebaseMessaging.onTokenRefresh.listen((token) => _saveTokenToSupabase(token));
+      _setupMessageListeners();
+      developer.log('✅ FCM initialized.', name: 'NotificationService');
+    } catch (e, st) {
+      developer.log('🔥 Error initializing FCM: $e', name: 'NotificationService', stackTrace: st);
+    }
+  }
 
   Future<void> _updateAndSaveToken() async {
     final token = await _firebaseMessaging.getToken();
@@ -326,13 +362,70 @@ class NotificationService {
     developer.log('🗑️ Cancelled recurring reminders for ID $txId', name: 'NotificationService');
   }
 
-  Future<void> refreshAllSchedules(List<RecurringTransaction> list) async {
-    await _localNotifier.cancelAll();
-    developer.log('🗑️ Cancelled all notifications to refresh', name: 'NotificationService');
-    for (var tx in list) {
-      await scheduleRecurringReminders(tx);
+  Future<void> refreshAllSchedules() async {
+    developer.log('🔄 [NotificationService] Starting HEAVY task: refreshAllSchedules()', name: 'NotificationService');
+    try {
+      if (!await Permission.scheduleExactAlarm.isGranted) {
+        developer.log('⚠️ No hay permiso para programar alarmas. Abortando refresh.', name: 'NotificationService');
+        return;
+      }
+
+      // 1. Obtenemos las transacciones recurrentes.
+      final recurringTxs = await RecurringRepository.instance.getAll();
+      
+      // 2. Limpiamos todas las notificaciones antiguas.
+      await _localNotifier.cancelAll();
+      developer.log('🗑️ Cancelled all notifications to refresh', name: 'NotificationService');
+      
+      // 3. Programamos las nuevas notificaciones.
+      for (final tx in recurringTxs) {
+        await _scheduleRemindersForTransaction(tx);
+      }
+      developer.log('✅ Refreshed and rescheduled ${recurringTxs.length} reminders', name: 'NotificationService');
+
+    } catch (e, st) {
+      developer.log('🔥 Error during refreshAllSchedules: $e', name: 'NotificationService', stackTrace: st);
     }
-    developer.log('🔄 Refreshed and rescheduled ${list.length} reminders', name: 'NotificationService');
+  }
+
+  /// Prograna recordatorios para UNA SOLA transacción recurrente.
+  Future<void> _scheduleRemindersForTransaction(RecurringTransaction tx) async {
+    // Usamos el ID de la transacción (que es un UUID string) para generar un ID base único.
+    final baseId = tx.id.hashCode & 0x7FFFFFFF; // Asegura que sea un entero de 31 bits positivo
+    final now = tz.TZDateTime.now(tz.local);
+
+    // Programamos recordatorios para los próximos 12 meses.
+    for (var i = 0; i < 12; i++) {
+      // Calcula la fecha de vencimiento futura
+      final dueDate = tz.TZDateTime(tz.local, tx.nextDueDate.year, tx.nextDueDate.month + i, tx.nextDueDate.day);
+      
+      // El recordatorio es 3 días antes de la fecha de vencimiento
+      final remindAt = dueDate.subtract(const Duration(days: 3));
+
+      // Solo programamos si la fecha del recordatorio es en el futuro
+      if (remindAt.isAfter(now)) {
+        final notificationId = baseId + i; // Creamos un ID único para cada notificación futura
+        
+        await _localNotifier.zonedSchedule(
+          notificationId,
+          'Recordatorio: ${tx.description}',
+          'Tu pago/cobro vence en 3 días.',
+          remindAt,
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              'recurring_payments_channel', // ID del canal
+              'Recordatorios de Pagos',
+              importance: Importance.high,
+              priority: Priority.high,
+            ),
+            iOS: DarwinNotificationDetails(presentSound: true),
+          ),
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+        );
+        developer.log('⏰ Scheduled notification #$notificationId at $remindAt', name: 'NotificationService');
+      }
+    }
   }
 
   Future<void> triggerBudgetNotification({

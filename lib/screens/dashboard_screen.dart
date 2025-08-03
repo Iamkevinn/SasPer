@@ -1,31 +1,33 @@
-// lib/screens/dashboard_screen.dart (VERSIÓN FINAL REFACtoRIZADA CON SINGLETONS)
+// lib/screens/dashboard_screen.dart
 
 import 'dart:async';
-//import 'dart:developer' as developer;
-//import 'dart:io';
+import 'dart:developer' as developer;
 import 'dart:ui';
-//import 'package:flutter/foundation.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-//import 'package:home_widget/home_widget.dart';
-//import 'package:path_provider/path_provider.dart';
+import 'package:path_provider/path_provider.dart'; // Importante para la ruta
+import 'package:sasper/data/dashboard_repository.dart';
 import 'package:sasper/data/transaction_repository.dart';
+import 'package:sasper/models/dashboard_data_model.dart';
 import 'package:sasper/models/transaction_models.dart';
-import 'package:sasper/screens/edit_transaction_screen.dart';
-import 'package:sasper/screens/transactions_screen.dart';
+import 'package:sasper/services/event_service.dart';
+import 'package:sasper/services/widget_service.dart'; // Contiene la función de fondo
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:shimmer/shimmer.dart';
-import 'package:sasper/services/widget_service.dart';
-import 'package:sasper/data/dashboard_repository.dart';
-import 'package:sasper/models/dashboard_data_model.dart';
-import 'package:sasper/services/event_service.dart';
+import 'package:sasper/main.dart';
+
+// Pantallas
+import 'edit_transaction_screen.dart';
+import 'transactions_screen.dart';
+
+// Widgets
 import 'package:sasper/widgets/dashboard/ai_analysis_section.dart';
 import 'package:sasper/widgets/dashboard/balance_card.dart';
 import 'package:sasper/widgets/dashboard/budgets_section.dart';
 import 'package:sasper/widgets/dashboard/dashboard_header.dart';
 import 'package:sasper/widgets/dashboard/recent_transactions_section.dart';
-import 'package:sasper/main.dart';
+
 
 class DashboardScreen extends StatefulWidget {
   // Solo necesita recibir los repositorios que AÚN NO son Singletons.
@@ -57,18 +59,34 @@ class DashboardScreenState extends State<DashboardScreen> {
     super.initState();
     // Obtenemos el stream directamente del Singleton.
     _dashboardDataStream = _dashboardRepository.getDashboardDataStream();
-
-    // La suscripción a EventService ya no es necesaria aquí, porque
-    // MainScreen ya se encarga de llamar a forceRefresh en el Singleton,
-    // y este widget escuchará los cambios a través del Stream del repositorio.
-    // Esto evita duplicar la lógica de refresh.
-    // Si aún quisieras mantenerla, no haría daño, pero es redundante.
-    // _eventSubscription = EventService.instance.eventStream.listen(...);
   }
 
+  /// LANZA LA TAREA PESADA DE ACTUALIZACIÓN DEL WIDGET A UN HILO DE FONDO.
+  void _updateWidgetsInBackground(DashboardData data) {
+    _widgetUpdateTimer?.cancel();
+    _widgetUpdateTimer = Timer(const Duration(milliseconds: 500), () async {
+      if (mounted) {
+        developer.log('UI Thread: Despachando tarea de actualización de widget al fondo...', name: 'DashboardScreen');
+        
+        // 1. Obtenemos la información necesaria del hilo principal (rápido).
+        final dir = await getApplicationSupportDirectory();
+        final path = '${dir.path}/widget_chart.png';
+        final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+        // 2. Creamos el payload.
+        final payload = WidgetUpdatePayload(
+          data: data,
+          chartImagePath: path,
+          isDarkMode: isDarkMode,
+        );
+
+        // 3. Lanzamos la tarea de fondo con 'compute' y NO la esperamos.
+        compute(updateWidgetsInBackground, payload);
+      }
+    });
+  }
+  
   // --- REVERSIÓN A LA SOLUCIÓN ESTABLE ---
-  // Revertimos la lógica de actualización del widget para que no use 'compute'
-  // y se ejecute en el hilo principal, ya que era la causa del bloqueo.
   void _updateWidgets(DashboardData data) {
     _widgetUpdateTimer?.cancel();
     _widgetUpdateTimer = Timer(const Duration(milliseconds: 500), () async {
@@ -94,7 +112,6 @@ class DashboardScreenState extends State<DashboardScreen> {
 
   @override
   void dispose() {
-    _eventSubscription?.cancel();
     _widgetUpdateTimer?.cancel();
     super.dispose();
   }
@@ -185,7 +202,7 @@ class DashboardScreenState extends State<DashboardScreen> {
               return _buildLoadingShimmer();
             }
             final data = snapshot.data!;
-            _updateWidgets(data); 
+            _updateWidgetsInBackground(data); 
             return _buildDashboardContent(data);
           },
         ),
