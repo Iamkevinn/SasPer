@@ -20,7 +20,21 @@ class ExpenseByCategory with EquatableMixin {
       throw FormatException('Error al parsear ExpenseByCategory: $e', json);
     }
   }
+  // Constructor fromMap (ya lo tienes)
+  factory ExpenseByCategory.fromMap(Map<String, dynamic> map) {
+    return ExpenseByCategory(
+      category: map['category'] as String,
+      totalSpent: (map['total_spent'] as num).toDouble(),
+    );
+  }
 
+  // ¡AÑADIR ESTO!
+  Map<String, dynamic> toMap() {
+    return {
+      'category': category,
+      'total_spent': totalSpent,
+    };
+  }
   @override
   List<Object?> get props => [category, totalSpent];
 }

@@ -59,9 +59,7 @@ Future<void> main() async {
   
   // 1. Asegura que los bindings de Flutter estén listos.
   WidgetsFlutterBinding.ensureInitialized();
-  if (kDebugMode) {
-    print('Forzando la inclusión de ${_usedIconsForTreeShaking.length} iconos predeterminados.');
-  }
+  print('Forzando la inclusión de ${_usedIconsForTreeShaking.length} iconos predeterminados.');
   // 2. Inicializa la localización de fechas (es muy rápido).
   await initializeDateFormatting('es_CO', null);
   

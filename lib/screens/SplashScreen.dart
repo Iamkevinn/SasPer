@@ -122,7 +122,6 @@ class _SplashScreenState extends State<SplashScreen> {
       await Future.delayed(const Duration(milliseconds: 500));
       
       NotificationService.instance.refreshAllSchedules();
-      WidgetService().updateUpcomingPaymentsWidget();
 
     } catch (e, stackTrace) {
       debugPrint("🔥🔥🔥 ERROR DURANTE LA INICIALIZACIÓN: $e\n$stackTrace");

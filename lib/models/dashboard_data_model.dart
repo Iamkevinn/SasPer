@@ -55,7 +55,24 @@ class DashboardData extends Equatable {
   /// Este método toma los datos detallados de la segunda llamada a la API
   /// y los usa para rellenar las listas, manteniendo los datos básicos ya cargados.
   /// `isLoading` se establece en `false` para indicar que la carga ha finalizado.
-  DashboardData copyWithDetails(Map<String, dynamic> map) {
+   DashboardData copyWithDetails(Map<String, dynamic> map) {
+    // Parsea la lista completa de presupuestos. Usa la clave que veas en el log.
+    final List<BudgetProgress> allBudgets = (map['budgets_progress'] as List<dynamic>?)
+        ?.map((b) => BudgetProgress.fromMap(b as Map<String, dynamic>))
+        .toList() ?? this.budgetsProgress; // Usa la lista vieja como fallback
+
+    // Lógica para determinar los presupuestos destacados.
+    List<BudgetProgress> featured;
+    // Opción 1: Si la API ya nos da una lista de "destacados", la usamos.
+    if (map.containsKey('featured_budgets')) {
+      featured = (map['featured_budgets'] as List<dynamic>?)
+          ?.map((b) => BudgetProgress.fromMap(b as Map<String, dynamic>))
+          .toList() ?? [];
+    } else {
+      // Opción 2 (Fallback): Si no, los tomamos de la lista completa (los 2 primeros).
+      featured = allBudgets.take(2).toList();
+    }
+    
     return DashboardData(
       // Mantenemos los datos de la Etapa 1
       fullName: fullName,
@@ -64,19 +81,21 @@ class DashboardData extends Equatable {
       // Poblamos las listas desde el nuevo mapa de detalles
       goals: (map['goals'] as List<dynamic>?)
           ?.map((g) => Goal.fromMap(g as Map<String, dynamic>))
-          .toList() ?? goals,
+          .toList() ?? this.goals,
+      
       recentTransactions: (map['recent_transactions'] as List<dynamic>?)
           ?.map((t) => Transaction.fromMap(t as Map<String, dynamic>)) 
-        .toList() ?? recentTransactions,
-      budgetsProgress: (map['budgets_progress'] as List<dynamic>?)
-          ?.map((b) => BudgetProgress.fromMap(b as Map<String, dynamic>))
-          .toList() ?? budgetsProgress,
-      featuredBudgets: (map['featured_budgets'] as List<dynamic>?)
-          ?.map((b) => BudgetProgress.fromMap(b as Map<String, dynamic>))
-          .toList() ?? featuredBudgets,
+          .toList() ?? this.recentTransactions,
+      
+      budgetsProgress: allBudgets, // Guardamos la lista completa
+      
+      featuredBudgets: allBudgets.take(2).toList(),
+       // Guardamos la lista de destacados
+      
+      // Usa la clave correcta que veas en el log, p. ej., 'expense_summary_widget'
       expenseSummaryForWidget: (map['expense_summary_for_widget'] as List<dynamic>?)
-          ?.map((e) => ExpenseByCategory.fromJson(e as Map<String, dynamic>))
-        .toList() ?? expenseSummaryForWidget,
+          ?.map((e) => ExpenseByCategory.fromMap(e as Map<String, dynamic>)) // Asegúrate de que ExpenseByCategory tenga fromMap
+          .toList() ?? this.expenseSummaryForWidget,
       
       isLoading: false, // La carga ha terminado
     );

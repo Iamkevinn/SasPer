@@ -29,7 +29,7 @@ class BudgetProgress extends Equatable {
     if (currentProgress >= 0.8) return BudgetStatus.warning;
     return BudgetStatus.onTrack;
   }
-
+  
   Map<String, dynamic> toJson() => {
         'budgetId': budgetId,
         'category': category,

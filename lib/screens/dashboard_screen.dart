@@ -1,10 +1,11 @@
 // lib/screens/dashboard_screen.dart
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:ui';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart'; // Importante para la ruta
 import 'package:sasper/data/dashboard_repository.dart';
 import 'package:sasper/data/transaction_repository.dart';
@@ -16,6 +17,7 @@ import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:sasper/main.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 // Pantallas
 import 'edit_transaction_screen.dart';
@@ -48,9 +50,11 @@ class DashboardScreenState extends State<DashboardScreen> {
   final DashboardRepository _dashboardRepository = DashboardRepository.instance;
   final TransactionRepository _transactionRepository = TransactionRepository.instance;
 
+  Timer? _widgetUpdateTimer;
+  final WidgetService _widgetService = WidgetService();
+
   late final Stream<DashboardData> _dashboardDataStream;
   StreamSubscription<AppEvent>? _eventSubscription; // Hacemos que la suscripción sea opcional
-  Timer? _widgetUpdateTimer;
   
   //get widgetService => null;
 
@@ -61,53 +65,30 @@ class DashboardScreenState extends State<DashboardScreen> {
     _dashboardDataStream = _dashboardRepository.getDashboardDataStream();
   }
 
-  /// LANZA LA TAREA PESADA DE ACTUALIZACIÓN DEL WIDGET A UN HILO DE FONDO.
-  void _updateWidgetsInBackground(DashboardData data) {
-    _widgetUpdateTimer?.cancel();
-    _widgetUpdateTimer = Timer(const Duration(milliseconds: 500), () async {
-      if (mounted) {
-        developer.log('UI Thread: Despachando tarea de actualización de widget al fondo...', name: 'DashboardScreen');
-        
-        // 1. Obtenemos la información necesaria del hilo principal (rápido).
-        final dir = await getApplicationSupportDirectory();
-        final path = '${dir.path}/widget_chart.png';
-        final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
-        // 2. Creamos el payload.
-        final payload = WidgetUpdatePayload(
-          data: data,
-          chartImagePath: path,
-          isDarkMode: isDarkMode,
-        );
-
-        // 3. Lanzamos la tarea de fondo con 'compute' y NO la esperamos.
-        compute(updateWidgetsInBackground, payload);
-      }
-    });
-  }
+  
   
   // --- REVERSIÓN A LA SOLUCIÓN ESTABLE ---
-  void _updateWidgets(DashboardData data) {
-    _widgetUpdateTimer?.cancel();
-    _widgetUpdateTimer = Timer(const Duration(milliseconds: 500), () async {
-      if (mounted && data.expenseSummaryForWidget.isNotEmpty) {
-        
-        // Actualiza los widgets principales existentes
-        WidgetService.updateAllWidgetData(data: data);
-
-        // ========== INICIO DE LA CORRECCIÓN ==========
-
-        // AHORA (Correcto): Creamos una instancia de WidgetService antes de usarla.
-        // También lo hacemos sin 'await' para no bloquear el hilo de la UI.
-        if (kDebugMode) {
-          print("🔄 Dashboard: Los datos cambiaron, actualizando widget de próximos pagos.");
-        }
-        WidgetService().updateUpcomingPaymentsWidget();
-
-        // ========== FIN DE LA CORRECCIÓN ==========
-      }
-    });
-  }
+// void _updateWidgets(DashboardData data) {
+//   _widgetUpdateTimer?.cancel();
+//   _widgetUpdateTimer = Timer(const Duration(milliseconds: 500), () async {
+//     if (mounted && data.expenseSummaryForWidget.isNotEmpty) {
+//       
+//       // Actualiza los widgets principales existentes
+//       WidgetService.updateAllWidgetData(data: data);
+//
+//       // ========== INICIO DE LA CORRECCIÓN ==========
+//
+//       // AHORA (Correcto): Creamos una instancia de WidgetService antes de usarla.
+//       // También lo hacemos sin 'await' para no bloquear el hilo de la UI.
+//       if (kDebugMode) {
+//         print("🔄 Dashboard: Los datos cambiaron, actualizando widget de próximos pagos.");
+//       }
+//       WidgetService().updateUpcomingPaymentsWidget();
+//
+//       // ========== FIN DE LA CORRECCIÓN ==========
+//     }
+//   });
+// }
 
 
   @override
@@ -202,7 +183,20 @@ class DashboardScreenState extends State<DashboardScreen> {
               return _buildLoadingShimmer();
             }
             final data = snapshot.data!;
-            _updateWidgetsInBackground(data); 
+            // ====================== INICIO DE LA CORRECCIÓN ======================
+            
+            _widgetUpdateTimer?.cancel();
+            _widgetUpdateTimer = Timer(const Duration(milliseconds: 500), () {
+              // 1. Llama a la actualización de los widgets principales.
+              _widgetService.updateAllWidgets(data, context);
+              
+              // 2. AÑADE la llamada para actualizar el widget de próximos pagos aquí.
+              //    En este punto, sabemos que el usuario está autenticado.
+              _widgetService.updateUpcomingPaymentsWidget();
+            });
+            
+            // ======================= FIN DE LA CORRECCIÓN ========================
+
             return _buildDashboardContent(data);
           },
         ),
