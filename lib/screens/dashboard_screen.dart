@@ -1,23 +1,20 @@
 // lib/screens/dashboard_screen.dart
 
 import 'dart:async';
-import 'dart:convert';
-import 'dart:developer' as developer;
+
+import 'package:sasper/widgets/shared/custom_notification_widget.dart';
+
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart'; // Importante para la ruta
 import 'package:sasper/data/dashboard_repository.dart';
 import 'package:sasper/data/transaction_repository.dart';
 import 'package:sasper/models/dashboard_data_model.dart';
 import 'package:sasper/models/transaction_models.dart';
 import 'package:sasper/services/event_service.dart';
-import 'package:sasper/services/widget_service.dart'; // Contiene la función de fondo
+import 'package:sasper/services/widget_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
-import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:sasper/main.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 // Pantallas
 import 'edit_transaction_screen.dart';
@@ -30,75 +27,63 @@ import 'package:sasper/widgets/dashboard/budgets_section.dart';
 import 'package:sasper/widgets/dashboard/dashboard_header.dart';
 import 'package:sasper/widgets/dashboard/recent_transactions_section.dart';
 
-
 class DashboardScreen extends StatefulWidget {
-  // Solo necesita recibir los repositorios que AÚN NO son Singletons.
-  // Una vez que todos lo sean, es posible que no necesite recibir ninguno.
-  //final DashboardRepository repository;
-
-  const DashboardScreen({
-    super.key,
-    //required this.repository,
-  });
+  const DashboardScreen({super.key});
 
   @override
   State<DashboardScreen> createState() => DashboardScreenState();
 }
 
 class DashboardScreenState extends State<DashboardScreen> {
-  // Obtenemos las instancias Singleton de los repositorios que necesitamos.
+  // --- Dependencias (Singletons) ---
   final DashboardRepository _dashboardRepository = DashboardRepository.instance;
   final TransactionRepository _transactionRepository = TransactionRepository.instance;
-
-  Timer? _widgetUpdateTimer;
   final WidgetService _widgetService = WidgetService();
 
+  // --- Gestión de Streams y Estado ---
   late final Stream<DashboardData> _dashboardDataStream;
-  StreamSubscription<AppEvent>? _eventSubscription; // Hacemos que la suscripción sea opcional
-  
-  //get widgetService => null;
+  StreamSubscription<DashboardData>? _widgetUpdateSubscription;
+  Timer? _widgetUpdateDebounce;
 
   @override
   void initState() {
     super.initState();
-    // Obtenemos el stream directamente del Singleton.
     _dashboardDataStream = _dashboardRepository.getDashboardDataStream();
+
+    // OPTIMIZACIÓN (IMPACTO ALTO): Desacoplar la lógica de actualización del widget del método `build`.
+    // Escuchamos el stream de datos aquí, una sola vez cuando el widget se crea.
+    _widgetUpdateSubscription = _dashboardDataStream.listen((data) {
+      // Solo actualizamos los widgets si el widget todavía está en pantalla (`mounted`)
+      // y si los datos ya están completamente cargados (`!data.isLoading`).
+      if (mounted && !data.isLoading) {
+        
+        // OPTIMIZACIÓN (DEBOUNCING): Evitamos una tormenta de actualizaciones.
+        // Si llegan múltiples actualizaciones de datos en un corto período (ej. por Realtime),
+        // cancelamos el timer anterior y creamos uno nuevo. Solo la última actualización
+        // en una ventana de 700ms activará la lógica de actualización del widget.
+        _widgetUpdateDebounce?.cancel();
+        _widgetUpdateDebounce = Timer(const Duration(milliseconds: 700), () {
+          // Esta lógica ahora se ejecuta de forma segura, eficiente y solo cuando es necesario.
+          _widgetService.updateAllWidgets(data, context);
+          _widgetService.updateUpcomingPaymentsWidget();
+        });
+      }
+    });
   }
-
-  
-  
-  // --- REVERSIÓN A LA SOLUCIÓN ESTABLE ---
-// void _updateWidgets(DashboardData data) {
-//   _widgetUpdateTimer?.cancel();
-//   _widgetUpdateTimer = Timer(const Duration(milliseconds: 500), () async {
-//     if (mounted && data.expenseSummaryForWidget.isNotEmpty) {
-//       
-//       // Actualiza los widgets principales existentes
-//       WidgetService.updateAllWidgetData(data: data);
-//
-//       // ========== INICIO DE LA CORRECCIÓN ==========
-//
-//       // AHORA (Correcto): Creamos una instancia de WidgetService antes de usarla.
-//       // También lo hacemos sin 'await' para no bloquear el hilo de la UI.
-//       if (kDebugMode) {
-//         print("🔄 Dashboard: Los datos cambiaron, actualizando widget de próximos pagos.");
-//       }
-//       WidgetService().updateUpcomingPaymentsWidget();
-//
-//       // ========== FIN DE LA CORRECCIÓN ==========
-//     }
-//   });
-// }
-
 
   @override
   void dispose() {
-    _widgetUpdateTimer?.cancel();
+    // OPTIMIZACIÓN (PREVENCIÓN DE FUGAS DE MEMORIA): Es CRÍTICO cancelar las suscripciones y timers.
+    // Si no lo hacemos, seguirán ejecutándose en segundo plano incluso después de que
+    // el usuario haya salido de la pantalla, causando errores y consumiendo recursos.
+    _widgetUpdateSubscription?.cancel();
+    _widgetUpdateDebounce?.cancel();
     super.dispose();
   }
 
+  // --- Métodos de Lógica de la Pantalla ---
+
   Future<void> _handleRefresh() async {
-    // Llama al Singleton para refrescar.
     await _dashboardRepository.forceRefresh(silent: false);
   }
 
@@ -109,19 +94,18 @@ class DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _handleTransactionTap(Transaction transaction) async {
-    final changed = await Navigator.of(context).push<bool>(
+    final bool? changed = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (context) => EditTransactionScreen(transaction: transaction),
       ),
     );
     if (changed == true) {
-      // Disparamos el evento para que MainScreen lo capture.
       EventService.instance.fire(AppEvent.transactionUpdated);
     }
   }
 
   Future<bool> _handleTransactionDelete(Transaction transaction) async {
-    final confirmed = await showDialog<bool>(
+    final bool? confirmed = await showDialog<bool>(
       context: navigatorKey.currentContext!,
       builder: (dialogContext) => BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
@@ -133,12 +117,13 @@ class DashboardScreenState extends State<DashboardScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Cancelar')
+              child: const Text('Cancelar'),
             ),
             FilledButton.tonal(
               style: FilledButton.styleFrom(
-                  backgroundColor: Theme.of(dialogContext).colorScheme.errorContainer,
-                  foregroundColor: Theme.of(dialogContext).colorScheme.onErrorContainer),
+                backgroundColor: Theme.of(dialogContext).colorScheme.errorContainer,
+                foregroundColor: Theme.of(dialogContext).colorScheme.onErrorContainer
+              ),
               onPressed: () => Navigator.of(dialogContext).pop(true),
               child: const Text('Confirmar'),
             ),
@@ -152,7 +137,6 @@ class DashboardScreenState extends State<DashboardScreen> {
         await _transactionRepository.deleteTransaction(transaction.id);
         if (mounted) {
           NotificationHelper.show(message: 'Transacción eliminada.', type: NotificationType.success);
-          // Disparamos el evento para que MainScreen lo capture.
           EventService.instance.fire(AppEvent.transactionDeleted);
         }
         return true;
@@ -165,7 +149,7 @@ class DashboardScreenState extends State<DashboardScreen> {
     }
     return false;
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -178,25 +162,15 @@ class DashboardScreenState extends State<DashboardScreen> {
             if (snapshot.hasError) {
               return Center(child: Text('Error al cargar los datos: ${snapshot.error}'));
             }
-            // Muestra el shimmer si no hay datos o si el modelo indica que está cargando detalles.
             if (!snapshot.hasData || snapshot.data!.isLoading) {
               return _buildLoadingShimmer();
             }
             final data = snapshot.data!;
-            // ====================== INICIO DE LA CORRECCIÓN ======================
             
-            _widgetUpdateTimer?.cancel();
-            _widgetUpdateTimer = Timer(const Duration(milliseconds: 500), () {
-              // 1. Llama a la actualización de los widgets principales.
-              _widgetService.updateAllWidgets(data, context);
-              
-              // 2. AÑADE la llamada para actualizar el widget de próximos pagos aquí.
-              //    En este punto, sabemos que el usuario está autenticado.
-              _widgetService.updateUpcomingPaymentsWidget();
-            });
+            // OPTIMIZACIÓN: El método `build` ahora es "puro". Solo se encarga de construir
+            // la interfaz de usuario. Toda la lógica pesada o asíncrona ha sido movida
+            // al `initState`, lo que hace que la reconstrucción del widget sea mucho más rápida.
             
-            // ======================= FIN DE LA CORRECCIÓN ========================
-
             return _buildDashboardContent(data);
           },
         ),
@@ -220,15 +194,15 @@ class DashboardScreenState extends State<DashboardScreen> {
             toolbarHeight: 80,
           ),
           SliverToBoxAdapter(child: BalanceCard(totalBalance: data.totalBalance)),
-          SliverToBoxAdapter(
-            child: BudgetsSection(
-              budgets: data.featuredBudgets,
-              // Ya no es necesario pasar transactionRepository ni accountRepository
-            ),
-          ),
+          SliverToBoxAdapter(child: BudgetsSection(budgets: data.featuredBudgets)),
+          
+          // OPTIMIZACIÓN (BUENA PRÁCTICA): Usar `const` para widgets que nunca cambian.
+          // Esto le dice a Flutter que puede saltarse la reconstrucción de estos widgets,
+          // ahorrando preciosos milisegundos en cada frame.
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
           const SliverToBoxAdapter(child: AiAnalysisSection()),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
+
           SliverToBoxAdapter(
             child: RecentTransactionsSection(
               transactions: data.recentTransactions,
@@ -243,126 +217,107 @@ class DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // El Shimmer sigue siendo el mismo, está muy bien.
+  // OPTIMIZACIÓN: Se ha añadido `const` a todos los widgets estáticos dentro del Shimmer.
   Widget _buildLoadingShimmer() {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final baseColor = isDarkMode ? Colors.grey[800]! : Colors.grey[300]!;
     final highlightColor = isDarkMode ? Colors.grey[700]! : Colors.grey[100]!;
 
     return Container(
-      width: double.infinity, // Asegura que ocupe todo el ancho
-      color: Theme.of(context).scaffoldBackgroundColor, // Le da un fondo sólido
+      width: double.infinity,
+      color: Theme.of(context).scaffoldBackgroundColor,
       child: Shimmer.fromColors(
         baseColor: baseColor,
         highlightColor: highlightColor,
         period: const Duration(milliseconds: 1500),
-        direction: ShimmerDirection.ltr,
-        child: SingleChildScrollView(
-          // <-- Usando SingleChildScrollView
-          physics: const NeverScrollableScrollPhysics(),
+        child: const SingleChildScrollView( // <-- `const` aquí porque el hijo es `const`
+          physics: NeverScrollableScrollPhysics(),
           child: Column(
-            // <-- Usando Column
-            crossAxisAlignment:
-                CrossAxisAlignment.start, // Alinea los elementos a la izquierda
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Padding general para que no esté pegado a los bordes
-              const SizedBox(height: 16),
-              // Shimmer para el Header
+              SizedBox(height: 16),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                padding: EdgeInsets.symmetric(horizontal: 16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 150.0,
-                      height: 24.0,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      width: 200.0,
-                      height: 32.0,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
+                    _ShimmerBox(width: 150.0, height: 24.0),
+                    SizedBox(height: 8),
+                    _ShimmerBox(width: 200.0, height: 32.0),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
-              // Shimmer para la Tarjeta de Saldo
-              Container(
-                height: 120,
-                margin: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                ),
-              ),
-              // --- NUEVO: SHIMMER PARA LA SECCIÓN DE PRESUPUESTOS ---
+              SizedBox(height: 16),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Container(
-                  width: 250.0,
-                  height: 28.0,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: _ShimmerBox(height: 120, borderRadius: 24),
               ),
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 140, // Misma altura que tu lista de presupuestos real
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: 3, // Muestra 3 placeholders de tarjetas
-                  itemBuilder: (context, index) => Container(
-                    width:
-                        220, // Mismo ancho que tus tarjetas de presupuesto reales
-                    margin: const EdgeInsets.only(right: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                  ),
-                ),
-              ),
-
-              // --- FIN DEL SHIMMER DE PRESUPUESTOS ---
-              const SizedBox(height: 24),
-              // Shimmer para la sección de IA
+              SizedBox(height: 24),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: EdgeInsets.symmetric(horizontal: 16.0),
+                child: _ShimmerBox(width: 250.0, height: 28.0),
+              ),
+              SizedBox(height: 12),
+              _BudgetShimmerList(), // <-- Extraído a un widget `const`
+              SizedBox(height: 24),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 220.0,
-                      height: 28.0,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      height: 150,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                    ),
+                    _ShimmerBox(width: 220.0, height: 28.0),
+                    SizedBox(height: 12),
+                    _ShimmerBox(height: 150, borderRadius: 20),
                   ],
                 ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// OPTIMIZACIÓN: Extraer partes repetitivas del Shimmer a widgets privados y `const`.
+class _ShimmerBox extends StatelessWidget {
+  final double? width;
+  final double height;
+  final double borderRadius;
+
+  const _ShimmerBox({
+    this.width,
+    required this.height,
+    this.borderRadius = 8.0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(borderRadius),
+      ),
+    );
+  }
+}
+
+class _BudgetShimmerList extends StatelessWidget {
+  const _BudgetShimmerList();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 140,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: 3,
+        itemBuilder: (context, index) => const Padding(
+          padding: EdgeInsets.only(right: 12),
+          child: _ShimmerBox(width: 220, height: 140, borderRadius: 20),
         ),
       ),
     );

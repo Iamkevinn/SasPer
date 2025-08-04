@@ -21,6 +21,12 @@
             "type": "dart",
             "flutterMode": "release"
         },
+         {
+            "name": "SasPer (profile mode)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile" // <-- La línea mágica que activa el modo profile
+        }
         //{ // <-- AÑADE ESTA NUEVA CONFIGURACIÓN
         //   "name": "SasPer (DEV - Aislamiento)",
         //    "request": "launch",
