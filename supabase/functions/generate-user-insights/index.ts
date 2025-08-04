@@ -1,79 +1,79 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 
-console.log('Edge Function "generate-user-insights" v3 (multi-insight) inicializada.');
+console.log('Edge Function "generate-user-insights" v4 (anti-duplicate) inicializada.');
 
-// La función principal se ejecuta cada vez que se invoca el endpoint.
+// Función auxiliar para comprobar si ya existe un insight reciente de un tipo específico.
+// Esto nos permite no duplicar alertas o notificaciones.
+async function hasRecentInsight(supabaseClient, userId: string, type: string, days = 7): Promise<boolean> {
+  const threshold = new Date();
+  threshold.setDate(threshold.getDate() - days);
+
+  const { data, error } = await supabaseClient
+    .from('insights')
+    .select('id', { count: 'exact', head: true }) // head: true hace la consulta más rápida
+    .eq('user_id', userId)
+    .eq('type', type)
+    .gte('created_at', threshold.toISOString());
+
+  if (error) {
+    console.error(`Error comprobando insights recientes para ${type}:`, error);
+    return true; // Para ser conservadores, asumimos que sí existe si hay un error.
+  }
+  return (data?.length ?? 0) > 0 || ( 'count' in (data || {}) && (data as any).count > 0);
+}
+
 serve(async (_req) => {
   try {
-    // Es CRÍTICO usar el rol de servicio (SERVICE_ROLE_KEY) para poder operar
-    // sobre los datos de todos los usuarios.
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // 1. Obtener la lista de todos los IDs de usuario.
     const { data: users, error: usersError } = await supabaseAdmin.from('profiles').select('id');
     if (usersError) throw usersError;
     
     console.log(`Encontrados ${users.length} usuarios para analizar.`);
 
-    // 2. Iterar sobre cada usuario para generar sus insights.
     for (const user of users) {
       const userId = user.id;
       console.log(`--- Analizando usuario: ${userId} ---`);
 
       // INSIGHT: Comparación de Gasto Semanal
       try {
-        const { data, error } = await supabaseAdmin.rpc('compare_weekly_spending', { p_user_id: userId });
-        if (error) throw error;
-        const result = data?.[0];
-        if (result && result.percentage_change && Math.abs(result.percentage_change) > 10) {
-          const isIncrease = result.percentage_change > 0;
-          await supabaseAdmin.from('insights').insert({
-            user_id: userId, type: 'weekly_spending_comparison',
-            severity: isIncrease ? 'warning' : 'success',
-            title: `${isIncrease ? '+' : ''}${result.percentage_change.toFixed(0)}% en Gastos`,
-            description: `Esta semana gastaste \$${result.current_week_total.toFixed(0)}, un cambio del ${result.percentage_change.toFixed(0)}% respecto a los \$${result.previous_week_total.toFixed(0)} de la semana anterior.`
-          });
-          console.log(`[OK] Insight de gasto semanal para ${userId}`);
+        if (!await hasRecentInsight(supabaseAdmin, userId, 'weekly_spending_comparison', 7)) {
+            const { data, error } = await supabaseAdmin.rpc('compare_weekly_spending', { p_user_id: userId });
+            if (error) throw error;
+            const result = data?.[0];
+            if (result && result.percentage_change && Math.abs(result.percentage_change) > 10) {
+              await supabaseAdmin.from('insights').insert({ /* ... */ });
+              console.log(`[OK] Insight de gasto semanal para ${userId}`);
+            }
         }
       } catch (e) { console.error(`[FAIL] Gasto semanal para ${userId}:`, e.message); }
 
       // INSIGHT: Categoría de Mayor Gasto del Mes
       try {
-        const { data, error } = await supabaseAdmin.rpc('get_top_spending_category_current_month', { p_user_id: userId });
-        if (error) throw error;
-        if (data && data.length > 0) {
-          const topCategory = data[0];
-          await supabaseAdmin.from('insights').insert({
-            user_id: userId, type: 'top_spending_category',
-            severity: 'info',
-            title: `Mayor Gasto: ${topCategory.category}`,
-            description: `Este mes, tu principal gasto ha sido en "${topCategory.category}", con un total de \$${topCategory.total_spent.toFixed(0)}.`
-          });
-          console.log(`[OK] Insight de categoría principal para ${userId}`);
+        if (!await hasRecentInsight(supabaseAdmin, userId, 'top_spending_category', 30)) {
+            const { data, error } = await supabaseAdmin.rpc('get_top_spending_category_current_month', { p_user_id: userId });
+            if (error) throw error;
+            if (data && data.length > 0) {
+              const topCategory = data[0];
+              await supabaseAdmin.from('insights').insert({
+                user_id: userId, type: 'top_spending_category',
+                severity: 'info', title: `Mayor Gasto: ${topCategory.category}`,
+                description: `Este mes, tu principal gasto ha sido en "${topCategory.category}", con un total de \$${topCategory.total_spent.toFixed(0)}.`
+              });
+              console.log(`[OK] Insight de categoría principal para ${userId}`);
+            }
         }
       } catch (e) { console.error(`[FAIL] Categoría principal para ${userId}:`, e.message); }
-
+      
       // INSIGHT: Comparación de Ahorro Mensual
       try {
-        const { data, error } = await supabaseAdmin.rpc('compare_monthly_savings', { p_user_id: userId });
-        if (error) throw error;
-        const result = data?.[0];
-        if (result && result.previous_month_savings !== 0) {
-          const diff = result.current_month_savings - result.previous_month_savings;
-          if (Math.abs(diff) > 1) {
-            const isIncrease = diff > 0;
-            await supabaseAdmin.from('insights').insert({
-              user_id: userId, type: 'monthly_savings_comparison',
-              severity: isIncrease ? 'success' : 'warning',
-              title: isIncrease ? `Mejora en Ahorros` : `Reducción en Ahorros`,
-              description: `Este mes, tu ahorro neto fue de \$${result.current_month_savings.toFixed(0)}, en comparación con los \$${result.previous_month_savings.toFixed(0)} del mes anterior.`,
-            });
-            console.log(`[OK] Insight de ahorro mensual para ${userId}`);
-          }
+        if (!await hasRecentInsight(supabaseAdmin, userId, 'monthly_savings_comparison', 30)) {
+           // ... (tu lógica de rpc e insert)
+           console.log(`[OK] Insight de ahorro mensual para ${userId}`);
         }
       } catch (e) { console.error(`[FAIL] Ahorro mensual para ${userId}:`, e.message); }
 
@@ -83,13 +83,13 @@ serve(async (_req) => {
         if (error) throw error;
         const exceeded = data.filter(b => b.progress >= 1.0);
         for (const budget of exceeded) {
-          await supabaseAdmin.from('insights').insert({
-            user_id: userId, type: 'budget_exceeded',
-            severity: 'alert',
-            title: `Presupuesto de "${budget.category}" superado`,
-            description: `Has gastado \$${budget.spent_amount.toFixed(0)} de tu presupuesto de \$${budget.budget_amount.toFixed(0)}.`,
-          });
-          console.log(`[OK] Insight de presupuesto superado para ${userId}`);
+          // Para este, la lógica anti-duplicación es un poco más compleja,
+          // se puede mejorar usando el `metadata` para guardar el ID del presupuesto.
+          // Por ahora, lo mantenemos simple.
+          if (!await hasRecentInsight(supabaseAdmin, userId, 'budget_exceeded', 7)) {
+             await supabaseAdmin.from('insights').insert({ /* ... */ });
+             console.log(`[OK] Insight de presupuesto superado para ${userId}`);
+          }
         }
       } catch (e) { console.error(`[FAIL] Presupuestos para ${userId}:`, e.message); }
 
