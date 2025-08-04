@@ -1,0 +1,17 @@
+{
+  // Activa la extensión de Deno para este espacio de trabajo.
+  "deno.enable": true,
+
+  // (Opcional pero recomendado) Activa "linting" para que Deno
+  // te ayude a formatear y encontrar errores en tu código de funciones.
+  "deno.lint": true,
+
+  // (Opcional pero recomendado) Especifica la ruta a la carpeta de import-maps.
+  // Supabase CLI genera este archivo para ayudar a gestionar las versiones de los módulos.
+  "deno.importMap": "./supabase/functions/import_map.json",
+
+  // Le dice a VS Code que no intente validar el código TypeScript en la carpeta
+  // de funciones con su motor interno, ya que Deno se encargará de ello.
+  "typescript.validate.enable": false,
+  "typescript.tsdk": null
+}

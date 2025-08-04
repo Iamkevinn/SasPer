@@ -2,6 +2,7 @@
 
 import 'dart:developer' as developer;
 import 'package:intl/intl.dart';
+import 'package:sasper/models/insight_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sasper/models/analysis_models.dart';
 
@@ -25,7 +26,7 @@ class AnalysisRepository {
       developer.log('✅ AnalysisRepository inicializado PEREZOSAMENTE.', name: 'AnalysisRepository');
     }
   }
-
+  
   /// Getter público para el cliente de Supabase.
   /// Activa la inicialización perezosa cuando es necesario.
   SupabaseClient get client {
@@ -41,6 +42,28 @@ class AnalysisRepository {
 
   // --- MÉTODOS PÚBLICOS DEL REPOSITORIO ---
 
+   /// Obtiene la lista de insights no leídos para el usuario actual.
+ Future<List<Insight>> getInsights() async {
+   developer.log('🧠 [Repo] Obteniendo insights inteligentes...', name: 'AnalysisRepository');
+   try {
+     final userId = client.auth.currentUser?.id;
+     if (userId == null) return []; // No hay usuario, no hay insights.
+
+     final response = await client
+         .from('insights')
+         .select()
+         .eq('user_id', userId)
+         .eq('is_read', false) // Opcional: solo traer los no leídos
+         .order('created_at', ascending: false)
+         .limit(5); // Traer solo los 5 más recientes para no saturar la UI
+
+     return (response as List).map((data) => Insight.fromMap(data)).toList();
+   } catch (e) {
+     developer.log('🔥 Error obteniendo insights: $e', name: 'AnalysisRepository');
+     return []; // Devolver lista vacía en caso de error.
+   }
+ }
+ 
   /// Obtiene solo el resumen de gastos, ideal para widgets o cargas rápidas.
   Future<List<ExpenseByCategory>> getExpenseSummaryForWidget() async {
     developer.log("📈 [Repo] Obteniendo resumen de gastos para widget...", name: 'AnalysisRepository');
