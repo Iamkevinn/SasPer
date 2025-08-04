@@ -1,30 +1,33 @@
 // lib/models/insight_model.dart
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:equatable/equatable.dart';
 import 'package:iconsax/iconsax.dart';
+import 'dart:developer' as developer;
+
 
 /// Define la severidad o el tono de un insight.
 enum InsightSeverity {
-  info,     // Neutral, un dato interesante.
-  success,  // Positivo, una celebración.
-  warning,  // Una advertencia, algo a lo que prestar atención.
-  alert     // Crítico, requiere acción.
+  info,
+  success,
+  warning,
+  alert
 }
 
 /// Define el tipo de insight para agruparlos o para lógicas específicas.
 enum InsightType {
   unknown,
   weeklySpendingComparison,
-  monthlySpendingComparison,
-  topSpendingCategory,
-  goalProgress,
-  unusualTransaction,
-  lowBalance,
+  monthly_savings_comparison, // Corregido para coincidir con el backend
+  top_spending_category,    // Corregido para coincidir con el backend
+  goal_milestone,
+  low_balance_warning,      // Corregido para coincidir con el backend
+  upcoming_payment,
+  budget_exceeded,
 }
 
-/// Representa una única pieza de información o "descubrimiento" generado por el sistema.
-/// Es inmutable y comparable gracias a `Equatable`.
 class Insight extends Equatable {
   final String id;
   final String userId;
@@ -34,7 +37,7 @@ class Insight extends Equatable {
   final String description;
   final InsightSeverity severity;
   final bool isRead;
-  final Map<String, dynamic> metadata; // Para datos extra como IDs de transacciones, etc.
+  final Map<String, dynamic> metadata;
 
   const Insight({
     required this.id,
@@ -48,28 +51,60 @@ class Insight extends Equatable {
     required this.metadata,
   });
 
-  /// Constructor Factory para crear una instancia de Insight desde un mapa (ej. JSON de Supabase).
+  /// Constructor Factory a prueba de fallos para crear una instancia desde un mapa.
   factory Insight.fromMap(Map<String, dynamic> map) {
-    return Insight(
-      id: map['id'] as String,
-      userId: map['user_id'] as String,
-      createdAt: DateTime.parse(map['created_at'] as String),
-      // Convierte el string de la DB al enum correspondiente.
-      type: InsightType.values.firstWhere(
-        (e) => e.name == map['type'],
-        orElse: () => InsightType.unknown,
-      ),
-      title: map['title'] as String,
-      description: map['description'] as String,
-      severity: InsightSeverity.values.firstWhere(
-        (e) => e.name == map['severity'],
-        orElse: () => InsightSeverity.info,
-      ),
-      isRead: map['is_read'] as bool,
-      metadata: map['metadata'] as Map<String, dynamic>,
-    );
+    try {
+      return Insight(
+        id: map['id'] ?? 'default_id',
+        userId: map['user_id'] ?? '',
+        createdAt: DateTime.tryParse(map['created_at'] ?? '') ?? DateTime.now(),
+        
+        type: InsightType.values.firstWhere(
+          (e) => e.name == map['type'],
+          orElse: () {
+            developer.log("⚠️ Tipo de Insight desconocido: '${map['type']}'. Usando 'unknown'.", name: 'InsightModel');
+            return InsightType.unknown;
+          },
+        ),
+        
+        title: map['title'] ?? 'Sin Título',
+        description: map['description'] ?? 'Sin Descripción',
+        
+        severity: InsightSeverity.values.firstWhere(
+          (e) => e.name == map['severity'],
+          orElse: () => InsightSeverity.info,
+        ),
+        
+        isRead: map['is_read'] ?? false,
+        
+        // --- CORRECCIÓN CLAVE ---
+        // Maneja el caso en que `metadata` sea nulo o no sea un mapa.
+        metadata: (map['metadata'] is Map<String, dynamic>) 
+                  ? map['metadata'] 
+                  : <String, dynamic>{},
+      );
+    } catch (e, st) {
+      developer.log(
+        '🔥🔥🔥 ERROR FATAL al parsear Insight. Revisa el mapa de datos.',
+        name: 'InsightModel',
+        error: e,
+        stackTrace: st,
+        // Imprime el mapa que causó el error para facilitar la depuración.
+        level: 1000, // Usa un nivel alto para que sea visible
+        zone: Zone.current.fork(
+          zoneValues: {'map_data': map}
+        )
+      );
+      // Devuelve un "Insight de error" para no romper la UI.
+      return Insight(
+        id: 'error_id', userId: '', createdAt: DateTime.now(),
+        type: InsightType.unknown, title: 'Error al cargar',
+        description: 'Hubo un problema al procesar este descubrimiento.',
+        severity: InsightSeverity.alert, isRead: false, metadata: {},
+      );
+    }
   }
-  
+
   @override
   List<Object?> get props => [id, userId, createdAt, type, title, description, severity, isRead, metadata];
 }
