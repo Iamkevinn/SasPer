@@ -6,121 +6,76 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:developer' as developer;
 
 class RecurringRepository {
-  // --- INICIO DE LOS CAMBIOS CRUCIALES ---
-  
-  // 1. El cliente ahora es privado y nullable.
-  SupabaseClient? _supabase;
+  // --- PATRÓN DE INICIALIZACIÓN PEREZOSA ---
 
-  // 2. Un getter público que PROTEGE el acceso al cliente.
+  SupabaseClient? _supabase;
+  bool _isInitialized = false;
+  final _streamController = StreamController<List<RecurringTransaction>>.broadcast();
+  RealtimeChannel? _channel;
+
+  // Constructor privado para forzar el uso del Singleton `instance`.
+  RecurringRepository._internal();
+  static final RecurringRepository instance = RecurringRepository._internal();
+
+  /// Se asegura de que el repositorio esté inicializado.
+  void _ensureInitialized() {
+    if (!_isInitialized) {
+      _supabase = Supabase.instance.client;
+      _setupRealtimeSubscription();
+      _isInitialized = true;
+      developer.log('✅ RecurringRepository inicializado PEREZOSAMENTE.', name: 'RecurringRepository');
+    }
+  }
+
+  /// Getter público para el cliente de Supabase.
   SupabaseClient get client {
+    _ensureInitialized();
     if (_supabase == null) {
-      throw Exception("¡ERROR! RecurringRepository no ha sido inicializado. Llama a .initialize() en SplashScreen.");
+      throw Exception("¡ERROR FATAL! Supabase no está disponible para RecurringRepository.");
     }
     return _supabase!;
   }
 
-  // --- FIN DE LOS CAMBIOS CRUCIALES ---
-  
-  final _streamController = StreamController<List<RecurringTransaction>>.broadcast();
-  RealtimeChannel? _channel;
-  bool _isInitialized = false;
+  // Se elimina el método `initialize()` público.
+  // void initialize(SupabaseClient supabaseClient) { ... } // <-- ELIMINADO
 
-  RecurringRepository._privateConstructor();
-  static final RecurringRepository instance = RecurringRepository._privateConstructor();
+  // --- MÉTODOS PÚBLICOS DEL REPOSITORIO ---
 
-  void initialize(SupabaseClient supabaseClient) {
-    if (_isInitialized) return;
-    _supabase = supabaseClient;
-    _isInitialized = true;
-    developer.log('✅ [Repo] RecurringRepository Singleton Initialized and Client Injected.', name: 'RecurringRepository');
-  }
-
-  // Ahora, todos los métodos usan el getter `client` en lugar de `_client`
-
+  /// Devuelve un stream de todas las transacciones recurrentes.
   Stream<List<RecurringTransaction>> getRecurringTransactionsStream() {
-    _setupRealtimeSubscription();
     _fetchAndPushData();
     return _streamController.stream;
   }
-
-  void _setupRealtimeSubscription() {
-    if (_channel != null) return;
-    final userId = client.auth.currentUser?.id;
-    if (userId == null) return;
-
-    developer.log('📡 [Repo] Setting up realtime subscription for recurring_transactions...', name: 'RecurringRepository');
-    _channel = client
-        .channel('public:recurring_transactions')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'recurring_transactions',
-          filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'user_id', value: userId),
-          callback: (payload) {
-            developer.log('🔔 [Repo] Realtime change detected in recurring_transactions. Refetching...', name: 'RecurringRepository');
-            _fetchAndPushData();
-          },
-        )
-        .subscribe();
-  }
-
-  Future<void> _fetchAndPushData() async {
-    developer.log('🔄 [Repo] Fetching recurring transactions...', name: 'RecurringRepository');
+  
+  /// Obtiene una lista de todas las transacciones recurrentes (llamada única).
+  Future<List<RecurringTransaction>> getAll() async {
+    developer.log('🔄 [Repo] Obteniendo todas las transacciones recurrentes...', name: 'RecurringRepository');
     try {
       final userId = client.auth.currentUser?.id;
-      if (userId == null) {
-        throw Exception("Usuario no autenticado.");
-      }
-      
+      if (userId == null) throw Exception('Usuario no autenticado.');
+
       final data = await client
           .from('recurring_transactions')
           .select()
           .eq('user_id', userId)
           .order('next_due_date', ascending: true);
-          
-      final transactions = (data as List).map((map) => RecurringTransaction.fromMap(map)).toList();
-      
-      if (!_streamController.isClosed) {
-        _streamController.add(transactions);
-        developer.log('✅ [Repo] Pushed ${transactions.length} recurring items to stream.', name: 'RecurringRepository');
-      }
+
+      final list = (data as List).map((e) => RecurringTransaction.fromMap(e)).toList();
+      developer.log('✅ [Repo] Obtenidas ${list.length} transacciones recurrentes.', name: 'RecurringRepository');
+      return list;
     } catch (e) {
-      developer.log('🔥 [Repo] Error fetching recurring transactions: $e', name: 'RecurringRepository');
-      if (!_streamController.isClosed) {
-        _streamController.addError('Error al cargar datos: $e');
-      }
+      developer.log('🔥 [Repo] Error obteniendo transacciones recurrentes: $e', name: 'RecurringRepository');
+      return []; // Devolver lista vacía en caso de error.
     }
   }
-  
-  /// Nuevo método: devuelve la lista completa de transacciones recurrentes
-  Future<List<RecurringTransaction>> getAll() async {
-    developer.log('🔄 [Repo] getAll(): fetching all recurring transactions...', name: 'RecurringRepository');
-    final userId = client.auth.currentUser?.id;
-    if (userId == null) throw Exception('Usuario no autenticado.');
 
-    final data = await client
-        .from('recurring_transactions')
-        .select()
-        .eq('user_id', userId)
-        .order('next_due_date', ascending: true);
-
-    final list = (data as List)
-        .map((e) => RecurringTransaction.fromMap(e))
-        .toList();
-
-    developer.log(
-      '✅ [Repo] getAll(): fetched ${list.length} transactions.',
-      name: 'RecurringRepository',
-    );
-    return list;
+  /// Vuelve a cargar los datos y los emite en el stream.
+  Future<void> refreshData() {
+    developer.log('🔄 [Repo] Refresco manual solicitado.', name: 'RecurringRepository');
+    return _fetchAndPushData();
   }
 
-  Future<void> refreshData() async {
-    developer.log('🔄 [Repo] Manual refresh requested.', name: 'RecurringRepository');
-    await _fetchAndPushData();
-  }
-
-  // Ahora devuelve Future<RecurringTransaction> en lugar de Future<void>
+  /// Añade una nueva transacción recurrente y la devuelve.
   Future<RecurringTransaction> addRecurringTransaction({
     required String description,
     required double amount,
@@ -147,23 +102,20 @@ class RecurringRepository {
         'end_date': endDate?.toIso8601String(),
       };
 
-      // Usamos .insert() y .select() para que Supabase nos devuelva el registro que acaba de crear
       final response = await client
           .from('recurring_transactions')
           .insert(newTransactionData)
           .select()
-          .single(); // .single() convierte la lista de un solo elemento en un solo objeto
+          .single();
 
-      // Parseamos el mapa devuelto por Supabase y lo retornamos
       return RecurringTransaction.fromMap(response);
-
     } catch (e) {
       developer.log('🔥 Error añadiendo transacción recurrente: $e', name: 'RecurringRepository');
       throw Exception('No se pudo crear el gasto fijo.');
     }
   }
 
-
+  /// Actualiza una transacción recurrente existente.
   Future<void> updateRecurringTransaction(RecurringTransaction transaction) async {
     try {
       await client
@@ -176,6 +128,7 @@ class RecurringRepository {
     }
   }
   
+  /// Elimina una transacción recurrente por su ID.
   Future<void> deleteRecurringTransaction(String id) async {
     try {
       await client.from('recurring_transactions').delete().eq('id', id);
@@ -185,12 +138,54 @@ class RecurringRepository {
     }
   }
 
+  /// Libera los recursos del repositorio.
   void dispose() {
-    developer.log('❌ [Repo] Disposing RecurringRepository Singleton resources.', name: 'RecurringRepository');
+    developer.log('❌ [Repo] Liberando recursos de RecurringRepository.', name: 'RecurringRepository');
     if (_channel != null) {
-      client.removeChannel(_channel!);
+      _supabase?.removeChannel(_channel!);
       _channel = null;
     }
     _streamController.close();
+  }
+
+  // --- MÉTODOS PRIVADOS ---
+
+  /// Configura la suscripción de Realtime.
+  void _setupRealtimeSubscription() {
+    if (_channel != null) return;
+    final userId = _supabase?.auth.currentUser?.id;
+    if (userId == null) return;
+
+    developer.log('📡 [Repo-Lazy] Configurando Realtime para Transacciones Recurrentes...', name: 'RecurringRepository');
+    _channel = _supabase!
+        .channel('public:recurring_transactions')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'recurring_transactions',
+          filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'user_id', value: userId),
+          callback: (payload) {
+            developer.log('🔔 [Repo] Realtime (RECURRING). Refrescando...', name: 'RecurringRepository');
+            _fetchAndPushData();
+          },
+        )
+        .subscribe();
+  }
+
+  /// Carga todas las transacciones recurrentes y las emite en el stream.
+  Future<void> _fetchAndPushData() async {
+    developer.log('🔄 [Repo] Obteniendo transacciones recurrentes...', name: 'RecurringRepository');
+    try {
+      final transactions = await getAll(); // Reutilizamos el método `getAll`
+      if (!_streamController.isClosed) {
+        _streamController.add(transactions);
+        developer.log('✅ [Repo] ${transactions.length} elementos recurrentes enviados al stream.', name: 'RecurringRepository');
+      }
+    } catch (e) {
+      developer.log('🔥 [Repo] Error obteniendo transacciones recurrentes: $e', name: 'RecurringRepository');
+      if (!_streamController.isClosed) {
+        _streamController.addError('Error al cargar datos: $e');
+      }
+    }
   }
 }

@@ -19,19 +19,10 @@ import 'package:sasper/screens/auth_gate.dart';
 import 'package:sasper/services/notification_service.dart';
 import 'package:sasper/services/widget_service.dart';
 
-// --- Repositorios (TODOS se inicializan aquí) ---
-import 'package:sasper/data/account_repository.dart';
-import 'package:sasper/data/analysis_repository.dart';
-import 'package:sasper/data/auth_repository.dart';
-import 'package:sasper/data/budget_repository.dart';
-import 'package:sasper/data/category_repository.dart';
+// --- Repositorios CRÍTICOS (solo los que se inicializan tempranamente) ---
 import 'package:sasper/data/dashboard_repository.dart';
-import 'package:sasper/data/debt_repository.dart';
-import 'package:sasper/data/goal_repository.dart';
-import 'package:sasper/data/recurring_repository.dart';
-import 'package:sasper/data/transaction_repository.dart';
 
-// Función auxiliar para guardar colores de Material You
+// Función auxiliar para guardar colores de Material You.
 Future<void> saveMaterialYouColors() async {
     try {
         final corePalette = await DynamicColorPlugin.getCorePalette();
@@ -77,22 +68,15 @@ class _SplashScreenState extends State<SplashScreen> {
         initializeDateFormatting('es_CO', null),
       ]);
 
-      // --- ETAPA 2: INYECCIÓN DE DEPENDENCIAS (Síncrono y Rápido) ---
-      // Una vez que lo crítico está listo, obtenemos las instancias.
+      // --- ETAPA 2: INYECCIÓN DE DEPENDENCIAS ESENCIALES ---
+      // Solo inicializamos los servicios y repositorios que son absolutamente
+      // necesarios ANTES de que el usuario vea la primera pantalla.
       final supabaseClient = Supabase.instance.client;
       final firebaseMessaging = FirebaseMessaging.instance;
       
-      // Inyección de dependencias para TODOS los repositorios. Esto es muy rápido.
-      AccountRepository.instance.initialize(supabaseClient);
-      AnalysisRepository.instance.initialize(supabaseClient);
-      AuthRepository.instance.initialize(supabaseClient);
-      BudgetRepository.instance.initialize(supabaseClient);
-      CategoryRepository.instance.initialize(supabaseClient);
+      // ÚNICAMENTE el repositorio del Dashboard es crítico para la primera pantalla.
+      // Todos los demás se inicializarán perezosamente cuando se necesiten.
       DashboardRepository.instance.initialize(supabaseClient);
-      DebtRepository.instance.initialize(supabaseClient);
-      GoalRepository.instance.initialize(supabaseClient);
-      RecurringRepository.instance.initialize(supabaseClient);
-      TransactionRepository.instance.initialize(supabaseClient);
       
       NotificationService.instance.initializeDependencies(
         supabaseClient: supabaseClient,

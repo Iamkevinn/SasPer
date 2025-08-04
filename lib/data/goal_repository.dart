@@ -6,94 +6,51 @@ import 'dart:async';
 import 'package:sasper/models/goal_model.dart';
 
 class GoalRepository {
-  // --- INICIO DE LOS CAMBIOS CRUCIALES ---
-  
-  // 1. El cliente ahora es privado y nullable.
-  SupabaseClient? _supabase;
+  // --- PATRÓN DE INICIALIZACIÓN PEREZOSA ---
 
-  // 2. Un getter público que PROTEGE el acceso al cliente.
+  SupabaseClient? _supabase;
+  bool _isInitialized = false;
+  final _streamController = StreamController<List<Goal>>.broadcast();
+  RealtimeChannel? _channel;
+
+  // Constructor privado para forzar el uso del Singleton `instance`.
+  GoalRepository._internal();
+  static final GoalRepository instance = GoalRepository._internal();
+
+  /// Se asegura de que el repositorio esté inicializado.
+  void _ensureInitialized() {
+    if (!_isInitialized) {
+      _supabase = Supabase.instance.client;
+      _setupRealtimeSubscription();
+      _isInitialized = true;
+      developer.log('✅ GoalRepository inicializado PEREZOSAMENTE.', name: 'GoalRepository');
+    }
+  }
+
+  /// Getter público para el cliente de Supabase.
   SupabaseClient get client {
+    _ensureInitialized();
     if (_supabase == null) {
-      throw Exception("¡ERROR! GoalRepository no ha sido inicializado. Llama a .initialize() en SplashScreen.");
+      throw Exception("¡ERROR FATAL! Supabase no está disponible para GoalRepository.");
     }
     return _supabase!;
   }
 
-  // --- FIN DE LOS CAMBIOS CRUCIALES ---
+  // Se elimina el método `initialize()` público.
+  // void initialize(SupabaseClient supabaseClient) { ... } // <-- ELIMINADO
 
-  final _streamController = StreamController<List<Goal>>.broadcast();
-  RealtimeChannel? _channel;
-  bool _isInitialized = false;
+  // --- MÉTODOS PÚBLICOS DEL REPOSITORIO ---
 
-  GoalRepository._privateConstructor();
-  static final GoalRepository instance = GoalRepository._privateConstructor();
-  
-  void initialize(SupabaseClient supabaseClient) {
-    if (_isInitialized) return;
-    _supabase = supabaseClient;
-    _isInitialized = true;
-    developer.log('✅ [Repo] GoalRepository Singleton Initialized and Client Injected.', name: 'GoalRepository');
-  }
-
-  // Ahora, todos los métodos usan el getter `client` en lugar de `_client`
-
+  /// Devuelve un stream de todas las metas del usuario.
   Stream<List<Goal>> getGoalsStream() {
-    _setupRealtimeSubscription();
     _fetchAndPushData();
     return _streamController.stream;
   }
   
-  void _setupRealtimeSubscription() {
-    if (_channel != null) return;
-    final userId = client.auth.currentUser?.id;
-    if (userId == null) return;
-
-    developer.log('📡 [Repo] Setting up realtime subscription for goals...', name: 'GoalRepository');
-    _channel = client
-        .channel('public:goals')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'goals',
-          filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'user_id', value: userId),
-          callback: (payload) {
-            developer.log('🔔 [Repo] Realtime change detected in goals. Refetching...', name: 'GoalRepository');
-            _fetchAndPushData();
-          },
-        )
-        .subscribe();
-  }
+  /// Vuelve a cargar los datos de las metas.
+  Future<void> refreshData() => _fetchAndPushData();
   
-  Future<void> _fetchAndPushData() async {
-    developer.log('🔄 [Repo] Fetching all goals...', name: 'GoalRepository');
-    try {
-      final userId = client.auth.currentUser?.id;
-      if (userId == null) throw Exception("User not authenticated");
-      
-      final data = await client
-          .from('goals')
-          .select()
-          .eq('user_id', userId)
-          .order('target_date', ascending: true);
-          
-      final goals = (data as List).map((map) => Goal.fromMap(map)).toList();
-      
-      if (!_streamController.isClosed) {
-        _streamController.add(goals);
-        developer.log('✅ [Repo] Pushed ${goals.length} goals to the stream.', name: 'GoalRepository');
-      }
-    } catch (e) {
-      developer.log('🔥 [Repo] Error fetching goals: $e', name: 'GoalRepository');
-      if (!_streamController.isClosed) {
-        _streamController.addError(e);
-      }
-    }
-  }
-
-  Future<void> refreshData() async {
-    await _fetchAndPushData();
-  }
-  
+  /// Añade una nueva meta para el usuario actual.
   Future<void> addGoal({
     required String name,
     required double targetAmount,
@@ -111,13 +68,14 @@ class GoalRepository {
         'target_date': targetDate?.toIso8601String(),
         'icon_name': iconName,
       });
-      developer.log('✅ [Repo] Goal "$name" added successfully.', name: 'GoalRepository');
+      developer.log('✅ [Repo] Meta "$name" añadida con éxito.', name: 'GoalRepository');
     } catch (e) {
-      developer.log('🔥 [Repo] Error adding goal: $e', name: 'GoalRepository');
+      developer.log('🔥 [Repo] Error añadiendo meta: $e', name: 'GoalRepository');
       throw Exception('No se pudo crear la meta.');
     }
   }
 
+  /// Actualiza una meta existente.
   Future<void> updateGoal(Goal goal) async {
     try {
       await client
@@ -129,13 +87,14 @@ class GoalRepository {
             'icon_name': goal.iconName,
           })
           .eq('id', goal.id);
-      developer.log('✅ [Repo] Goal updated successfully.', name: 'GoalRepository');
+      developer.log('✅ [Repo] Meta actualizada con éxito.', name: 'GoalRepository');
     } catch (e) {
-      developer.log('🔥 [Repo] Error updating goal: $e', name: 'GoalRepository');
+      developer.log('🔥 [Repo] Error actualizando meta: $e', name: 'GoalRepository');
       throw Exception('No se pudo actualizar la meta.');
     }
   }
   
+  /// Llama a un RPC para eliminar una meta y sus transacciones asociadas.
   Future<void> deleteGoalSafely(String goalId) async {
     try {
       await client.rpc(
@@ -143,11 +102,12 @@ class GoalRepository {
         params: {'goal_id_to_delete': goalId},
       );
     } catch (e) {
-      developer.log('🔥 [Repo] Error in RPC delete_goal_safely: $e', name: 'GoalRepository');
+      developer.log('🔥 [Repo] Error en RPC delete_goal_safely: $e', name: 'GoalRepository');
       throw Exception('No se pudo eliminar la meta.');
     }
   }
 
+  /// Llama a un RPC para registrar una contribución a una meta.
   Future<void> addContribution({
     required String goalId,
     required String accountId,
@@ -159,19 +119,71 @@ class GoalRepository {
         'account_id_input': accountId,
         'amount_input': amount,
       });
-      developer.log('✅ [Repo] Contribution added successfully.', name: 'GoalRepository');
+      developer.log('✅ [Repo] Aportación a meta registrada con éxito.', name: 'GoalRepository');
     } catch (e) {
-      developer.log('🔥 [Repo] Error adding contribution: $e', name: 'GoalRepository');
+      developer.log('🔥 [Repo] Error al registrar aportación: $e', name: 'GoalRepository');
       throw Exception('No se pudo realizar la aportación.');
     }
   }
 
+  /// Libera los recursos del repositorio.
   void dispose() {
-    developer.log('❌ [Repo] Disposing GoalRepository resources.', name: 'GoalRepository');
+    developer.log('❌ [Repo] Liberando recursos de GoalRepository.', name: 'GoalRepository');
     if (_channel != null) {
-      client.removeChannel(_channel!);
+      _supabase?.removeChannel(_channel!);
       _channel = null;
     }
     _streamController.close();
+  }
+
+  // --- MÉTODOS PRIVADOS ---
+
+  /// Configura la suscripción de Realtime para la tabla de metas.
+  void _setupRealtimeSubscription() {
+    if (_channel != null) return;
+    final userId = _supabase?.auth.currentUser?.id;
+    if (userId == null) return;
+
+    developer.log('📡 [Repo-Lazy] Configurando Realtime para Metas...', name: 'GoalRepository');
+    _channel = _supabase!
+        .channel('public:goals')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'goals',
+          filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'user_id', value: userId),
+          callback: (payload) {
+            developer.log('🔔 [Repo] Realtime (GOALS). Refrescando...', name: 'GoalRepository');
+            _fetchAndPushData();
+          },
+        )
+        .subscribe();
+  }
+  
+  /// Carga todas las metas y las emite en el stream.
+  Future<void> _fetchAndPushData() async {
+    developer.log('🔄 [Repo] Obteniendo todas las metas...', name: 'GoalRepository');
+    try {
+      final userId = client.auth.currentUser?.id;
+      if (userId == null) throw Exception("Usuario no autenticado");
+      
+      final data = await client
+          .from('goals')
+          .select()
+          .eq('user_id', userId)
+          .order('target_date', ascending: true);
+          
+      final goals = (data as List).map((map) => Goal.fromMap(map)).toList();
+      
+      if (!_streamController.isClosed) {
+        _streamController.add(goals);
+        developer.log('✅ [Repo] ${goals.length} metas enviadas al stream.', name: 'GoalRepository');
+      }
+    } catch (e) {
+      developer.log('🔥 [Repo] Error obteniendo metas: $e', name: 'GoalRepository');
+      if (!_streamController.isClosed) {
+        _streamController.addError(e);
+      }
+    }
   }
 }
