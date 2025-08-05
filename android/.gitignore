@@ -12,3 +12,6 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+# ✅ Ignorar archivo de variables de entorno
+.env
+supabase/migrations/20250804052345_create_cron_job_for_insights.sql
