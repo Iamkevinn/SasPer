@@ -345,28 +345,50 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     
     return Scaffold(
       appBar: AppBar(
-        title: Animate(
-    target: _isSearching ? 1 : 0,
-    effects: const [FadeEffect(), ScaleEffect()],
-    child: _isSearching
-        ? TextField(
-            controller: _searchController,
-            autofocus: true,
-            decoration: const InputDecoration(hintText: 'Buscar...', border: InputBorder.none),
-          )
-        : Text('Movimientos', style: GoogleFonts.poppins()),
-  ),
-        actions: [
-          IconButton(
-            icon: Badge(isLabelVisible: hasActiveFilters, child: const Icon(Iconsax.filter)),
-            onPressed: _showFilterBottomSheet,
+  // --- TÍTULO (Tu código aquí ya es perfecto) ---
+  title: _isSearching
+      ? TextField(
+          controller: _searchController,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: 'Buscar...',
+            border: InputBorder.none,
           ),
-          IconButton(
-            icon: Icon(_isSearching ? Iconsax.close_square : Iconsax.search_normal),
-            onPressed: _toggleSearch,
-          ),
-        ],
+          style: GoogleFonts.poppins(),
+        )
+          .animate()
+          // ---- CORRECCIÓN AQUÍ: Eliminamos `const` de la duración ----
+          .fadeIn(duration: 200.ms) 
+          .scaleX(begin: 0.8, duration: 200.ms, curve: Curves.easeOut)
+      : Text(
+          'Movimientos',
+          style: GoogleFonts.poppins(),
+        )
+          .animate()
+          // ---- CORRECCIÓN AQUÍ: Eliminamos `const` de la duración ----
+          .fadeIn(duration: 200.ms),
+
+  // --- ACCIONES (Usando AnimatedSwitcher, que no tiene este problema) ---
+  actions: [
+    IconButton(
+      icon: Badge(isLabelVisible: hasActiveFilters, child: const Icon(Iconsax.filter)),
+      onPressed: _showFilterBottomSheet,
+    ),
+    IconButton(
+      icon: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300), // Usamos el constructor `const` estándar
+        transitionBuilder: (Widget child, Animation<double> animation) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+        child: _isSearching
+            ? const Icon(Iconsax.close_square, key: ValueKey('close_icon'))
+            : const Icon(Iconsax.search_normal, key: ValueKey('search_icon')),
       ),
+      onPressed: _toggleSearch,
+    ),
+  ],
+),
+
       body: StreamBuilder<List<Transaction>>(
         stream: _transactionsStream,
         builder: (context, snapshot) {
