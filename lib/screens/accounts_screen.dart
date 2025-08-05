@@ -1,12 +1,17 @@
 // lib/screens/accounts_screen.dart (VERSIÓN FINAL COMPLETA USANDO SINGLETONS)
-
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:shimmer/shimmer.dart';
-import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+
+// --- NUEVAS IMPORTACIONES ---
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:sasper/widgets/shared/custom_notification_widget.dart';
+import 'package:skeletonizer/skeletonizer.dart';
+import 'package:lottie/lottie.dart';
+
+// --- DEPENDENCIAS EXISTENTES ---
 import 'package:sasper/data/account_repository.dart';
 import 'package:sasper/models/account_model.dart';
 import 'package:sasper/services/event_service.dart';
@@ -15,9 +20,7 @@ import 'package:sasper/screens/add_transfer_screen.dart';
 import 'package:sasper/screens/account_details_screen.dart';
 import 'package:sasper/screens/edit_account_screen.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
-import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:sasper/widgets/accounts/projection_card.dart';
-import 'package:sasper/widgets/shared/empty_state_card.dart';
 import 'package:sasper/main.dart';
 
 class AccountsScreen extends StatefulWidget {
@@ -181,19 +184,24 @@ class AccountsScreenState extends State<AccountsScreen> {
         stream: _accountsStream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-            return _buildLoadingShimmer();
+            // --- REEMPLAZO CON SKELETONIZER ---
+            return Skeletonizer(
+              child: ListView.builder(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 150),
+                itemCount: 5,
+                itemBuilder: (context, index) => Padding(
+                  padding: const EdgeInsets.only(bottom: 16.0),
+                  // Usamos un Account.empty() para que el esqueleto tenga la forma correcta
+                  child: _buildAccountTile(Account.empty()),
+                ),
+              ),
+            );
           }
           if (snapshot.hasError) {
             return Center(child: Padding(padding: const EdgeInsets.all(24.0), child: Text('Error al cargar cuentas:\n${snapshot.error}', textAlign: TextAlign.center)));
           }
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(
-                child: EmptyStateCard(
-              title: 'Aún no tienes cuentas',
-              message: '¡Añade una para empezar a organizar tus finanzas!',
-              icon: Iconsax.wallet_add_1,
-              actionButton: ElevatedButton.icon(onPressed: _navigateToAddAccount, icon: const Icon(Iconsax.add), label: const Text('Añadir mi primera cuenta')),
-            ));
+            return _buildLottieEmptyState();
           }
           return _buildContent(snapshot.data!);
         },
@@ -201,49 +209,42 @@ class AccountsScreenState extends State<AccountsScreen> {
     );
   }
 
-  Widget _buildContent(List<Account> accounts) {
+   Widget _buildContent(List<Account> accounts) {
     return RefreshIndicator(
       onRefresh: _handleRefresh,
-      child: AnimationLimiter(
-        child: ListView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 150),
-          itemCount: accounts.length,
-          itemBuilder: (context, index) {
-            final account = accounts[index];
-            return AnimationConfiguration.staggeredList(
-              position: index,
-              duration: const Duration(milliseconds: 375),
-              child: SlideAnimation(
-                verticalOffset: 50.0,
-                child: FadeInAnimation(
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _buildAccountTile(account),
-                        FutureBuilder<double>(
-                          key: ValueKey(account.id),
-                          // Usamos la instancia singleton para obtener la proyección
-                          future: _accountRepository.getAccountProjectionInDays(account.id),
-                          builder: (context, projectionSnapshot) {
-                            if (projectionSnapshot.connectionState == ConnectionState.waiting) {
-                              return ProjectionCard.buildShimmer(context);
-                            }
-                            if (projectionSnapshot.hasError || !projectionSnapshot.hasData || projectionSnapshot.data! <= 0) {
-                              return const SizedBox.shrink();
-                            }
-                            return ProjectionCard(daysLeft: projectionSnapshot.data!);
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
+      // --- REEMPLAZO DE STAGGEREDANIMATIONS CON FLUTTER_ANIMATE ---
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 150),
+        itemCount: accounts.length,
+        itemBuilder: (context, index) {
+          final account = accounts[index];
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildAccountTile(account),
+                FutureBuilder<double>(
+                  key: ValueKey(account.id),
+                  future: _accountRepository.getAccountProjectionInDays(account.id),
+                  builder: (context, projectionSnapshot) {
+                    if (projectionSnapshot.connectionState == ConnectionState.waiting) {
+                      return ProjectionCard.buildShimmer(context);
+                    }
+                    if (projectionSnapshot.hasError || !projectionSnapshot.hasData || projectionSnapshot.data! <= 0) {
+                      return const SizedBox.shrink();
+                    }
+                    return ProjectionCard(daysLeft: projectionSnapshot.data!);
+                  },
                 ),
-              ),
-            );
-          },
-        ),
+              ],
+            ),
+          )
+          // La animación se aplica a todo el conjunto (Tile + ProjectionCard)
+          .animate()
+          .fadeIn(duration: 500.ms, delay: (100 * index).ms)
+          .slideY(begin: 0.2, curve: Curves.easeOutCubic);
+        },
       ),
     );
   }
@@ -294,29 +295,45 @@ class AccountsScreenState extends State<AccountsScreen> {
     );
   }
 
-  Widget _buildLoadingShimmer() {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final baseColor = isDarkMode ? Colors.grey[850]! : Colors.grey[300]!;
-    final highlightColor = isDarkMode ? Colors.grey[700]! : Colors.grey[100]!;
-
-    return Shimmer.fromColors(
-      baseColor: baseColor,
-      highlightColor: highlightColor,
-      child: ListView.builder(
-        physics: const NeverScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 150),
-        itemCount: 5,
-        itemBuilder: (_, __) => Padding(
-          padding: const EdgeInsets.only(bottom: 16.0),
-          child: Container(
-            height: 82,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: const BorderRadius.all(Radius.circular(16)),
-            ),
+  Widget _buildLottieEmptyState() {
+    return Center(
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Lottie.asset(
+                'assets/animations/add_account_animation.json', // <-- Nuevo archivo
+                width: 250,
+                height: 250,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Aún no tienes cuentas',
+                style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '¡Añade una para empezar a organizar tus finanzas!',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: _navigateToAddAccount,
+                icon: const Icon(Iconsax.add),
+                label: const Text('Añadir mi primera cuenta'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  textStyle: const TextStyle(fontSize: 16),
+                ),
+              ),
+            ],
           ),
         ),
       ),
-    );
+    ).animate().fadeIn(duration: 400.ms);
   }
 }

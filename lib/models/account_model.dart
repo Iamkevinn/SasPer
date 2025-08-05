@@ -15,6 +15,7 @@ class Account extends Equatable {
   final String? iconName;
   final String? color;
 
+  
   // El constructor ahora es `const`.
   const Account({
     required this.id,
@@ -28,6 +29,17 @@ class Account extends Equatable {
     this.color,
   });
 
+  factory Account.empty() {
+  return Account(
+    id: '',
+    userId: '',
+    name: 'Nombre de Cuenta',
+    type: 'Efectivo',
+    balance: 0.0,
+    initialBalance: 0.0,
+    createdAt: DateTime.now(),
+  );
+}
   // 2. Método factory `fromMap` mejorado para ser más estricto.
   factory Account.fromMap(Map<String, dynamic> map) {
     try {

@@ -39,6 +39,9 @@ dependencies:
   flutter_staggered_animations: ^1.1.1
   flutter_heatmap_calendar: ^1.0.5
   flutter_svg: ^2.0.10
+  flutter_animate: ^4.5.0    # <-- NUEVO: Para animaciones "pop"
+  lottie: ^3.1.2             # <-- NUEVO: Para animaciones complejas (JSON)
+  skeletonizer: ^2.1.0+1   
   
   # Theming y colores dinámicos
   dynamic_color: ^1.7.0
@@ -80,6 +83,7 @@ flutter:
   # ¡IMPORTANTE! Declara la carpeta de assets para que Flutter la incluya.
   assets:
     - assets/icons/
+    - assets/animations/
 
   # Shaders para efectos visuales (como el ruido en la navbar).
   shaders:

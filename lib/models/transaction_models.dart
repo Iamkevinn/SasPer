@@ -1,4 +1,4 @@
-// lib/models/transaction_models.dart (VERSIÓN FINAL LIMPIA)
+// lib/models/transaction_models.dart
 
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
@@ -32,7 +32,30 @@ class Transaction extends Equatable {
     this.transferId,
   });
 
+  // --- NUEVO CONSTRUCTOR AÑADIDO ---
+  /// Crea una instancia "vacía" de Transaction.
+  /// Ideal para usar como placeholder en estados de carga, como en Skeletonizer.
+  /// No puede ser `const` porque usa `DateTime.now()`.
+  factory Transaction.empty() {
+    return Transaction(
+      id: 0,
+      userId: '', // Proporciona un valor por defecto para el campo requerido
+      accountId: '',
+      type: 'Gasto',
+      category: 'Categoría',
+      description: 'Cargando descripción...',
+      amount: 0.0,
+      transactionDate: DateTime.now(),
+      budgetId: null,
+      debtId: null,
+      goalId: null,
+      transferId: null,
+    );
+  }
+  // --- FIN DEL CÓDIGO AÑADIDO ---
+  
   Map<String, dynamic> toJson() => {
+        // Tu método toJson actual parece incompleto, podría necesitar más campos.
         'description': description,
         'amount': amount,
         'type': type,

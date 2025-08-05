@@ -54,17 +54,13 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
   }
 
   Future<void> _pickIcon() async {
-    IconData? icon = await FlutterIconPicker.showIconPicker(
-      context,
-      iconPackModes: [IconPack.lineAwesomeIcons],
-      title: const Text('Selecciona un icono'),
-      searchHintText: 'Buscar...',
-    );
+    IconData? icon = (await FlutterIconPicker.showIconPicker(context)) as IconData?;
 
     if (icon != null) {
       setState(() => _selectedIcon = icon);
     }
   }
+
 
   void _pickColor() {
     showDialog(

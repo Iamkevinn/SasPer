@@ -1,21 +1,28 @@
-// lib/screens/transactions_screen.dart (VERSIÓN FINAL REACTIVA CON STREAMBUILDER Y SINGLETONS)
+// lib/screens/transactions_screen.dart
 
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:intl/intl.dart';
+import 'dart:developer' as developer;
+
+// --- NUEVAS IMPORTACIONES ---
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:sasper/widgets/shared/custom_notification_widget.dart';
+import 'package:sasper/widgets/shared/empty_state_card.dart';
+import 'package:skeletonizer/skeletonizer.dart';
+import 'package:lottie/lottie.dart';
+
+// --- DEPENDENCIAS EXISTENTES ---
 import 'package:sasper/data/transaction_repository.dart';
 import 'package:sasper/models/transaction_models.dart';
 import 'package:sasper/screens/edit_transaction_screen.dart';
-import 'package:sasper/widgets/shared/custom_notification_widget.dart';
-import 'package:sasper/widgets/shared/empty_state_card.dart';
 import 'package:sasper/widgets/shared/transaction_tile.dart';
 import 'package:sasper/services/event_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/config/app_constants.dart';
-import 'package:intl/intl.dart';
-import 'dart:developer' as developer;
 import 'package:sasper/main.dart';
 
 class TransactionsScreen extends StatefulWidget {
@@ -338,13 +345,17 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     
     return Scaffold(
       appBar: AppBar(
-        title: _isSearching
-            ? TextField(
-                controller: _searchController,
-                autofocus: true,
-                decoration: const InputDecoration(hintText: 'Buscar...', border: InputBorder.none),
-              )
-            : Text('Movimientos', style: GoogleFonts.poppins()),
+        title: Animate(
+    target: _isSearching ? 1 : 0,
+    effects: const [FadeEffect(), ScaleEffect()],
+    child: _isSearching
+        ? TextField(
+            controller: _searchController,
+            autofocus: true,
+            decoration: const InputDecoration(hintText: 'Buscar...', border: InputBorder.none),
+          )
+        : Text('Movimientos', style: GoogleFonts.poppins()),
+  ),
         actions: [
           IconButton(
             icon: Badge(isLabelVisible: hasActiveFilters, child: const Icon(Iconsax.filter)),
@@ -360,19 +371,21 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         stream: _transactionsStream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            // AHORA: Usamos Skeletonizer para un estado de carga más realista.
+            return Skeletonizer(
+              child: ListView.builder(
+                itemCount: 10, // Muestra 10 elementos esqueleto
+                itemBuilder: (context, index) => TransactionTile(
+                  transaction: Transaction.empty(), // Usamos un modelo vacío como molde
+                ),
+              ),
+            );
           }
           if (snapshot.hasError) {
             return Center(child: Text('Error: ${snapshot.error}'));
           }
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(
-              child: EmptyStateCard(
-                icon: Iconsax.receipt_search,
-                title: 'Sin Resultados',
-                message: 'No se encontraron movimientos. Prueba a cambiar los filtros o añade una nueva transacción.',
-              ),
-            );
+            return _buildLottieEmptyState();
           }
           final transactions = snapshot.data!;
           return ListView.builder(
@@ -380,14 +393,51 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
             itemBuilder: (context, index) {
               final transaction = transactions[index];
               return TransactionTile(
-                transaction: transaction,
-                onTap: () => _navigateToEdit(transaction),
-                onDeleted: () => _handleDelete(transaction),
-              );
+          transaction: transaction,
+          onTap: () => _navigateToEdit(transaction),
+          onDeleted: () => _handleDelete(transaction),
+        )
+        .animate()
+        .fadeIn(duration: 400.ms, delay: (50 * index).ms)
+        .slideX(begin: 0.1, duration: 400.ms, delay: (50 * index).ms);
             },
           );
         },
       ),
     );
+  }
+
+  /// Construye el widget que se muestra cuando no hay transacciones, usando Lottie.
+  Widget _buildLottieEmptyState() {
+    return Center(
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Lottie.asset(
+                'assets/animations/empty_box.json',
+                width: 200,
+                height: 200,
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Sin Resultados',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'No se encontraron movimientos que coincidan con tu búsqueda. Prueba a cambiar los filtros o añade una nueva transacción.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ).animate().fadeIn(duration: 400.ms);
   }
 }
