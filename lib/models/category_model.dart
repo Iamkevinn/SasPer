@@ -3,6 +3,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:equatable/equatable.dart';
+import 'package:iconsax/iconsax.dart';
 
 enum CategoryType { income, expense }
 
@@ -25,6 +26,19 @@ class Category extends Equatable {
     required this.createdAt,
   });
 
+  /// Crea una instancia "vacía" de Category.
+  /// Ideal para usar como placeholder en Skeletonizer.
+  /// Puede ser `const` porque no usamos valores dinámicos.
+  static final empty = Category(
+    id: '',
+    userId: '',
+    name: 'Cargando categoría...',
+    icon: Iconsax.category,
+    color: Colors.grey,
+    type: CategoryType.expense,
+    createdAt: DateTime(2024), // Valor fijo para que pueda ser `const`
+  );
+  
   @override
   List<Object?> get props => [id, name, icon, color, type];
 

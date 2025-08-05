@@ -33,6 +33,27 @@ class RecurringTransaction extends Equatable {
     required this.createdAt,
   });
 
+  /// Crea una instancia "vacía" de RecurringTransaction.
+  /// Ideal para usar como placeholder en Skeletonizer.
+  /// No puede ser `const` porque usa DateTime.now().
+  factory RecurringTransaction.empty() {
+    return RecurringTransaction(
+      id: '',
+      userId: '',
+      description: 'Cargando gasto fijo...',
+      amount: 0.0,
+      type: 'Gasto',
+      category: 'Categoría',
+      accountId: '',
+      frequency: 'mensual',
+      interval: 1,
+      startDate: DateTime.now(),
+      nextDueDate: DateTime.now(),
+      createdAt: DateTime.now(),
+    );
+  }
+  
+  
   factory RecurringTransaction.fromMap(Map<String, dynamic> map) {
     return RecurringTransaction(
       id: map['id'] as String,

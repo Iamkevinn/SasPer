@@ -3,6 +3,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+
 import 'package:sasper/data/auth_repository.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
@@ -64,7 +66,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       );
       if (mounted) {
         NotificationHelper.show(
-          message: '¡Registro exitoso! Revisa tu correo electrónico para confirmar la cuenta.',
+          message: '¡Registro exitoso! Revisa tu correo para confirmar la cuenta.',
           type: NotificationType.success,
         );
         Navigator.of(context).pop();
@@ -113,6 +115,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   controller: _fullNameController,
                   decoration: const InputDecoration(labelText: 'Nombre Completo', prefixIcon: Icon(Iconsax.user_octagon)),
                   textCapitalization: TextCapitalization.words,
+                  validator: (value) => (value == null || value.isEmpty) ? 'Tu nombre es requerido.' : null,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
@@ -131,7 +134,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   keyboardType: TextInputType.emailAddress,
                   validator: (value) => (value == null || !value.contains('@')) ? 'Introduce un correo válido.' : null,
                 ),
-              ]),
+              ])
+              .animate()
+              .fadeIn(duration: 500.ms)
+              .slideX(begin: -0.2, curve: Curves.easeOutCubic),
+
               const SizedBox(height: 24),
               
               // --- Sección de Contraseña ---
@@ -149,10 +156,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) return 'La contraseña es obligatoria.';
-                    if (!_hasMinLength) return 'Debe tener al menos 8 caracteres.';
-                    if (!_hasUppercase) return 'Debe contener una mayúscula.';
-                    if (!_hasLowercase) return 'Debe contener una minúscula.';
-                    if (!_hasSpecialChar) return 'Debe contener un carácter especial.';
+                    if (!_hasMinLength || !_hasUppercase || !_hasLowercase || !_hasSpecialChar) {
+                      return 'Por favor, cumple todos los requisitos.';
+                    }
                     if (_usernameController.text.isNotEmpty && value.toLowerCase().contains(_usernameController.text.toLowerCase())) {
                       return 'No debe contener tu nombre de usuario.';
                     }
@@ -177,11 +183,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   },
                 ),
                 const SizedBox(height: 24),
-                _PasswordRequirement(label: 'Mínimo 8 caracteres', isValid: _hasMinLength),
-                _PasswordRequirement(label: 'Una letra mayúscula (A-Z)', isValid: _hasUppercase),
-                _PasswordRequirement(label: 'Una letra minúscula (a-z)', isValid: _hasLowercase),
-                _PasswordRequirement(label: 'Un carácter especial (!@#\$...)', isValid: _hasSpecialChar),
-              ]),
+                Column(
+                  children: [
+                    _PasswordRequirement(label: 'Mínimo 8 caracteres', isValid: _hasMinLength),
+                    _PasswordRequirement(label: 'Una letra mayúscula (A-Z)', isValid: _hasUppercase),
+                    _PasswordRequirement(label: 'Una letra minúscula (a-z)', isValid: _hasLowercase),
+                    _PasswordRequirement(label: 'Un carácter especial (!@#\$...)', isValid: _hasSpecialChar),
+                  ],
+                ).animate(delay: 50.ms).fadeIn(duration: 300.ms, delay: 300.ms).slideX(begin: -0.1),
+              ])
+              .animate(delay: 200.ms)
+              .fadeIn(duration: 500.ms)
+              .slideX(begin: 0.2, curve: Curves.easeOutCubic),
+
               const SizedBox(height: 32),
               
               // --- Botón de Registro ---
@@ -195,7 +209,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         textStyle: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 16),
                       ),
-                    ),
+                    )
+                    .animate(delay: 400.ms)
+                    .fadeIn(duration: 500.ms)
+                    .shake(hz: 2, duration: 300.ms),
             ],
           ),
         ),
@@ -203,12 +220,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // Widget helper para agrupar campos en una tarjeta con estilo.
   Widget _buildSectionCard(List<Widget> children) {
     return Card(
       elevation: 0,
       color: Theme.of(context).colorScheme.surface.withAlpha(50),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -219,7 +235,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 }
 
-// Widget auxiliar para mostrar los requisitos de la contraseña.
 class _PasswordRequirement extends StatelessWidget {
   final String label;
   final bool isValid;
@@ -231,25 +246,40 @@ class _PasswordRequirement extends StatelessWidget {
     final successColor = Colors.green.shade600;
     final defaultColor = Theme.of(context).colorScheme.onSurfaceVariant;
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4.0),
-      child: Row(
-        children: [
-          Icon(
-            isValid ? Iconsax.tick_circle : Iconsax.close_circle,
-            color: isValid ? successColor : defaultColor,
-            size: 18,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: TextStyle(
-              color: isValid ? successColor : defaultColor,
-              decoration: isValid ? TextDecoration.lineThrough : TextDecoration.none,
-            ),
-          ),
-        ],
+    // TweenAnimationBuilder es un widget de Flutter que anima un valor entre un `begin` y un `end`.
+    return TweenAnimationBuilder<Color?>(
+      // 1. El `tween` define qué se va a animar. En este caso, un Color.
+      //    Pasa del color por defecto al color de éxito.
+      tween: ColorTween(
+        begin: defaultColor,
+        end: isValid ? successColor : defaultColor,
       ),
+      // 2. La duración de la animación.
+      duration: const Duration(milliseconds: 300),
+      // 3. El `builder` se reconstruye en cada "tick" de la animación.
+      //    Nos da el `context`, el `color` actual de la animación, y un `child` opcional.
+      builder: (context, color, child) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 6.0),
+          child: Row(
+            children: [
+              Icon(
+                isValid ? Iconsax.tick_circle : Iconsax.close_circle,
+                color: color, // <-- Usamos el color animado
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: color, // <-- Usamos el color animado
+                  decoration: isValid ? TextDecoration.lineThrough : null,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

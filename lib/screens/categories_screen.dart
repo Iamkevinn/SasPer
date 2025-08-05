@@ -14,6 +14,9 @@ import 'package:sasper/widgets/categories/category_list_item.dart';
 import 'package:sasper/widgets/shared/custom_dialog.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:sasper/widgets/shared/empty_state_card.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:skeletonizer/skeletonizer.dart';
+import 'package:lottie/lottie.dart';
 
 class CategoriesScreen extends StatefulWidget {
   const CategoriesScreen({super.key});
@@ -108,28 +111,23 @@ class _CategoriesScreenState extends State<CategoriesScreen> with SingleTickerPr
       ),
       body: StreamBuilder<List<Category>>(
         stream: _categoriesStream,
-        builder: (context, snapshot) {
+         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            // --- REEMPLAZO DE INDICADOR CON SKELETONIZER ---
+            return _buildSkeletonizer();
           }
           if (snapshot.hasError) {
-            //print("DEBUG: StreamBuilder ha recibido un error: ${snapshot.error}");
             return Center(child: Text('Error: ${snapshot.error}'));
           }
-          if (snapshot.hasData) {
-          //print("DEBUG: El tipo de dato en snapshot.data es: ${snapshot.data.runtimeType}");
-        }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: EmptyStateCard(
-                title: 'Sin Categorías',
-                message: 'Usa el botón (+) para crear tu primera categoría de gastos o ingresos.',
-                icon: Iconsax.shapes_1,
-            ));
-          }
-
-          final allCategories = snapshot.data!;
+          
+          final allCategories = snapshot.data ?? [];
           final expenseCategories = allCategories.where((c) => c.type == CategoryType.expense).toList();
           final incomeCategories = allCategories.where((c) => c.type == CategoryType.income).toList();
+
+          if (allCategories.isEmpty) {
+            // --- REEMPLAZO DE EMPTYSTATE ESTÁTICO CON LOTTIE ---
+            return _buildLottieEmptyState();
+          }
 
           return TabBarView(
             controller: _tabController,
@@ -144,37 +142,81 @@ class _CategoriesScreenState extends State<CategoriesScreen> with SingleTickerPr
         onPressed: _navigateToAddCategory,
         label: const Text('Nueva Categoría'),
         icon: const Icon(Iconsax.add),
-      ),
+      ).animate().scale(delay: 300.ms, duration: 400.ms), // Pequeña animación para el FAB
     );
   }
 
   Widget _buildCategoryList(List<Category> categories, String emptyMessage) {
     if (categories.isEmpty) {
-      return Center(child: Text(emptyMessage));
+      return Center(
+        child: Text(emptyMessage)
+            .animate()
+            .fadeIn(duration: 300.ms)
+      );
     }
 
-    return AnimationLimiter(
+    // --- REEMPLAZO DE STAGGEREDANIMATIONS CON FLUTTER_ANIMATE ---
+    return ListView.builder(
+      padding: const EdgeInsets.all(8),
+      itemCount: categories.length,
+      itemBuilder: (context, index) {
+        final category = categories[index];
+        return CategoryListItem(
+          category: category,
+          onEdit: () => _navigateToEditCategory(category),
+          onDelete: () => _handleDeleteCategory(category),
+        )
+        // Animación de entrada en cascada
+        .animate()
+        .fadeIn(duration: 500.ms, delay: (100 * index).ms)
+        .slideY(begin: 0.2, curve: Curves.easeOutCubic);
+      },
+    );
+  }
+
+    Widget _buildSkeletonizer() {
+    return Skeletonizer(
       child: ListView.builder(
-        padding: const EdgeInsets.all(8),
-        itemCount: categories.length,
-        itemBuilder: (context, index) {
-          final category = categories[index];
-          return AnimationConfiguration.staggeredList(
-            position: index,
-            duration: const Duration(milliseconds: 375),
-            child: SlideAnimation(
-              verticalOffset: 50.0,
-              child: FadeInAnimation(
-                child: CategoryListItem(
-                  category: category,
-                  onEdit: () => _navigateToEditCategory(category),
-                  onDelete: () => _handleDeleteCategory(category),
-                ),
-              ),
-            ),
-          );
-        },
+        padding: const EdgeInsets.all(8.0),
+        itemCount: 8, // Muestra 8 elementos esqueleto
+        itemBuilder: (context, index) =>   CategoryListItem(
+          category: Category.empty, 
+          onEdit: () {},
+          onDelete: () {},// Usa el modelo vacío como molde
+        ),
       ),
     );
+  }
+
+  Widget _buildLottieEmptyState() {
+    return Center(
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Lottie.asset(
+                'assets/animations/categories_animation.json',
+                width: 250,
+                height: 250,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Sin Categorías',
+                style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Usa el botón (+) para crear tu primera categoría de gastos o ingresos y personalizar tu app.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ).animate().fadeIn(duration: 400.ms);
   }
 }

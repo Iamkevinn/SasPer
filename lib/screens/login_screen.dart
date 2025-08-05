@@ -3,8 +3,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:lottie/lottie.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+
 import 'package:sasper/data/auth_repository.dart';
-import 'package:sasper/screens/register_screen.dart'; // <-- IMPORTAMOS LA NUEVA PANTALLA
+import 'package:sasper/screens/register_screen.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 
@@ -20,6 +23,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
+  bool _obscureText = true;
 
   final AuthRepository _authRepository = AuthRepository.instance;
 
@@ -31,10 +35,11 @@ class _LoginScreenState extends State<LoginScreen> {
         _emailController.text.trim(),
         _passwordController.text.trim(),
       );
+      // La navegación ocurrirá automáticamente gracias al AuthGate que escucha los cambios de sesión.
     } catch (e) {
       if (mounted) {
         NotificationHelper.show(
-          message: e.toString().replaceFirst("Exception: ", ""),
+          message: e.toString(), // El repo ya devuelve un mensaje amigable
           type: NotificationType.error,
         );
       }
@@ -44,8 +49,6 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     }
   }
-
-  // El método _signUp() ha sido eliminado de esta pantalla.
 
   @override
   void dispose() {
@@ -64,10 +67,15 @@ class _LoginScreenState extends State<LoginScreen> {
           padding: const EdgeInsets.all(24.0),
           child: Form(
             key: _formKey,
+            // Anima todos los widgets hijos en cascada
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Iconsax.wallet_check, size: 80, color: colorScheme.primary),
+                // 1. Reemplazamos el icono estático por una animación Lottie
+                Lottie.asset(
+                  'assets/animations/login_animation.json',
+                  height: 200, // Ajusta el tamaño como prefieras
+                ),
                 const SizedBox(height: 16),
                 Text('Bienvenido a SasPer', style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold)),
                 Text('Toma el control de tus finanzas', style: GoogleFonts.poppins(fontSize: 16, color: colorScheme.onSurfaceVariant)),
@@ -77,11 +85,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   decoration: const InputDecoration(
                     labelText: 'Correo Electrónico',
                     prefixIcon: Icon(Iconsax.sms),
-                    border: OutlineInputBorder(),
                   ),
                   keyboardType: TextInputType.emailAddress,
                   validator: (value) {
-                    if (value == null || !value.contains('@')) {
+                    if (value == null || !value.contains('@') || !value.contains('.')) {
                       return 'Por favor, introduce un correo válido.';
                     }
                     return null;
@@ -90,12 +97,20 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _passwordController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Contraseña',
-                    prefixIcon: Icon(Iconsax.key),
-                    border: OutlineInputBorder(),
+                    prefixIcon: const Icon(Iconsax.key),
+                    // 2. Añadimos un botón para mostrar/ocultar la contraseña
+                    suffixIcon: IconButton(
+                      icon: Icon(_obscureText ? Iconsax.eye_slash : Iconsax.eye),
+                      onPressed: () {
+                        setState(() {
+                          _obscureText = !_obscureText;
+                        });
+                      },
+                    ),
                   ),
-                  obscureText: true,
+                  obscureText: _obscureText,
                   validator: (value) {
                     if (value == null || value.length < 6) {
                       return 'La contraseña debe tener al menos 6 caracteres.';
@@ -104,6 +119,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   },
                 ),
                 const SizedBox(height: 24),
+                // 3. Mejoramos el botón de carga
                 _isLoading
                     ? const CircularProgressIndicator()
                     : ElevatedButton.icon(
@@ -117,7 +133,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                 const SizedBox(height: 12),
                 TextButton(
-                  // El botón ahora navega a la pantalla de registro
                   onPressed: _isLoading ? null : () {
                     Navigator.of(context).push(MaterialPageRoute(
                       builder: (_) => const RegisterScreen(),
@@ -126,7 +141,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: const Text('¿No tienes cuenta? Regístrate'),
                 ),
               ],
-            ),
+            )
+            // 4. Aplicamos las animaciones de entrada a toda la columna
+            .animate(delay: 200.ms)
+            .slideY(begin: 0.2, duration: 500.ms, curve: Curves.easeOutCubic)
+            .fadeIn(duration: 500.ms),
           ),
         ),
       ),
