@@ -36,6 +36,7 @@ class Goal extends Equatable {
   final GoalStatus status;
   final String? iconName;
 
+  
   const Goal({
     required this.id,
     required this.userId,
@@ -47,6 +48,23 @@ class Goal extends Equatable {
     required this.status,
     this.iconName,
   });
+
+  /// Crea una instancia "vacía" de Goal.
+  /// Ideal para usar como placeholder en Skeletonizer.
+  /// Puede ser `const` porque no usa `DateTime.now()`.
+  factory Goal.empty() {
+    return Goal(
+      id: '',
+      userId: '',
+      name: 'Cargando meta...',
+      targetAmount: 1000,
+      currentAmount: 0,
+      createdAt: DateTime.now(), // <-- Usamos el valor real, no una referencia
+      status: GoalStatus.active,
+      iconName: null,
+      targetDate: null,
+    );
+  }
 
   // 3. Método `fromMap` robustecido.
   factory Goal.fromMap(Map<String, dynamic> map) {

@@ -1,21 +1,27 @@
-// lib/screens/goals_screen.dart (VERSIÓN FINAL CON SINGLETON)
+// lib/screens/goals_screen.dart
 
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
+
+// --- NUEVAS IMPORTACIONES ---
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:sasper/widgets/shared/custom_notification_widget.dart';
+import 'package:skeletonizer/skeletonizer.dart';
+import 'package:lottie/lottie.dart';
+
+// --- DEPENDENCIAS EXISTENTES ---
 import 'package:sasper/data/goal_repository.dart';
 import 'package:sasper/models/goal_model.dart';
 import 'package:sasper/services/event_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
-import 'package:sasper/widgets/shared/custom_notification_widget.dart';
-import 'package:shimmer/shimmer.dart';
 import 'package:sasper/screens/add_goal_screen.dart';
 import 'package:sasper/widgets/goals/contribute_to_goal_dialog.dart';
 import 'package:sasper/screens/edit_goal_screen.dart';
 import 'package:sasper/main.dart';
+
 
 class GoalsScreen extends StatefulWidget {
   // El repositorio ya no se pasa como parámetro en el constructor.
@@ -132,7 +138,17 @@ class _GoalsScreenState extends State<GoalsScreen> {
         stream: _goalsStream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-            return _buildLoadingShimmer();
+            // --- REEMPLAZO CON SKELETONIZER ---
+            return Skeletonizer(
+              child: ListView.builder(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                itemCount: 4, // Muestra 4 tarjetas esqueleto
+                itemBuilder: (context, index) => _GoalCard(
+                  goal: Goal.empty(), // Usa el modelo vacío como molde
+                  onContributeSuccess: () {},
+                ),
+              ),
+            );
           }
           if (snapshot.hasError) {
             return Center(child: Text('Error al cargar metas: ${snapshot.error}'));
@@ -140,7 +156,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
 
           final allGoals = snapshot.data ?? [];
           if (allGoals.isEmpty) {
-            return _buildEmptyState();
+            return _buildLottieEmptyState();
           }
 
           final activeGoals = allGoals.where((g) => g.status == GoalStatus.active).toList();
@@ -152,12 +168,12 @@ class _GoalsScreenState extends State<GoalsScreen> {
               padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 100.0),
               children: [
                 if (activeGoals.isNotEmpty)
-                  _buildSectionHeader('Metas Activas'),
+                  _buildSectionHeader('Metas Activas',context),
                 _buildGoalsList(activeGoals),
                 
                 if (completedGoals.isNotEmpty) ...[
                   const SizedBox(height: 24),
-                  _buildSectionHeader('Metas Completadas'),
+                  _buildSectionHeader('Metas Completadas',context),
                   _buildGoalsList(completedGoals, isCompleted: true),
                 ],
               ],
@@ -169,35 +185,62 @@ class _GoalsScreenState extends State<GoalsScreen> {
   }
 
   Widget _buildGoalsList(List<Goal> goals, {bool isCompleted = false}) {
-    return AnimationLimiter(
-      child: ListView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: goals.length,
-        itemBuilder: (context, index) {
-          final goal = goals[index];
-          return AnimationConfiguration.staggeredList(
-            position: index,
-            duration: const Duration(milliseconds: 375),
-            child: FadeInAnimation(
-                child: _GoalCard(
-                  goal: goal,
-                  isCompleted: isCompleted,
-                  onEdit: isCompleted ? null : () => _navigateToEditGoal(goal),
-                  onDelete: () => _handleDeleteGoal(goal),
-                  onContributeSuccess: () {
-                    // "Nudge" para asegurar la actualización del progreso
-                    _repository.refreshData(); 
-                  },
-                ),
-              ),
-          );
-        },
-      ),
+    // --- REEMPLAZO DE STAGGEREDANIMATIONS CON FLUTTER_ANIMATE ---
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: goals.length,
+      itemBuilder: (context, index) {
+        final goal = goals[index];
+        return _GoalCard(
+          goal: goal,
+          isCompleted: isCompleted,
+          onEdit: isCompleted ? null : () => _navigateToEditGoal(goal),
+          onDelete: () => _handleDeleteGoal(goal),
+          onContributeSuccess: () => _repository.refreshData(),
+        )
+        // Cada tarjeta se anima con un efecto de cascada.
+        .animate()
+        .fadeIn(duration: 500.ms, delay: (100 * index).ms)
+        .slideY(begin: 0.3, curve: Curves.easeOutCubic);
+      },
     );
   }
 
-  Widget _buildSectionHeader(String title) {
+  // --- NUEVO WIDGET AUXILIAR PARA EL ESTADO VACÍO CON LOTTIE ---
+  Widget _buildLottieEmptyState() {
+    return Center(
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Lottie.asset(
+                'assets/animations/trophy_animation.json',
+                width: 250,
+                height: 250,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Aún no tienes metas',
+                style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '¡Usa el botón (+) para crear tu primera meta y empezar a ahorrar para algo increíble!',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ).animate().fadeIn(duration: 400.ms);
+  }
+}
+  Widget _buildSectionHeader(String title,BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0, top: 8.0),
       child: Text(
@@ -211,53 +254,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
     );
   }
 
-  Widget _buildLoadingShimmer() {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final baseColor = isDarkMode ? Colors.grey[850]! : Colors.grey[300]!;
-    final highlightColor = isDarkMode ? Colors.grey[700]! : Colors.grey[100]!;
 
-    return Shimmer.fromColors(
-      baseColor: baseColor,
-      highlightColor: highlightColor,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16.0),
-        itemCount: 5,
-        itemBuilder: (context, index) {
-          return Card(
-            margin: const EdgeInsets.only(bottom: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            child: const SizedBox(height: 150),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Iconsax.flag_2, size: 80, color: Theme.of(context).colorScheme.secondary),
-            const SizedBox(height: 20),
-            Text(
-              'Aún no tienes metas',
-              style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              '¡Usa el botón (+) para crear tu primera meta y empezar a ahorrar!',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 
 // --- WIDGET _GoalCard MODIFICADO ---
