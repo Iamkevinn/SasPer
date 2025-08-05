@@ -12,6 +12,11 @@ import 'package:sasper/data/analysis_repository.dart';
 import 'package:sasper/models/analysis_models.dart';
 import 'package:sasper/models/insight_model.dart'; 
 
+// --- NUEVAS IMPORTACIONES ---
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:skeletonizer/skeletonizer.dart';
+import 'package:lottie/lottie.dart';
+
 // Widgets de la Pantalla
 import 'package:sasper/widgets/analysis_charts/heatmap_section.dart';
 import 'package:sasper/widgets/analysis_charts/monthly_cashflow_chart.dart';
@@ -118,14 +123,18 @@ class AnalysisScreenState extends State<AnalysisScreen> {
         child: FutureBuilder<({AnalysisData charts, List<Insight> insights})>(
           future: _analysisFuture,
           builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
+            final isLoading = snapshot.connectionState == ConnectionState.waiting;
+
+            // Usamos Skeletonizer para el estado de carga
+            if (isLoading) {
               return _buildShimmer();
             }
+
             if (snapshot.hasError) {
               return _buildErrorState(snapshot.error);
             }
             if (!snapshot.hasData) {
-              return _buildEmptyState(onRefresh: _handleRefresh);
+              return _buildLottieEmptyState(onRefresh: _handleRefresh);
             }
 
             final data = snapshot.data!;
@@ -135,7 +144,7 @@ class AnalysisScreenState extends State<AnalysisScreen> {
             final bool hasAnyData = insights.isNotEmpty || chartData.hasData;
 
             if (!hasAnyData) {
-              return _buildEmptyState(onRefresh: _handleRefresh);
+              return _buildLottieEmptyState(onRefresh: _handleRefresh);
             }
 
             return CustomScrollView(
@@ -157,7 +166,10 @@ class AnalysisScreenState extends State<AnalysisScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
                     sliver: SliverList.separated(
                       itemCount: insights.length,
-                      itemBuilder: (context, index) => InsightCard(insight: insights[index]),
+                      itemBuilder: (context, index) => InsightCard(insight: insights[index])
+                          .animate()
+                          .fadeIn(duration: 500.ms, delay: (100 * index).ms)
+                          .slideY(begin: 0.2, curve: Curves.easeOutCubic),
                       separatorBuilder: (context, index) => const SizedBox(height: 12),
                     ),
                   ),
@@ -171,7 +183,10 @@ class AnalysisScreenState extends State<AnalysisScreen> {
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 150),
                     sliver: SliverList.separated(
                       itemCount: _getChartCount(chartData),
-                      itemBuilder: (context, index) => _buildChartWidget(chartData, index),
+                      itemBuilder: (context, index) => _buildChartWidget(chartData, index)
+                          .animate()
+                          .fadeIn(duration: 600.ms, delay: (200 * index).ms)
+                          .moveY(begin: 30, curve: Curves.easeOutCubic),
                       separatorBuilder: (context, index) => const SizedBox(height: 32),
                     ),
                   ),
@@ -227,19 +242,6 @@ class AnalysisScreenState extends State<AnalysisScreen> {
     return Center(child: EmptyStateCard(title: 'Ocurrió un Error', message: 'No se pudieron cargar los datos.\nError: $error', icon: Iconsax.warning_2));
   }
 
-  Widget _buildEmptyState({required Future<void> Function() onRefresh}) {
-    // Envolvemos el estado vacío en un RefreshIndicator para que el usuario pueda reintentar.
-    return RefreshIndicator(
-      onRefresh: onRefresh,
-      child: Stack( // Stack permite que el ListView exista para habilitar el pull-to-refresh
-        children: [
-          ListView(),
-          const Center(child: EmptyStateCard(title: 'Sin Datos Suficientes', message: 'Aún no hay transacciones para generar un análisis.', icon: Iconsax.chart_21)),
-        ],
-      ),
-    );
-  }
-
   Widget _buildShimmer() {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final baseColor = isDarkMode ? Colors.grey[800]! : Colors.grey[300]!;
@@ -287,6 +289,48 @@ class AnalysisScreenState extends State<AnalysisScreen> {
       ),
     );
   }
+
+  // --- WIDGET DE ESTADO VACÍO CON LOTTIE ---
+  Widget _buildLottieEmptyState({required Future<void> Function() onRefresh}) {
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      child: Stack(
+        children: [
+          ListView(), // Para habilitar pull-to-refresh
+          Center(
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Lottie.asset(
+                      'assets/animations/analysis_animation.json',
+                      width: 250,
+                      height: 250,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Sin Datos Suficientes',
+                      style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Registra algunas transacciones para empezar a ver tus análisis inteligentes.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 400.ms);
+  }
+
 }
 
 /// Extensión para simplificar la comprobación de si hay datos de gráficos para mostrar.

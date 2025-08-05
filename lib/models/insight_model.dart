@@ -51,6 +51,14 @@ class Insight extends Equatable {
     required this.metadata,
   });
 
+  factory Insight.empty() {
+    return Insight(
+      id: '', userId: '', createdAt: DateTime.now(),
+      type: InsightType.unknown, title: 'Cargando descubrimiento...',
+      description: 'Analizando tus datos para encontrar información valiosa.',
+      severity: InsightSeverity.info, isRead: false, metadata: {},
+    );
+  }
   /// Constructor Factory a prueba de fallos para crear una instancia desde un mapa.
   factory Insight.fromMap(Map<String, dynamic> map) {
     try {
