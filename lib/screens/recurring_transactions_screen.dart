@@ -15,6 +15,9 @@ import 'package:sasper/widgets/shared/empty_state_card.dart';
 import 'package:sasper/services/notification_service.dart'; 
 import 'package:sasper/main.dart'; // Para navigatorKey
 import 'dart:developer' as developer; // Para logging
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:skeletonizer/skeletonizer.dart';
+import 'package:lottie/lottie.dart';
 
 enum RecurringStatus { due, upcoming, scheduled }
 
@@ -152,36 +155,39 @@ class _RecurringTransactionsScreenState extends State<RecurringTransactionsScree
         stream: _stream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            // --- REEMPLAZO DE INDICADOR CON SKELETONIZER ---
+            return Skeletonizer(
+              child: ListView.builder(
+                padding: const EdgeInsets.all(8.0),
+                itemCount: 6, // Muestra 6 elementos esqueleto
+                itemBuilder: (context, index) => Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  child: ListTile(
+                    leading: const CircleAvatar(),
+                    title: Text('Cargando descripción...' * 2),
+                    subtitle: const Text('Próximo: dd/mm/aaaa - Frecuencia'),
+                    trailing: Text(' \$000,000', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ),
+            );
           }
           if (snapshot.hasError) {
             return Center(child: Text('Error: ${snapshot.error}'));
           }
           final items = snapshot.data ?? [];
           if (items.isEmpty) {
-            return Center(
-              child: EmptyStateCard(
-                icon: Iconsax.repeat,
-                title: 'Automatiza tus Finanzas',
-                message: 'Añade aquí tus gastos o ingresos fijos (suscripciones, sueldo, alquiler) y la app los registrará por ti.',
-                actionButton: ElevatedButton.icon(
-                  onPressed: _navigateToAdd,
-                  icon: const Icon(Iconsax.add),
-                  label: const Text('Añadir mi primer gasto fijo'),
-                ),
-              ),
-            );
+            // --- REEMPLAZO DE EMPTYSTATECARD CON LOTTIE ---
+            return _buildLottieEmptyState();
           }
-          return ListView.builder(
+         return ListView.builder(
             padding: const EdgeInsets.all(8.0),
             itemCount: items.length,
             itemBuilder: (context, index) {
               final item = items[index];
               final status = _getStatus(item.nextDueDate);
-
               Color statusColor;
               IconData statusIcon;
-
               switch (status) {
                 case RecurringStatus.due:
                   statusColor = Colors.red.shade400;
@@ -231,11 +237,56 @@ class _RecurringTransactionsScreenState extends State<RecurringTransactionsScree
                     ],
                   ),
                 ),
-              );
+              )
+              .animate()
+              .fadeIn(duration: 500.ms, delay: (100 * index).ms)
+              .slideY(begin: 0.2, curve: Curves.easeOutCubic);
             },
           );
         },
       ),
     );
+  }
+   // --- NUEVO WIDGET AUXILIAR PARA EL ESTADO VACÍO CON LOTTIE ---
+  Widget _buildLottieEmptyState() {
+    return Center(
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Lottie.asset(
+                'assets/animations/automation_animation.json',
+                width: 250,
+                height: 250,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Automatiza tus Finanzas',
+                style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Añade aquí tus gastos o ingresos fijos (suscripciones, sueldo, alquiler) y la app los registrará por ti.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: _navigateToAdd,
+                icon: const Icon(Iconsax.add),
+                label: const Text('Añadir mi primer gasto fijo'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  textStyle: const TextStyle(fontSize: 16),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ).animate().fadeIn(duration: 400.ms);
   }
 }

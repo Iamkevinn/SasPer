@@ -20,6 +20,15 @@ class BudgetProgress extends Equatable {
     required this.spentAmount,
   });
 
+  factory BudgetProgress.empty() {
+    return const BudgetProgress(
+      budgetId: 0,
+      category: 'Cargando...',
+      budgetAmount: 1000,
+      spentAmount: 0,
+    );
+  }
+  
   double get progress => (budgetAmount > 0) ? (spentAmount / budgetAmount) : 0.0;
   double get remainingAmount => budgetAmount - spentAmount;
 

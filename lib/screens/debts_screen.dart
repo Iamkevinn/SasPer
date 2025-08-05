@@ -17,6 +17,11 @@ import 'register_payment_screen.dart';
 import 'package:sasper/screens/edit_debt_screen.dart'; // NUEVO: Importamos la pantalla de edición
 import 'package:sasper/widgets/shared/custom_dialog.dart';
 
+// --- NUEVAS IMPORTACIONES ---
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:skeletonizer/skeletonizer.dart';
+import 'package:lottie/lottie.dart';
+
 class DebtsScreen extends StatefulWidget {
   // El constructor ahora es simple y constante. No recibe ningún parámetro.
   const DebtsScreen({super.key});
@@ -55,7 +60,7 @@ class _DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderStat
   }
 
   @override
-  Widget build(BuildContext context) {
+    Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text('Deudas y Préstamos', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
@@ -81,17 +86,26 @@ class _DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderStat
       body: StreamBuilder<List<Debt>>(
         stream: _debtsStream,
         builder: (context, snapshot) {
+          // --- ESTADO DE CARGA ---
           if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
+            return _buildSkeletonizer();
           }
+
+          // --- ESTADO DE ERROR ---
           if (snapshot.hasError) {
             return Center(child: Text('Error: ${snapshot.error}'));
           }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return _buildEmptyStateForAll();
+          
+          final allDebts = snapshot.data ?? [];
+
+          // --- ESTADO VACÍO GENERAL ---
+          // Si la lista COMPLETA está vacía, mostramos la animación Lottie principal.
+          if (allDebts.isEmpty) {
+            return _buildLottieEmptyState(); // <-- CORRECCIÓN #1
           }
           
-          final allDebts = snapshot.data!;
+          // --- ESTADO CON DATOS ---
+          // Si hay datos, separamos las listas y construimos la TabBarView.
           final myDebts = allDebts.where((d) => d.type == DebtType.debt).toList();
           final loansToOthers = allDebts.where((d) => d.type == DebtType.loan).toList();
           
@@ -108,6 +122,43 @@ class _DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderStat
   }
 
   // --- MÉTODOS PARA MANEJAR LAS ACCIONES ---
+
+  Widget _buildLottieEmptyState({bool isForTab = false, bool isMyDebt = true}) {
+    // Personalizamos el texto según si es el estado vacío general o de una pestaña.
+    final title = isForTab
+        ? (isMyDebt ? '¡Sin deudas pendientes!' : '¡Nadie te debe!')
+        : 'Todo en Orden';
+    final message = isForTab
+        ? (isMyDebt ? 'Aquí aparecerán los préstamos que has recibido.' : 'Cuando le prestes dinero a alguien, aparecerá aquí.')
+        : 'No tienes deudas ni préstamos registrados. ¡Usa el botón (+) para añadir uno nuevo!';
+
+    return Center(
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Lottie.asset(
+                'assets/animations/add_item_animation.json',
+                width: 250,
+                height: 250,
+              ),
+              const SizedBox(height: 16),
+              Text(title, style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ).animate().fadeIn(duration: 400.ms);
+  }
 
   void _handleDebtAction(DebtCardAction action, Debt debt) {
     switch (action) {
@@ -140,30 +191,39 @@ class _DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderStat
 
   Widget _buildDebtsList(List<Debt> debts, {required bool isMyDebt}) {
     if (debts.isEmpty) {
-      return _buildEmptyStateForTab(isMyDebt: isMyDebt);
+      // Usamos el mismo Lottie para el estado vacío de cada pestaña.
+      return _buildLottieEmptyState(isForTab: true, isMyDebt: isMyDebt);
     }
     
-    return AnimationLimiter(
+    // --- REEMPLAZO DE STAGGEREDANIMATIONS CON FLUTTER_ANIMATE ---
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 150),
+      itemCount: debts.length,
+      itemBuilder: (context, index) {
+        final debt = debts[index];
+        return DebtCard(
+          debt: debt,
+          onActionSelected: (action) => _handleDebtAction(action, debt),
+        )
+        // Animación de entrada en cascada para cada tarjeta.
+        .animate()
+        .fadeIn(duration: 500.ms, delay: (100 * index).ms)
+        .slideY(begin: 0.3, curve: Curves.easeOutCubic);
+      },
+    );
+  }
+
+  // --- NUEVOS WIDGETS AUXILIARES ---
+
+  Widget _buildSkeletonizer() {
+    return Skeletonizer(
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 150),
-        itemCount: debts.length,
-        itemBuilder: (context, index) {
-          final debt = debts[index];
-          return AnimationConfiguration.staggeredList(
-            position: index,
-            duration: const Duration(milliseconds: 375),
-            child: SlideAnimation(
-              verticalOffset: 50.0,
-              child: FadeInAnimation(
-                child: DebtCard(
-                  debt: debt,
-                  // Conectamos el callback unificado al manejador de acciones.
-                  onActionSelected: (action) => _handleDebtAction(action, debt),
-                ),
-              ),
-            ),
-          );
-        },
+        itemCount: 4,
+        itemBuilder: (context, index) => DebtCard(
+          debt: Debt.empty(), // Usa el modelo vacío como molde
+          onActionSelected: (_) {},
+        ),
       ),
     );
   }
@@ -199,43 +259,5 @@ class _DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderStat
     );
   }
   
-  Widget _buildEmptyStateForAll() {
-    return const Center(
-      child: EmptyStateCard(
-        title: 'Todo en Orden',
-        message: 'No tienes deudas ni préstamos registrados. ¡Usa el botón (+) para añadir uno nuevo!',
-        icon: Iconsax.safe_home,
-      ),
-    );
-  }
 
-  Widget _buildEmptyStateForTab({required bool isMyDebt}) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              isMyDebt ? Iconsax.wallet_minus : Iconsax.wallet_add_1,
-              size: 60,
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              isMyDebt ? '¡Sin deudas pendientes!' : '¡Nadie te debe!',
-              style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              isMyDebt ? 'Aquí aparecerán los préstamos que has recibido.' : 'Cuando le prestes dinero a alguien, aparecerá aquí.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

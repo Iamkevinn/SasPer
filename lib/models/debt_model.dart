@@ -56,6 +56,24 @@ class Debt extends Equatable {
     required this.createdAt,
   });
 
+  factory Debt.empty() {
+    return Debt(
+      id: '',
+      userId: '',
+      name: 'Cargando deuda...',
+      type: DebtType.debt,
+      initialAmount: 1000.0,
+      currentBalance: 500.0,
+      status: DebtStatus.active,
+      createdAt: DateTime.now(),
+      // Los campos opcionales pueden ser nulos
+      entityName: null,
+      contactId: null,
+      dueDate: null,
+      interestRate: 0.0,
+    );
+  }
+  
   // 3. Método `fromMap` robustecido.
   factory Debt.fromMap(Map<String, dynamic> map) {
     try {

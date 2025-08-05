@@ -15,6 +15,10 @@ import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:sasper/widgets/shared/empty_state_card.dart';
 import 'package:sasper/widgets/shared/budget_card.dart';
 import 'package:sasper/main.dart';
+// --- NUEVAS IMPORTACIONES ---
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:skeletonizer/skeletonizer.dart';
+import 'package:lottie/lottie.dart';
 
 class BudgetsScreen extends StatefulWidget {
   // El repositorio ya no se pasa como parámetro en el constructor.
@@ -130,28 +134,27 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
         stream: _budgetsStream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
+            // --- REEMPLAZO DE INDICADOR CON SKELETONIZER ---
+            return Skeletonizer(
+              child: ListView.separated(
+                padding: const EdgeInsets.all(16.0),
+                itemCount: 5, // Muestra 5 tarjetas esqueleto
+                separatorBuilder: (context, index) => const SizedBox(height: 12),
+                itemBuilder: (context, index) => BudgetCard(
+                  budget: BudgetProgress.empty(), // Usa el modelo vacío como molde
+                ),
+              ),
+            );
           }
           if (snapshot.hasError) {
             return Center(child: Text('Error al cargar presupuestos: ${snapshot.error}'));
           }
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(
-              child: EmptyStateCard(
-                title: 'Sin Presupuestos',
-                message: 'Aún no has creado ningún presupuesto para este mes. ¡Empieza ahora!',
-                icon: Iconsax.additem,
-                actionButton: ElevatedButton.icon(
-                  onPressed: _navigateToAddBudget,
-                  icon: const Icon(Iconsax.add),
-                  label: const Text('Crear mi primer presupuesto'),
-                ),
-              ),
-            );
+            return _buildLottieEmptyState();
           }
 
           final budgets = snapshot.data!;
-          return ListView.separated(
+         return ListView.separated(
             padding: const EdgeInsets.all(16.0),
             itemCount: budgets.length,
             separatorBuilder: (context, index) => const SizedBox(height: 12),
@@ -162,11 +165,56 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
                 onTap: () => _navigateToEditBudget(budget),
                 onEdit: () => _navigateToEditBudget(budget),
                 onDelete: () => _handleDeleteBudget(budget),
-              );
+              )
+              .animate()
+              .fadeIn(duration: 500.ms, delay: (100 * index).ms)
+              .slideY(begin: 0.2, curve: Curves.easeOutCubic);
             },
           );
         },
       ),
     );
+  }
+  // --- NUEVO WIDGET AUXILIAR PARA EL ESTADO VACÍO CON LOTTIE ---
+  Widget _buildLottieEmptyState() {
+    return Center(
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Lottie.asset(
+                'assets/animations/piggy_bank_animation.json',
+                width: 250,
+                height: 250,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Sin Presupuestos',
+                style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Aún no has creado ningún presupuesto para este mes. ¡Empieza a planificar tus gastos!',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: _navigateToAddBudget,
+                icon: const Icon(Iconsax.add),
+                label: const Text('Crear mi primer presupuesto'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  textStyle: const TextStyle(fontSize: 16),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ).animate().fadeIn(duration: 400.ms);
   }
 }
