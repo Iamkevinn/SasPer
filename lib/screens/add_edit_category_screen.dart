@@ -2,9 +2,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import 'package:flutter_iconpicker/Models/configuration.dart';
 import 'package:flutter_iconpicker/flutter_iconpicker.dart';
 // ignore: library_prefixes
-import 'package:flutter_iconpicker/flutter_iconpicker.dart' as FlutterIconPicker;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:sasper/data/category_repository.dart';
@@ -54,12 +54,25 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
   }
 
   Future<void> _pickIcon() async {
-    IconData? icon = (await FlutterIconPicker.showIconPicker(context)) as IconData?;
+    if (!mounted) return;
+
+    IconPickerIcon? icon = await showIconPicker(
+      context,
+      configuration: SinglePickerConfiguration(
+        iconPackModes: [
+          IconPack.material,
+          IconPack.cupertino,
+        ],
+        showTooltips: true,
+        showSearchBar: true,
+      ),
+    );
 
     if (icon != null) {
-      setState(() => _selectedIcon = icon);
+      setState(() => _selectedIcon = icon.data); // Nota: usa icon.data
+      FocusScope.of(context).unfocus();
     }
-  }
+}
 
 
   void _pickColor() {

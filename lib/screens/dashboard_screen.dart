@@ -55,6 +55,7 @@ class DashboardScreenState extends State<DashboardScreen> {
         _widgetUpdateDebounce = Timer(const Duration(milliseconds: 700), () {
           _widgetService.updateAllWidgets(data, context);
           _widgetService.updateUpcomingPaymentsWidget();
+          WidgetService.updateGoalsWidget(); 
         });
       }
     });

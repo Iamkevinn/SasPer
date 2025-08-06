@@ -47,6 +47,40 @@ class GoalRepository {
     return _streamController.stream;
   }
   
+  // =================================================================
+  // NUEVO MÉTODO AÑADIDO
+  // =================================================================
+  /// Obtiene una lista de todas las metas activas del usuario una sola vez.
+  /// Perfecto para cargas iniciales o actualizaciones de widgets.
+  Future<List<Goal>> getActiveGoals() async {
+    _ensureInitialized(); // Nos aseguramos de que el cliente de Supabase esté listo.
+    developer.log('🔄 [Repo] Obteniendo metas activas (una vez)...', name: 'GoalRepository');
+    try {
+      final userId = client.auth.currentUser?.id;
+      if (userId == null) {
+        developer.log('⚠️ [Repo] Intento de obtener metas sin usuario autenticado.', name: 'GoalRepository');
+        return []; // Retorna lista vacía si no hay usuario
+      }
+      
+      final data = await client
+          .from('goals')
+          .select()
+          .eq('user_id', userId)
+          .eq('status', 'active') // Filtramos solo por metas activas
+          .order('target_date', ascending: true);
+          
+      final goals = (data as List).map((map) => Goal.fromMap(map)).toList();
+      developer.log('✅ [Repo] ${goals.length} metas activas obtenidas con éxito.', name: 'GoalRepository');
+      return goals;
+
+    } catch (e) {
+      developer.log('🔥 [Repo] Error obteniendo metas activas: $e', name: 'GoalRepository');
+      // En lugar de lanzar una excepción que podría romper la UI, 
+      // devolvemos una lista vacía y registramos el error.
+      return [];
+    }
+  }
+  
   /// Vuelve a cargar los datos de las metas.
   Future<void> refreshData() => _fetchAndPushData();
   

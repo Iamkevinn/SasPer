@@ -1,0 +1,21 @@
+Front,Back
+¿Qué es una red LAN?,Una red de área local que conecta dispositivos en un área geográfica limitada.
+¿Qué es una red WAN?,Una red de área amplia que conecta redes más pequeñas a través de grandes distancias.
+¿Qué es una dirección IP?,Un número único que identifica un dispositivo en una red.
+¿Para qué sirve el protocolo DHCP?,Para asignar direcciones IP automáticamente a los dispositivos.
+¿Qué hace el comando 'ping'?,Verifica la conectividad entre dispositivos en una red.
+¿Qué es el DNS?,Un sistema que traduce nombres de dominio en direcciones IP.
+¿Qué es una máscara de subred?,Determina qué parte de una dirección IP corresponde a la red y cuál al host.
+¿Qué es un router?,Un dispositivo que conecta distintas redes entre sí.
+¿Qué es un switch?,Un dispositivo que conecta dispositivos dentro de una misma red.
+¿Qué es Moodle?,Una plataforma de gestión de aprendizaje de código abierto.
+¿Cómo se crean usuarios en Moodle?,"Desde el panel de administración, en la sección de usuarios."
+¿Qué tipos de recursos se pueden subir a Moodle?,"PDF, videos, enlaces, imágenes, archivos de audio."
+¿Qué es un curso en Moodle?,Un espacio virtual donde se organizan contenidos y actividades de aprendizaje.
+¿Qué son los roles en Moodle?,"Permisos asignados a los usuarios como estudiante, profesor o administrador."
+¿Qué es un plugin en Moodle?,Una extensión que agrega funcionalidades a la plataforma.
+¿Cómo se hace un respaldo en Moodle?,"Desde la configuración del curso, opción 'Respaldo'."
+¿Qué habilidades se necesitan para capacitar usuarios?,"Comunicación clara, paciencia y empatía."
+¿Qué herramientas se usan para capacitaciones virtuales?,"Zoom, Meet, PowerPoint, grabadores de pantalla."
+¿Qué es importante al capacitar a alguien?,Adaptarse al nivel del usuario y explicar paso a paso.
+¿Qué puedes usar para reforzar la capacitación?,"Guías, manuales, videos tutoriales y prácticas."

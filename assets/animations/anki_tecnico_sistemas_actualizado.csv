@@ -1,0 +1,33 @@
+Front,Back
+¿Qué es una red LAN?,Una red de área local que conecta dispositivos en un área geográfica limitada.
+¿Qué es una red WAN?,Una red de área amplia que conecta redes más pequeñas a través de grandes distancias.
+¿Qué es una red WLAN?,Una red local inalámbrica.
+¿Qué dispositivos se configuran en una red?,"Routers, switches y puntos de acceso."
+¿Qué información contiene una dirección IP?,"Identifica un dispositivo en la red, junto con la máscara, puerta de enlace y DNS."
+¿Qué protocolos comunes se usan en redes?,"TCP/IP, DHCP, DNS, FTP."
+¿Qué herramientas se usan en cableado estructurado?,"Crimpadora, pelacables, probador de red."
+¿Qué comandos ayudan a diagnosticar problemas de red?,"ping, tracert, ipconfig."
+¿Qué se necesita para instalar Moodle?,"Servidor web, PHP, y una base de datos."
+¿Cómo se configuran usuarios en Moodle?,Desde la administración: crear cuentas y asignar roles.
+¿Qué actividades se pueden crear en Moodle?,"Cursos, foros, tareas y exámenes."
+¿Qué materiales se pueden subir a Moodle?,"PDF, videos, enlaces, imágenes."
+¿Cómo se hace respaldo en Moodle?,Desde la configuración del curso o administración general.
+¿Cómo se solucionan problemas comunes en Moodle?,"Revisando logs, configuraciones y actualizaciones de plugins."
+¿Cómo explicar conceptos técnicos a un usuario?,Usando ejemplos claros y lenguaje sencillo.
+¿Qué herramientas ayudan en capacitaciones virtuales?,"PowerPoint, Canva, Zoom, Meet, grabación de pantalla."
+¿Qué habilidades personales ayudan en capacitaciones?,"Paciencia, comunicación y empatía."
+¿Por qué es importante identificar el nivel del usuario?,Para adaptar la capacitación a su conocimiento.
+¿Qué material complementa una capacitación?,Guías paso a paso o manuales visuales.
+¿Por qué es clave la comunicación efectiva?,Permite transmitir ideas claramente y evitar errores.
+¿Por qué se valora la actitud de servicio?,Porque demuestra disposición para ayudar al usuario.
+¿Qué significa tener proactividad?,Buscar soluciones sin esperar a que se lo pidan.
+¿Qué es adaptabilidad?,Capacidad para ajustarse a diferentes usuarios o situaciones.
+¿Por qué es importante la organización?,Para cumplir tareas de forma eficiente y responsable.
+¿Cómo debe ser una hoja de vida?,"Clara, organizada y actualizada."
+¿Qué certificados pueden apoyar tu perfil?,"Cursos en redes, Moodle, pedagogía."
+¿Qué disponibilidad es valorada en el cargo?,Poder desplazarse o trabajar de forma remota.
+¿Por qué puede ser útil el inglés técnico?,Para leer documentación o comunicarse con software y usuarios.
+¿Qué ejemplos debes tener listos para una entrevista?,Situaciones donde resolviste problemas técnicos.
+¿Cómo explicarías qué es Moodle?,Es una plataforma de aprendizaje virtual que permite crear cursos.
+¿Cómo darías una capacitación básica?,"Con ejemplos sencillos, pasos claros y apoyo visual."
+¿Qué te pueden pedir en una prueba técnica?,"Configurar una red, IP, o mostrar uso básico de Moodle."

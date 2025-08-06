@@ -17,6 +17,7 @@ import 'package:sasper/data/recurring_repository.dart';
 import 'package:sasper/models/analysis_models.dart';
 import 'package:sasper/models/dashboard_data_model.dart';
 import 'package:sasper/models/upcoming_payment_model.dart';
+import 'package:sasper/data/goal_repository.dart';
 
 // --- Constante de Logging ---
 const String _logName = 'WidgetService';
@@ -43,6 +44,7 @@ class WidgetService {
   /// Esta función debe ser llamada desde el hilo principal de la UI, ya que
   /// contiene operaciones de renderizado (`dart:ui`) que no pueden ejecutarse
   /// en un Isolate secundario.
+  static const String _goalsWidgetName = 'GoalsWidgetProvider';
   Future<void> updateAllWidgets(DashboardData data, BuildContext context) async {
     developer.log('🚀 [UI_THREAD] Iniciando actualización completa de todos los widgets.', name: _logName);
 
@@ -94,6 +96,35 @@ class WidgetService {
       developer.log('🔥🔥🔥 [UI_THREAD] ERROR FATAL al actualizar widgets: $e', name: _logName, error: e, stackTrace: st);
     }
   }
+
+  static Future<void> updateGoalsWidget() async {
+        developer.log('🔄 [WidgetService] Iniciando actualización del widget de metas...', name: 'WidgetService');
+        try {
+            // 1. Usa la instancia Singleton
+            final goalRepo = GoalRepository.instance;
+            
+            // 2. Llama al nuevo método que devuelve un Future
+            final goals = await goalRepo.getActiveGoals();
+
+            final goalsListForWidget = goals.map((goal) => {
+                'name': goal.name,
+                'current_amount': goal.currentAmount,
+                'target_amount': goal.targetAmount,
+            }).toList();
+
+            // Guardar los datos para que el widget nativo los lea
+            await HomeWidget.saveWidgetData<String>('goals_list', json.encode(goalsListForWidget));
+            
+            // Notificar al widget que se actualice
+            await HomeWidget.updateWidget(
+                name: _goalsWidgetName,
+                androidName: _goalsWidgetName,
+            );
+            developer.log('✅ [WidgetService] Widget de metas actualizado con ${goals.length} metas.', name: 'WidgetService');
+        } catch (e) {
+            developer.log('🔥 [WidgetService] Error al actualizar el widget de metas: $e', name: 'WidgetService');
+        }
+    }
 
   /// Método estático privado para generar la imagen del gráfico.
   static Future<Uint8List?> _createChartImageFromData(

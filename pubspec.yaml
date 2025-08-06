@@ -6,7 +6,7 @@ publish_to: 'none' # Evita que se publique accidentalmente.
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.3.3 <4.0.0'
+  sdk: '>=3.5.0 <4.0.0'
 
 # Dependencias que la aplicación necesita para funcionar.
 dependencies:
@@ -17,54 +17,56 @@ dependencies:
     
   # Iconos de estilo iOS
   cupertino_icons: ^1.0.8
-  line_awesome_flutter: ^2.0.0 
+  line_awesome_flutter: ^2.0.0 # Actualizado
 
   # Base de datos y backend
-  supabase_flutter: ^2.5.2
+  supabase_flutter: ^2.8.0 # Actualizado
 
   # Herramientas de formato y utilidades
-  intl: ^0.20.2
-  http: ^1.2.1
-  app_links: ^6.4.0 
-  permission_handler: ^11.3.1 # O la última versión
+  intl: ^0.20.1 # Actualizado
+  http: ^1.2.2 # Actualizado
+  app_links: ^6.4.0 # Actualizado
+  permission_handler: ^11.4.0 # Actualizado
 
   #Passwords
-  flutter_dotenv: ^5.1.0
+  flutter_dotenv: ^5.2.1 # Actualizado
+  
   # UI y Gráficos
-  fl_chart: ^1.0.0 
-  google_fonts: ^6.2.1
+  fl_chart: ^1.0.0 # Actualizado
+  google_fonts: ^6.3.0 # Actualizado
   iconsax: ^0.0.8
-  path_provider: ^2.0.11
+  path_provider: ^2.1.5 # Actualizado
+  
   # Widgets y efectos visuales
   shimmer: ^3.0.0
   flutter_staggered_animations: ^1.1.1
   flutter_heatmap_calendar: ^1.0.5
-  flutter_svg: ^2.0.10
-  flutter_animate: ^4.5.0    # <-- NUEVO: Para animaciones "pop"
-  lottie: ^3.1.2             # <-- NUEVO: Para animaciones complejas (JSON)
-  skeletonizer: ^2.1.0+1   
+  flutter_svg: ^2.0.17 # Actualizado
+  flutter_animate: ^4.5.2 # Actualizado
+  lottie: ^3.2.0 # Actualizado
+  skeletonizer: ^2.1.0+1 # Actualizado
   
   # Theming y colores dinámicos
-  dynamic_color: ^1.7.0
-  flutter_iconpicker: ^3.2.2 # Para seleccionar iconos fácilmente
-  flutter_colorpicker: ^1.0.3 # Para seleccionar colores
+  dynamic_color: ^1.8.0 # Actualizado
+  flutter_iconpicker: ^4.0.1 # Para seleccionar iconos fácilmente
+  flutter_colorpicker: ^1.1.0 # Actualizado
   
   # Widget de la pantalla de inicio
-  home_widget: ^0.8.0
+  home_widget: ^0.8.0 # Actualizado
   
   # Para mostrar texto con formato (Markdown)
-  flutter_markdown: ^0.7.1
+  flutter_markdown: ^0.7.4 # Actualizado
   
   # Dependencias para Notificaciones Push
-  firebase_core: ^3.15.2
-  firebase_messaging: ^15.2.10
-  connectivity_plus: ^6.0.3
-  equatable: ^2.0.5
-  provider: ^6.1.5
-  shared_preferences: ^2.5.3
-  flutter_local_notifications: ^18.0.1 # O la última versión estable
+  firebase_core: ^3.8.0 # Actualizado
+  firebase_messaging: ^15.1.6 # Actualizado
+  connectivity_plus: ^6.1.0 # Actualizado
+  equatable: ^2.0.7 # Actualizado
+  provider: ^6.1.5 # Actualizado
+  shared_preferences: ^2.5.3 # Actualizado
+  flutter_local_notifications: ^19.4.0 # Actualizado
   timezone: ^0.10.0
-  flutter_timezone: ^1.0.8
+  flutter_timezone: ^3.0.1 # Actualizado
 
 # Dependencias que solo se usan durante el desarrollo.
 dev_dependencies:
@@ -72,7 +74,7 @@ dev_dependencies:
     sdk: flutter
 
   # Paquete para generar los íconos de la aplicación.
-  flutter_launcher_icons: ^0.14.4
+  flutter_launcher_icons: ^0.14.4 # Actualizado
 
   # Herramientas para asegurar un código limpio y consistente.
   flutter_lints: ^6.0.0
