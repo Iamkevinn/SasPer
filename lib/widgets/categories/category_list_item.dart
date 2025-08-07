@@ -27,7 +27,7 @@ class CategoryListItem extends StatelessWidget {
 
     return ListTile(
       leading: CircleAvatar(
-        backgroundColor: category.color,
+        backgroundColor: category.colorAsObject,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [

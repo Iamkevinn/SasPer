@@ -1,4 +1,3 @@
-// lib/screens/auth_gate.dart
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:sasper/services/notification_service.dart';
@@ -43,6 +42,7 @@ class _AuthGateState extends State<AuthGate> {
         // Si hay una sesión activa, procedemos a la inicialización de servicios.
         if (session != null) {
           // Si el future no ha sido creado aún, lo creamos.
+          // Esto evita que _initializeUserServices se llame en cada rebuild del widget.
           _initializationFuture ??= _initializeUserServices();
 
           // Usamos un FutureBuilder para esperar a que los servicios terminen.
@@ -73,20 +73,27 @@ class _AuthGateState extends State<AuthGate> {
   /// y así acelerar el tiempo de carga.
   Future<void> _initializeUserServices() async {
     if (kDebugMode) {
-      print("✅ Usuario autenticado. Orquestando inicialización de servicios...");
+      print("✅ Usuario autenticado. Orquestando inicialización de servicios tardíos...");
     }
     try {
       await Future.wait([
-        // Aquí puedes añadir más inicializaciones de servicios en el futuro.
-        NotificationService.instance.initialize(),
-        // Ejemplo: AnalyticsService.instance.identifyUser(),
+        // [CAMBIO CLAVE] Aquí es el lugar perfecto para llamar a `initializeLate`.
+        // Este método pide los permisos de notificación y obtiene el token FCM,
+        // tareas que deben ocurrir DESPUÉS de que el usuario haya iniciado sesión.
+        NotificationService.instance.initializeLate(),
+        
+        // (Opcional) Si en el futuro necesitas refrescar todas las notificaciones
+        // programadas al iniciar sesión, este sería un buen lugar para hacerlo.
+        // NotificationService.instance.refreshAllSchedules(),
+        
+        // Ejemplo: AnalyticsService.instance.identifyUser(session.user.id),
       ]);
       if (kDebugMode) {
         print("✅ Todos los servicios de usuario inicializados exitosamente.");
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       if (kDebugMode) {
-        print("🚨 Error fatal durante la inicialización de servicios: $e");
+        print("🚨 Error fatal durante la inicialización de servicios: $e\n$stackTrace");
         // En una app de producción, aquí podrías registrar el error en un servicio
         // como Sentry o Firebase Crashlytics.
       }

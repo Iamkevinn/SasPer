@@ -8,6 +8,7 @@ import android.content.Intent
 import android.widget.RemoteViews
 import android.net.Uri
 import android.app.PendingIntent
+import android.util.Log     
 
 class UpcomingPaymentsWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
@@ -57,5 +58,6 @@ class UpcomingPaymentsWidgetProvider : AppWidgetProvider() {
             appWidgetManager.updateAppWidget(appWidgetId, views)
             appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetId, R.id.lv_upcoming_payments)
         }
+        Log.d("WidgetBypass", "onUpdate para Upcomingpaymentswidgetprovider fue llamado, pero se omitió el trabajo pesado.")
     }
 }

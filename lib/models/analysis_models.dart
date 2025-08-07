@@ -212,3 +212,38 @@ class AnalysisData extends Equatable {
         heatmapData,
       ];
 }
+
+// --- AÑADIR ESTOS NUEVOS MODELOS AL FINAL DEL ARCHIVO ---
+
+// Modelo para el Widget de "Salud Financiera"
+class FinancialHealthInsight extends Equatable {
+  final double spendingPace; // Gasto promedio por día este mes
+  final double savingsRate;  // Porcentaje de ingresos ahorrado este mes
+  final String topCategoryName;
+  final double topCategoryAmount;
+
+  const FinancialHealthInsight({
+    required this.spendingPace,
+    required this.savingsRate,
+    required this.topCategoryName,
+    required this.topCategoryAmount,
+  });
+
+  @override
+  List<Object?> get props => [spendingPace, savingsRate, topCategoryName, topCategoryAmount];
+}
+
+// Modelo para el Widget de "Comparativa Mensual"
+class MonthlyComparison extends Equatable {
+  final double currentMonthSpending;
+  final double previousMonthSpending;
+  // El cambio porcentual lo calcularemos en el lado del cliente (Kotlin) para más flexibilidad
+
+  const MonthlyComparison({
+    required this.currentMonthSpending,
+    required this.previousMonthSpending,
+  });
+  
+  @override
+  List<Object?> get props => [currentMonthSpending, previousMonthSpending];
+}

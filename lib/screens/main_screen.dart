@@ -14,6 +14,7 @@ import 'package:sasper/screens/planning_hub_screen.dart';
 import 'package:sasper/screens/settings_screen.dart';
 import 'package:sasper/screens/transactions_screen.dart';
 import 'package:sasper/services/event_service.dart';
+import 'package:sasper/services/notification_service.dart';
 import 'package:sasper/utils/custom_page_route.dart';
 
 // Pantallas
@@ -85,6 +86,14 @@ class _MainScreenState extends State<MainScreen> {
         DashboardRepository.instance.forceRefresh();
       }
     });
+
+     Future.delayed(const Duration(seconds: 15), () {
+      if (mounted) { // Comprueba si el widget todavía está en el árbol
+        print("🚀 Ejecutando tarea de mantenimiento retrasada: refreshAllSchedules");
+        NotificationService.instance.refreshAllSchedules();
+      }
+    });
+    
   }
 
   @override

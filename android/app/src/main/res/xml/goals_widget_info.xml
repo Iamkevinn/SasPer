@@ -3,7 +3,7 @@
     android:minWidth="250dp"
     android:minHeight="110dp"
     android:updatePeriodMillis="86400000"
-    android:previewImage="@drawable/widget_medium_preview"
+    android:previewImage="@drawable/widget_goals"
     android:initialLayout="@layout/widget_goals_layout"
     android:description="@string/goals_widget_description"
     android:resizeMode="horizontal|vertical"

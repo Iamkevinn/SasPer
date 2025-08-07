@@ -20,7 +20,7 @@ import 'package:sasper/config/app_config.dart';
 import 'package:sasper/firebase_options.dart';
 import 'package:sasper/models/recurring_transaction_model.dart';
 
-// --- HANDLERS DE RESPUESTA PARA NOTIFICACIONES LOCALES ---
+// --- HANDLERS DE RESPUESTA PARA NOTIFICACIONES LOCALES (Deben ser funciones de nivel superior) ---
 void onDidReceiveNotificationResponse(NotificationResponse resp) {
   developer.log(
     '🔔 onDidReceiveNotificationResponse (payload: ${resp.payload})',
@@ -35,9 +35,10 @@ void onDidReceiveBackgroundNotificationResponse(NotificationResponse resp) {
   );
 }
 
-// FUNCION DE BACKGROUND PARA FCM
+// [CAMBIO CLAVE] La función ahora es PÚBLICA (sin guion bajo)
+// para que pueda ser accedida desde SplashScreen.dart.
 @pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   developer.log(
     '📥 Handling background FCM message: ${message.messageId}',
@@ -46,20 +47,18 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 }
 
 class NotificationService {
-  // Dependencias
+  // ... (El resto del archivo no cambia)
+  
+  // --- DEPENDENCIAS Y SINGLETON ---
   late final SupabaseClient _supabase;
   late final FirebaseMessaging _firebaseMessaging;
   late final http.Client _httpClient;
   
   final FlutterLocalNotificationsPlugin _localNotifier = FlutterLocalNotificationsPlugin();
 
-  // El constructor privado ahora está vacío.
   NotificationService._privateConstructor();
-
-  // La instancia estática se mantiene igual.
   static final NotificationService instance = NotificationService._privateConstructor();
   
-  // Se llamará desde SplashScreen para inyectar las dependencias.
   void initializeDependencies({
     required SupabaseClient supabaseClient,
     required FirebaseMessaging firebaseMessaging,
@@ -71,103 +70,64 @@ class NotificationService {
     developer.log('✅ [NotificationService] Dependencies Injected.', name: 'NotificationService');
   }
 
-  Future<void> initialize() async {
+  Future<void> initializeQuick() async {
     developer.log('🚀 [NotificationService] Starting QUICK initialize()', name: 'NotificationService');
     
-    // Configura FCM, pide permisos y actualiza el token.
-    // Estas operaciones son relativamente rápidas.
-    await _initializeFcm();
+    tz.initializeTimeZones();
+    final tzName = await FlutterTimezone.getLocalTimezone();
+    tz.setLocalLocation(tz.getLocation(tzName));
+    developer.log('   Timezone set: $tzName', name: 'NotificationService');
     
-    // Configura los canales y permisos de notificaciones locales.
-    // Esto también es rápido.
-    await _initializeLocalNotifications();
+    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const iosInit = DarwinInitializationSettings();
+    const settings = InitializationSettings(android: androidInit, iOS: iosInit);
+    await _localNotifier.initialize(
+      settings,
+      onDidReceiveNotificationResponse: onDidReceiveNotificationResponse,
+      onDidReceiveBackgroundNotificationResponse: onDidReceiveBackgroundNotificationResponse,
+    );
+    developer.log('   FlutterLocalNotificationsPlugin initialized', name: 'NotificationService');
+
+    await _createAndroidChannels();
+    _setupMessageListeners();
   }
 
-  /// Prueba inmediata: programa una notificación a 10s y muestra SnackBars.
-  Future<void> testImmediateNotification() async {
-    _showSnackbar('🔔 Test: iniciando prueba de notificación...');
-
+  Future<void> initializeLate() async {
+    developer.log('⏳ [NotificationService] Starting LATE initialize() (permissions & token)', name: 'NotificationService');
     try {
-      // Verifica permisos otra vez
-      var notifStatus = await Permission.notification.status;
-      developer.log('🔍 testImmediate notifStatus: $notifStatus', name: 'NotificationService');
-      if (!notifStatus.isGranted) {
-        _showSnackbar('Solicitando permiso NOTIFICATION...');
-        notifStatus = await Permission.notification.request();
-      }
-      if (!notifStatus.isGranted) {
-        _showSnackbar('❌ NOTIFICATION no concedido.', isError: true);
-        return;
-      }
-
-      var alarmStatus = await Permission.scheduleExactAlarm.status;
-      developer.log('🔍 testImmediate alarmStatus: $alarmStatus', name: 'NotificationService');
-      if (!alarmStatus.isGranted) {
-        _showSnackbar('Solicitando permiso ALARM...');
-        alarmStatus = await Permission.scheduleExactAlarm.request();
-      }
-      if (!alarmStatus.isGranted) {
-        _showSnackbar('❌ ALARM no concedido.', isError: true);
-        return;
-      }
-
-      // Todo OK: programamos
-      final when = tz.TZDateTime.now(tz.local).add(const Duration(seconds: 10));
-      _showSnackbar('✅ Programando para ${when.toLocal()}...');
-      await _localNotifier.zonedSchedule(
-        999,
-        '🎉 Prueba Exitosa',
-        'Si ves esto, tu sistema de notificaciones funciona.',
-        when,
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            'test_channel',
-            'Notificaciones de Prueba',
-            channelDescription: 'Canal para pruebas de desarrollo.',
-            importance: Importance.max,
-            priority: Priority.high,
-            visibility: NotificationVisibility.public,
-            playSound: true,
-            enableVibration: true,
-          ),
-          iOS: DarwinNotificationDetails(presentSound: true),
-        ),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        // REMOVIDO: uiLocalNotificationDateInterpretation (ya no existe)
+      final settings = await _firebaseMessaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
       );
-      _showSnackbar('⏳ Notificación agendada. Revisa en 10s.');
-      developer.log('✅ testImmediateNotification zonedSchedule called', name: 'NotificationService');
-    } catch (e, st) {
-      _showSnackbar('🔥 Error en testImmediate: $e', isError: true);
-      developer.log('🔥 Exception in testImmediateNotification: $e', name: 'NotificationService', stackTrace: st);
-    }
-  }
-
-  // ------------------------------------------------------------
-  //  Helpers privados
-  // ------------------------------------------------------------
-
-  Future<void> _initializeFcm() async {
-    try {
-      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-      final settings = await _firebaseMessaging.requestPermission();
       developer.log('① Permisos FCM: auth=${settings.authorizationStatus}', name: 'NotificationService');
-      await _updateAndSaveToken();
-      _firebaseMessaging.onTokenRefresh.listen((token) => _saveTokenToSupabase(token));
-      _setupMessageListeners();
-      developer.log('✅ FCM initialized.', name: 'NotificationService');
+
+      await _localNotifier
+          .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
+          ?.requestPermissions(alert: true, sound: true, badge: true);
+          
+      if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+        await _updateAndSaveToken();
+      } else {
+        developer.log('⚠️ Permiso FCM no concedido. No se buscará token.', name: 'NotificationService');
+      }
+
     } catch (e, st) {
-      developer.log('🔥 Error initializing FCM: $e', name: 'NotificationService', stackTrace: st);
+      developer.log('🔥 Error in initializeLate: $e', name: 'NotificationService', stackTrace: st);
     }
   }
 
   Future<void> _updateAndSaveToken() async {
-    final token = await _firebaseMessaging.getToken();
-    if (token != null) {
-      developer.log('🔑 FCM token: $token', name: 'NotificationService');
-      await _saveTokenToSupabase(token);
-    } else {
-      developer.log('⚠️ No se obtuvo FCM token.', name: 'NotificationService');
+    try {
+      final token = await _firebaseMessaging.getToken();
+      if (token != null) {
+        developer.log('🔑 FCM token: $token', name: 'NotificationService');
+        await _saveTokenToSupabase(token);
+      } else {
+        developer.log('⚠️ No se obtuvo FCM token.', name: 'NotificationService');
+      }
+    } catch(e, st) {
+      developer.log('🔥 Error en _updateAndSaveToken: $e', name: 'NotificationService', stackTrace: st);
     }
   }
 
@@ -181,31 +141,14 @@ class NotificationService {
     FirebaseMessaging.onMessageOpenedApp.listen((msg) {
       developer.log('📂 onMessageOpenedApp: ${msg.messageId}', name: 'NotificationService');
     });
+    _firebaseMessaging.onTokenRefresh.listen((token) => _saveTokenToSupabase(token));
   }
-
-  Future<void> _initializeLocalNotifications() async {
-    // Timezones
-    tz.initializeTimeZones();
-    final tzName = await FlutterTimezone.getLocalTimezone();
-    tz.setLocalLocation(tz.getLocation(tzName));
-    developer.log('   Timezone set: $tzName', name: 'NotificationService');
-
-    // Init plugin
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const iosInit = DarwinInitializationSettings();
-    const settings = InitializationSettings(android: androidInit, iOS: iosInit);
-
-    await _localNotifier.initialize(
-      settings,
-      onDidReceiveNotificationResponse: onDidReceiveNotificationResponse,
-      onDidReceiveBackgroundNotificationResponse: onDidReceiveBackgroundNotificationResponse,
-    );
-    developer.log('   FlutterLocalNotificationsPlugin initialized', name: 'NotificationService');
-
-    // Crear canales Android
-    final androidImpl = _localNotifier
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-    await androidImpl?.createNotificationChannel(
+  
+  Future<void> _createAndroidChannels() async {
+    final androidImpl = _localNotifier.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    if (androidImpl == null) return;
+    
+    await androidImpl.createNotificationChannel(
       const AndroidNotificationChannel(
         'recurring_payments_channel',
         'Recordatorios de Pagos',
@@ -213,7 +156,7 @@ class NotificationService {
         importance: Importance.max,
       ),
     );
-    await androidImpl?.createNotificationChannel(
+    await androidImpl.createNotificationChannel(
       const AndroidNotificationChannel(
         'test_channel',
         'Notificaciones de Prueba',
@@ -222,11 +165,6 @@ class NotificationService {
       ),
     );
     developer.log('   Notification channels created', name: 'NotificationService');
-
-    // iOS permissions
-    await _localNotifier
-        .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
-        ?.requestPermissions(alert: true, sound: true, badge: true);
   }
 
   Future<void> _saveTokenToSupabase(String token) async {
@@ -257,10 +195,57 @@ class NotificationService {
         );
     }
   }
+  
+  // Métodos públicos (sin cambios)
+  Future<void> testImmediateNotification() async {
+    _showSnackbar('🔔 Test: iniciando prueba de notificación...');
+    try {
+      var notifStatus = await Permission.notification.status;
+      if (!notifStatus.isGranted) {
+        notifStatus = await Permission.notification.request();
+      }
+      if (!notifStatus.isGranted) {
+        _showSnackbar('❌ NOTIFICATION no concedido.', isError: true);
+        return;
+      }
 
-  // ------------------------------------------------------------
-  //  Métodos públicos de notificaciones programadas
-  // ------------------------------------------------------------
+      var alarmStatus = await Permission.scheduleExactAlarm.status;
+      if (!alarmStatus.isGranted) {
+        alarmStatus = await Permission.scheduleExactAlarm.request();
+      }
+      if (!alarmStatus.isGranted) {
+        _showSnackbar('❌ ALARM no concedido.', isError: true);
+        return;
+      }
+      
+      final when = tz.TZDateTime.now(tz.local).add(const Duration(seconds: 10));
+      _showSnackbar('✅ Programando para ${when.toLocal()}...');
+      await _localNotifier.zonedSchedule(
+        999,
+        '🎉 Prueba Exitosa',
+        'Si ves esto, tu sistema de notificaciones funciona.',
+        when,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'test_channel',
+            'Notificaciones de Prueba',
+            channelDescription: 'Canal para pruebas de desarrollo.',
+            importance: Importance.max,
+            priority: Priority.high,
+            visibility: NotificationVisibility.public,
+            playSound: true,
+            enableVibration: true,
+          ),
+          iOS: DarwinNotificationDetails(presentSound: true),
+        ),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      );
+      _showSnackbar('⏳ Notificación agendada. Revisa en 10s.');
+    } catch (e, st) {
+      _showSnackbar('🔥 Error en testImmediate: $e', isError: true);
+      developer.log('🔥 Exception in testImmediateNotification: $e', name: 'NotificationService', stackTrace: st);
+    }
+  }
 
   Future<void> scheduleRecurringReminders(RecurringTransaction tx) async {
     if (!await Permission.scheduleExactAlarm.isGranted) {
@@ -292,7 +277,6 @@ class NotificationService {
             iOS: DarwinNotificationDetails(presentSound: true),
           ),
           androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-          // REMOVIDO: uiLocalNotificationDateInterpretation
         );
         developer.log('⏰ Scheduled notification #$nid at $remindAt', name: 'NotificationService');
       }
@@ -314,43 +298,26 @@ class NotificationService {
         developer.log('⚠️ No hay permiso para programar alarmas. Abortando refresh.', name: 'NotificationService');
         return;
       }
-
-      // 1. Obtenemos las transacciones recurrentes.
       final recurringTxs = await RecurringRepository.instance.getAll();
-      
-      // 2. Limpiamos todas las notificaciones antiguas.
       await _localNotifier.cancelAll();
       developer.log('🗑️ Cancelled all notifications to refresh', name: 'NotificationService');
-      
-      // 3. Programamos las nuevas notificaciones.
       for (final tx in recurringTxs) {
         await _scheduleRemindersForTransaction(tx);
       }
       developer.log('✅ Refreshed and rescheduled ${recurringTxs.length} reminders', name: 'NotificationService');
-
     } catch (e, st) {
       developer.log('🔥 Error during refreshAllSchedules: $e', name: 'NotificationService', stackTrace: st);
     }
   }
 
-  /// Prograna recordatorios para UNA SOLA transacción recurrente.
   Future<void> _scheduleRemindersForTransaction(RecurringTransaction tx) async {
-    // Usamos el ID de la transacción (que es un UUID string) para generar un ID base único.
-    final baseId = tx.id.hashCode & 0x7FFFFFFF; // Asegura que sea un entero de 31 bits positivo
+    final baseId = tx.id.hashCode & 0x7FFFFFFF;
     final now = tz.TZDateTime.now(tz.local);
-
-    // Programamos recordatorios para los próximos 12 meses.
     for (var i = 0; i < 12; i++) {
-      // Calcula la fecha de vencimiento futura
       final dueDate = tz.TZDateTime(tz.local, tx.nextDueDate.year, tx.nextDueDate.month + i, tx.nextDueDate.day);
-      
-      // El recordatorio es 3 días antes de la fecha de vencimiento
       final remindAt = dueDate.subtract(const Duration(days: 3));
-
-      // Solo programamos si la fecha del recordatorio es en el futuro
       if (remindAt.isAfter(now)) {
-        final notificationId = baseId + i; // Creamos un ID único para cada notificación futura
-        
+        final notificationId = baseId + i;
         await _localNotifier.zonedSchedule(
           notificationId,
           'Recordatorio: ${tx.description}',
@@ -358,7 +325,7 @@ class NotificationService {
           remindAt,
           const NotificationDetails(
             android: AndroidNotificationDetails(
-              'recurring_payments_channel', // ID del canal
+              'recurring_payments_channel',
               'Recordatorios de Pagos',
               importance: Importance.high,
               priority: Priority.high,
@@ -366,7 +333,6 @@ class NotificationService {
             iOS: DarwinNotificationDetails(presentSound: true),
           ),
           androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-          // REMOVIDO: uiLocalNotificationDateInterpretation
         );
         developer.log('⏰ Scheduled notification #$notificationId at $remindAt', name: 'NotificationService');
       }
@@ -392,4 +358,10 @@ class NotificationService {
       developer.log('🔥 Error triggering budget notification: $e', name: 'NotificationService', stackTrace: st);
     }
   }
+}
+Future<void> _initializeTimezonesInIsolate() async {
+  // Estas dos líneas se ejecutarán en un hilo separado.
+  tz.initializeTimeZones();
+  final String localTimezone = await FlutterTimezone.getLocalTimezone();
+  tz.setLocalLocation(tz.getLocation(localTimezone));
 }

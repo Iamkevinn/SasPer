@@ -42,6 +42,54 @@ class AnalysisRepository {
 
   // --- MÉTODOS PÚBLICOS DEL REPOSITORIO ---
 
+  /// Obtiene los datos para el widget de "Salud Financiera".
+Future<FinancialHealthInsight> getFinancialHealthInsightForWidget() async {
+  developer.log("🩺 [Repo] Obteniendo datos para widget con RPC...", name: 'AnalysisRepository');
+  try {
+    final userId = client.auth.currentUser?.id;
+    if (userId == null) throw Exception("Usuario no autenticado");
+    
+    // Volvemos a la llamada RPC, que es mucho más eficiente.
+    final result = await client.rpc(
+      'get_financial_health_metrics',
+      params: {'user_id_param': userId}
+    );
+    
+    // El resultado de un RPC que devuelve una tabla con una fila es una Lista que contiene un Mapa.
+    final data = (result as List).first as Map<String, dynamic>;
+
+    developer.log('📊 [Repo] Datos recibidos de RPC: $data', name: 'AnalysisRepository');
+
+    return FinancialHealthInsight(
+      spendingPace: (data['w_spending_pace'] as num? ?? 0).toDouble(),
+      savingsRate: (data['w_savings_rate'] as num? ?? 0).toDouble(),
+      topCategoryName: data['w_top_category'] as String? ?? 'N/A',
+      topCategoryAmount: (data['w_top_amount'] as num? ?? 0).toDouble(),
+    );
+
+  } catch (e, stackTrace) {
+    developer.log('🔥 [Repo] Error en getFinancialHealthInsightForWidget: $e', name: 'AnalysisRepository', stackTrace: stackTrace);
+    return const FinancialHealthInsight(spendingPace: 0, savingsRate: 0, topCategoryName: 'Error', topCategoryAmount: 0);
+  }
+}
+/// Obtiene los datos para el widget de "Comparativa Mensual".
+Future<MonthlyComparison> getMonthlySpendingComparisonForWidget() async {
+  developer.log("📊 [Repo] Obteniendo datos para widget de Comparativa Mensual...", name: 'AnalysisRepository');
+  try {
+    // De igual forma, necesitarás una RPC llamada 'get_monthly_spending_comparison'.
+    final result = await client.rpc('get_monthly_spending_comparison');
+    final data = result as Map<String, dynamic>;
+
+    return MonthlyComparison(
+      currentMonthSpending: (data['current_month_spending'] as num? ?? 0).toDouble(),
+      previousMonthSpending: (data['previous_month_spending'] as num? ?? 0).toDouble(),
+    );
+  } catch (e) {
+    developer.log('🔥 Error en getMonthlyComparisonForWidget: $e', name: 'AnalysisRepository');
+    return const MonthlyComparison(currentMonthSpending: 0, previousMonthSpending: 0);
+  }
+}
+
    /// Obtiene la lista de insights no leídos para el usuario actual.
  Future<List<Insight>> getInsights() async {
    developer.log('🧠 [Repo] Obteniendo insights inteligentes...', name: 'AnalysisRepository');

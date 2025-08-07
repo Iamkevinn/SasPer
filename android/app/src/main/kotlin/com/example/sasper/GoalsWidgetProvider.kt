@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.widget.RemoteViews
 import android.net.Uri
+import android.util.Log
 
 class GoalsWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
@@ -28,5 +29,6 @@ class GoalsWidgetProvider : AppWidgetProvider() {
             appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetId, R.id.goals_list_view)
         }
         super.onUpdate(context, appWidgetManager, appWidgetIds)
+        Log.d("WidgetBypass", "onUpdate para GoalsWidgetProvider fue llamado, pero se omitió el trabajo pesado.")
     }
 }

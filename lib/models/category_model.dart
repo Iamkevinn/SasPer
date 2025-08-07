@@ -1,9 +1,10 @@
-// lib/models/category_model.dart (CÓDIGO FINAL Y ROBUSTO)
+// lib/models/category_model.dart (CÓDIGO CORREGIDO Y ESTANDARIZADO)
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:equatable/equatable.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:line_awesome_flutter/line_awesome_flutter.dart';
 
 enum CategoryType { income, expense }
 
@@ -12,7 +13,7 @@ class Category extends Equatable {
   final String userId;
   final String name;
   final IconData? icon;
-  final Color color;
+  final String color; // <--- CAMBIO 1: De Color a String
   final CategoryType type;
   final DateTime createdAt;
 
@@ -21,79 +22,76 @@ class Category extends Equatable {
     required this.userId,
     required this.name,
     this.icon,
-    required this.color,
+    required this.color, // <--- CAMBIO 2: Ahora es un String
     required this.type,
     required this.createdAt,
   });
 
-  /// Crea una instancia "vacía" de Category.
-  /// Ideal para usar como placeholder en Skeletonizer.
-  /// Puede ser `const` porque no usamos valores dinámicos.
+  /// Getter conveniente para usar el color en la UI.
+  /// Convierte el String hexadecimal (ej: '#FF4CAF50') en un objeto Color.
+  Color get colorAsObject {
+    try {
+      final hex = color.startsWith('#') ? color.substring(1) : color;
+      final buffer = StringBuffer();
+      if (hex.length == 6) buffer.write('ff'); // Añade opacidad total si no está presente
+      buffer.write(hex.replaceAll('#', ''));
+      return Color(int.parse(buffer.toString(), radix: 16));
+    } catch (e) {
+      // Si el color guardado es inválido, devuelve un color por defecto.
+      return Colors.grey;
+    }
+  }
+
   static final empty = Category(
     id: '',
     userId: '',
-    name: 'Cargando categoría...',
+    name: 'Cargando...',
     icon: Iconsax.category,
-    color: Colors.grey,
+    color: '#808080', // <--- CAMBIO 3: Color como String
     type: CategoryType.expense,
-    createdAt: DateTime(2024), // Valor fijo para que pueda ser `const`
+    createdAt: DateTime(2024),
   );
   
   @override
   List<Object?> get props => [id, name, icon, color, type];
 
   factory Category.fromMap(Map<String, dynamic> map) {
-    if (kDebugMode) {
-      print('--- Parseando categoría: "${map['name']}" ---');
-      print('Datos recibidos del mapa: $map');
-    }
     IconData? parsedIcon;
     if (map['icon_name'] != null && map['icon_name'].toString().isNotEmpty) {
       try {
-        // =================================================================
-        //                       LA LÍNEA CORREGIDA
-        // .toString() convierte el dato a String sin importar si es int o String,
-        // permitiendo que int.parse() siempre funcione.
-        // =================================================================
         parsedIcon = IconData(
-          int.parse(map['icon_name'].toString()), // <-- ESTA ES LA MAGIA
-          fontFamily: map['icon_font_family'],
-          fontPackage: map['icon_font_package'],
+          int.parse(map['icon_name'].toString()),
+          // --- ESTANDARIZACIÓN A LINEAWESOME ---
+          fontFamily: 'LineAwesomeIcons', 
+          fontPackage: 'line_awesome_flutter',
         );
-        if (kDebugMode) {
-          print('>>> ÉXITO: Icono parseado para "${map['name']}" es: $parsedIcon');
-        }
       } catch (e) {
         if (kDebugMode) {
           print('Error al parsear el icono para "${map['name']}": $e');
         }
       }
-    }else {
-    if (kDebugMode) {
-      print('No se encontró icon_name para "${map['name']}", se asignará null.');
     }
-  }
     
     return Category(
       id: map['id'],
       userId: map['user_id'],
       name: map['name'],
       icon: parsedIcon,
-      color: Color(map['color'] as int),
+      color: map['color'] as String, // <--- CAMBIO 4: Se lee como String
       type: (map['type'] as String) == 'income' ? CategoryType.income : CategoryType.expense,
       createdAt: DateTime.parse(map['created_at']),
     );
   }
 
-  // El método toMap no necesita cambios, ya está bien.
   Map<String, dynamic> toMap() {
     return {
       'name': name,
-      'color': color.value,
+      'color': color, // <--- CAMBIO 5: Se guarda el String directamente
       'type': type.name,
       'icon_name': icon?.codePoint.toString(),
-      'icon_font_family': icon?.fontFamily,
-      'icon_font_package': icon?.fontPackage,
+      // --- ESTANDARIZACIÓN A LINEAWESOME ---
+      'icon_font_family': 'LineAwesomeIcons',
+      'icon_font_package': 'line_awesome_flutter',
     };
   }
 }

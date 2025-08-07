@@ -1,0 +1,33 @@
+<!-- android/app/src/main/res/layout/widget_monthly_comparison.xml -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="@drawable/widget_background_m3">
+    
+    <TextView
+        android:id="@+id/comparison_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Gasto Mensual"
+        android:textAppearance="?android:attr/textAppearanceMedium"
+        android:textColor="?android:attr/textColorPrimary"
+        android:textStyle="bold"/>
+        
+    <TextView
+        android:id="@+id/current_spending_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="\$0.00"
+        android:textSize="24sp"
+        android:textColor="?android:attr/textColorPrimary"/>
+
+    <TextView
+        android:id="@+id/percentage_change_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="vs. mes anterior"
+        android:textColor="?android:attr/textColorSecondary"/>
+</LinearLayout>

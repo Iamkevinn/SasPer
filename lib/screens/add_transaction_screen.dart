@@ -254,7 +254,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                             label: Text(category.name, style: GoogleFonts.poppins()),
                             avatar: Icon(
                               category.icon ?? Iconsax.category, // Usamos el icono del objeto
-                              color: _selectedCategory == category ? Theme.of(context).colorScheme.onSecondaryContainer : category.color,
+                              color: _selectedCategory == category ? Theme.of(context).colorScheme.onSecondaryContainer : category.colorAsObject,
                             ),
                             selected: _selectedCategory == category,
                             onSelected: (selected) {

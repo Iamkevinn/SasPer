@@ -4,4 +4,6 @@
     <string name="widget_medium_description">Muestra tu saldo y un gráfico de gastos.</string>
     <string name="widget_large_description">Un resumen completo de tus finanzas.</string>
     <string name="goals_widget_description">Muestra el progreso de tus metas</string>
+    <string name="financial_health_widget_description">Un vistazo rápido a tu salud financiera.</string>
+    <string name="monthly_comparison_widget_description">Compara tus gastos con el mes anterior.</string>
 </resources>

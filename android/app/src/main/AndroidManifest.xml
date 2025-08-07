@@ -59,7 +59,10 @@
             android:permission="android.permission.BIND_JOB_SERVICE"
             android:exported="true"/>
 
-        <!-- App Widgets -->
+        <!-- =============================================================== -->
+        <!-- App Widgets - Declaraciones de cada proveedor de widget -->
+        <!-- =============================================================== -->
+
         <receiver
             android:name=".SasPerWidgetProvider"
             android:exported="true"
@@ -112,14 +115,18 @@
                 android:resource="@xml/goals_widget_info" />
         </receiver>
 
-        <service
-            android:name=".GoalsWidgetService"
-            android:permission="android.permission.BIND_REMOTEVIEWS"
-            android:exported="false" />
-
-        <!-- =============================================================== -->
-        <!-- NUEVO WIDGET: Provider para los Próximos Pagos                   -->
-        <!-- =============================================================== -->
+        <receiver
+            android:name=".FinancialHealthWidgetProvider"
+            android:exported="true"
+            android:label="Salud Financiera">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/financial_health_widget_info" />
+        </receiver>
+        
         <receiver
             android:name=".UpcomingPaymentsWidgetProvider"
             android:exported="true"
@@ -132,33 +139,33 @@
                 android:resource="@xml/upcoming_payments_widget_info" />
         </receiver>
 
-        <!-- Receptor para cambios de wallpaper y boot -->
+        <!-- [NUEVO] Declaración para el widget de Comparación Mensual -->
         <receiver
-            android:name=".WallpaperChangeReceiver"
-            android:exported="true">
+            android:name=".MonthlyComparisonWidgetProvider"
+            android:exported="true"
+            android:label="Comparación Mensual">
             <intent-filter>
-                <action android:name="android.intent.action.WALLPAPER_CHANGED"/>
-                <action android:name="android.intent.action.CONFIGURATION_CHANGED"/>
-                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/monthly_comparison_widget_info" />
         </receiver>
 
-        <!-- Servicio de RemoteViews (widgets) -->
+        <!-- =============================================================== -->
+        
+        <service
+            android:name=".GoalsWidgetService"
+            android:permission="android.permission.BIND_REMOTEVIEWS"
+            android:exported="false" />
         <service
             android:name=".WidgetListService"
             android:permission="android.permission.BIND_REMOTEVIEWS"
             android:exported="false" />
-        
-        <!-- =============================================================== -->
-        <!-- NUEVO WIDGET: Servicio para la lista de Próximos Pagos          -->
-        <!-- =============================================================== -->
         <service
             android:name=".UpcomingPaymentsListService"
             android:permission="android.permission.BIND_REMOTEVIEWS"
             android:exported="false" />
-        <!-- =============================================================== -->
-
-        <!-- FileProvider -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.provider"
@@ -168,13 +175,9 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/provider_paths" />
         </provider>
-
-        <!-- flutterEmbedding meta -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
-
-        <!-- Para que zonedSchedule() funcione tras reboot o reinstalación -->
         <receiver
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"
             android:exported="false">
@@ -183,8 +186,6 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
             </intent-filter>
         </receiver>
-
-        <!-- El receptor que dispara las notificaciones programadas -->
         <receiver
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
             android:exported="false"/>

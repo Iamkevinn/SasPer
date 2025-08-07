@@ -40,7 +40,7 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
       final c = widget.categoryToEdit!;
       _nameController = TextEditingController(text: c.name);
       _selectedIcon = c.icon;
-      _selectedColor = c.color;
+      _selectedColor = c.colorAsObject;
     } else {
       _nameController = TextEditingController();
       _selectedIcon = Iconsax.category; // Icono por defecto
@@ -107,7 +107,7 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
           userId: widget.categoryToEdit!.userId, // No cambia
           name: _nameController.text.trim(),
           icon: _selectedIcon,
-          color: _selectedColor,
+          color: '#${_selectedColor.value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}',
           type: widget.categoryToEdit!.type, // No se puede cambiar el tipo
           createdAt: widget.categoryToEdit!.createdAt, // No cambia
         );
@@ -118,7 +118,7 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
           userId: '', // El repositorio lo añade
           name: _nameController.text.trim(),
           icon: _selectedIcon,
-          color: _selectedColor,
+          color: '#${_selectedColor.value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}',
           type: widget.type!,
           createdAt: DateTime.now(),
         );

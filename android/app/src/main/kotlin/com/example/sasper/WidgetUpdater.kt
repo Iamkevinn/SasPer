@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.BitmapFactory
+import android.graphics.Color
 import android.net.Uri
 import android.util.Log
 import android.util.TypedValue
@@ -19,18 +20,35 @@ import java.io.File
 import java.text.NumberFormat
 import java.util.Locale
 
+// --- MODELOS DE DATOS DE KOTLIN (Añadidos aquí) ---
+// Estos deben coincidir con los campos del JSON que envías desde Dart.
+data class WidgetBudget(
+    val category: String,
+    // Asegúrate de que tu JSON de Dart incluya 'progress'
+    val progress: Double 
+)
+
+data class WidgetTransaction(
+    val description: String?, // Hacemos los strings nullable por seguridad
+    val category: String?,    // <-- CORRECCIÓN: De 'categoryName' a 'category'
+    val amount: Double,
+    val type: String
+)
+
+
+
 object WidgetUpdater {
 
     private const val TAG = "WidgetDebug"
 
-    @ColorInt
-    private fun getThemeColor(context: Context, @AttrRes colorAttr: Int): Int {
-        val typedValue = TypedValue()
-        context.theme.resolveAttribute(colorAttr, typedValue, true)
-        return typedValue.data
-    }
+    // Claves para leer de SharedPreferences. DEBEN COINCIDIR CON LAS DE DART.
+    private const val KEY_BUDGETS = "featured_budgets_json"
+    private const val KEY_TRANSACTIONS = "recent_transactions_json"
+
+    // --- FUNCIONES DE WIDGETS PEQUEÑO Y MEDIANO (SIN CAMBIOS) ---
 
     fun updateSmallWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int, widgetData: SharedPreferences) {
+        // Tu código existente aquí, sin cambios...
         Log.d(TAG, "Iniciando updateSmallWidget para el widgetId: $widgetId")
         val views = RemoteViews(context.packageName, R.layout.home_widget_layout)
 
@@ -51,6 +69,7 @@ object WidgetUpdater {
     }
 
     fun updateMediumWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int, widgetData: SharedPreferences) {
+        // Tu código existente aquí, sin cambios...
         Log.d(TAG, "Iniciando updateMediumWidget para el widgetId: $widgetId")
         val views = RemoteViews(context.packageName, R.layout.widget_medium_layout)
 
@@ -97,99 +116,125 @@ object WidgetUpdater {
         appWidgetManager.updateAppWidget(widgetId, views)
         Log.d(TAG, "updateMediumWidget completado para el widgetId: $widgetId")
     }
-    
+
+    // --- FUNCIÓN DEL WIDGET GRANDE (VERSIÓN FUNCIONAL) ---
     fun updateLargeWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int, widgetData: SharedPreferences) {
         Log.d(TAG, "=================================================")
-        Log.d(TAG, "[$widgetId] INICIANDO actualización de Widget Grande")
+        Log.d(TAG, "[$widgetId] INICIANDO actualización de Widget Grande (VERSIÓN FUNCIONAL)")
         
         val views = RemoteViews(context.packageName, R.layout.widget_large_layout)
         val gson = Gson()
-        val currencyFormat = NumberFormat.getCurrencyInstance(Locale("es", "CO"))
-        currencyFormat.maximumFractionDigits = 0
-
-        // --- DEPURACIÓN DE PRESUPUESTOS ---
+        
+        // --- 1. PROCESAR PRESUPUESTOS ---
+        val budgetsJson = widgetData.getString(KEY_BUDGETS, "[]")
+        Log.d(TAG, "[$widgetId] JSON de Presupuestos recibido: $budgetsJson")
         try {
-            val budgetsJson = widgetData.getString("featured_budgets_json", "[]")
-            Log.d(TAG, "[$widgetId] JSON de Presupuestos: $budgetsJson")
-            val budgets: List<BudgetWidgetItem> = gson.fromJson(budgetsJson, object : TypeToken<List<BudgetWidgetItem>>() {}.type) ?: emptyList()
+            val budgetListType = object : TypeToken<List<WidgetBudget>>() {}.type
+            val budgets: List<WidgetBudget> = gson.fromJson(budgetsJson, budgetListType)
             Log.d(TAG, "[$widgetId] Presupuestos Parseados: ${budgets.size}")
 
-            views.setViewVisibility(R.id.budget_item_1, View.GONE)
-            views.setViewVisibility(R.id.budget_item_2, View.GONE)
+            // Llenar Presupuesto 1
+            if (budgets.isNotEmpty()) {
+                populateBudget(context, views, budgets[0], 1)
+            } else {
+                views.setViewVisibility(R.id.budget_item_1, View.GONE)
+            }
 
-            budgets.getOrNull(0)?.let {
-                Log.d(TAG, "[$widgetId] Rellenando Presupuesto 1: ${it.category} - Progress: ${it.progress}")
-                views.setTextViewText(R.id.budget_item_1_title, it.category ?: "Presupuesto")
-                val percentage = (it.progress * 100).toInt()
-                views.setTextViewText(R.id.budget_item_1_percentage, "$percentage%")
-                views.setProgressBar(R.id.budget_item_1_progress, 100, percentage, false)
-                views.setViewVisibility(R.id.budget_item_1, View.VISIBLE)
+            // Llenar Presupuesto 2
+            if (budgets.size > 1) {
+                populateBudget(context, views, budgets[1], 2)
+            } else {
+                views.setViewVisibility(R.id.budget_item_2, View.GONE)
             }
-            budgets.getOrNull(1)?.let {
-                Log.d(TAG, "[$widgetId] Rellenando Presupuesto 2: ${it.category} - Progress: ${it.progress}")
-                views.setTextViewText(R.id.budget_item_2_title, it.category ?: "Presupuesto")
-                val percentage = (it.progress * 100).toInt()
-                views.setTextViewText(R.id.budget_item_2_percentage, "$percentage%")
-                views.setProgressBar(R.id.budget_item_2_progress, 100, percentage, false)
-                views.setViewVisibility(R.id.budget_item_2, View.VISIBLE)
-            }
+
         } catch (e: Exception) {
             Log.e(TAG, "[$widgetId] CRASH en la sección de presupuestos: ${e.message}", e)
+            views.setViewVisibility(R.id.budget_item_1, View.GONE)
+            views.setViewVisibility(R.id.budget_item_2, View.GONE)
         }
 
-        // --- DEPURACIÓN DE TRANSACCIONES ---
+        // --- 2. PROCESAR TRANSACCIONES ---
+        val transactionsJson = widgetData.getString(KEY_TRANSACTIONS, "[]")
+        Log.d(TAG, "[$widgetId] JSON de Transacciones recibido: $transactionsJson")
         try {
-            val transactionsJson = widgetData.getString("recent_transactions_json", "[]")
-            Log.d(TAG, "[$widgetId] JSON de Transacciones: $transactionsJson")
-            val transactions: List<TransactionWidgetItem> = gson.fromJson(transactionsJson, object : TypeToken<List<TransactionWidgetItem>>() {}.type) ?: emptyList()
+            val transactionListType = object : TypeToken<List<WidgetTransaction>>() {}.type
+            val transactions: List<WidgetTransaction> = gson.fromJson(transactionsJson, transactionListType)
             Log.d(TAG, "[$widgetId] Transacciones Parseadas: ${transactions.size}")
 
+            // Llenar Transacción 1
+            if (transactions.isNotEmpty()) {
+                populateTransaction(context, views, transactions[0], 1)
+            } else {
+                views.setViewVisibility(R.id.transaction_item_1, View.GONE)
+            }
+
+            // Llenar Transacción 2
+            if (transactions.size > 1) {
+                populateTransaction(context, views, transactions[1], 2)
+            } else {
+                views.setViewVisibility(R.id.transaction_item_2, View.GONE)
+            }
+            
+            // Llenar Transacción 3
+            if (transactions.size > 2) {
+                populateTransaction(context, views, transactions[2], 3)
+            } else {
+                views.setViewVisibility(R.id.transaction_item_3, View.GONE)
+            }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "[$widgetId] CRASH en la sección de transacciones: ${e.message}", e)
             views.setViewVisibility(R.id.transaction_item_1, View.GONE)
             views.setViewVisibility(R.id.transaction_item_2, View.GONE)
             views.setViewVisibility(R.id.transaction_item_3, View.GONE)
-            
-            // Cargamos los colores directamente desde los recursos, evitando problemas con los temas.
-            val positiveColor = context.getColor(R.color.widget_positive_color)
-            val negativeColor = context.getColor(R.color.widget_negative_color)
-            Log.d(TAG, "[$widgetId] Colores del tema cargados. Negativo: $negativeColor, Positivo: $positiveColor")
-
-            transactions.getOrNull(0)?.let { tx ->
-                Log.d(TAG, "[$widgetId] Rellenando Transacción 1: ${tx.description} - Monto: ${tx.amount}")
-                views.setTextViewText(R.id.transaction_item_1_title, tx.description?.trim() ?: "Transacción")
-                views.setTextViewText(R.id.transaction_item_1_category, tx.category ?: "")
-                views.setTextViewText(R.id.transaction_item_1_amount, currencyFormat.format(tx.amount))
-                views.setTextColor(R.id.transaction_item_1_amount, if (tx.amount < 0) negativeColor else positiveColor)
-                views.setViewVisibility(R.id.transaction_item_1, View.VISIBLE)
-            }
-            transactions.getOrNull(1)?.let { tx ->
-                Log.d(TAG, "[$widgetId] Rellenando Transacción 2: ${tx.description} - Monto: ${tx.amount}")
-                views.setTextViewText(R.id.transaction_item_2_title, tx.description?.trim() ?: "Transacción")
-                views.setTextViewText(R.id.transaction_item_2_category, tx.category ?: "")
-                views.setTextViewText(R.id.transaction_item_2_amount, currencyFormat.format(tx.amount))
-                views.setTextColor(R.id.transaction_item_2_amount, if (tx.amount < 0) negativeColor else positiveColor)
-                views.setViewVisibility(R.id.transaction_item_2, View.VISIBLE)
-            }
-            transactions.getOrNull(2)?.let { tx ->
-                Log.d(TAG, "[$widgetId] Rellenando Transacción 3: ${tx.description} - Monto: ${tx.amount}")
-                views.setTextViewText(R.id.transaction_item_3_title, tx.description?.trim() ?: "Transacción")
-                views.setTextViewText(R.id.transaction_item_3_category, tx.category ?: "")
-                views.setTextViewText(R.id.transaction_item_3_amount, currencyFormat.format(tx.amount))
-                views.setTextColor(R.id.transaction_item_3_amount, if (tx.amount < 0) negativeColor else positiveColor)
-                views.setViewVisibility(R.id.transaction_item_3, View.VISIBLE)
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "[$widgetId] CRASH en la sección de transacciones: ${e.message}", e)
         }
 
-        // --- ACTUALIZACIÓN FINAL ---
-        try {
-            appWidgetManager.updateAppWidget(widgetId, views)
-            Log.d(TAG, "[$widgetId] appWidgetManager.updateAppWidget LLAMADO CON ÉXITO")
-        } catch (e: Exception) {
-            Log.e(TAG, "[$widgetId] CRASH al llamar a updateAppWidget: ${e.message}", e)
-        }
+        // --- 3. CONFIGURAR INTENTS ---
+        val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+        val pendingLaunch = PendingIntent.getActivity(context, widgetId * 10 + 4, launchIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        views.setOnClickPendingIntent(R.id.widget_large_container, pendingLaunch)
         
-        Log.d(TAG, "[$widgetId] FIN de la actualización de Widget Grande")
+        val addIntent = Intent(Intent.ACTION_VIEW, Uri.parse("sasper://add_transaction")).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+        val pendingAdd = PendingIntent.getActivity(context, widgetId * 10 + 5, addIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        views.setOnClickPendingIntent(R.id.widget_large_add_button, pendingAdd)
+
+        // --- 4. ACTUALIZACIÓN FINAL ---
+        appWidgetManager.updateAppWidget(widgetId, views)
+        Log.d(TAG, "[$widgetId] FIN de la actualización de Widget Grande (VERSIÓN FUNCIONAL)")
         Log.d(TAG, "=================================================")
+    }
+
+    // --- FUNCIONES AUXILIARES (HELPERS) ---
+    private fun populateBudget(context: Context, views: RemoteViews, budget: WidgetBudget, index: Int) {
+        val titleId = context.resources.getIdentifier("budget_item_${index}_title", "id", context.packageName)
+        val percentageId = context.resources.getIdentifier("budget_item_${index}_percentage", "id", context.packageName)
+        val progressId = context.resources.getIdentifier("budget_item_${index}_progress", "id", context.packageName)
+        val containerId = context.resources.getIdentifier("budget_item_${index}", "id", context.packageName)
+
+        views.setTextViewText(titleId, budget.category)
+        val percentage = (budget.progress * 100).toInt()
+        views.setTextViewText(percentageId, "$percentage%")
+        views.setProgressBar(progressId, 100, percentage, false)
+        views.setViewVisibility(containerId, View.VISIBLE)
+    }
+
+    private fun populateTransaction(context: Context, views: RemoteViews, transaction: WidgetTransaction, index: Int) {
+        val titleId = context.resources.getIdentifier("transaction_item_${index}_title", "id", context.packageName)
+        val categoryId = context.resources.getIdentifier("transaction_item_${index}_category", "id", context.packageName)
+        val amountId = context.resources.getIdentifier("transaction_item_${index}_amount", "id", context.packageName)
+        val containerId = context.resources.getIdentifier("transaction_item_${index}", "id", context.packageName)
+
+        val format = NumberFormat.getCurrencyInstance(Locale("es", "CO"))
+        format.maximumFractionDigits = 0
+        
+        // CORRECCIÓN: Usamos transaction.category y proveemos un valor por defecto si es nulo
+        views.setTextViewText(titleId, transaction.description ?: "Sin descripción")
+        views.setTextViewText(categoryId, transaction.category ?: "Sin categoría")
+        views.setTextViewText(amountId, format.format(transaction.amount))
+
+        val color = if (transaction.type == "Gasto") Color.parseColor("#E57373") else Color.parseColor("#81C784")
+        views.setTextColor(amountId, color)
+        
+        views.setViewVisibility(containerId, View.VISIBLE)
     }
 }

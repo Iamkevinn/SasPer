@@ -51,7 +51,7 @@ class GoalsListFactory(private val context: Context) : RemoteViewsService.Remote
 
         val progress = if (targetAmount > 0) ((currentAmount / targetAmount) * 100).toInt() else 0
         
-        val currencyFormat = NumberFormat.getCurrencyInstance(Locale("es", "MX"))
+        val currencyFormat = NumberFormat.getCurrencyInstance(Locale("es", "CO"))
         val progressText = "${currencyFormat.format(currentAmount)} / ${currencyFormat.format(targetAmount)}"
         
         views.setTextViewText(R.id.goal_name, name)

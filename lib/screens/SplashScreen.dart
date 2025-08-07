@@ -58,7 +58,6 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _initializeAppAndNavigate() async {
     try {
       // --- ETAPA 1: INICIALIZACIONES CRÍTICAS EN PARALELO ---
-      // Ejecutamos las tareas de red/disco indispensables al mismo tiempo para minimizar la espera.
       await Future.wait([
         Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform),
         Supabase.initialize(
@@ -69,13 +68,9 @@ class _SplashScreenState extends State<SplashScreen> {
       ]);
 
       // --- ETAPA 2: INYECCIÓN DE DEPENDENCIAS ESENCIALES ---
-      // Solo inicializamos los servicios y repositorios que son absolutamente
-      // necesarios ANTES de que el usuario vea la primera pantalla.
       final supabaseClient = Supabase.instance.client;
       final firebaseMessaging = FirebaseMessaging.instance;
       
-      // ÚNICAMENTE el repositorio del Dashboard es crítico para la primera pantalla.
-      // Todos los demás se inicializarán perezosamente cuando se necesiten.
       DashboardRepository.instance.initialize(supabaseClient);
       
       NotificationService.instance.initializeDependencies(
@@ -86,10 +81,11 @@ class _SplashScreenState extends State<SplashScreen> {
       // --- ETAPA 3: REGISTRO DE CALLBACKS DE SEGUNDO PLANO ---
       GlobalState.supabaseInitialized = true;
       HomeWidget.registerBackgroundCallback(backgroundCallback);
-      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+      
+      // [CAMBIO CLAVE] Se usa el nombre público de la función importada desde notification_service.dart
+      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
       // --- ETAPA 4: NAVEGACIÓN INMEDIATA ---
-      // La app se siente rápida porque navegamos tan pronto como sea posible.
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const AuthGate()),
@@ -97,20 +93,17 @@ class _SplashScreenState extends State<SplashScreen> {
       }
       
       // --- ETAPA 5: TAREAS SECUNDARIAS (NO BLOQUEANTES) ---
-      // Estas tareas se ejecutan en segundo plano después de que la navegación ha comenzado.
-      // No usamos `await` para no bloquear el hilo principal.
       saveMaterialYouColors();
-      NotificationService.instance.initialize();
-      NotificationService.instance.refreshAllSchedules();
+      NotificationService.instance.initializeQuick();
 
     } catch (e, stackTrace) {
       debugPrint("🔥🔥🔥 ERROR CRÍTICO DURANTE LA INICIALIZACIÓN: $e\n$stackTrace");
       if (mounted) {
-        // En caso de un error fatal, es mejor informar al usuario.
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error al inicializar la app: $e'),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 10),
           ),
         );
       }
@@ -119,7 +112,6 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Un Splash Screen simple y limpio. El `const` ayuda al rendimiento.
     return const Scaffold(
       body: Center(
         child: Column(
@@ -136,12 +128,4 @@ class _SplashScreenState extends State<SplashScreen> {
       ),
     );
   }
-}
-
-// --- FUNCIONES DE ALTO NIVEL (CALLBACKS) ---
-@pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Asegurarse de que Firebase esté inicializado para manejar el mensaje.
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  debugPrint("Handling a background message: ${message.messageId}");
 }

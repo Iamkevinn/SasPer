@@ -43,10 +43,21 @@ flutter {
 }
 
 dependencies {
-    //noinspection GradleDependency
+    // Tus dependencias existentes
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlinVersion")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     implementation("com.google.code.gson:gson:2.13.1")
-    // No necesitamos añadir las otras dependencias como material, etc.
-    // Flutter las añade automáticamente.
+
+    // ===================================================================
+    //  AÑADE ESTE BLOQUE COMPLETO PARA ARREGLAR FIREBASE
+    // ===================================================================
+    // Importa el Firebase BoM (Bill of Materials)
+    // Esto asegura que todas tus dependencias de Firebase usen la misma versión compatible.
+    implementation(platform("com.google.firebase:firebase-bom:33.2.0"))
+
+    // Ahora, declara las dependencias para los productos de Firebase que usas.
+    // El BoM se encargará de gestionar sus versiones automáticamente.
+    implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-messaging")
+    // ===================================================================
 }
