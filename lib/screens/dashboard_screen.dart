@@ -89,6 +89,7 @@ class DashboardScreenState extends State<DashboardScreen> {
         WidgetService.updateMonthlyComparisonWidget(),
         WidgetService.updateGoalsWidget(), // Si el método es estático, se llama así
         WidgetService.updateUpcomingPaymentsWidget(),
+        WidgetService.updateNextPaymentWidget(),
       ]);
       developer.log("✅ [Background] Actualización de widgets completada.", name: "Dashboard");
     } catch (e, stackTrace) {

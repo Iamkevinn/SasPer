@@ -151,7 +151,19 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/monthly_comparison_widget_info" />
         </receiver>
-
+        
+         <!-- [NUEVO] Declaración para el widget de Próximo Pago -->
+        <receiver
+            android:name=".NextPaymentWidgetProvider"
+            android:exported="true"
+            android:label="Próximo Pago">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/next_payment_widget_info" />
+        </receiver>
         <!-- =============================================================== -->
         
         <service

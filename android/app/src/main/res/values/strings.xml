@@ -6,4 +6,5 @@
     <string name="goals_widget_description">Muestra el progreso de tus metas</string>
     <string name="financial_health_widget_description">Un vistazo rápido a tu salud financiera.</string>
     <string name="monthly_comparison_widget_description">Compara tus gastos con el mes anterior.</string>
+    <string name="widget_next_payment_description">Muestra tu próximo pago pendiente.</string>
 </resources>

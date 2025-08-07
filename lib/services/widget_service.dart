@@ -440,6 +440,50 @@ class WidgetService {
     return upcomingPayments;
   }
 
+  //============================================================================
+  // [NUEVO] SECCIÓN DE WIDGET DE PRÓXIMO PAGO INDIVIDUAL
+  //============================================================================
+  static Future<void> updateNextPaymentWidget() async {
+    developer.log(
+        '🚀 [WidgetService] Iniciando actualización del widget de Próximo Pago Individual.',
+        name: _logName);
+    try {
+      // 1. Reutilizamos la lógica que ya tenemos para obtener TODOS los pagos ordenados.
+      final allPayments = await getUpcomingPayments();
+
+      if (allPayments.isNotEmpty) {
+        // 2. Tomamos solo el primer elemento de la lista.
+        final nextPayment = allPayments.first;
+        
+        // 3. Lo convertimos a JSON.
+        final jsonString = jsonEncode(nextPayment.toJson());
+
+        // 4. Lo guardamos en SharedPreferences con una clave ÚNICA para este widget.
+        await HomeWidget.saveWidgetData<String>('next_payment_data', jsonString);
+        developer.log(
+            '✅ [WidgetService] Próximo pago ("${nextPayment.concept}") guardado para el widget.',
+            name: _logName);
+
+      } else {
+        // 5. Si no hay pagos, guardamos un valor nulo o vacío para que Kotlin lo sepa.
+        await HomeWidget.saveWidgetData<String?>('next_payment_data', null);
+        developer.log(
+            '✅ [WidgetService] No hay pagos pendientes, se limpiaron los datos del widget.',
+            name: _logName);
+      }
+
+      // 6. Notificamos al widget específico que debe actualizarse.
+      await HomeWidget.updateWidget(
+        name: 'NextPaymentWidgetProvider', // Debe coincidir con el nombre de la clase en Kotlin
+        androidName: 'NextPaymentWidgetProvider',
+      );
+
+    } catch (e, st) {
+      developer.log('🔥🔥🔥 Error en updateNextPaymentWidget: $e',
+          name: _logName, error: e, stackTrace: st);
+    }
+  }
+  
   // La función `updateUpcomingPaymentsWidget` se mantiene igual, ya que solo llama a la anterior.
   static Future<void> updateUpcomingPaymentsWidget() async {
     developer.log(
