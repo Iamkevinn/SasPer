@@ -3,9 +3,10 @@ package com.example.sasper
 
 import android.content.Intent // Importa la clase Intent
 import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity 
 import android.os.Bundle // Importa la clase Bundle
 
-class MainActivity: FlutterActivity() {
+class MainActivity: FlutterFragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         

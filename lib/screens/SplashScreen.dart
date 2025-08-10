@@ -21,6 +21,7 @@ import 'package:sasper/services/widget_service.dart';
 
 // --- Repositorios CRÍTICOS (solo los que se inicializan tempranamente) ---
 import 'package:sasper/data/dashboard_repository.dart';
+import 'package:sasper/screens/auth_check_screen.dart';
 
 // Función auxiliar para guardar colores de Material You.
 Future<void> saveMaterialYouColors() async {
@@ -88,7 +89,7 @@ class _SplashScreenState extends State<SplashScreen> {
       // --- ETAPA 4: NAVEGACIÓN INMEDIATA ---
       if (mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const AuthGate()),
+          MaterialPageRoute(builder: (context) => const AuthCheckScreen()), 
         );
       }
       

@@ -68,6 +68,9 @@ dependencies:
   timezone: ^0.10.0
   flutter_timezone: ^3.0.1 # Actualizado
 
+  # Seguridad 
+  local_auth: 2.3.0 
+
 # Dependencias que solo se usan durante el desarrollo.
 dev_dependencies:
   flutter_test:
