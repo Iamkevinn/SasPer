@@ -1,10 +1,11 @@
-// lib/models/category_model.dart (CÓDIGO CORREGIDO Y ESTANDARIZADO)
+// lib/models/category_model.dart (CÓDIGO CORREGIDO Y DINÁMICO)
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:equatable/equatable.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:line_awesome_flutter/line_awesome_flutter.dart';
+
+// NO es necesario importar 'line_awesome_flutter' aquí, ya que los iconos se manejarán dinámicamente.
 
 enum CategoryType { income, expense }
 
@@ -13,7 +14,7 @@ class Category extends Equatable {
   final String userId;
   final String name;
   final IconData? icon;
-  final String color; // <--- CAMBIO 1: De Color a String
+  final String color;
   final CategoryType type;
   final DateTime createdAt;
 
@@ -22,22 +23,19 @@ class Category extends Equatable {
     required this.userId,
     required this.name,
     this.icon,
-    required this.color, // <--- CAMBIO 2: Ahora es un String
+    required this.color,
     required this.type,
     required this.createdAt,
   });
 
-  /// Getter conveniente para usar el color en la UI.
-  /// Convierte el String hexadecimal (ej: '#FF4CAF50') en un objeto Color.
   Color get colorAsObject {
     try {
       final hex = color.startsWith('#') ? color.substring(1) : color;
       final buffer = StringBuffer();
-      if (hex.length == 6) buffer.write('ff'); // Añade opacidad total si no está presente
+      if (hex.length == 6) buffer.write('ff');
       buffer.write(hex.replaceAll('#', ''));
       return Color(int.parse(buffer.toString(), radix: 16));
     } catch (e) {
-      // Si el color guardado es inválido, devuelve un color por defecto.
       return Colors.grey;
     }
   }
@@ -47,7 +45,7 @@ class Category extends Equatable {
     userId: '',
     name: 'Cargando...',
     icon: Iconsax.category,
-    color: '#808080', // <--- CAMBIO 3: Color como String
+    color: '#808080',
     type: CategoryType.expense,
     createdAt: DateTime(2024),
   );
@@ -57,13 +55,13 @@ class Category extends Equatable {
 
   factory Category.fromMap(Map<String, dynamic> map) {
     IconData? parsedIcon;
+    // NOVEDAD: Ahora leemos dinámicamente el nombre, la familia y el paquete del icono.
     if (map['icon_name'] != null && map['icon_name'].toString().isNotEmpty) {
       try {
         parsedIcon = IconData(
           int.parse(map['icon_name'].toString()),
-          // --- ESTANDARIZACIÓN A LINEAWESOME ---
-          fontFamily: 'LineAwesomeIcons', 
-          fontPackage: 'line_awesome_flutter',
+          fontFamily: map['icon_font_family'] as String?, // Leemos la familia de la DB
+          fontPackage: map['icon_font_package'] as String?, // Leemos el paquete de la DB
         );
       } catch (e) {
         if (kDebugMode) {
@@ -77,7 +75,7 @@ class Category extends Equatable {
       userId: map['user_id'],
       name: map['name'],
       icon: parsedIcon,
-      color: map['color'] as String, // <--- CAMBIO 4: Se lee como String
+      color: map['color'] as String,
       type: (map['type'] as String) == 'income' ? CategoryType.income : CategoryType.expense,
       createdAt: DateTime.parse(map['created_at']),
     );
@@ -86,12 +84,12 @@ class Category extends Equatable {
   Map<String, dynamic> toMap() {
     return {
       'name': name,
-      'color': color, // <--- CAMBIO 5: Se guarda el String directamente
+      'color': color,
       'type': type.name,
+      // NOVEDAD: Ahora guardamos dinámicamente los datos del icono seleccionado.
       'icon_name': icon?.codePoint.toString(),
-      // --- ESTANDARIZACIÓN A LINEAWESOME ---
-      'icon_font_family': 'LineAwesomeIcons',
-      'icon_font_package': 'line_awesome_flutter',
+      'icon_font_family': icon?.fontFamily,
+      'icon_font_package': icon?.fontPackage,
     };
   }
 }
