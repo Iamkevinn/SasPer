@@ -1,7 +1,11 @@
+// C:\Proyectos\SasPer\lib\widgets\dashboard\balance_card.dart
+
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 import 'package:lottie/lottie.dart';
+// NOVEDAD: Importamos el paquete para guardar las preferencias.
+import 'package:shared_preferences/shared_preferences.dart';
 
 // El enum y la extensión se mantienen, son una excelente práctica.
 enum BalanceStatus { positive, negative, neutral }
@@ -18,9 +22,6 @@ extension BalanceStatusX on BalanceStatus {
         return colorScheme.onSurfaceVariant;
     }
   }
-
-  // Este ya no lo usaremos, la gráfica lo reemplaza.
-  // IconData get icon { ... }
 }
 
 class BalanceCard extends StatefulWidget {
@@ -33,8 +34,12 @@ class BalanceCard extends StatefulWidget {
 }
 
 class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStateMixin {
+  // Se mantiene el valor inicial en true, pero se sobrescribirá al cargar las preferencias.
   bool _isBalanceVisible = true;
   late final AnimationController _eyeAnimationController;
+
+  // NOVEDAD: Definimos una clave constante para guardar la preferencia.
+  static const String _balanceVisibilityKey = 'balance_visibility_preference';
 
   @override
   void initState() {
@@ -43,7 +48,32 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
+    // NOVEDAD: Llamamos a la función para cargar la preferencia del usuario.
+    _loadVisibilityPreference();
   }
+  
+  // NOVEDAD: Nueva función asíncrona para cargar el estado de visibilidad.
+  Future<void> _loadVisibilityPreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    // Leemos el valor guardado. Si no existe (la primera vez que se usa la app),
+    // el valor por defecto será 'true' (visible).
+    setState(() {
+      _isBalanceVisible = prefs.getBool(_balanceVisibilityKey) ?? true;
+      // Sincronizamos la animación del ojo con el estado cargado.
+      if (_isBalanceVisible) {
+        _eyeAnimationController.value = 0; // Ojo abierto
+      } else {
+        _eyeAnimationController.value = 1; // Ojo cerrado
+      }
+    });
+  }
+
+  // NOVEDAD: Nueva función asíncrona para guardar el estado de visibilidad.
+  Future<void> _saveVisibilityPreference(bool isVisible) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_balanceVisibilityKey, isVisible);
+  }
+
 
   @override
   void dispose() {
@@ -51,7 +81,8 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
     super.dispose();
   }
 
-  void _toggleVisibility() {
+  // NOVEDAD: La función ahora es 'async' para poder guardar la preferencia.
+  void _toggleVisibility() async {
     setState(() {
       _isBalanceVisible = !_isBalanceVisible;
       if (_isBalanceVisible) {
@@ -60,6 +91,8 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
         _eyeAnimationController.forward();
       }
     });
+    // NOVEDAD: Guardamos el nuevo estado cada vez que se cambia.
+    await _saveVisibilityPreference(_isBalanceVisible);
   }
 
   BalanceStatus get _status => widget.totalBalance > 0
@@ -87,10 +120,8 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
         decoration: BoxDecoration(
           border: Border(left: BorderSide(color: statusColor, width: 6)),
         ),
-        // --- NOVEDAD: Usamos un Stack para superponer la gráfica ---
         child: Stack(
           children: [
-            // --- NOVEDAD: Gráfica de tendencia posicionada en la esquina ---
             Positioned(
               bottom: -2,
               right: -2,
@@ -100,14 +131,12 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
                 child: CustomPaint(
                   painter: _BalanceTrendPainter(
                     status: _status,
-                    // Usamos el mismo color pero con opacidad para que sea más sutil
                     color: statusColor.withOpacity(0.4),
                   ),
                 ),
               ),
             ),
             
-            // Contenido principal de la tarjeta
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
               child: Column(
@@ -161,8 +190,7 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
   }
 }
 
-
-// --- NOVEDAD: Widget de dibujo personalizado para la gráfica de tendencia ---
+// El widget _BalanceTrendPainter no necesita cambios.
 class _BalanceTrendPainter extends CustomPainter {
   final BalanceStatus status;
   final Color color;
@@ -173,33 +201,30 @@ class _BalanceTrendPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = color
-      ..strokeWidth = 3.5 // Grosor de la línea
+      ..strokeWidth = 3.5
       ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round; // Extremos de línea redondeados
+      ..strokeCap = StrokeCap.round;
 
     final path = Path();
     
     switch (status) {
       case BalanceStatus.positive:
-        // Dibuja una línea que empieza abajo y termina arriba (tendencia positiva)
-        path.moveTo(size.width * 0.1, size.height * 0.9); // Inicio
+        path.moveTo(size.width * 0.1, size.height * 0.9);
         path.cubicTo(
-          size.width * 0.3, size.height * 0.8, // Punto de control 1
-          size.width * 0.6, size.height * 0.2, // Punto de control 2
-          size.width, size.height * 0.1,      // Fin
+          size.width * 0.3, size.height * 0.8,
+          size.width * 0.6, size.height * 0.2,
+          size.width, size.height * 0.1,
         );
         break;
       case BalanceStatus.negative:
-        // Dibuja una línea que empieza arriba y termina abajo (tendencia negativa)
-        path.moveTo(size.width * 0.1, size.height * 0.1); // Inicio
+        path.moveTo(size.width * 0.1, size.height * 0.1);
         path.cubicTo(
-          size.width * 0.3, size.height * 0.2, // Punto de control 1
-          size.width * 0.6, size.height * 0.8, // Punto de control 2
-          size.width, size.height * 0.9,      // Fin
+          size.width * 0.3, size.height * 0.2,
+          size.width * 0.6, size.height * 0.8,
+          size.width, size.height * 0.9,
         );
         break;
       case BalanceStatus.neutral:
-        // Dibuja una línea horizontal
         path.moveTo(size.width * 0.1, size.height / 2);
         path.lineTo(size.width, size.height / 2);
         break;
@@ -210,7 +235,6 @@ class _BalanceTrendPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _BalanceTrendPainter oldDelegate) {
-    // Solo redibuja si el estado o el color han cambiado
     return oldDelegate.status != status || oldDelegate.color != color;
   }
 }
