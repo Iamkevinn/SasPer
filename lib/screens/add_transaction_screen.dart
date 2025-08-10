@@ -9,6 +9,7 @@ import 'package:sasper/data/account_repository.dart';
 import 'package:sasper/data/transaction_repository.dart';
 import 'package:sasper/data/budget_repository.dart'; // Importamos para la lógica de presupuestos
 import 'package:sasper/models/account_model.dart';
+import 'package:sasper/models/enums/transaction_mood_enum.dart';
 import 'package:sasper/models/budget_models.dart';
 import 'package:sasper/data/category_repository.dart';
 import 'package:sasper/models/category_model.dart';
@@ -42,6 +43,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   bool _isLoading = false;
   String? _selectedAccountId;
   int? _selectedBudgetId;
+  TransactionMood? _selectedMood;
   
   late Future<List<Account>> _accountsFuture;
   late Future<List<BudgetProgress>> _budgetsFuture;
@@ -99,6 +101,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         description: _descriptionController.text.trim(),
         transactionDate: DateTime.now(),
         budgetId: _selectedBudgetId,
+        mood: _selectedMood,
       );
       
       if (mounted) {
@@ -227,9 +230,43 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   if (categorySnapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: Padding(padding: EdgeInsets.all(8.0), child: CircularProgressIndicator()));
                   }
+                  // --- BLOQUE MODIFICADO PARA DEPURACIÓN ---
                   if (categorySnapshot.hasError) {
-                    return const Text('Error al cargar categorías.');
+                    // Logueamos el error completo en la consola de depuración para un análisis detallado.
+                    developer.log(
+                      'Error en FutureBuilder<List<Category>>',
+                      name: 'AddTransactionScreen',
+                      error: categorySnapshot.error,
+      stackTrace: categorySnapshot.stackTrace,
+                    );
+                    
+                    // Mostramos un mensaje más informativo en la UI.
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Iconsax.warning_2, color: Theme.of(context).colorScheme.error, size: 40),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Error al cargar categorías',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 8),
+                            // Mostramos el error real en la pantalla para una depuración rápida.
+                            Text(
+                              '${categorySnapshot.error}',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
                   }
+                  // --- FIN DEL BLOQUE MODIFICADO ---
                   if (!categorySnapshot.hasData || categorySnapshot.data!.isEmpty) {
                     return const Text('No tienes categorías. Créalas en Ajustes.');
                   }
@@ -277,6 +314,40 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 },
               ),
               const SizedBox(height: 24),
+              
+              // NOVEDAD: Añadimos la sección para seleccionar el estado de ánimo.
+              // Solo se muestra si es un gasto.
+              if (_transactionType == 'Gasto') ...[
+                Text('¿Cómo te sentiste con este gasto? (Opcional)', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8.0,
+                  runSpacing: 8.0,
+                  children: TransactionMood.values.map((mood) {
+                    return FilterChip(
+                      label: Text(mood.displayName, style: GoogleFonts.poppins()),
+                      avatar: Icon(
+                        mood.icon,
+                        color: _selectedMood == mood ? colorScheme.onSecondaryContainer : colorScheme.onSurfaceVariant,
+                      ),
+                      selected: _selectedMood == mood,
+                      onSelected: (selected) {
+                        setState(() {
+                          if (selected) {
+                            _selectedMood = mood;
+                          } else {
+                            // Permite deseleccionar si se vuelve a tocar
+                            _selectedMood = null;
+                          }
+                        });
+                      },
+                      selectedColor: colorScheme.secondaryContainer,
+                      checkmarkColor: colorScheme.onSecondaryContainer,
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 24),
+              ],
               
               TextFormField(
                 controller: _descriptionController,

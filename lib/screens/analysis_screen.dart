@@ -16,6 +16,8 @@ import 'package:sasper/models/insight_model.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 import 'package:lottie/lottie.dart';
+// NOVEDAD: Importa el nuevo widget de análisis que acabamos de crear.
+import 'package:sasper/widgets/analysis_charts/mood_spending_analysis_card.dart';
 
 // Widgets de la Pantalla
 import 'package:sasper/widgets/analysis_charts/heatmap_section.dart';
@@ -215,6 +217,7 @@ class AnalysisScreenState extends State<AnalysisScreen> {
 
   int _getChartCount(AnalysisData data) {
     int count = 0;
+    if (data.moodAnalysisData.isNotEmpty) count++;
     if (data.heatmapData.isNotEmpty) count++;
     if (data.cashflowBarData.isNotEmpty) count++;
     if (data.netWorthLineData.isNotEmpty) count++;
@@ -227,6 +230,8 @@ class AnalysisScreenState extends State<AnalysisScreen> {
 
   Widget _buildChartWidget(AnalysisData data, int index) {
     final widgets = [
+      // NOVEDAD: Añadimos nuestro nuevo widget a la lista, preferiblemente al principio.
+      if (data.moodAnalysisData.isNotEmpty) MoodSpendingAnalysisCard(analysisData: data.moodAnalysisData),
       if (data.heatmapData.isNotEmpty) HeatmapSection(data: data.heatmapData, startDate: DateTime.now().subtract(const Duration(days: 119)), endDate: DateTime.now()),
       if (data.cashflowBarData.isNotEmpty) MonthlyCashflowChart(data: data.cashflowBarData),
       if (data.netWorthLineData.isNotEmpty) NetWorthTrendChart(data: data.netWorthLineData),
@@ -336,6 +341,8 @@ class AnalysisScreenState extends State<AnalysisScreen> {
 /// Extensión para simplificar la comprobación de si hay datos de gráficos para mostrar.
 extension on AnalysisData {
   bool get hasData =>
+  // NOVEDAD: Añadimos el nuevo análisis a la comprobación general.
+      moodAnalysisData.isNotEmpty || 
       expensePieData.isNotEmpty ||
       cashflowBarData.isNotEmpty ||
       netWorthLineData.isNotEmpty ||

@@ -2,6 +2,7 @@
 
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
+import 'package:sasper/models/enums/transaction_mood_enum.dart'; // NOVEDAD: Importamos el enum
 
 class Transaction extends Equatable {
   final int id;
@@ -16,6 +17,7 @@ class Transaction extends Equatable {
   final String? debtId;
   final String? goalId;
   final String? transferId;
+  final TransactionMood? mood; // NOVEDAD: Añadimos el nuevo campo.
 
   const Transaction({
     required this.id,
@@ -30,16 +32,13 @@ class Transaction extends Equatable {
     this.debtId,
     this.goalId,
     this.transferId,
+    this.mood, // NOVEDAD: Añadimos al constructor.
   });
 
-  // --- NUEVO CONSTRUCTOR AÑADIDO ---
-  /// Crea una instancia "vacía" de Transaction.
-  /// Ideal para usar como placeholder en estados de carga, como en Skeletonizer.
-  /// No puede ser `const` porque usa `DateTime.now()`.
   factory Transaction.empty() {
     return Transaction(
       id: 0,
-      userId: '', // Proporciona un valor por defecto para el campo requerido
+      userId: '',
       accountId: '',
       type: 'Gasto',
       category: 'Categoría',
@@ -50,20 +49,43 @@ class Transaction extends Equatable {
       debtId: null,
       goalId: null,
       transferId: null,
+      mood: null, // NOVEDAD: Añadimos el valor por defecto.
     );
   }
-  // --- FIN DEL CÓDIGO AÑADIDO ---
   
+  // NOVEDAD: Renombramos `toJson` a `toMap` para consistencia y lo completamos.
+  // Este mapa se usa para ENVIAR datos a Supabase.
   Map<String, dynamic> toJson() => {
-        // Tu método toJson actual parece incompleto, podría necesitar más campos.
-        'description': description,
-        'amount': amount,
+        'user_id': userId,
+        'account_id': accountId,
         'type': type,
         'category': category,
+        'description': description,
+        'amount': amount,
+        'transaction_date': transactionDate.toIso8601String(),
+        'budget_id': budgetId,
+        'debt_id': debtId,
+        'goal_id': goalId,
+        'transfer_id': transferId,
+        'mood': mood?.name, // NOVEDAD: Convertimos el enum a texto para Supabase.
       };
 
   factory Transaction.fromMap(Map<String, dynamic> map) {
     try {
+      // NOVEDAD: Lógica para parsear el estado de ánimo desde la base de datos.
+      TransactionMood? parsedMood;
+      if (map['mood'] != null && map['mood'] is String) {
+        try {
+          parsedMood = TransactionMood.values.byName(map['mood']);
+        } catch (e) {
+          // Si el valor en la DB no es un enum válido, se ignora.
+          parsedMood = null;
+          if (kDebugMode) {
+            print("⚠️ Mood desconocido en la DB: '${map['mood']}'. Se establecerá como null.");
+          }
+        }
+      }
+
       return Transaction(
         id: map['id'] as int,
         userId: map['user_id'] as String,
@@ -77,6 +99,7 @@ class Transaction extends Equatable {
         debtId: map['debt_id'] as String?,
         goalId: map['goal_id'] as String?,
         transferId: map['transfer_id'] as String?,
+        mood: parsedMood, // NOVEDAD: Asignamos el mood parseado.
       );
     } catch (e, stackTrace) {
       if (kDebugMode) {
@@ -101,6 +124,7 @@ class Transaction extends Equatable {
     String? debtId,
     String? goalId,
     String? transferId,
+    TransactionMood? mood, // NOVEDAD: Añadimos al copyWith.
   }) {
     return Transaction(
       id: id ?? this.id,
@@ -115,6 +139,7 @@ class Transaction extends Equatable {
       debtId: debtId ?? this.debtId,
       goalId: goalId ?? this.goalId,
       transferId: transferId ?? this.transferId,
+      mood: mood ?? this.mood, // NOVEDAD: Asignamos el mood en copyWith.
     );
   }
 
@@ -132,5 +157,6 @@ class Transaction extends Equatable {
         debtId,
         goalId,
         transferId,
+        mood, // NOVEDAD: Añadimos a la lista de props para Equatable.
       ];
 }

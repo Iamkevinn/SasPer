@@ -7,6 +7,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 
 import 'package:sasper/models/transaction_models.dart';
+import 'package:sasper/models/enums/transaction_mood_enum.dart'; 
 
 class TransactionTile extends StatelessWidget {
   final Transaction transaction;
@@ -43,22 +44,47 @@ class TransactionTile extends StatelessWidget {
     );
   }
 
-  @override
+@override
   Widget build(BuildContext context) {
     IconData icon;
     Color color;
     String amountText;
 
-    // Se usa la categoría de la transacción, o un texto por defecto si es nula.
-    final String title = transaction.category ?? 'Sin categoría';
+    final String title = transaction.description?.isNotEmpty == true
+        ? transaction.description!
+        : transaction.category ?? 'Sin Descripción';
     
-    // La descripción puede ser nula, así que la manejamos como tal.
-    final String? subtitle = transaction.description;
-
-    // Formato de moneda.
+    final String mainSubtitle = transaction.category ?? 'Transferencia';
+    
     final currencyFormat = NumberFormat.currency(locale: 'es_CO', symbol: '');
-
-    // Lógica para determinar el icono, color y formato del monto según el tipo.
+    
+    // NOVEDAD: Definimos el widget del estado de ánimo para reutilizarlo.
+    Widget? moodWidget;
+    if (transaction.type == 'Gasto' && transaction.mood != null) {
+      moodWidget = Padding(
+        padding: const EdgeInsets.only(top: 4.0), // Espacio entre subtítulos
+        child: Row(
+          mainAxisSize: MainAxisSize.min, // Para que el Row no ocupe todo el ancho
+          children: [
+            Icon(
+              transaction.mood!.icon,
+              size: 14,
+              color: Theme.of(context).colorScheme.secondary,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              transaction.mood!.displayName,
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.secondary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
     switch (transaction.type) {
       case 'Ingreso':
         icon = Iconsax.arrow_up_1;
@@ -75,32 +101,36 @@ class TransactionTile extends StatelessWidget {
         color = Theme.of(context).colorScheme.secondary;
         amountText = currencyFormat.format(transaction.amount);
         break;
-      default: // Para 'Transferencia' y cualquier otro tipo no especificado.
+      default:
         icon = Iconsax.refresh;
         color = Colors.blue.shade400;
         amountText = currencyFormat.format(transaction.amount);
     }
 
-    // Se construye el contenido visual del Tile.
     final tileContent = InkWell(
       onTap: onTap,
       child: ListTile(
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
         leading: Icon(icon, color: color, size: 28),
         title: Text(title, style: GoogleFonts.poppins(fontWeight: FontWeight.w500)),
-        subtitle: (subtitle != null && subtitle.isNotEmpty)
-            ? Text(subtitle, style: GoogleFonts.poppins())
-            : null,
+        
+        // NOVEDAD: Construimos el subtítulo dinámicamente.
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(mainSubtitle, style: GoogleFonts.poppins()),
+            // Si el widget de mood fue creado, lo añadimos aquí.
+            if (moodWidget != null) moodWidget, 
+          ],
+        ),
+
         trailing: Text(
           amountText,
-          style: GoogleFonts.poppins(
-              fontWeight: FontWeight.w600, fontSize: 15, color: color),
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 15, color: color),
         ),
       ),
     );
 
-    // Si se proporcionó una función 'onDeleted', el Tile se puede deslizar para borrar.
     if (onDeleted != null) {
       return Dismissible(
         key: ValueKey(transaction.id),
@@ -109,23 +139,19 @@ class TransactionTile extends StatelessWidget {
           color: Theme.of(context).colorScheme.errorContainer,
           padding: const EdgeInsets.symmetric(horizontal: 20),
           alignment: Alignment.centerRight,
-          child: Icon(Iconsax.trash,
-              color: Theme.of(context).colorScheme.onErrorContainer),
+          child: Icon(Iconsax.trash, color: Theme.of(context).colorScheme.onErrorContainer),
         ),
         confirmDismiss: (direction) async {
           HapticFeedback.mediumImpact();
-          
           if (transaction.debtId != null) {
             await _showDebtLinkedWarning(context);
             return false;
           }
-          
           return await onDeleted!();
         },
         child: tileContent,
       );
     } else {
-      // Si no hay función 'onDeleted', se muestra un Tile simple no deslizable.
       return tileContent;
     }
   }

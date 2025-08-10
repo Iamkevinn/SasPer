@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:sasper/models/insight_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sasper/models/analysis_models.dart';
+import 'package:sasper/models/mood_analysis_model.dart'; 
 
 class AnalysisRepository {
   // --- PATRÓN DE INICIALIZACIÓN PEREZOSA ---
@@ -138,6 +139,28 @@ Future<MonthlyComparison> getMonthlySpendingComparisonForWidget() async {
       return [];
     }
   }
+
+  // NOVEDAD: Añadimos el nuevo método para obtener el análisis por estado de ánimo.
+  /// Obtiene un análisis de los gastos agrupados por categoría y estado de ánimo.
+  Future<List<MoodAnalysis>> getMoodSpendingAnalysis() async {
+    developer.log("😊 [Repo] Obteniendo análisis de gastos por mood...", name: 'AnalysisRepository');
+    try {
+      // Llamamos a la nueva función RPC que creamos en Supabase.
+      final result = await client.rpc('get_mood_spending_analysis');
+      
+      if (result is List) {
+        final analysis = result.map((e) => MoodAnalysis.fromMap(e)).toList();
+        developer.log('✅ [Repo] Encontrados ${analysis.length} registros de análisis por mood.', name: 'AnalysisRepository');
+        return analysis;
+      }
+      return [];
+
+    } catch (e, stackTrace) {
+      developer.log('🔥 [Repo] Error en getMoodSpendingAnalysis: $e', name: 'AnalysisRepository', stackTrace: stackTrace);
+      // Devolvemos una lista vacía en caso de error para no romper la UI.
+      return [];
+    }
+  }
   
   /// Obtiene el conjunto completo de datos para la pantalla de análisis.
   Future<AnalysisData> fetchAllAnalysisData() async {
@@ -163,6 +186,8 @@ Future<MonthlyComparison> getMonthlySpendingComparisonForWidget() async {
         client.rpc('get_income_summary_by_category', params: {'p_user_id': userId, 'client_date': clientDate}).catchError((_) => []),
         client.rpc('get_monthly_income_expense_summary', params: {'p_user_id': userId, 'client_date': clientDate}).catchError((_) => []),
         client.rpc('get_daily_net_flow', params: {'p_user_id': userId, 'start_date': startDate, 'end_date': endDate}).catchError((_) => []),
+        // NOVEDAD: Añadimos nuestra nueva función a la lista de llamadas en paralelo.
+        getMoodSpendingAnalysis().catchError((_) => []),
       ]);
       
       // Función auxiliar robusta para parsear los resultados de Future.wait.
@@ -187,6 +212,9 @@ Future<MonthlyComparison> getMonthlySpendingComparisonForWidget() async {
               if(DateTime.tryParse(item['day']) != null)
                 DateTime.parse(item['day']): (item['net_amount'] as num).toInt()
         },
+        // NOVEDAD: Asignamos el resultado del análisis de mood.
+        // `results[7]` corresponde a la nueva llamada que añadimos. El tipo ya es `List<MoodAnalysis>`.
+        moodAnalysisData: results[7] as List<MoodAnalysis>,
       );
       
     } catch (e, stackTrace) {

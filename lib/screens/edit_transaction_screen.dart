@@ -10,6 +10,7 @@ import 'package:sasper/models/account_model.dart';
 import 'package:sasper/models/transaction_models.dart';
 import 'package:sasper/services/event_service.dart'; // Importamos EventService para la notificación global
 import 'package:sasper/utils/NotificationHelper.dart';
+import 'package:sasper/models/enums/transaction_mood_enum.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'dart:developer' as developer;
 import 'package:sasper/main.dart';
@@ -43,6 +44,7 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
   String? _selectedCategory;
   String? _selectedAccountId;
   bool _isLoading = false;
+  TransactionMood? _selectedMood;
 
   late Future<List<Account>> _accountsFuture;
   late Future<List<Category>> _categoriesFuture;
@@ -57,6 +59,7 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
     _transactionType = widget.transaction.type;
     _selectedCategoryName = widget.transaction.category;
     _selectedAccountId = widget.transaction.accountId;
+    _selectedMood = widget.transaction.mood; 
     // Usamos la instancia singleton para cargar las cuentas.
     _accountsFuture = _accountRepository.getAccounts();
     _categoriesFuture = _categoryRepository.getCategories();
@@ -102,6 +105,7 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
           type: _transactionType,
           category: _selectedCategoryName!,
           description: _descriptionController.text.trim(),
+          mood: _selectedMood,
           transactionDate: widget.transaction.transactionDate,
         );
 
@@ -229,6 +233,8 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // NOVEDAD: Se añade esta línea para que 'colorScheme' esté disponible en todo el método.
+    final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: Text('Editar Transacción', style: GoogleFonts.poppins()),
@@ -373,30 +379,53 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
                 },
               ),
               const SizedBox(height: 24),
+
+              // NOVEDAD: Añadimos la sección para seleccionar el estado de ánimo.
+              // Es idéntica a la de la pantalla de añadir.
+              if (_transactionType == 'Gasto') ...[
+                Text('Estado de ánimo del gasto (Opcional)', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8.0,
+                  runSpacing: 8.0,
+                  children: TransactionMood.values.map((mood) {
+                    return FilterChip(
+                      label: Text(mood.displayName, style: GoogleFonts.poppins()),
+                      avatar: Icon(
+                        mood.icon,
+                        color: _selectedMood == mood ? colorScheme.onSecondaryContainer : colorScheme.onSurfaceVariant,
+                      ),
+                      selected: _selectedMood == mood,
+                      onSelected: (selected) {
+                        setState(() {
+                          _selectedMood = selected ? mood : null;
+                        });
+                      },
+                      selectedColor: colorScheme.secondaryContainer,
+                      checkmarkColor: colorScheme.onSecondaryContainer,
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 24),
+              ],
+              
               TextFormField(
                 controller: _descriptionController,
                 decoration: InputDecoration(
                   labelText: 'Descripción (Opcional)',
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
               const SizedBox(height: 32),
+              
               ElevatedButton.icon(
-                icon: _isLoading
-                    ? const SizedBox.shrink()
-                    : const Icon(Iconsax.edit),
-                label: _isLoading
-                    ? const CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white)
-                    : const Text('Guardar Cambios'),
+                icon: _isLoading ? const SizedBox.shrink() : const Icon(Iconsax.edit),
+                label: _isLoading ? const CircularProgressIndicator(strokeWidth: 2, color: Colors.white) : const Text('Guardar Cambios'),
                 onPressed: _isLoading ? null : _updateTransaction,
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  textStyle: GoogleFonts.poppins(
-                      fontSize: 16, fontWeight: FontWeight.bold),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                  textStyle: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
             ],

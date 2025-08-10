@@ -1,5 +1,6 @@
 // lib/models/analysis_models.dart
 import 'package:equatable/equatable.dart';
+import 'package:sasper/models/mood_analysis_model.dart';
 
 // --- MODELOS INDIVIDUALES PARA CADA GRÁFICO ---
 
@@ -176,6 +177,7 @@ class AnalysisData extends Equatable {
   final List<IncomeByCategory> incomePieData;
   final List<MonthlyIncomeExpenseSummaryData> incomeExpenseBarData;
   final Map<DateTime, int> heatmapData;
+  final List<MoodAnalysis> moodAnalysisData; 
 
   const AnalysisData({
     required this.expensePieData,
@@ -185,6 +187,7 @@ class AnalysisData extends Equatable {
     required this.incomePieData,
     required this.incomeExpenseBarData,
     required this.heatmapData,
+    required this.moodAnalysisData,
   });
 
   // Constructor "vacío" para usar en estados iniciales o de carga.
@@ -198,6 +201,7 @@ class AnalysisData extends Equatable {
       incomePieData: [],
       incomeExpenseBarData: [],
       heatmapData: {},
+       moodAnalysisData: [],
     );
   }
 
@@ -210,6 +214,7 @@ class AnalysisData extends Equatable {
         incomePieData,
         incomeExpenseBarData,
         heatmapData,
+        moodAnalysisData,
       ];
 }
 

@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:sasper/models/transaction_models.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:sasper/models/enums/transaction_mood_enum.dart';
 import 'dart:developer' as developer;
 
 class TransactionRepository {
@@ -60,6 +61,7 @@ class TransactionRepository {
     required String description,
     required DateTime transactionDate,
     int? budgetId,
+    TransactionMood? mood, 
   }) async {
     try {
       await client.from('transactions').insert({
@@ -71,6 +73,7 @@ class TransactionRepository {
         'description': description,
         'transaction_date': transactionDate.toIso8601String(),
         'budget_id': budgetId,
+        'mood': mood?.name,
       });
     } catch (e) {
       developer.log('🔥 Error al añadir transacción: $e', name: 'TransactionRepository');
@@ -87,6 +90,7 @@ class TransactionRepository {
     required String category,
     required String description,
     required DateTime transactionDate,
+    TransactionMood? mood,
   }) async {
     try {
       await client.from('transactions').update({
@@ -96,6 +100,7 @@ class TransactionRepository {
         'category': category,
         'description': description,
         'transaction_date': transactionDate.toIso8601String(),
+        'mood': mood?.name,
       }).eq('id', transactionId);
     } catch (e) {
       developer.log('🔥 Error al actualizar transacción: $e', name: 'TransactionRepository');
