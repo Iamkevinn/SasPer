@@ -36,6 +36,28 @@ class CategoryRepository {
     return _supabase!;
   }
 
+  /// Obtiene una lista de categorías de GASTO (llamada única).
+  /// Ideal para dropdowns en la creación de presupuestos o gastos.
+  Future<List<Category>> getExpenseCategories() async {
+    try {
+      final data = await client
+          .from('categories')
+          .select()
+          .eq('user_id', client.auth.currentUser!.id) // Siempre filtra por usuario
+          .eq('type', 'expense') // La clave: solo tipo 'expense'
+          .order('name', ascending: true);
+          
+      final categories = (data as List)
+          .map((item) => Category.fromMap(item as Map<String, dynamic>))
+          .toList();
+      developer.log('✅ [Repo] Obtenidas ${categories.length} categorías de GASTO.', name: 'CategoryRepository');
+      return categories;
+    } catch (e, st) {
+      developer.log('🔥 Error al obtener categorías de GASTO: $e', name: 'CategoryRepository', error: e, stackTrace: st);
+      throw Exception('No se pudieron cargar las categorías de gasto.');
+    }
+  }
+  
   // Se elimina el método `initialize()` público.
   // void initialize(SupabaseClient supabaseClient) { ... } // <-- ELIMINADO
 

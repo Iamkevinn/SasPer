@@ -2,7 +2,6 @@
 
 import 'dart:async';
 import 'dart:developer' as developer;
-import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sasper/models/budget_models.dart';
 
@@ -11,10 +10,10 @@ class BudgetRepository {
 
   SupabaseClient? _supabase;
   bool _isInitialized = false;
-  final _streamController = StreamController<List<BudgetProgress>>.broadcast();
+  // ¡CAMBIO CLAVE! El stream ahora maneja el nuevo modelo `Budget`.
+  final _streamController = StreamController<List<Budget>>.broadcast();
   RealtimeChannel? _channel;
 
-  // Constructor privado para forzar el uso del Singleton `instance`.
   BudgetRepository._internal();
   static final BudgetRepository instance = BudgetRepository._internal();
 
@@ -22,7 +21,7 @@ class BudgetRepository {
   void _ensureInitialized() {
     if (!_isInitialized) {
       _supabase = Supabase.instance.client;
-      _setupRealtimeSubscription(); // La configuración de Realtime depende de la inicialización.
+      _setupRealtimeSubscription();
       _isInitialized = true;
       developer.log('✅ BudgetRepository inicializado PEREZOSAMENTE.', name: 'BudgetRepository');
     }
@@ -37,14 +36,10 @@ class BudgetRepository {
     return _supabase!;
   }
 
-  // Se elimina el método `initialize()` público.
-  // void initialize(SupabaseClient supabaseClient) { ... } // <-- ELIMINADO
-
   // --- MÉTODOS PÚBLICOS DEL REPOSITORIO ---
 
-  /// Devuelve un stream del progreso de los presupuestos.
-  Stream<List<BudgetProgress>> getBudgetsStream() {
-    // La inicialización se activará la primera vez que se llame a `_fetchAndPushData`.
+  /// Devuelve un stream de los presupuestos.
+  Stream<List<Budget>> getBudgetsStream() {
     _fetchAndPushData();
     return _streamController.stream;
   }
@@ -52,69 +47,81 @@ class BudgetRepository {
   /// Vuelve a cargar los datos de los presupuestos.
   Future<void> refreshData() => _fetchAndPushData();
 
-  /// Obtiene el progreso de los presupuestos para el mes actual (llamada única).
-  Future<List<BudgetProgress>> getBudgetsForCurrentMonth() => _fetchBudgetsProgress();
-  
-  /// Añade o actualiza un presupuesto para una categoría en un mes/año específico.
+  /// Obtiene una lista única de los presupuestos activos.
+  Future<List<Budget>> getBudgets() => _fetchBudgets();
+
+  /// Añade un nuevo presupuesto con fechas flexibles.
   Future<void> addBudget({
-    required String category,
+    required String categoryName, // Ahora usamos ID para mayor robustez
     required double amount,
-    required int month,
-    required int year,
+    required DateTime startDate,
+    required DateTime endDate,
+    required String periodicity,
   }) async {
-    developer.log('💾 [Repo] Guardando presupuesto para "$category" con monto $amount', name: 'BudgetRepository');
+    developer.log('💾 [Repo] Guardando presupuesto para categoría ID $categoryName', name: 'BudgetRepository');
     final userId = client.auth.currentUser!.id;
     try {
-      await client.from('budgets').upsert({
+      await client.from('budgets').insert({
         'user_id': userId,
-        'category': category,
-        'month': month,
-        'year': year,
+        'category': categoryName,
         'amount': amount,
-      }, onConflict: 'user_id, category, month, year');
+        'start_date': startDate.toIso8601String(),
+        'end_date': endDate.toIso8601String(),
+        'periodicity': periodicity,
+      });
       developer.log('✅ [Repo] Presupuesto guardado con éxito.', name: 'BudgetRepository');
     } catch (e) {
       developer.log('🔥 [Repo] Error guardando presupuesto: $e', name: 'BudgetRepository');
-      throw Exception('No se pudo guardar el presupuesto.');
+      rethrow; // Propagamos el error para que la UI pueda manejarlo.
     }
   }
 
-  /// Actualiza el monto de un presupuesto existente por su ID.
-  Future<void> updateBudget({required int budgetId, required double newAmount}) async {
-    developer.log('🔄 [Repo] Actualizando presupuesto $budgetId con nuevo monto $newAmount', name: 'BudgetRepository');
+  /// Actualiza un presupuesto existente.
+  Future<void> updateBudget({
+    required int budgetId,
+    required String categoryName,
+    required double amount,
+    required DateTime startDate,
+    required DateTime endDate,
+    required String periodicity,
+  }) async {
+    developer.log('🔄 [Repo] Actualizando presupuesto $budgetId', name: 'BudgetRepository');
     try {
       await client
           .from('budgets')
-          .update({'amount': newAmount})
+          .update({
+            'amount': amount,
+            'start_date': startDate.toIso8601String(),
+            'end_date': endDate.toIso8601String(),
+            'periodicity': periodicity,
+          })
           .eq('id', budgetId);
       developer.log('✅ [Repo] Presupuesto actualizado con éxito.', name: 'BudgetRepository');
     } catch (e) {
       developer.log('🔥 [Repo] Error actualizando presupuesto: $e', name: 'BudgetRepository');
-      throw Exception('No se pudo actualizar el presupuesto.');
+      rethrow;
     }
   }
-  
+
   /// Llama a un RPC para eliminar un presupuesto de forma segura.
   Future<void> deleteBudgetSafely(int budgetId) async {
     developer.log('🗑️ [Repo] Eliminando presupuesto con id $budgetId', name: 'BudgetRepository');
     try {
       await client.rpc(
-        'delete_budget_safely',
+        'delete_budget_safely', // Asegúrate de que esta RPC exista en tu DB
         params: {'budget_id_to_delete': budgetId},
       );
     } catch (e) {
       developer.log('🔥 [Repo] Error en RPC delete_budget_safely: $e', name: 'BudgetRepository');
-      throw Exception('No se pudo eliminar el presupuesto.');
+      rethrow;
     }
   }
 
   /// Libera los recursos del repositorio.
   void dispose() {
     developer.log('❌ [Repo] Liberando recursos de BudgetRepository.', name: 'BudgetRepository');
-    if (_channel != null) {
-      _supabase?.removeChannel(_channel!);
-      _channel = null;
-    }
+    _channel?.unsubscribe();
+    _channel = null;
     _streamController.close();
   }
 
@@ -148,9 +155,9 @@ class BudgetRepository {
 
   /// Carga los datos frescos desde el RPC y los emite en el stream.
   Future<void> _fetchAndPushData() async {
-    developer.log('🔄 [Repo] Obteniendo progreso de presupuestos...', name: 'BudgetRepository');
+    developer.log('🔄 [Repo] Refrescando datos de presupuestos para el stream...', name: 'BudgetRepository');
     try {
-      final data = await _fetchBudgetsProgress();
+      final data = await _fetchBudgets();
       if (!_streamController.isClosed) {
         _streamController.add(data);
       }
@@ -161,29 +168,27 @@ class BudgetRepository {
     }
   }
 
-  /// Llama al RPC para obtener el progreso de todos los presupuestos del mes actual.
-  Future<List<BudgetProgress>> _fetchBudgetsProgress() async {
+  /// Llama a la nueva RPC para obtener los presupuestos con su progreso calculado.
+  Future<List<Budget>> _fetchBudgets() async {
     try {
-      // Usa el getter `client` para asegurar la inicialización.
       final userId = client.auth.currentUser?.id;
       if (userId == null) throw Exception("Usuario no autenticado");
-      
-      final response = await client.rpc('get_budgets_progress_for_user', params: {'p_user_id': userId});
-      
-      if (kDebugMode && response is List && response.isNotEmpty) {
-        print('===== VERDAD ABSOLUTA DE SUPABASE (Budgets) =====');
-        print('Datos crudos del primer presupuesto: ${response.first}');
-        print('=======================================');
-      }
 
-      final budgetsProgress = (response as List)
-          .map((data) => BudgetProgress.fromMap(data))
+      // ¡CAMBIO CLAVE! Llamamos a la nueva RPC.
+      final response = await client.rpc(
+        'get_active_budgets_with_progress',
+        params: {'p_user_id': userId}
+      );
+
+      final budgets = (response as List)
+          .map((data) => Budget.fromMap(data))
           .toList();
-      developer.log('✅ [Repo] Obtenidos ${budgetsProgress.length} presupuestos vía RPC.', name: 'BudgetRepository');
-      return budgetsProgress;
+          
+      developer.log('✅ [Repo] Obtenidos ${budgets.length} presupuestos vía RPC.', name: 'BudgetRepository');
+      return budgets;
     } catch (e) {
-      developer.log('🔥 [Repo] Error en RPC get_budgets_progress: $e', name: 'BudgetRepository');
-      throw Exception('Falló al obtener el progreso de los presupuestos.');
+      developer.log('🔥 [Repo] Error en RPC get_active_budgets_with_progress: $e', name: 'BudgetRepository');
+      throw Exception('Falló al obtener los presupuestos.');
     }
   }
 }

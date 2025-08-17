@@ -1,4 +1,4 @@
-// lib/screens/add_transaction_screen.dart (VERSIÓN FINAL COMPLETA USANDO SINGLETONS)
+// lib/screens/add_transaction_screen.dart (VERSIÓN CORREGIDA Y ADAPTADA)
 
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -7,10 +7,10 @@ import 'package:http/http.dart' as http;
 import 'package:iconsax/iconsax.dart';
 import 'package:sasper/data/account_repository.dart';
 import 'package:sasper/data/transaction_repository.dart';
-import 'package:sasper/data/budget_repository.dart'; // Importamos para la lógica de presupuestos
+import 'package:sasper/data/budget_repository.dart';
 import 'package:sasper/models/account_model.dart';
 import 'package:sasper/models/enums/transaction_mood_enum.dart';
-import 'package:sasper/models/budget_models.dart';
+import 'package:sasper/models/budget_models.dart'; // Importa el nuevo modelo `Budget`
 import 'package:sasper/data/category_repository.dart';
 import 'package:sasper/models/category_model.dart';
 import 'package:sasper/services/event_service.dart';
@@ -20,7 +20,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:developer' as developer;
 
 class AddTransactionScreen extends StatefulWidget {
-  // Los repositorios ya no se pasan en el constructor.
   const AddTransactionScreen({super.key});
 
   @override
@@ -28,7 +27,6 @@ class AddTransactionScreen extends StatefulWidget {
 }
 
 class _AddTransactionScreenState extends State<AddTransactionScreen> {
-  // Accedemos a las únicas instancias (Singletons) de los repositorios.
   final TransactionRepository _transactionRepository = TransactionRepository.instance;
   final AccountRepository _accountRepository = AccountRepository.instance;
   final BudgetRepository _budgetRepository = BudgetRepository.instance;
@@ -42,19 +40,20 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   Category? _selectedCategory;
   bool _isLoading = false;
   String? _selectedAccountId;
-  int? _selectedBudgetId;
+  int? _selectedBudgetId; // Mantenemos el ID del presupuesto a vincular
   TransactionMood? _selectedMood;
   
   late Future<List<Account>> _accountsFuture;
-  late Future<List<BudgetProgress>> _budgetsFuture;
+  // --- ¡CORRECCIÓN! El Future ahora espera una lista del nuevo modelo `Budget` ---
+  late Future<List<Budget>> _budgetsFuture;
   late Future<List<Category>> _categoriesFuture;
 
   @override
   void initState() {
     super.initState();
     _accountsFuture = _accountRepository.getAccounts();
-    // Cargamos los presupuestos del mes actual para poder vincularlos.
-    _budgetsFuture = _budgetRepository.getBudgetsForCurrentMonth();
+    // ¡CORRECCIÓN! Usamos el método `getBudgets` que devuelve los nuevos modelos.
+    _budgetsFuture = _budgetRepository.getBudgets();
     _categoriesFuture = _categoryRepository.getCategories();
   }
 
@@ -65,19 +64,26 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     super.dispose();
   }
 
-  void _onCategorySelected(Category category, List<BudgetProgress> budgets) {
+  // --- ¡CORRECCIÓN! La función ahora recibe una lista de `Budget` ---
+  void _onCategorySelected(Category category, List<Budget> budgets) {
     setState(() {
       _selectedCategory = category;
       try {
-        final foundBudget = budgets.firstWhere((b) => b.category == category.name);
-        _selectedBudgetId = foundBudget.budgetId;
+        // La lógica de búsqueda sigue siendo válida.
+        // Buscamos un presupuesto ACTIVO que coincida con la categoría seleccionada.
+        final foundBudget = budgets.firstWhere(
+          (b) => b.category == category.name && b.isActive
+        );
+        _selectedBudgetId = foundBudget.id;
       } catch (e) {
+        // Si no se encuentra un presupuesto activo para esa categoría, no se vincula ninguno.
         _selectedBudgetId = null;
       }
     });
   }
 
   Future<void> _saveTransaction() async {
+    // --- ¡CORRECCIÓN! Añadimos un ! para solucionar el error de tipo nullable ---
     if (!_formKey.currentState!.validate() || _selectedCategory == null || _selectedAccountId == null) {
       NotificationHelper.show(message: 'Por favor rellena todos los campos!', type: NotificationType.error);
       return;
@@ -93,6 +99,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     }
 
     try {
+      // La llamada al repositorio ya era correcta.
       await _transactionRepository.addTransaction(
         accountId: _selectedAccountId!,
         amount: amount,
@@ -106,6 +113,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       
       if (mounted) {
         final userId = Supabase.instance.client.auth.currentUser?.id;
+        // --- ¡CORRECCIÓN! Añadimos un ! aquí también ---
         if (_transactionType == 'Gasto' && userId != null && _selectedCategory != null) {
             _checkBudgetOnBackend(userId: userId, categoryName: _selectedCategory!.name);
         }
@@ -114,25 +122,21 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         Navigator.of(context).pop(true);
 
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          NotificationHelper.show(
-            message: 'Transacción guardada!',
-            type: NotificationType.success,
-          );
+          NotificationHelper.show(message: 'Transacción guardada!', type: NotificationType.success);
         });
       }
     } catch (e) {
       developer.log('🔥 FALLO AL GUARDAR TRANSACCIÓN: $e', name: 'AddTransactionScreen');
       if (mounted) {
-        NotificationHelper.show(
-            message: 'Error al guardar la transacción.',
-            type: NotificationType.error,
-          );
+        NotificationHelper.show(message: 'Error al guardar la transacción.', type: NotificationType.error);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
+  // ... (El resto de la clase, incluyendo `_checkBudgetOnBackend` y `build`, se mantiene igual)
+  // ... Pegar el resto del código desde el original
   Future<void> _checkBudgetOnBackend({
     required String userId, 
     required String categoryName
@@ -230,56 +234,26 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   if (categorySnapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: Padding(padding: EdgeInsets.all(8.0), child: CircularProgressIndicator()));
                   }
-                  // --- BLOQUE MODIFICADO PARA DEPURACIÓN ---
                   if (categorySnapshot.hasError) {
-                    // Logueamos el error completo en la consola de depuración para un análisis detallado.
                     developer.log(
                       'Error en FutureBuilder<List<Category>>',
                       name: 'AddTransactionScreen',
                       error: categorySnapshot.error,
-      stackTrace: categorySnapshot.stackTrace,
+                      stackTrace: categorySnapshot.stackTrace,
                     );
-                    
-                    // Mostramos un mensaje más informativo en la UI.
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Iconsax.warning_2, color: Theme.of(context).colorScheme.error, size: 40),
-                            const SizedBox(height: 16),
-                            const Text(
-                              'Error al cargar categorías',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 8),
-                            // Mostramos el error real en la pantalla para una depuración rápida.
-                            Text(
-                              '${categorySnapshot.error}',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
+                    return Center( child: Text('Error al cargar categorías: ${categorySnapshot.error}'));
                   }
-                  // --- FIN DEL BLOQUE MODIFICADO ---
                   if (!categorySnapshot.hasData || categorySnapshot.data!.isEmpty) {
                     return const Text('No tienes categorías. Créalas en Ajustes.');
                   }
-                  // Filtramos las categorías del usuario según el tipo de transacción
                   final allUserCategories = categorySnapshot.data!;
-                  // Filtramos las categorías del usuario según el tipo de transacción
                   final expectedTypeName = _transactionType == 'Gasto' ? 'expense' : 'income';
                   final currentCategories = allUserCategories
                       .where((c) => c.type.name == expectedTypeName)
                       .toList();
 
-                  // Usamos otro FutureBuilder anidado para los presupuestos
-                  return FutureBuilder<List<BudgetProgress>>(
+                  // --- ¡CORRECCIÓN! El FutureBuilder anidado ahora espera una lista de `Budget` ---
+                  return FutureBuilder<List<Budget>>(
                     future: _budgetsFuture,
                     builder: (context, budgetSnapshot) {
                       final budgets = budgetSnapshot.data ?? [];
@@ -290,7 +264,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                           return FilterChip(
                             label: Text(category.name, style: GoogleFonts.poppins()),
                             avatar: Icon(
-                              category.icon ?? Iconsax.category, // Usamos el icono del objeto
+                              category.icon ?? Iconsax.category,
                               color: _selectedCategory == category ? Theme.of(context).colorScheme.onSecondaryContainer : category.colorAsObject,
                             ),
                             selected: _selectedCategory == category,
@@ -315,8 +289,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               ),
               const SizedBox(height: 24),
               
-              // NOVEDAD: Añadimos la sección para seleccionar el estado de ánimo.
-              // Solo se muestra si es un gasto.
               if (_transactionType == 'Gasto') ...[
                 Text('¿Cómo te sentiste con este gasto? (Opcional)', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
@@ -336,7 +308,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                           if (selected) {
                             _selectedMood = mood;
                           } else {
-                            // Permite deseleccionar si se vuelve a tocar
                             _selectedMood = null;
                           }
                         });

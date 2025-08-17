@@ -52,7 +52,7 @@ class Category extends Equatable {
   
   @override
   List<Object?> get props => [id, name, icon, color, type];
-
+  
   factory Category.fromMap(Map<String, dynamic> map) {
     IconData? parsedIcon;
     // NOVEDAD: Ahora leemos dinámicamente el nombre, la familia y el paquete del icono.

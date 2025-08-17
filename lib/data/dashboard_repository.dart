@@ -3,37 +3,33 @@
 import 'dart:async';
 import 'dart:developer' as developer;
 import 'package:flutter/foundation.dart';
+import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sasper/models/dashboard_data_model.dart';
 
 class DashboardRepository {
   // --- PATRÓN DE INICIALIZACIÓN TEMPRANA (Eager Initialization) ---
-  // Este repositorio es crítico y se inicializa intencionadamente al arrancar la app.
-
   SupabaseClient? _supabase;
   bool _isInitialized = false;
 
-  // El getter protege el acceso al cliente.
   SupabaseClient get client {
     if (_supabase == null) {
-      throw Exception("¡ERROR! DashboardRepository no ha sido inicializado. Llama a .initialize() en SplashScreen.");
+      throw Exception("¡ERROR! DashboardRepository no ha sido inicializado.");
     }
     return _supabase!;
   }
 
   // --- GESTIÓN DE ESTADO Y CACHÉ ---
-  
   final _dashboardDataController = StreamController<DashboardData>.broadcast();
   RealtimeChannel? _subscriptionChannel;
-  DashboardData? _lastKnownData; // Caché en memoria para carga instantánea.
-  bool _isFetching = false; // Flag para prevenir peticiones redundantes.
-  Timer? _realtimeDebounceTimer; // Timer para agrupar eventos de Realtime.
+  DashboardData? _lastKnownData;
+  bool _isFetching = false;
+  Timer? _realtimeDebounceTimer;
 
   // --- SINGLETON ---
   DashboardRepository._privateConstructor();
   static final DashboardRepository instance = DashboardRepository._privateConstructor();
 
-  // Este método `initialize` se mantiene público y se llama desde el SplashScreen.
   void initialize(SupabaseClient supabaseClient) {
     if (_isInitialized) return;
     _supabase = supabaseClient;
@@ -42,10 +38,8 @@ class DashboardRepository {
     developer.log('✅ DashboardRepository inicializado TEMPRANAMENTE.', name: 'DashboardRepository');
   }
 
-  // --- MÉTODOS DEL REPOSITORIO ---
+  // --- MÉTODOS PÚBLICOS DEL REPOSITORIO ---
 
-  /// Devuelve un stream de los datos del dashboard.
-  /// Emite datos cacheados al instante y luego busca una actualización.
   Stream<DashboardData> getDashboardDataStream() {
     if (_lastKnownData != null) {
       _dashboardDataController.add(_lastKnownData!);
@@ -56,9 +50,7 @@ class DashboardRepository {
     return _dashboardDataController.stream;
   }
 
-  /// Configura las suscripciones de Realtime para las tablas relevantes.
   void _setupRealtimeSubscription() {
-    // Verificación de seguridad adicional.
     if (_subscriptionChannel != null) {
         client.removeChannel(_subscriptionChannel!);
     }
@@ -71,7 +63,6 @@ class DashboardRepository {
         .subscribe();
   }
 
-  /// Agrupa múltiples eventos de Realtime en una sola llamada de refresco.
   void _handleRealtimeUpdate() {
     _realtimeDebounceTimer?.cancel();
     _realtimeDebounceTimer = Timer(const Duration(milliseconds: 700), () {
@@ -102,8 +93,24 @@ class DashboardRepository {
       DashboardData partialData = DashboardData.fromPartialMap(balanceDataMap);
       if (!_dashboardDataController.isClosed) _dashboardDataController.add(partialData);
 
-      // Etapa 2: Detalles (más lento)
-      final detailsDataMap = await client.rpc('get_dashboard_details', params: {'p_user_id': userId});
+      // --- ¡CAMBIO CLAVE! Etapa 2 ahora llama a RPCs individuales ---
+      final detailsResults = await Future.wait([
+          client.rpc('get_recent_transactions', params: {'user_id_param': userId}).catchError((_) => []),
+          client.rpc('get_user_goals', params: {'user_id_param': userId}).catchError((_) => []),
+          // ¡USAMOS NUESTRA NUEVA FUNCIÓN PARA LOS PRESUPUESTOS!
+          client.rpc('get_active_budgets_with_progress', params: {'p_user_id': userId}).catchError((_) => []),
+          // Añade aquí la RPC para `expense_summary_for_widget` si la tienes
+          client.rpc('get_expense_summary_by_category', params: {'p_user_id': userId, 'client_date': DateFormat('yyyy-MM-dd').format(DateTime.now())}).catchError((_) => []),
+      ]);
+
+      // Reconstruimos el mapa que `copyWithDetails` espera.
+      final detailsDataMap = {
+        'recent_transactions': detailsResults[0],
+        'goals': detailsResults[1],
+        'budgets_progress': detailsResults[2], // Mantenemos la clave `budgets_progress`
+        'expense_summary_for_widget': detailsResults[3],
+      };
+      
       if (kDebugMode) {
         developer.log('✅ [Repo] Datos DETALLADOS recibidos de Supabase: $detailsDataMap', name: 'DashboardRepository');
       }
@@ -115,8 +122,8 @@ class DashboardRepository {
         _dashboardDataController.add(fullData);
         developer.log('✅ [Repo] Datos completos del dashboard enviados al stream.', name: 'DashboardRepository');
       }
-    } catch (e) {
-      developer.log('🔥 [Repo] Error durante la carga del dashboard: $e', name: 'DashboardRepository');
+    } catch (e, stackTrace) {
+      developer.log('🔥 [Repo] Error durante la carga del dashboard: $e', name: 'DashboardRepository', error: e, stackTrace: stackTrace);
       if (!_dashboardDataController.isClosed) _dashboardDataController.addError(e);
     } finally {
       _isFetching = false;
@@ -132,13 +139,23 @@ class DashboardRepository {
         return null;
       }
 
-       final results = await Future.wait([
+      // --- ¡CAMBIO CLAVE! También usamos las RPCs individuales aquí ---
+      final results = await Future.wait([
         client.rpc('get_dashboard_balance', params: {'p_user_id': userId}),
-        client.rpc('get_dashboard_details', params: {'p_user_id': userId}),
+        // Replicamos la misma lógica de `forceRefresh`
+        client.rpc('get_recent_transactions', params: {'user_id_param': userId}).catchError((_) => []),
+        client.rpc('get_user_goals', params: {'user_id_param': userId}).catchError((_) => []),
+        client.rpc('get_active_budgets_with_progress', params: {'p_user_id': userId}).catchError((_) => []),
+        client.rpc('get_expense_summary_by_category', params: {'p_user_id': userId, 'client_date': DateFormat('yyyy-MM-dd').format(DateTime.now())}).catchError((_) => []),
       ]);
 
       final balanceMap = results[0] as Map<String, dynamic>;
-      final detailsMap = results[1] as Map<String, dynamic>;
+      final detailsMap = {
+        'recent_transactions': results[1],
+        'goals': results[2],
+        'budgets_progress': results[3],
+        'expense_summary_for_widget': results[4],
+      };
       
       DashboardData partialData = DashboardData.fromPartialMap(balanceMap, loadingDetails: false);
       DashboardData fullData = partialData.copyWithDetails(detailsMap);

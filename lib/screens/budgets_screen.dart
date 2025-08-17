@@ -1,27 +1,26 @@
-// lib/screens/budgets_screen.dart (VERSIÓN FINAL COMPLETA USANDO SINGLETON)
+// lib/screens/budgets_screen.dart (VERSIÓN FINAL CON PRESUPUESTOS FLEXIBLES)
 
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:intl/intl.dart';
 import 'package:sasper/data/budget_repository.dart';
-import 'package:sasper/models/budget_models.dart';
+import 'package:sasper/models/budget_models.dart'; // ¡Importa el nuevo modelo `Budget`!
 import 'package:sasper/services/event_service.dart';
-import 'package:sasper/screens/edit_budget_screen.dart'; 
 import 'package:sasper/screens/add_budget_screen.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:sasper/widgets/shared/empty_state_card.dart';
-import 'package:sasper/widgets/shared/budget_card.dart';
+import 'package:sasper/widgets/shared/budget_card.dart'; // ¡Necesitaremos actualizar este widget!
 import 'package:sasper/main.dart';
-// --- NUEVAS IMPORTACIONES ---
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 import 'package:lottie/lottie.dart';
+// ¡Importamos la pantalla de detalles que ya refactorizamos!
+import 'package:sasper/screens/budget_details_screen.dart'; 
+
 
 class BudgetsScreen extends StatefulWidget {
-  // El repositorio ya no se pasa como parámetro en el constructor.
   const BudgetsScreen({super.key});
   
   @override
@@ -29,14 +28,13 @@ class BudgetsScreen extends StatefulWidget {
 }
 
 class _BudgetsScreenState extends State<BudgetsScreen> {
-  // Accedemos a la única instancia (Singleton) del repositorio.
   final BudgetRepository _repository = BudgetRepository.instance;
-  late final Stream<List<BudgetProgress>> _budgetsStream;
+  // --- ¡CORRECCIÓN! El Stream ahora es de `Budget` ---
+  late final Stream<List<Budget>> _budgetsStream;
 
   @override
   void initState() {
     super.initState();
-    // Obtenemos el stream del repositorio singleton.
     _budgetsStream = _repository.getBudgetsStream();
   }
   
@@ -44,46 +42,38 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
     final result = await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (context) => const AddBudgetScreen()),
     );
-    // Si se creó un presupuesto, le damos el "empujón" para refrescar.
     if (result == true && mounted) {
+      // La suscripción realtime ya debería refrescar, pero esto asegura la inmediatez.
       _repository.refreshData();
     }
   }
 
-  void _navigateToEditBudget(BudgetProgress budget) async {
-    final result = await Navigator.of(context).push<bool>(
+  // --- ¡NUEVO! Navegamos a la pantalla de detalles ---
+  void _navigateToBudgetDetails(Budget budget) {
+    Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => EditBudgetScreen(budget: budget),
+        builder: (context) => BudgetDetailsScreen(budgetId: budget.id),
       ),
     );
-    // Si se editó el presupuesto, refrescamos.
-    if (result == true && mounted) {
-      _repository.refreshData();
-    }
   }
 
-  Future<void> _handleDeleteBudget(BudgetProgress budget) async {
+  Future<void> _handleDeleteBudget(Budget budget) async {
     final confirmed = await showDialog<bool>(
-      // 1. Usamos el context del Navigator global.
       context: navigatorKey.currentContext!,
-      
-      // 2. Usamos 'dialogContext' para el builder.
       builder: (dialogContext) => BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
         child: AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
           title: const Text('Confirmar eliminación'),
+          // Usamos la propiedad `category` del nuevo modelo.
           content: Text('¿Seguro que quieres eliminar el presupuesto para "${budget.category}"?'),
           actions: [
-            // 3. Usamos 'dialogContext' para cerrar el diálogo.
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
               child: const Text('Cancelar')
             ),
             FilledButton.tonal(
-              // 4. Usamos 'dialogContext' para obtener el tema.
               style: FilledButton.styleFrom(backgroundColor: Theme.of(dialogContext).colorScheme.errorContainer),
-              // 5. Y para cerrar el diálogo.
               onPressed: () => Navigator.of(dialogContext).pop(true),
               child: const Text('Eliminar'),
             ),
@@ -94,34 +84,22 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
 
     if (confirmed == true && mounted) {
       try {
-        await _repository.deleteBudgetSafely(budget.budgetId);  // Corregido: 'id' en lugar de 'budgetId'
-        // El listener reactivo debería actuar, pero un "nudge" asegura inmediatez.
-        _repository.refreshData();
-
-        // Disparamos el evento global para el Dashboard.
+        // Usamos la propiedad `id` del nuevo modelo.
+        await _repository.deleteBudgetSafely(budget.id);
         EventService.instance.fire(AppEvent.budgetsChanged);
-
-        NotificationHelper.show(
-          message: 'Presupuesto eliminado.',
-          type: NotificationType.success,
-        );
+        NotificationHelper.show(message: 'Presupuesto eliminado.', type: NotificationType.success);
       } catch (e) {
-        NotificationHelper.show(
-          message: e.toString().replaceFirst("Exception: ", ""),
-          type: NotificationType.error,
-        );
+        NotificationHelper.show(message: e.toString().replaceFirst("Exception: ", ""), type: NotificationType.error);
       }
     }
   }
   
   @override
   Widget build(BuildContext context) {
-    // Usamos toBeginningOfSentenceCase para que el mes empiece con mayúscula.
-    final monthName = toBeginningOfSentenceCase(DateFormat.MMMM('es_CO').format(DateTime.now()));
-
     return Scaffold(
       appBar: AppBar(
-        title: Text('Presupuestos de $monthName', style: GoogleFonts.poppins()),
+        // El título ahora es genérico.
+        title: Text('Mis Presupuestos', style: GoogleFonts.poppins()),
         actions: [
           IconButton(
             icon: const Icon(Iconsax.add_square),
@@ -130,18 +108,19 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
           ),
         ],
       ),
-      body: StreamBuilder<List<BudgetProgress>>(
+      // --- ¡CORRECCIÓN! El StreamBuilder ahora espera una lista de `Budget` ---
+      body: StreamBuilder<List<Budget>>(
         stream: _budgetsStream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-            // --- REEMPLAZO DE INDICADOR CON SKELETONIZER ---
             return Skeletonizer(
               child: ListView.separated(
                 padding: const EdgeInsets.all(16.0),
-                itemCount: 5, // Muestra 5 tarjetas esqueleto
+                itemCount: 5,
                 separatorBuilder: (context, index) => const SizedBox(height: 12),
                 itemBuilder: (context, index) => BudgetCard(
-                  budget: BudgetProgress.empty(), // Usa el modelo vacío como molde
+                  // Usamos el modelo `Budget.empty()`
+                  budget: Budget.empty(),
                 ),
               ),
             );
@@ -153,29 +132,62 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
             return _buildLottieEmptyState();
           }
 
-          final budgets = snapshot.data!;
-         return ListView.separated(
+          final allBudgets = snapshot.data!;
+          // --- NUEVA LÓGICA DE AGRUPACIÓN ---
+          final activeBudgets = allBudgets.where((b) => b.isActive).toList();
+          final inactiveBudgets = allBudgets.where((b) => !b.isActive).toList();
+
+          // Usamos un `ListView` para poder tener secciones.
+          return ListView(
             padding: const EdgeInsets.all(16.0),
-            itemCount: budgets.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              final budget = budgets[index];
-              return BudgetCard(
-                budget: budget,
-                onTap: () => _navigateToEditBudget(budget),
-                onEdit: () => _navigateToEditBudget(budget),
-                onDelete: () => _handleDeleteBudget(budget),
-              )
-              .animate()
-              .fadeIn(duration: 500.ms, delay: (100 * index).ms)
-              .slideY(begin: 0.2, curve: Curves.easeOutCubic);
-            },
+            children: [
+              if (activeBudgets.isNotEmpty) ...[
+                _buildSectionHeader('Activos'),
+                ...activeBudgets.map((budget) => _buildBudgetListItem(budget)).toList(),
+              ],
+              if (inactiveBudgets.isNotEmpty) ...[
+                const SizedBox(height: 24),
+                _buildSectionHeader('Próximos y Pasados'),
+                ...inactiveBudgets.map((budget) => _buildBudgetListItem(budget, isActive: false)).toList(),
+              ],
+            ],
           );
         },
       ),
     );
   }
-  // --- NUEVO WIDGET AUXILIAR PARA EL ESTADO VACÍO CON LOTTIE ---
+
+  // --- NUEVO WIDGET para construir un elemento de la lista ---
+  Widget _buildBudgetListItem(Budget budget, {bool isActive = true}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: BudgetCard(
+        budget: budget,
+        // Al tocar, navegamos a los detalles.
+        onTap: () => _navigateToBudgetDetails(budget),
+        // Opcional: mantenemos los gestos de editar/borrar
+        // onEdit: () => _navigateToEditBudget(budget),
+        onDelete: () => _handleDeleteBudget(budget),
+      ).animate().fadeIn(duration: 400.ms).slideX(begin: isActive ? -0.1 : 0.1),
+    );
+  }
+
+  // --- NUEVO WIDGET para los encabezados de sección ---
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Text(
+        title,
+        style: GoogleFonts.poppins(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: Theme.of(context).colorScheme.primary,
+        ),
+      ),
+    );
+  }
+  
+  // Widget de estado vacío (lógica de texto actualizada)
   Widget _buildLottieEmptyState() {
     return Center(
       child: SingleChildScrollView(
@@ -185,19 +197,13 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Lottie.asset(
-                'assets/animations/piggy_bank_animation.json',
-                width: 250,
-                height: 250,
-              ),
+              Lottie.asset('assets/animations/piggy_bank_animation.json', width: 250, height: 250),
               const SizedBox(height: 16),
-              Text(
-                'Sin Presupuestos',
-                style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w600),
-              ),
+              Text('Sin Presupuestos', style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
+              // --- Texto actualizado ---
               Text(
-                'Aún no has creado ningún presupuesto para este mes. ¡Empieza a planificar tus gastos!',
+                'Aún no has creado ningún presupuesto. ¡Empieza a planificar tus gastos semanales, mensuales o personalizados!',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
@@ -206,10 +212,6 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
                 onPressed: _navigateToAddBudget,
                 icon: const Icon(Iconsax.add),
                 label: const Text('Crear mi primer presupuesto'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  textStyle: const TextStyle(fontSize: 16),
-                ),
               ),
             ],
           ),

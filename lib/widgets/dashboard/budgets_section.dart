@@ -1,22 +1,18 @@
-// lib/widgets/dashboard/budgets_section.dart (VERSIÓN FINAL REFACtoRIZADA CON SINGLETONS)
+// lib/widgets/dashboard/budgets_section.dart
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
-//import 'package:sasper/data/budget_repository.dart';
-import 'package:sasper/models/budget_models.dart';
+import 'package:sasper/models/budget_models.dart'; // ¡Importa el nuevo modelo `Budget`!
 import 'package:sasper/screens/budget_details_screen.dart';
 import 'package:sasper/screens/budgets_screen.dart';
 import 'package:sasper/widgets/shared/budget_card.dart';
 import 'package:sasper/widgets/shared/empty_state_card.dart';
 
 class BudgetsSection extends StatelessWidget {
-  final List<BudgetProgress> budgets;
-  
-  // Obtenemos la instancia Singleton directamente aquí.
-  //final BudgetRepository _budgetRepository = BudgetRepository.instance;
+  // --- ¡CORRECCIÓN! El widget ahora recibe una lista de `Budget` ---
+  final List<Budget> budgets;
 
-  // El constructor ahora es mucho más simple.
   const BudgetsSection({
     super.key,
     required this.budgets,
@@ -52,7 +48,6 @@ class BudgetsSection extends StatelessWidget {
             child: const Text('Ver Todos'),
             onPressed: () {
               Navigator.of(context).push(MaterialPageRoute(
-                  // La pantalla de destino ya no necesita el repositorio.
                   builder: (context) => const BudgetsScreen()));
             },
           ),
@@ -83,7 +78,7 @@ class BudgetsSection extends StatelessWidget {
 
   Widget _buildBudgetsList(BuildContext context) {
     return SizedBox(
-      height: 140.0, 
+      height: 160.0, // Puedes ajustar esta altura según el diseño de tu nueva `BudgetCard`
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
         scrollDirection: Axis.horizontal,
@@ -92,20 +87,20 @@ class BudgetsSection extends StatelessWidget {
           final budget = budgets[index];
           
           return Container(
-            width: 220,
+            width: 220, // Puedes ajustar el ancho
             margin: const EdgeInsets.only(right: 12.0),
             child: GestureDetector(
               onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    // BudgetDetailsScreen ahora tampoco necesita los repositorios.
-                    // (Asumiendo que también la refactorizaremos).
+                    // --- ¡CORRECCIÓN! Usamos `budget.id` del nuevo modelo ---
                     builder: (context) => BudgetDetailsScreen(
-                      budgetId: budget.budgetId,
+                      budgetId: budget.id,
                     ),
                   ),
                 );
               },
+              // El `BudgetCard` ya fue refactorizado y aceptará `budget` sin problemas.
               child: BudgetCard(budget: budget),
             ),
           );

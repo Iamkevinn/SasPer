@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
@@ -9,7 +10,7 @@ import 'package:intl/intl.dart';
 import 'package:sasper/data/budget_repository.dart';
 import 'package:sasper/data/transaction_repository.dart';
 import 'package:sasper/main.dart'; // Para navigatorKey
-import 'package:sasper/models/budget_models.dart';
+import 'package:sasper/models/budget_models.dart'; // ¡Importa el nuevo modelo `Budget`!
 import 'package:sasper/models/transaction_models.dart';
 import 'package:sasper/services/event_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
@@ -22,7 +23,6 @@ import 'package:sasper/widgets/shared/transaction_tile.dart';
 
 
 class BudgetDetailsScreen extends StatefulWidget {
-  // El constructor ahora solo necesita el ID del presupuesto.
   final int budgetId;
 
   const BudgetDetailsScreen({
@@ -35,29 +35,28 @@ class BudgetDetailsScreen extends StatefulWidget {
 }
 
 class _BudgetDetailsScreenState extends State<BudgetDetailsScreen> {
-  // Accedemos a las únicas instancias (Singletons) de los repositorios.
   final BudgetRepository _budgetRepository = BudgetRepository.instance;
   final TransactionRepository _transactionRepository = TransactionRepository.instance;
   
-  late Stream<BudgetProgress?> _budgetStream;
+  // --- ¡CORRECCIÓN! El Stream ahora emite el nuevo modelo `Budget` ---
+  late Stream<Budget?> _budgetStream;
   late Stream<List<Transaction>> _transactionsStream;
   StreamSubscription? _eventSubscription;
 
   @override
   void initState() {
     super.initState();
-    // Filtramos el stream principal para escuchar solo los cambios de ESTE presupuesto.
     _budgetStream = _budgetRepository.getBudgetsStream().map(
       (budgets) {
-        final matchingBudgets = budgets.where((b) => b.budgetId == widget.budgetId);
+        // La lógica de búsqueda sigue siendo la misma, pero ahora con `budget.id`
+        final matchingBudgets = budgets.where((b) => b.id == widget.budgetId);
         return matchingBudgets.isNotEmpty ? matchingBudgets.first : null;
       },
     );
 
-    // Creamos el stream para las transacciones.
+    // La lógica de transacciones no cambia.
     _transactionsStream = _transactionRepository.getTransactionsForBudget(widget.budgetId.toString()).asStream();
     
-    // Escuchamos eventos globales para saber cuándo refrescar las transacciones.
     _eventSubscription = EventService.instance.eventStream.listen((event) {
       final refreshEvents = {
         AppEvent.transactionCreated,
@@ -66,7 +65,6 @@ class _BudgetDetailsScreenState extends State<BudgetDetailsScreen> {
       };
       if (refreshEvents.contains(event)) {
         _refreshTransactions();
-        // También refrescamos los presupuestos por si el cambio afecta su progreso
         _budgetRepository.refreshData();
       }
     });
@@ -78,7 +76,6 @@ class _BudgetDetailsScreenState extends State<BudgetDetailsScreen> {
     super.dispose();
   }
 
-  /// Recarga los datos de las transacciones para este presupuesto.
   void _refreshTransactions() {
     if (mounted) {
       setState(() {
@@ -93,10 +90,10 @@ class _BudgetDetailsScreenState extends State<BudgetDetailsScreen> {
         builder: (context) => EditTransactionScreen(transaction: transaction),
       ),
     );
-    // La arquitectura reactiva se encarga de las actualizaciones.
   }
 
   Future<bool> _handleDeleteTransaction(Transaction transaction) async {
+    // ... (Tu lógica de borrado aquí, no necesita cambios)
     final bool? confirmed = await showDialog<bool>(
       context: navigatorKey.currentContext!,
       builder: (dialogContext) => BackdropFilter(
@@ -126,22 +123,14 @@ class _BudgetDetailsScreenState extends State<BudgetDetailsScreen> {
     if (confirmed == true) {
       try {
         await _transactionRepository.deleteTransaction(transaction.id);
-        
         EventService.instance.fire(AppEvent.transactionDeleted);
-        
         if (mounted) {
-          NotificationHelper.show(
-            message: 'Transacción eliminada correctamente.',
-            type: NotificationType.success,
-          );
+          NotificationHelper.show(message: 'Transacción eliminada correctamente.', type: NotificationType.success);
         }
         return true;
       } catch (e) {
         if (mounted) {
-          NotificationHelper.show(
-            message: 'Error al eliminar la transacción.',
-            type: NotificationType.error,
-          );
+          NotificationHelper.show(message: 'Error al eliminar la transacción.', type: NotificationType.error);
         }
         return false;
       }
@@ -151,7 +140,8 @@ class _BudgetDetailsScreenState extends State<BudgetDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<BudgetProgress?>(
+    // --- ¡CORRECCIÓN! El StreamBuilder ahora espera un `Budget` ---
+    return StreamBuilder<Budget?>(
       stream: _budgetStream,
       builder: (context, budgetSnapshot) {
         if (budgetSnapshot.connectionState == ConnectionState.waiting && !budgetSnapshot.hasData) {
@@ -168,7 +158,18 @@ class _BudgetDetailsScreenState extends State<BudgetDetailsScreen> {
 
         return Scaffold(
           appBar: AppBar(
+            // Mostramos el nombre de la categoría y el periodo
             title: Text(budget.category, style: GoogleFonts.poppins()),
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(20.0),
+              child: Text(
+                budget.periodText, // Usamos el nuevo getter
+                style: GoogleFonts.poppins(
+                  color: Theme.of(context).textTheme.bodySmall?.color,
+                  fontSize: 14,
+                ),
+              ),
+            ),
           ),
           body: Column(
             children: [
@@ -194,18 +195,33 @@ class _BudgetDetailsScreenState extends State<BudgetDetailsScreen> {
     );
   }
 
-  Widget _buildBudgetSummaryCard(BudgetProgress budget) {
-    final formatCurrency = NumberFormat.currency(locale: 'es_CO', symbol: '\$');
+  // --- ¡CORRECCIÓN! El método ahora recibe un `Budget` ---
+  Widget _buildBudgetSummaryCard(Budget budget) {
+    final formatCurrency = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Progreso del Presupuesto',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
+          // --- NUEVO: Mostramos los días restantes ---
+          if (budget.isActive && budget.daysLeft >= 0)
+            Align(
+              alignment: Alignment.centerRight,
+              child: Chip(
+                avatar: Icon(Iconsax.clock, size: 16, color: Theme.of(context).colorScheme.secondary),
+                label: Text(
+                  'Quedan ${budget.daysLeft} ${budget.daysLeft == 1 ? "día" : "días"}',
+                  style: GoogleFonts.poppins(
+                    textStyle: Theme.of(context).textTheme.labelLarge,
+                    color: Theme.of(context).colorScheme.secondary,
+                    fontWeight: FontWeight.bold,
+                  )
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                backgroundColor: Theme.of(context).colorScheme.secondaryContainer.withOpacity(0.5),
+              ),
+            ),
+          const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -217,12 +233,23 @@ class _BudgetDetailsScreenState extends State<BudgetDetailsScreen> {
             ],
           ),
           const SizedBox(height: 8),
+           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Restante:', style: Theme.of(context).textTheme.bodyLarge),
+              Text(
+                formatCurrency.format(budget.remainingAmount), // Usamos el getter
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+           const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Límite:', style: Theme.of(context).textTheme.bodyLarge),
               Text(
-                formatCurrency.format(budget.budgetAmount),
+                formatCurrency.format(budget.amount),
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
             ],
@@ -241,6 +268,7 @@ class _BudgetDetailsScreenState extends State<BudgetDetailsScreen> {
   }
 
   Widget _buildTransactionsList() {
+    // ... (Tu lógica aquí no necesita cambios)
     return StreamBuilder<List<Transaction>>(
       stream: _transactionsStream,
       builder: (context, snapshot) {
@@ -254,7 +282,7 @@ class _BudgetDetailsScreenState extends State<BudgetDetailsScreen> {
           return const Center(
             child: EmptyStateCard(
               title: 'Sin Movimientos',
-              message: 'Aún no hay transacciones asociadas a este presupuesto para el mes actual.',
+              message: 'Aún no hay transacciones asociadas a este presupuesto.',
               icon: Iconsax.receipt_search,
             ),
           );
