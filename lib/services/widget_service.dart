@@ -21,19 +21,49 @@ import 'package:sasper/models/dashboard_data_model.dart';
 import 'package:sasper/models/upcoming_payment_model.dart';
 import 'package:sasper/data/goal_repository.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+// NOVEDAD: Importamos SharedPreferences para leer las claves en segundo plano.
+import 'package:shared_preferences/shared_preferences.dart';
 
 // --- Constante de Logging ---
 const String _logName = 'WidgetService';
 
 /// Callback de nivel superior para la actualización periódica en segundo plano.
-/// NOTA: La lógica principal de actualización se activa desde la app cuando está abierta.
+/// Este es el punto de entrada para TODAS las actualizaciones de widgets que se
+/// ejecutan cuando la app está cerrada.
 @pragma('vm:entry-point')
 Future<void> backgroundCallback(Uri? uri) async {
-  developer.log('🚀 [BACKGROUND] Callback de HomeWidget iniciado.',
-      name: _logName);
-  // Aquí se podría implementar una lógica de actualización ligera si fuera necesario,
-  // por ejemplo, usando las credenciales guardadas para obtener datos mínimos.
-  // Llama a las funciones de actualización de TODOS tus widgets
+  developer.log('🚀 [BACKGROUND] Callback de HomeWidget iniciado.', name: _logName);
+  
+  // 1. Leer las claves guardadas desde SharedPreferences.
+  final prefs = await SharedPreferences.getInstance();
+  final supabaseUrl = prefs.getString('supabase_url');
+  final supabaseApiKey = prefs.getString('supabase_api_key');
+
+  if (supabaseUrl == null || supabaseApiKey == null) {
+    developer.log('🔥 [BACKGROUND] ERROR: No se encontraron las claves de Supabase en SharedPreferences. Abortando actualización.', name: _logName);
+    return; // No podemos continuar sin las claves.
+  }
+
+  try {
+    // 2. Inicializar una instancia de Supabase DENTRO de este Isolate de fondo.
+    // Usamos `Supabase.initialize` para configurar el singleton para este hilo.
+    // Esto es SEGURO y NECESARIO.
+    await Supabase.initialize(url: supabaseUrl, anonKey: supabaseApiKey);
+    developer.log('✅ [BACKGROUND] Supabase inicializado correctamente en segundo plano.', name: _logName);
+
+    // 3. Ahora que Supabase está listo, llamamos a nuestros métodos de actualización.
+    // Estos métodos ahora pueden usar `Supabase.instance.client` de forma segura.
+    await WidgetService.updateFinancialHealthWidget();
+    await WidgetService.updateMonthlyComparisonWidget();
+    await WidgetService.updateGoalsWidget();
+    await WidgetService.updateUpcomingPaymentsWidget();
+    await WidgetService.updateNextPaymentWidget();
+    
+    developer.log('✅ [BACKGROUND] Todas las tareas de actualización de widgets han sido llamadas.', name: _logName);
+
+  } catch (e) {
+    developer.log('🔥 [BACKGROUND] ERROR FATAL durante la actualización de widgets en segundo plano: $e', name: _logName);
+  }
 }
 
 /// Clase de servicio que encapsula toda la lógica para los widgets de la pantalla de inicio.

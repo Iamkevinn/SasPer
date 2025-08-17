@@ -1,8 +1,10 @@
 // lib/screens/analysis_screen.dart
 
 import 'dart:async';
+import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:sasper/widgets/analysis_charts/mood_by_day_chart.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -57,12 +59,21 @@ class AnalysisScreenState extends State<AnalysisScreen> {
   }
 
   /// Carga en paralelo los datos de los gráficos y los insights para una carga más rápida.
-  Future<({AnalysisData charts, List<Insight> insights})> _fetchAllScreenData() async {
+  /// Carga en paralelo los datos de los gráficos y los insights de forma resiliente.
+Future<({AnalysisData charts, List<Insight> insights})> _fetchAllScreenData() async {
+    // Usamos Future.wait con manejo de errores individual, similar a como lo
+    // hace tu AnalysisRepository. Esto asegura que si una parte falla, la otra no.
     final results = await Future.wait([
-      _repository.fetchAllAnalysisData(),
-      // Descomenta esta línea cuando implementes el método en el repositorio.
-      // _repository.getInsights(),
-      _repository.getInsights(),// Placeholder mientras no existe el método real.
+      _repository.fetchAllAnalysisData().catchError((e) {
+        // Si falla la carga de gráficos, logueamos el error y devolvemos datos vacíos.
+        developer.log('Fallo al cargar datos de gráficos', name: 'AnalysisScreen', error: e);
+        return AnalysisData.empty();
+      }),
+      _repository.getInsights().catchError((e) {
+        // Si falla la carga de insights, logueamos y devolvemos una lista vacía.
+        developer.log('Fallo al cargar insights', name: 'AnalysisScreen', error: e);
+        return <Insight>[];
+      }),
     ]);
     
     return (charts: results[0] as AnalysisData, insights: results[1] as List<Insight>);
@@ -218,6 +229,7 @@ class AnalysisScreenState extends State<AnalysisScreen> {
   int _getChartCount(AnalysisData data) {
     int count = 0;
     if (data.moodAnalysisData.isNotEmpty) count++;
+    if (data.moodByDayData.isNotEmpty) count++;
     if (data.heatmapData.isNotEmpty) count++;
     if (data.cashflowBarData.isNotEmpty) count++;
     if (data.netWorthLineData.isNotEmpty) count++;
@@ -232,6 +244,7 @@ class AnalysisScreenState extends State<AnalysisScreen> {
     final widgets = [
       // NOVEDAD: Añadimos nuestro nuevo widget a la lista, preferiblemente al principio.
       if (data.moodAnalysisData.isNotEmpty) MoodSpendingAnalysisCard(analysisData: data.moodAnalysisData),
+      if (data.moodByDayData.isNotEmpty) MoodByDayChart(analysisData: data.moodByDayData),
       if (data.heatmapData.isNotEmpty) HeatmapSection(data: data.heatmapData, startDate: DateTime.now().subtract(const Duration(days: 119)), endDate: DateTime.now()),
       if (data.cashflowBarData.isNotEmpty) MonthlyCashflowChart(data: data.cashflowBarData),
       if (data.netWorthLineData.isNotEmpty) NetWorthTrendChart(data: data.netWorthLineData),
@@ -240,11 +253,31 @@ class AnalysisScreenState extends State<AnalysisScreen> {
       if (data.expensePieData.isNotEmpty) ExpensePieChart(data: data.expensePieData),
       if (data.incomePieData.isNotEmpty) IncomePieChart(data: data.incomePieData),
     ];
+    // Devuelve un contenedor vacío temporalmente para que no haya errores
+    if (widgets.isEmpty) {
+      return const SizedBox(height: 1, child: Text("Gráfico desactivado temporalmente"));
+    }
     return widgets[index];
   }
 
   Widget _buildErrorState(Object? error) {
-    return Center(child: EmptyStateCard(title: 'Ocurrió un Error', message: 'No se pudieron cargar los datos.\nError: $error', icon: Iconsax.warning_2));
+    // NOVEDAD: Logueamos el error para verlo completo en la consola.
+    developer.log(
+      'Error capturado por FutureBuilder en AnalysisScreen', 
+      name: 'AnalysisScreen', 
+      error: error,
+      // Si tienes el stackTrace del snapshot, añádelo también:
+      // stackTrace: snapshot.stackTrace,
+    );
+
+    return Center(
+      child: EmptyStateCard(
+        title: 'Ocurrió un Error', 
+        // NOVEDAD: Mostramos el error real en la UI.
+        message: 'No se pudieron cargar los datos de análisis.\n\nError: $error', 
+        icon: Iconsax.warning_2
+      )
+    );
   }
 
   Widget _buildShimmer() {
@@ -342,6 +375,7 @@ class AnalysisScreenState extends State<AnalysisScreen> {
 extension on AnalysisData {
   bool get hasData =>
   // NOVEDAD: Añadimos el nuevo análisis a la comprobación general.
+      moodByDayData.isNotEmpty ||
       moodAnalysisData.isNotEmpty || 
       expensePieData.isNotEmpty ||
       cashflowBarData.isNotEmpty ||

@@ -1,144 +1,316 @@
 // lib/widgets/analysis_charts/heatmap_section.dart
 
+import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter_heatmap_calendar/flutter_heatmap_calendar.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 
-class HeatmapSection extends StatelessWidget {
-  // Guardamos los datos completos (con ceros) para el SnackBar.
-  final Map<DateTime, int> originalDatasets;
-  // Pasamos al widget un mapa SIN los ceros para el coloreado correcto.
-  final Map<DateTime, int> datasetsForCalendar;
+// --- Novedad: Widget para renderizar un solo mes ---
+class _MonthlyHeatmap extends StatelessWidget {
+  final int year;
+  final int month;
+  final Map<DateTime, int> datasets;
+  final double maxPositive;
+  final double maxNegative;
+  final Function(DateTime) onDateTap;
 
-  final bool isEdgeCase;
+  const _MonthlyHeatmap({
+    required this.year,
+    required this.month,
+    required this.datasets,
+    required this.maxPositive,
+    required this.maxNegative,
+    required this.onDateTap,
+  });
 
-  HeatmapSection({
-    super.key,
-    required Map<DateTime, int> data,
-    required DateTime startDate,
-    required DateTime endDate,
-  }) : originalDatasets = _createCompleteDataset(data, startDate, endDate),
-       // ¡LA SOLUCIÓN! Filtramos los ceros de los datos que verá el calendario.
-       datasetsForCalendar = _filterZeroValues(
-           _createCompleteDataset(data, startDate, endDate)
-       ),
-       isEdgeCase = _isEdgeCase(data);
-
-  // Detecta el caso borde que causa la división por cero.
-  static bool _isEdgeCase(Map<DateTime, int> data) {
-    final nonZeroValues = data.values.where((v) => v != 0);
-    if (nonZeroValues.isEmpty) {
-      return true;
+  Color _getColorForValue(int value, BuildContext context) {
+    final theme = Theme.of(context);
+    if (value == 0) {
+      return theme.brightness == Brightness.dark ? Colors.grey.shade800 : Colors.grey.shade200;
     }
-    return nonZeroValues.toSet().length <= 1;
+    if (value > 0) {
+      final intensity = (value / maxPositive).clamp(0.0, 1.0);
+      return Color.lerp(Colors.green.shade100, Colors.green.shade800, intensity)!;
+    } else {
+      final intensity = (value.abs() / maxNegative).clamp(0.0, 1.0);
+      return Color.lerp(Colors.red.shade100, Colors.red.shade800, intensity)!;
+    }
   }
 
-  // Crea un conjunto de datos con todos los días, rellenando con 0 los vacíos.
+  @override
+  Widget build(BuildContext context) {
+    final firstDayOfMonth = DateTime(year, month, 1);
+    final daysInMonth = DateTime(year, month + 1, 0).day;
+    // Lunes = 1, Domingo = 7. Restamos 1 para el índice de la cuadrícula.
+    final emptyCells = firstDayOfMonth.weekday - 1;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            DateFormat.yMMMM('es_CO').format(firstDayOfMonth),
+            style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          const SizedBox(height: 8),
+          _buildWeekHeaders(context),
+          const SizedBox(height: 4),
+          GridView.builder(
+            physics: const NeverScrollableScrollPhysics(),
+            shrinkWrap: true,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 7),
+            itemCount: daysInMonth + emptyCells,
+            itemBuilder: (context, index) {
+              if (index < emptyCells) {
+                return const SizedBox.shrink(); // Celdas vacías al inicio del mes
+              }
+              final day = index - emptyCells + 1;
+              final date = DateTime(year, month, day);
+              final value = datasets[date] ?? 0;
+              return _HeatmapCell(
+                date: date,
+                color: _getColorForValue(value, context),
+                onTap: () => onDateTap(date),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWeekHeaders(BuildContext context) {
+    final days = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+    return Row(
+      children: days.map((day) => Expanded(
+        child: Center(
+          child: Text(
+            day,
+            style: GoogleFonts.poppins(
+              fontSize: 10,
+              color: Colors.grey,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      )).toList(),
+    );
+  }
+}
+
+
+// --- Novedad: El widget principal ahora es Stateful para gestionar los meses ---
+class HeatmapSection extends StatefulWidget {
+  final Map<DateTime, int> data;
+  final DateTime startDate;
+  final DateTime endDate;
+
+  const HeatmapSection({
+    super.key,
+    required this.data,
+    required this.startDate,
+    required this.endDate,
+  });
+
+  @override
+  State<HeatmapSection> createState() => _HeatmapSectionState();
+}
+
+class _HeatmapSectionState extends State<HeatmapSection> {
+  late final Map<DateTime, int> _completeDatasets;
+  late final List<DateTime> _monthsToDisplay;
+  late final double _maxPositive;
+  late final double _maxNegative;
+
+  @override
+  void initState() {
+    super.initState();
+    _completeDatasets = _createCompleteDataset(widget.data, widget.startDate, widget.endDate);
+    _monthsToDisplay = _calculateMonthsInRange(widget.startDate, widget.endDate);
+    _calculateMaxValues();
+  }
+
+  void _calculateMaxValues() {
+    final nonZeroValues = _completeDatasets.values.where((v) => v != 0);
+    final positiveValues = nonZeroValues.where((v) => v > 0);
+    final negativeValues = nonZeroValues.where((v) => v < 0).map((v) => v.abs());
+    _maxPositive = positiveValues.isEmpty ? 1.0 : positiveValues.reduce(max).toDouble();
+    _maxNegative = negativeValues.isEmpty ? 1.0 : negativeValues.reduce(max).toDouble();
+  }
+  
   static Map<DateTime, int> _createCompleteDataset(Map<DateTime, int> originalData, DateTime start, DateTime end) {
-    final Map<DateTime, int> normalized = { for (var e in originalData.entries) DateTime(e.key.year, e.key.month, e.key.day): e.value };
+    final Map<DateTime, int> normalizedKeys = {
+      for (var e in originalData.entries) DateTime(e.key.year, e.key.month, e.key.day): e.value
+    };
     final Map<DateTime, int> complete = {};
     for (int i = 0; i <= end.difference(start).inDays; i++) {
       final date = DateTime(start.year, start.month, start.day).add(Duration(days: i));
-      complete[date] = normalized[date] ?? 0;
+      complete[date] = normalizedKeys[date] ?? 0;
     }
     return complete;
   }
   
-  // --- MÉTODO CLAVE AÑADIDO ---
-  // Este método elimina las entradas cuyo valor es 0.
-  static Map<DateTime, int> _filterZeroValues(Map<DateTime, int> data) {
-    final filteredData = <DateTime, int>{};
-    data.forEach((date, value) {
-      if (value != 0) {
-        filteredData[date] = value;
-      }
-    });
-    return filteredData;
+  List<DateTime> _calculateMonthsInRange(DateTime start, DateTime end) {
+    final List<DateTime> months = [];
+    DateTime current = DateTime(start.year, start.month, 1);
+    while (current.isBefore(end) || current.isAtSameMomentAs(end)) {
+      months.add(current);
+      current = DateTime(current.year, current.month + 1, 1);
+    }
+    return months;
   }
-  
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    
-    // Para la configuración de colores, sí usamos los datos filtrados.
-    final Map<DateTime, int> displayData = isEdgeCase 
-        ? datasetsForCalendar.map((key, value) => MapEntry(key, value > 0 ? 1 : -1))
-        : datasetsForCalendar;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildHeader(context),
         const SizedBox(height: 16),
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
           decoration: BoxDecoration(
-            color: colorScheme.surface.withAlpha(50),
+            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.grey.withOpacity(0.2), width: 1),
           ),
-          child: Center(
-            child: HeatMapCalendar(
-              // Pasamos los datos SIN ceros.
-              datasets: displayData,
-              
-              defaultColor: theme.brightness == Brightness.dark
-                  ? Colors.grey.shade800
-                  : Colors.grey.shade200,
-              
-              colorsets: isEdgeCase
-                  ? { // Configuración SEGURA
-                      1: Colors.green.shade400,
-                      -1: Colors.red.shade400,
-                    }
-                  : { // Configuración BONITA
-                      1: Colors.green[100]!, 2: Colors.green[300]!, 3: Colors.green[500]!, 4: Colors.green[700]!, 5: Colors.green[900]!,
-                      -1: Colors.red[100]!, -2: Colors.red[300]!, -3: Colors.red[500]!, -4: Colors.red[700]!, -5: Colors.red[900]!,
-                    },
-
-              colorMode: isEdgeCase ? ColorMode.color : ColorMode.opacity,
-              
-              monthFontSize: 16,
-              weekFontSize: 10,
-              fontSize: 10,
-              textColor: colorScheme.onSurface,
-              onClick: (date) {
-                // El onClick sigue usando los datos originales, que sí tienen los ceros.
-                _showActivitySnackBar(context, date);
+          // --- Novedad: Contenedor con altura fija para la lista scrollable ---
+          child: SizedBox(
+            height: 380, // Altura ajustable según tus necesidades
+            child: ListView.builder(
+              itemCount: _monthsToDisplay.length,
+              itemBuilder: (context, index) {
+                final month = _monthsToDisplay[index];
+                return _MonthlyHeatmap(
+                  year: month.year,
+                  month: month.month,
+                  datasets: _completeDatasets,
+                  maxPositive: _maxPositive,
+                  maxNegative: _maxNegative,
+                  onDateTap: (date) => _showActivitySnackBar(context, date),
+                );
               },
             ),
           ),
         ),
+        const SizedBox(height: 16),
+        _buildLegend(context),
+      ],
+    );
+  }
+
+  Widget _buildLegend(BuildContext context) {
+    // ... (sin cambios)
+     final textStyle = GoogleFonts.poppins(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text('Poco', style: textStyle),
+        const SizedBox(width: 8),
+        Container(width: 15, height: 15, color: Colors.red[100]),
+        Container(width: 15, height: 15, color: Colors.red[400]),
+        Container(width: 15, height: 15, color: Colors.red[800]),
+        const SizedBox(width: 4),
+        Container(
+          width: 15, height: 15, 
+          decoration: BoxDecoration(
+            color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade800 : Colors.grey.shade200
+          ),
+        ),
+        const SizedBox(width: 4),
+        Container(width: 15, height: 15, color: Colors.green[100]),
+        Container(width: 15, height: 15, color: Colors.green[400]),
+        Container(width: 15, height: 15, color: Colors.green[800]),
+        const SizedBox(width: 8),
+        Text('Mucho', style: textStyle),
       ],
     );
   }
 
   Widget _buildHeader(BuildContext context) {
+    // ... (sin cambios)
     return Row(
       children: [
-        const Icon(Iconsax.calendar_1, size: 20),
+        const Icon(Iconsax.calendar_1, size: 20, color: Colors.grey),
         const SizedBox(width: 8),
-        Text('Actividad Financiera Diaria', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+        Text(
+          'Actividad Financiera Diaria',
+          style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600),
+        ),
       ],
     );
   }
 
   void _showActivitySnackBar(BuildContext context, DateTime date) {
-    // Buscamos el valor en el mapa de datos ORIGINAL.
-    final value = originalDatasets[date] ?? 0;
+    // ... (sin cambios)
+     final value = _completeDatasets[date] ?? 0;
     
     final currencyFmt = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
     String message;
+    IconData icon;
+    Color color;
 
     if (value == 0) {
       message = 'Sin movimientos registrados';
+      icon = Iconsax.info_circle;
+      color = Colors.grey;
     } else if (value > 0) {
       message = 'Flujo neto positivo de ${currencyFmt.format(value)}';
+      icon = Iconsax.arrow_up_3;
+      color = Colors.green;
     } else {
       message = 'Flujo neto negativo de ${currencyFmt.format(value.abs())}';
+      icon = Iconsax.arrow_down_2;
+      color = Colors.red;
     }
     
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${DateFormat.yMMMd('es_CO').format(date)}: $message'), duration: const Duration(seconds: 3)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Row(
+        children: [
+          Icon(icon, color: color),
+          const SizedBox(width: 12),
+          Expanded(child: Text('${DateFormat.yMMMd('es_CO').format(date)}: $message')),
+        ],
+      ),
+      duration: const Duration(seconds: 3)
+    ));
+  }
+}
+
+// Celda individual del calendario (sin cambios)
+class _HeatmapCell extends StatelessWidget {
+  final DateTime date;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _HeatmapCell({required this.date, required this.color, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Tooltip(
+        message: DateFormat.yMMMd('es_CO').format(date),
+        child: Container(
+          margin: const EdgeInsets.all(2),
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Center(
+            child: Text(
+              date.day.toString(),
+              style: GoogleFonts.poppins(
+                color: color.computeLuminance() > 0.5 ? Colors.black54 : Colors.white70,
+                fontSize: 8,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

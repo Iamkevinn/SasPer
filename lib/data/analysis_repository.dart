@@ -6,6 +6,7 @@ import 'package:sasper/models/insight_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sasper/models/analysis_models.dart';
 import 'package:sasper/models/mood_analysis_model.dart'; 
+import 'package:sasper/models/mood_by_day_analysis_model.dart';
 
 class AnalysisRepository {
   // --- PATRÓN DE INICIALIZACIÓN PEREZOSA ---
@@ -162,6 +163,28 @@ Future<MonthlyComparison> getMonthlySpendingComparisonForWidget() async {
     }
   }
   
+  // NOVEDAD: Añadimos el nuevo método para el análisis temporal.
+  Future<List<MoodByDayAnalysis>> getMoodSpendingByDayOfWeek() async {
+    developer.log("📅 [Repo] Obteniendo análisis de mood por día...", name: 'AnalysisRepository');
+    try {
+      final userId = client.auth.currentUser?.id;
+      if (userId == null) return [];
+
+      final result = await client.rpc(
+        'get_mood_spending_by_day_of_week',
+        params: {'p_user_id': userId},
+      );
+      
+      if (result is List) {
+        return result.map((e) => MoodByDayAnalysis.fromMap(e)).toList();
+      }
+      return [];
+    } catch (e, stackTrace) {
+      developer.log('🔥 [Repo] Error en getMoodSpendingByDayOfWeek: $e', name: 'AnalysisRepository', stackTrace: stackTrace);
+      return [];
+    }
+  }
+
   /// Obtiene el conjunto completo de datos para la pantalla de análisis.
   Future<AnalysisData> fetchAllAnalysisData() async {
     developer.log("📈 [Repo] Obteniendo todos los datos de análisis...", name: 'AnalysisRepository');
@@ -188,6 +211,8 @@ Future<MonthlyComparison> getMonthlySpendingComparisonForWidget() async {
         client.rpc('get_daily_net_flow', params: {'p_user_id': userId, 'start_date': startDate, 'end_date': endDate}).catchError((_) => []),
         // NOVEDAD: Añadimos nuestra nueva función a la lista de llamadas en paralelo.
         getMoodSpendingAnalysis().catchError((_) => []),
+        // Ahora la lista tiene 9 elementos, con índices del 0 al 8.
+        getMoodSpendingByDayOfWeek().catchError((_) => []), // Índice 8
       ]);
       
       // Función auxiliar robusta para parsear los resultados de Future.wait.
@@ -198,6 +223,19 @@ Future<MonthlyComparison> getMonthlySpendingComparisonForWidget() async {
         return [];
       }
 
+      // --- CORRECCIÓN Y DEPURACIÓN ---
+      final heatmapRawData = {
+        if (results[6] is List)
+          for (var item in (results[6] as List))
+            if(DateTime.tryParse(item['day']) != null)
+              DateTime.parse(item['day']): (item['net_amount'] as num? ?? 0).toInt()
+      };
+
+      // MODIFICA ESTA LÍNEA para que sea más fácil de encontrar
+      developer.log('PASO 1 (REPOSITORIO) -> Datos enviados al widget: $heatmapRawData', name: 'HEATMAP_DEBUG');
+
+      developer.log('📊 [Repo] Heatmap Data being sent: $heatmapRawData', name: 'AnalysisRepository');
+
       return AnalysisData(
         expensePieData: _parseResult(results[0], ExpenseByCategory.fromMap),
         netWorthLineData: _parseResult(results[1], NetWorthDataPoint.fromJson),
@@ -205,16 +243,18 @@ Future<MonthlyComparison> getMonthlySpendingComparisonForWidget() async {
         categoryComparisonData: _parseResult(results[3], CategorySpendingComparisonData.fromJson),
         incomePieData: _parseResult(results[4], IncomeByCategory.fromJson),
         incomeExpenseBarData: _parseResult(results[5], MonthlyIncomeExpenseSummaryData.fromJson),
-        heatmapData: {
+         heatmapData: {
           if (results[6] is List)
             for (var item in (results[6] as List))
-              // Parseo seguro con `tryParse` para evitar errores con formatos de fecha inesperados.
               if(DateTime.tryParse(item['day']) != null)
-                DateTime.parse(item['day']): (item['net_amount'] as num).toInt()
+                // --- ¡CORRECCIÓN DEFINITIVA! Eliminamos la inversión de signo. ---
+                // El valor 'net_amount' de la RPC ya es correcto.
+                DateTime.parse(item['day']): (item['net_amount'] as num? ?? 0).toInt()
         },
         // NOVEDAD: Asignamos el resultado del análisis de mood.
         // `results[7]` corresponde a la nueva llamada que añadimos. El tipo ya es `List<MoodAnalysis>`.
         moodAnalysisData: results[7] as List<MoodAnalysis>,
+        moodByDayData: results[8] as List<MoodByDayAnalysis>, 
       );
       
     } catch (e, stackTrace) {

@@ -14,6 +14,9 @@ import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // NOVEDAD: Importar
+import 'package:supabase_flutter/supabase_flutter.dart'; // NOVEDAD: Importar
+import 'dart:developer' as developer; // NOVEDAD: Importar
 
 // --- Tus importaciones existentes ---
 import 'package:sasper/config/app_config.dart';
@@ -39,11 +42,41 @@ void onDidReceiveBackgroundNotificationResponse(NotificationResponse resp) {
 // para que pueda ser accedida desde SplashScreen.dart.
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  developer.log('🔔 [BACKGROUND] Notificación de Firebase recibida en segundo plano: ${message.messageId}', name: 'NotificationService-FCM');
+
+  // 1. Inicializamos Firebase. Es requerido en el Isolate de FCM.
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  developer.log(
-    '📥 Handling background FCM message: ${message.messageId}',
-    name: 'NotificationService-BackgroundFCM',
-  );
+  
+  // 2. Leemos las claves de Supabase desde SharedPreferences.
+  final prefs = await SharedPreferences.getInstance();
+  final supabaseUrl = prefs.getString('supabase_url');
+  final supabaseApiKey = prefs.getString('supabase_api_key');
+
+  if (supabaseUrl == null || supabaseApiKey == null) {
+    developer.log('🔥 [BACKGROUND-FCM] ERROR: No se encontraron las claves de Supabase. Abortando.', name: 'NotificationService-FCM');
+    return; // No podemos continuar sin las claves.
+  }
+
+  try {
+    // 3. Inicializamos una instancia de Supabase DENTRO de este Isolate.
+    await Supabase.initialize(url: supabaseUrl, anonKey: supabaseApiKey);
+    developer.log('✅ [BACKGROUND-FCM] Supabase inicializado para el manejador de notificaciones.', name: 'NotificationService-FCM');
+
+    // 4. Ahora que Supabase está listo, puedes ejecutar tu lógica de negocio.
+    // Por ejemplo, aquí podrías llamar a un método para guardar la notificación
+    // o para actualizar el token del usuario si es necesario.
+    final uid = Supabase.instance.client.auth.currentUser?.id;
+    if (uid != null) {
+       // Ejemplo: Actualizar el token si la notificación lo trae
+       final fcmToken = await FirebaseMessaging.instance.getToken();
+       if (fcmToken != null) {
+          await Supabase.instance.client.from('profiles').update({'fcm_token': fcmToken}).eq('id', uid);
+          developer.log('✅ [BACKGROUND-FCM] Token FCM actualizado para el usuario.', name: 'NotificationService-FCM');
+       }
+    }
+  } catch (e) {
+    developer.log('🔥 [BACKGROUND-FCM] ERROR FATAL en el manejador de notificaciones: $e', name: 'NotificationService-FCM');
+  }
 }
 
 class NotificationService {
@@ -67,7 +100,8 @@ class NotificationService {
     _supabase = supabaseClient;
     _firebaseMessaging = firebaseMessaging;
     _httpClient = httpClient ?? http.Client();
-    developer.log('✅ [NotificationService] Dependencies Injected.', name: 'NotificationService');
+    developer.
+    log('✅ [NotificationService] Dependencies Injected.', name: 'NotificationService');
   }
 
   Future<void> initializeQuick() async {

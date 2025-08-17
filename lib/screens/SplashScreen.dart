@@ -10,6 +10,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:developer' as developer; // NOVEDAD: Importamos developer para logs
 
 // --- Dependencias de Configuración y Servicios ---
 import 'package:sasper/config/app_config.dart';
@@ -58,6 +59,19 @@ class _SplashScreenState extends State<SplashScreen> {
   /// Orquesta la secuencia de inicialización optimizada de la aplicación.
   Future<void> _initializeAppAndNavigate() async {
     try {
+      // --- NOVEDAD: ETAPA 0 - PERSISTENCIA DE CLAVES PARA SERVICIOS DE FONDO ---
+      // Guardamos las claves críticas en SharedPreferences para que los Isolates (widgets, notificaciones)
+      // puedan acceder a ellas sin depender del .env, que no es accesible en segundo plano.
+      if (AppConfig.supabaseUrl.isNotEmpty && AppConfig.supabaseAnonKey.isNotEmpty) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('supabase_url', AppConfig.supabaseUrl);
+        await prefs.setString('supabase_api_key', AppConfig.supabaseAnonKey);
+        developer.log('✅ Claves de Supabase guardadas en SharedPreferences para uso en segundo plano.', name: 'SplashScreen');
+      } else {
+        // Lanzamos un error si las claves no están en AppConfig. Esto detendrá la app
+        // y te mostrará el problema claramente en lugar de fallar silenciosamente.
+        throw Exception("Las claves de Supabase no están definidas en AppConfig.");
+      }
       // --- ETAPA 1: INICIALIZACIONES CRÍTICAS EN PARALELO ---
       await Future.wait([
         Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform),

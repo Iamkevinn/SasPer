@@ -5,7 +5,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:sasper/screens/SplashScreen.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+//import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:sasper/services/theme_provider.dart';
 import 'package:line_awesome_flutter/line_awesome_flutter.dart'; // ¡Asegúrate de importar el paquete!
 import 'package:sasper/screens/auth_check_screen.dart';
@@ -60,17 +60,8 @@ Future<void> main() async {
   
   // 1. Asegura que los bindings de Flutter estén listos.
   WidgetsFlutterBinding.ensureInitialized();
-  print('Forzando la inclusión de ${_usedIconsForTreeShaking.length} iconos predeterminados.');
   // 2. Inicializa la localización de fechas (es muy rápido).
   await initializeDateFormatting('es_CO', null);
-  await dotenv.load(fileName: ".env");
-  final geminiApiKey = dotenv.env['GEMINI_API_KEY'];
-  final openWeatherApiKey = dotenv.env['OPENWEATHER_API_KEY'];
-  final supabaseApiKey = dotenv.env['SUPABASE_API_KEY'];
-  print("🔑 Claves cargadas:");
-  print("Gemini: ${geminiApiKey != null}");
-  print("OpenWeather: ${openWeatherApiKey != null}");
-  print("Supabase: ${supabaseApiKey != null}");
   // 3. ¡Ejecuta la app INMEDIATAMENTE!
   //    Toda la carga pesada ahora está dentro de SplashScreen.
   runApp(
