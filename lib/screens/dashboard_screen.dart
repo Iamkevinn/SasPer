@@ -4,6 +4,8 @@ import 'dart:async';
 import 'dart:developer' as developer;
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:sasper/data/dashboard_repository.dart';
 import 'package:sasper/data/transaction_repository.dart';
 import 'package:sasper/models/dashboard_data_model.dart';
@@ -18,6 +20,7 @@ import 'package:skeletonizer/skeletonizer.dart';
 // Pantallas
 import 'edit_transaction_screen.dart';
 import 'transactions_screen.dart';
+import 'package:sasper/screens/can_i_afford_it_screen.dart'; 
 
 // Widgets
 import 'package:sasper/widgets/dashboard/ai_analysis_section.dart';
@@ -121,6 +124,12 @@ class DashboardScreenState extends State<DashboardScreen> {
   }
 
   // --- NAVEGACIÓN Y ACCIONES DEL USUARIO ---
+   // ¡NUEVO MÉTODO!
+  void _navigateToCanIAffordIt() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => const CanIAffordItScreen()),
+    );
+  }
 
   void _navigateToTransactionsScreen() {
     Navigator.of(context).push(
@@ -211,22 +220,40 @@ class DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildDashboardContent(DashboardData data) {
+    Widget _buildDashboardContent(DashboardData data) {
     return RefreshIndicator(
       onRefresh: _handleRefresh,
       child: CustomScrollView(
-        // Deshabilita el scroll mientras la UI es un esqueleto.
         physics: data.isLoading ? const NeverScrollableScrollPhysics() : const AlwaysScrollableScrollPhysics(),
         slivers: [
           SliverAppBar(
             pinned: true,
             floating: true,
-            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor.withAlpha(240),
             elevation: 0,
             titleSpacing: 16.0,
             title: DashboardHeader(userName: data.fullName),
             toolbarHeight: 80,
+            // --- ¡AQUÍ ESTÁ LA MODIFICACIÓN! ---
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: 16.0),
+                child: FilledButton.tonalIcon(
+                  onPressed: _navigateToCanIAffordIt,
+                  icon: const Icon(Iconsax.calculator, size: 18),
+                  label: const Text('Simular'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    textStyle: GoogleFonts.poppins(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+            // --- FIN DE LA MODIFICACIÓN ---
           ),
+
           SliverToBoxAdapter(child: BalanceCard(totalBalance: data.totalBalance)),
           SliverToBoxAdapter(child: BudgetsSection(budgets: data.featuredBudgets)),
           

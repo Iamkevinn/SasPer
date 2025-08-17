@@ -14,7 +14,9 @@ dependencies:
     sdk: flutter
   flutter_localizations: # <-- AÑADE ESTA LÍNEA
     sdk: flutter 
-    
+  
+  # Porcentaje
+  percent_indicator: ^4.2.3 # O la última versión disponible
   # Iconos de estilo iOS
   cupertino_icons: ^1.0.8
   line_awesome_flutter: ^2.0.0 # Actualizado
