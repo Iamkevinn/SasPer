@@ -16,6 +16,8 @@
 	</array>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Necesitamos tu autorización para acceder a la aplicación de forma segura.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Esta aplicación necesita acceso a tus contactos para ayudarte a seleccionar rápidamente a quién le debes o quién te debe dinero, evitando errores al escribir nombres.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

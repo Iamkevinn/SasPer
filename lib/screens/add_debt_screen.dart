@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter_contacts/flutter_contacts.dart' as contacts;
 
 // Importa los repositorios, modelos y servicios necesarios.
 import 'package:sasper/data/account_repository.dart';
@@ -50,6 +52,48 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
     _entityController.dispose();
     _amountController.dispose();
     super.dispose();
+  }
+
+  // --- ¡NUEVA FUNCIÓN PARA SELECCIONAR CONTACTOS! ---
+  Future<void> _pickContact() async {
+    print("--- INICIANDO DIAGNÓSTICO DE PERMISO DE CONTACTOS ---");
+
+    // 1. Pide el permiso usando permission_handler
+    final PermissionStatus status = await Permission.contacts.request();
+
+    // 2. Imprime el estado detallado que se recibió
+    print("Estado del permiso de contactos: $status");
+
+    if (status.isGranted) {
+      print("✅ El permiso está concedido. Intentando abrir el selector de contactos...");
+      final contacts.Contact? contact = await contacts.FlutterContacts.openExternalPick();
+      if (contact != null) {
+        setState(() {
+          _entityController.text = contact.displayName;
+        });
+        print("👍 Contacto seleccionado: ${contact.displayName}");
+      } else {
+        print("ℹ️ El usuario cerró el selector de contactos sin elegir a nadie.");
+      }
+    } else if (status.isPermanentlyDenied) {
+      print("❌ El permiso está DENEGADO PERMANENTEMENTE.");
+      print("   Esto requiere que el usuario vaya a los ajustes de la app manualmente.");
+      NotificationHelper.show(
+        message: 'El permiso de contactos fue denegado permanentemente. Por favor, actívalo en los ajustes.',
+        type: NotificationType.error,
+      );
+      // Opcional: abrir directamente los ajustes de la app
+      await openAppSettings();
+    } else if (status.isDenied) {
+      print("⚠️ El permiso fue DENEGADO, pero no permanentemente.");
+      NotificationHelper.show(
+        message: 'Permiso denegado. No podemos acceder a tus contactos.',
+        type: NotificationType.warning,
+      );
+    } else {
+      print("❓ Estado desconocido o restringido: $status");
+    }
+    print("--- FIN DEL DIAGNÓSTICO ---");
   }
 
   Future<void> _submitForm() async {
@@ -131,7 +175,18 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _entityController,
-                decoration: const InputDecoration(labelText: 'Persona o Entidad (Opcional)', hintText: 'Ej. Banco XYZ, Juan Pérez', border: OutlineInputBorder(), prefixIcon: Icon(Iconsax.user)),
+                decoration: InputDecoration(
+                  labelText: 'Persona o Entidad (Opcional)',
+                  hintText: 'Ej. Banco XYZ, Juan Pérez',
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Iconsax.user),
+                  // Añadimos un botón al final del campo de texto
+                  suffixIcon: IconButton(
+                    icon: const Icon(Iconsax.user_search),
+                    tooltip: 'Seleccionar de Contactos',
+                    onPressed: _pickContact, // Llama a nuestra nueva función
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
               TextFormField(

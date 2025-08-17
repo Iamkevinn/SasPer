@@ -15,6 +15,10 @@ dependencies:
   flutter_localizations: # <-- AÑADE ESTA LÍNEA
     sdk: flutter 
   
+
+  # Contactos
+  flutter_contacts: ^1.1.9
+
   # Porcentaje
   percent_indicator: ^4.2.3 # O la última versión disponible
   # Iconos de estilo iOS

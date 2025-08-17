@@ -6,7 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 
 // Enum para definir el tipo de notificación y controlar el estilo
-enum NotificationType { success, error, info }
+enum NotificationType { success, error, info, warning }
 
 class CustomNotificationWidget extends StatefulWidget {
   final String message;
