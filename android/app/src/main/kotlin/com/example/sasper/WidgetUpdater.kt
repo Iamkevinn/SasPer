@@ -19,11 +19,12 @@ import com.google.gson.reflect.TypeToken
 import java.io.File
 import java.text.NumberFormat
 import java.util.Locale
+import com.google.gson.annotations.SerializedName
 
 // --- MODELOS DE DATOS DE KOTLIN (Añadidos aquí) ---
 // Estos deben coincidir con los campos del JSON que envías desde Dart.
 data class WidgetBudget(
-    val category: String,
+    @SerializedName("category_name") val category: String,
     // Asegúrate de que tu JSON de Dart incluya 'progress'
     val progress: Double 
 )
