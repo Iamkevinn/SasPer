@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:intl/intl.dart';
 
 // Importamos la arquitectura limpia
 import 'package:sasper/data/debt_repository.dart';
@@ -18,6 +19,7 @@ import 'package:sasper/screens/edit_debt_screen.dart'; // NUEVO: Importamos la p
 import 'package:sasper/widgets/shared/custom_dialog.dart';
 
 // --- NUEVAS IMPORTACIONES ---
+import 'package:sasper/models/contact_debt_summary_model.dart'; // El nuevo modelo
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 import 'package:lottie/lottie.dart';
@@ -57,6 +59,45 @@ class _DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderStat
       // Ella misma obtendrá los Singletons que necesite.
       builder: (_) => const AddDebtScreen(),
     ));
+  }
+
+  // --- NUEVO: Lógica para agrupar deudas por contacto ---
+  List<ContactDebtSummary> _groupDebtsByContact(List<Debt> allDebts) {
+    final Map<String, List<Debt>> groupedByEntity = {};
+
+    // 1. Agrupar todas las deudas por el nombre de la entidad
+    for (final debt in allDebts) {
+      final key = debt.entityName?.trim() ?? 'Sin Asignar';
+      if (key.isEmpty) {
+         groupedByEntity.putIfAbsent('Sin Asignar', () => []).add(debt);
+      } else {
+         groupedByEntity.putIfAbsent(key, () => []).add(debt);
+      }
+    }
+
+    // 2. Transformar el mapa en una lista de resúmenes
+    final List<ContactDebtSummary> summaries = [];
+    groupedByEntity.forEach((name, debts) {
+      final myDebts = debts.where((d) => d.type == DebtType.debt).toList();
+      final myLoans = debts.where((d) => d.type == DebtType.loan).toList();
+
+      final totalOwedToMe = myLoans.fold<double>(0, (sum, loan) => sum + loan.currentBalance);
+      final totalIOwe = myDebts.fold<double>(0, (sum, debt) => sum + debt.currentBalance);
+
+      final netBalance = totalOwedToMe - totalIOwe;
+
+      summaries.add(ContactDebtSummary(
+        contactName: name,
+        netBalance: netBalance,
+        debts: myDebts,
+        loans: myLoans,
+      ));
+    });
+    
+    // Ordenar: primero los balances más grandes (quienes más te deben o a quienes más les debes)
+    summaries.sort((a, b) => b.netBalance.abs().compareTo(a.netBalance.abs()));
+    
+    return summaries;
   }
 
   @override
@@ -104,6 +145,12 @@ class _DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderStat
             return _buildLottieEmptyState(); // <-- CORRECCIÓN #1
           }
           
+          // --- NUEVO: Procesamos la lista para agruparla ---
+          final groupedSummaries = _groupDebtsByContact(allDebts);
+          
+          final peopleIOwe = groupedSummaries.where((s) => s.netBalance < 0).toList();
+          final peopleWhoOweMe = groupedSummaries.where((s) => s.netBalance > 0).toList();
+
           // --- ESTADO CON DATOS ---
           // Si hay datos, separamos las listas y construimos la TabBarView.
           final myDebts = allDebts.where((d) => d.type == DebtType.debt).toList();
@@ -112,8 +159,8 @@ class _DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderStat
           return TabBarView(
             controller: _tabController,
             children: [
-              _buildDebtsList(myDebts, isMyDebt: true),
-              _buildDebtsList(loansToOthers, isMyDebt: false),
+              _buildGroupedList(peopleIOwe, isMyDebt: true),
+              _buildGroupedList(peopleWhoOweMe, isMyDebt: false),
             ],
           );
         },
@@ -122,6 +169,49 @@ class _DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderStat
   }
 
   // --- MÉTODOS PARA MANEJAR LAS ACCIONES ---
+
+  // --- NUEVO: Widget que construye la lista de resúmenes agrupados ---
+  Widget _buildGroupedList(List<ContactDebtSummary> summaries, {required bool isMyDebt}) {
+    if (summaries.isEmpty) {
+      return _buildLottieEmptyState(isForTab: true, isMyDebt: isMyDebt);
+    }
+    
+    final numberFormatter = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 150),
+      itemCount: summaries.length,
+      itemBuilder: (context, index) {
+        final summary = summaries[index];
+        final allRelatedDebts = [...summary.debts, ...summary.loans];
+        
+        return Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          elevation: 0.5,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          clipBehavior: Clip.antiAlias, // Importante para que el ExpansionTile no se salga de los bordes
+          child: ExpansionTile(
+            title: Text(summary.contactName, style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+            subtitle: Text(
+              'Balance total: ${numberFormatter.format(summary.netBalance.abs())}',
+              style: TextStyle(
+                color: isMyDebt ? Colors.red.shade700 : Colors.green.shade700,
+                fontWeight: FontWeight.w500
+              ),
+            ),
+            children: allRelatedDebts.map((debt) => DebtCard(
+              debt: debt,
+              onActionSelected: (action) => _handleDebtAction(action, debt),
+              isInsideList: true, // Propiedad opcional para quitar márgenes/elevación si es necesario
+            )).toList(),
+          ),
+        )
+        .animate()
+        .fadeIn(duration: 500.ms, delay: (100 * index).ms)
+        .slideY(begin: 0.3, curve: Curves.easeOutCubic);
+      },
+    );
+  }
 
   Widget _buildLottieEmptyState({bool isForTab = false, bool isMyDebt = true}) {
     // Personalizamos el texto según si es el estado vacío general o de una pestaña.

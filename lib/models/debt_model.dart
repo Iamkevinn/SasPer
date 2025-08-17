@@ -110,6 +110,7 @@ class Debt extends Equatable {
     double? interestRate,
     DebtStatus? status,
     DateTime? createdAt,
+    
   }) {
     return Debt(
       id: id ?? this.id,

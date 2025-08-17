@@ -10,10 +10,12 @@ enum DebtCardAction { registerPayment, edit, delete }
 class DebtCard extends StatelessWidget {
   final Debt debt;
   final Function(DebtCardAction) onActionSelected;
+  final bool isInsideList;
   const DebtCard({
     super.key,
     required this.debt,
     required this.onActionSelected,
+    this.isInsideList = false, 
   });
 
   @override
@@ -27,9 +29,13 @@ class DebtCard extends StatelessWidget {
     final progressColor = isDebt ? colorScheme.primary : colorScheme.secondary;
     final title = isDebt ? debt.name : 'Préstamo a ${debt.name}';
     
+    // 3. USA LA PROPIEDAD PARA CAMBIAR EL ESTILO
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      elevation: 0,
+      // Si está dentro de una lista, quita la elevación y el margen vertical.
+      elevation: isInsideList ? 0 : 1,
+      margin: isInsideList 
+        ? EdgeInsets.zero 
+        : const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       color: colorScheme.surface.withAlpha(100),
       clipBehavior: Clip.antiAlias, // Asegura que el InkWell respete los bordes

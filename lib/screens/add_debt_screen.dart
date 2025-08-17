@@ -6,7 +6,6 @@ import 'package:intl/intl.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_contacts/flutter_contacts.dart' as contacts;
 
-// Importa los repositorios, modelos y servicios necesarios.
 import 'package:sasper/data/account_repository.dart';
 import 'package:sasper/data/debt_repository.dart';
 import 'package:sasper/models/account_model.dart';
@@ -16,7 +15,6 @@ import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 
 class AddDebtScreen extends StatefulWidget {
-  // El constructor ahora es simple y constante. No recibe ningún parámetro.
   const AddDebtScreen({super.key});
 
   @override
@@ -26,10 +24,9 @@ class AddDebtScreen extends StatefulWidget {
 class _AddDebtScreenState extends State<AddDebtScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _entityController = TextEditingController();
   final _amountController = TextEditingController();
+  final _entityControllerForManualEntry = TextEditingController(); // Para entrada manual
 
-  // Accedemos a las únicas instancias (Singletons) de los repositorios.
   final DebtRepository _debtRepository = DebtRepository.instance;
   final AccountRepository _accountRepository = AccountRepository.instance;
 
@@ -39,110 +36,184 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
   bool _isLoading = false;
   late Future<List<Account>> _accountsFuture;
 
+  // --- NUEVOS ESTADOS PARA GESTIONAR EL CONTACTO ---
+  contacts.Contact? _selectedContact;
+  double? _contactTotalBalance;
+  bool _isFetchingDebt = false;
+  bool _useManualEntry = true; // Empieza en modo manual
+
   @override
   void initState() {
     super.initState();
-    // Usamos el Singleton para obtener las cuentas.
     _accountsFuture = _accountRepository.getAccounts();
+    _entityControllerForManualEntry.addListener(() {
+      if (_entityControllerForManualEntry.text.isNotEmpty) {
+        _clearSelectedContact();
+      }
+    });
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _entityController.dispose();
     _amountController.dispose();
+    _entityControllerForManualEntry.dispose();
     super.dispose();
   }
 
-  // --- ¡NUEVA FUNCIÓN PARA SELECCIONAR CONTACTOS! ---
   Future<void> _pickContact() async {
-    print("--- INICIANDO DIAGNÓSTICO DE PERMISO DE CONTACTOS ---");
-
-    // 1. Pide el permiso usando permission_handler
     final PermissionStatus status = await Permission.contacts.request();
 
-    // 2. Imprime el estado detallado que se recibió
-    print("Estado del permiso de contactos: $status");
-
     if (status.isGranted) {
-      print("✅ El permiso está concedido. Intentando abrir el selector de contactos...");
       final contacts.Contact? contact = await contacts.FlutterContacts.openExternalPick();
       if (contact != null) {
         setState(() {
-          _entityController.text = contact.displayName;
+          _selectedContact = contact;
+          _useManualEntry = false; // Cambiamos a modo contacto
+          _entityControllerForManualEntry.clear();
         });
-        print("👍 Contacto seleccionado: ${contact.displayName}");
-      } else {
-        print("ℹ️ El usuario cerró el selector de contactos sin elegir a nadie.");
+        _fetchDebtForSelectedContact();
       }
     } else if (status.isPermanentlyDenied) {
-      print("❌ El permiso está DENEGADO PERMANENTEMENTE.");
-      print("   Esto requiere que el usuario vaya a los ajustes de la app manualmente.");
       NotificationHelper.show(
-        message: 'El permiso de contactos fue denegado permanentemente. Por favor, actívalo en los ajustes.',
+        message: 'Permiso de contactos denegado permanentemente. Actívalo en los ajustes.',
         type: NotificationType.error,
       );
-      // Opcional: abrir directamente los ajustes de la app
       await openAppSettings();
-    } else if (status.isDenied) {
-      print("⚠️ El permiso fue DENEGADO, pero no permanentemente.");
+    } else {
       NotificationHelper.show(
-        message: 'Permiso denegado. No podemos acceder a tus contactos.',
+        message: 'Permiso denegado para acceder a contactos.',
         type: NotificationType.warning,
       );
-    } else {
-      print("❓ Estado desconocido o restringido: $status");
     }
-    print("--- FIN DEL DIAGNÓSTICO ---");
+  }
+  
+  void _clearSelectedContact() {
+    setState(() {
+      _selectedContact = null;
+      _contactTotalBalance = null;
+      _isFetchingDebt = false;
+      _useManualEntry = true; // Volvemos a modo manual
+    });
+  }
+  
+  Future<void> _fetchDebtForSelectedContact() async {
+    if (_selectedContact == null) return;
+
+    setState(() {
+      _isFetchingDebt = true;
+      _contactTotalBalance = null;
+    });
+
+    try {
+      final total = await _debtRepository.getTotalDebtForEntity(_selectedContact!.displayName);
+      if (mounted) {
+        setState(() => _contactTotalBalance = total);
+      }
+    } catch (e) {
+      if (mounted) {
+        NotificationHelper.show(message: 'Error al obtener la deuda del contacto.', type: NotificationType.error);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isFetchingDebt = false);
+      }
+    }
   }
 
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedAccount == null) {
-      NotificationHelper.show(
-        message: 'Por favor, selecciona una cuenta.',
-        type: NotificationType.error,
-      );
+      NotificationHelper.show(message: 'Por favor, selecciona una cuenta.', type: NotificationType.error);
       return;
     }
+
+    final entityName = _selectedContact?.displayName ?? _entityControllerForManualEntry.text.trim();
 
     setState(() => _isLoading = true);
 
     try {
-      // Usamos el Singleton para añadir la deuda.
       await _debtRepository.addDebtAndInitialTransaction(
         name: _nameController.text.trim(),
         type: _selectedDebtType,
-        entityName: _entityController.text.trim().isNotEmpty ? _entityController.text.trim() : null,
+        entityName: entityName.isNotEmpty ? entityName : null,
         amount: double.parse(_amountController.text),
         accountId: _selectedAccount!.id,
         dueDate: _dueDate,
-        transactionDate: DateTime.now()
+        transactionDate: DateTime.now(),
       );
 
       if (!mounted) return;
 
-      // Disparamos un evento para que otras partes de la app (como el Dashboard) sepan que algo cambió.
       EventService.instance.fire(AppEvent.transactionsChanged);
-
-      NotificationHelper.show(
-        message: 'Operación guardada!',
-        type: NotificationType.success,
-      );
+      NotificationHelper.show(message: 'Operación guardada!', type: NotificationType.success);
       Navigator.of(context).pop();
 
     } catch (e) {
       if (!mounted) return;
-      NotificationHelper.show(
-        message: 'Error al guardar: ${e.toString().replaceFirst("Exception: ", "")}',
-        type: NotificationType.error,
-      );
+      NotificationHelper.show(message: 'Error al guardar: ${e.toString().replaceFirst("Exception: ", "")}', type: NotificationType.error);
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
+
+  // --- WIDGET DINÁMICO PARA SELECCIONAR O MOSTRAR CONTACTO ---
+  Widget _buildEntityInput() {
+    final numberFormatter = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+
+    if (_useManualEntry) {
+      return TextFormField(
+        controller: _entityControllerForManualEntry,
+        decoration: InputDecoration(
+          labelText: 'Persona o Entidad (Opcional)',
+          hintText: 'Ej. Banco XYZ, Juan Pérez',
+          border: const OutlineInputBorder(),
+          prefixIcon: const Icon(Iconsax.user),
+          suffixIcon: IconButton(
+            icon: const Icon(Iconsax.user_search),
+            tooltip: 'Seleccionar de Contactos',
+            onPressed: _pickContact,
+          ),
+        ),
+      );
+    } else {
+      return Card(
+        margin: EdgeInsets.zero,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          side: BorderSide(color: Theme.of(context).colorScheme.outline),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: ListTile(
+          leading: CircleAvatar(
+            child: Text(_selectedContact!.displayName.isNotEmpty ? _selectedContact!.displayName[0] : '?'),
+          ),
+          title: Text(_selectedContact!.displayName, style: const TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: _isFetchingDebt
+            ? const LinearProgressIndicator()
+            : _contactTotalBalance != null
+              ? Text(
+                  _contactTotalBalance! == 0
+                    ? 'Están a paz y salvo'
+                    : _contactTotalBalance! > 0
+                      ? 'Te debe: ${numberFormatter.format(_contactTotalBalance)}'
+                      : 'Le debes: ${numberFormatter.format(_contactTotalBalance!.abs())}',
+                  style: TextStyle(
+                    color: _contactTotalBalance! == 0 ? Colors.grey : _contactTotalBalance! > 0 ? Colors.green.shade700 : Colors.red.shade700,
+                    fontWeight: FontWeight.w500
+                  ),
+                )
+              : const Text('No se pudo calcular la deuda.'),
+          trailing: IconButton(
+            icon: const Icon(Iconsax.close_circle, color: Colors.grey),
+            tooltip: 'Quitar contacto',
+            onPressed: _clearSelectedContact,
+          ),
+        ),
+      );
+    }
+  }
+  
 
   @override
   Widget build(BuildContext context) {
@@ -173,21 +244,10 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
                 validator: (value) => (value == null || value.isEmpty) ? 'El concepto es obligatorio' : null,
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _entityController,
-                decoration: InputDecoration(
-                  labelText: 'Persona o Entidad (Opcional)',
-                  hintText: 'Ej. Banco XYZ, Juan Pérez',
-                  border: const OutlineInputBorder(),
-                  prefixIcon: const Icon(Iconsax.user),
-                  // Añadimos un botón al final del campo de texto
-                  suffixIcon: IconButton(
-                    icon: const Icon(Iconsax.user_search),
-                    tooltip: 'Seleccionar de Contactos',
-                    onPressed: _pickContact, // Llama a nuestra nueva función
-                  ),
-                ),
-              ),
+              
+              // --- WIDGET DINÁMICO EN ACCIÓN ---
+              _buildEntityInput(),
+              
               const SizedBox(height: 16),
               TextFormField(
                 controller: _amountController,
