@@ -6,11 +6,13 @@ class Profile extends Equatable {
   final String id;
   final String? fullName; // Puede ser nulo si aún no lo ha configurado
   final int xpPoints;
+  final String? avatarUrl;
 
   const Profile({
     required this.id,
     this.fullName,
     required this.xpPoints,
+    this.avatarUrl, 
   });
 
   // Un getter computado para calcular el nivel actual del usuario
@@ -29,8 +31,9 @@ class Profile extends Equatable {
   factory Profile.fromMap(Map<String, dynamic> map) {
     return Profile(
       id: map['id'],
-      fullName: map['username'],
+      fullName: map['full_name'],
       xpPoints: map['xp_points'] ?? 0,
+      avatarUrl: map['avatar_url'],
     );
   }
   
@@ -40,5 +43,5 @@ class Profile extends Equatable {
   }
 
   @override
-  List<Object?> get props => [id, fullName, xpPoints];
+  List<Object?> get props => [id, fullName, xpPoints, avatarUrl];
 }

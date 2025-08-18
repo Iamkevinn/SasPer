@@ -20,6 +20,8 @@
 	<string>Esta aplicación necesita acceso a tus contactos para ayudarte a seleccionar rápidamente a quién le debes o quién te debe dinero, evitando errores al escribir nombres.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Necesitamos acceso a tu galería para que puedas seleccionar una foto de perfil.</string>
 	<key>CFBundleDisplayName</key>
 	<string>Finanzas App</string>
 	<key>CFBundleExecutable</key>
