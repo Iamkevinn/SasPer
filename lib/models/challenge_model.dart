@@ -1,7 +1,7 @@
 // lib/models/challenge_model.dart
 import 'package:equatable/equatable.dart';
 
-// Modelo para la definición de un reto
+// ------------------- MODELO CHALLENGE (LA DEFINICIÓN DEL RETO) -------------------
 class Challenge extends Equatable {
   final String id;
   final String title;
@@ -11,6 +11,7 @@ class Challenge extends Equatable {
   final String type;
   final int rewardXp;
   final String? lottieAnimationUrl;
+  final bool resetsDaily; // <--- Es importante tener este campo que viene de la DB
 
   const Challenge({
     required this.id,
@@ -21,6 +22,7 @@ class Challenge extends Equatable {
     required this.type,
     required this.rewardXp,
     this.lottieAnimationUrl,
+    required this.resetsDaily, // <--- Añadido al constructor
   });
 
   factory Challenge.fromMap(Map<String, dynamic> map) {
@@ -33,22 +35,25 @@ class Challenge extends Equatable {
       type: map['type'],
       rewardXp: map['reward_xp'],
       lottieAnimationUrl: map['lottie_animation_url'],
+      resetsDaily: map['resets_daily'] ?? false, // <--- Añadido el mapeo
     );
   }
   
+  // Lista de props correcta para Equatable
   @override
-  List<Object?> get props => [id, title, description];
+  List<Object?> get props => [id, title, description, resetsDaily];
 }
 
 
-// Modelo para el progreso de un reto de un usuario
+
+// ------------------- MODELO USER_CHALLENGE (EL PROGRESO DEL USUARIO) -------------------
 class UserChallenge extends Equatable {
   final String id;
   final String challengeId;
   final DateTime startDate;
   final DateTime endDate;
   final String status;
-  // Puedes añadir una propiedad `Challenge challengeDetails` y llenarla con un JOIN
+  final int currentStreak; // <-- Lugar correcto para la racha
   final Challenge challengeDetails; 
 
   const UserChallenge({
@@ -57,6 +62,7 @@ class UserChallenge extends Equatable {
     required this.startDate,
     required this.endDate,
     required this.status,
+    required this.currentStreak, // <-- Añadido al constructor
     required this.challengeDetails,
   });
 
@@ -67,11 +73,12 @@ class UserChallenge extends Equatable {
       startDate: DateTime.parse(map['start_date']),
       endDate: DateTime.parse(map['end_date']),
       status: map['status'],
-      // Asume que el JOIN se hizo en la consulta
+      currentStreak: map['current_streak'] ?? 0, // <-- Añadido el mapeo
       challengeDetails: Challenge.fromMap(map['challenges']), 
     );
   }
   
+  // Lista de props correcta para Equatable
   @override
-  List<Object?> get props => [id, status];
+  List<Object?> get props => [id, status, currentStreak];
 }

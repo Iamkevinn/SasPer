@@ -57,6 +57,19 @@ class ChallengeRepository {
     }
   }
 
+  /// Cancela (elimina) un reto activo que el usuario ya no desea continuar.
+  Future<void> cancelUserChallenge(String userChallengeId) async {
+    try {
+      await _supabase
+          .from('user_challenges')
+          .delete()
+          .eq('id', userChallengeId);
+    } catch (e) {
+      print('Error al cancelar el reto de usuario: $e');
+      throw Exception('No se pudo cancelar el reto.');
+    }
+  }
+  
   // Obtiene los retos activos y completados del usuario
   Stream<List<UserChallenge>> getUserChallengesStream() {
     // Usamos un JOIN implícito mediante una segunda consulta para obtener los detalles del reto maestro

@@ -55,6 +55,9 @@ class DashboardScreenState extends State<DashboardScreen> {
   // --- CAMBIO 1: Añadimos una bandera para controlar la celebración ---
   bool _hasCheckedForCelebrations = false;
 
+  // Bandera para asegurar que la celebración solo se muestre una vez por sesión.
+  bool _hasShownCelebration = false;
+
   // --- ARQUITECTURA DE DATOS ---
   // La lógica de esta pantalla se divide en dos partes:
   // 1. EL STREAM DE LA UI: `_dashboardDataStream` alimenta el `StreamBuilder` para construir la pantalla
@@ -79,7 +82,7 @@ class DashboardScreenState extends State<DashboardScreen> {
     // 4. Lanza la actualización de TODOS los widgets en segundo plano. NO se usa 'await'.
     _updateAllBackgroundWidgets();
 
-    _checkChallenges();
+    //_checkChallenges();
 
     // --- CAMBIO 2: Eliminamos la llamada a la celebración desde aquí ---
     // La lógica de `_checkChallenges` para actualizar el estado está bien aquí,
@@ -93,6 +96,27 @@ class DashboardScreenState extends State<DashboardScreen> {
     super.dispose();
   }
 
+  /// Comprueba si hay retos recién completados y muestra un diálogo de celebración.
+  Future<void> _checkAndShowCelebrations() async {
+    try {
+      final newlyCompleted = await ChallengeRepository.instance.checkUserChallengesStatus();
+      
+      for (var challenge in newlyCompleted) {
+        // 'mounted' comprueba si el widget todavía está en el árbol de widgets.
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => _buildCelebrationDialog(challenge),
+          );
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print("Error al chequear retos para celebración: $e");
+      }
+    }
+  }
+  
   Future<void> _checkChallengesAndShowCelebration() async {
     try {
       final newlyCompleted = await ChallengeRepository.instance.checkUserChallengesStatus();
@@ -282,15 +306,18 @@ class DashboardScreenState extends State<DashboardScreen> {
             // Usa datos vacíos para el esqueleto o los datos reales si ya llegaron.
             final data = isLoading ? DashboardData.empty() : snapshot.data!;
 
-            // --- CAMBIO 3: Disparamos la celebración en el momento correcto ---
-            if (!isLoading && !_hasCheckedForCelebrations) {
-              // Marcamos la bandera para que solo se ejecute una vez por sesión
-              _hasCheckedForCelebrations = true; 
-              // Usamos un post-frame callback para no interferir con el build actual
+                        // --- ¡LÓGICA DE CELEBRACIÓN REACTIVADA Y SEGURA! ---
+            // Si la carga principal del dashboard ha terminado Y aún no hemos mostrado la celebración...
+            if (!isLoading && !_hasShownCelebration) {
+              // 1. Marcamos la bandera para que esto no se vuelva a ejecutar en esta sesión.
+              _hasShownCelebration = true; 
+              // 2. Usamos un post-frame callback para ejecutar nuestra función DESPUÉS de que la UI se haya pintado.
+              //    Esto evita cualquier conflicto de renderizado.
               WidgetsBinding.instance.addPostFrameCallback((_) {
-                _checkChallengesAndShowCelebration();
+                _checkAndShowCelebrations();
               });
             }
+
             
             // Skeletonizer muestra una UI "fantasma" mientras isLoading es true.
             return Skeletonizer(
