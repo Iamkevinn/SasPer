@@ -77,6 +77,10 @@ dependencies:
   # Seguridad 
   local_auth: 2.3.0 
 
+  # Imagenes generadas
+  screenshot: ^3.0.0  # Para capturar widgets como imágenes
+  share_plus: ^10.1.4   # Para abrir el diálogo de compartir nativo
+  
 # Dependencias que solo se usan durante el desarrollo.
 dev_dependencies:
   flutter_test:

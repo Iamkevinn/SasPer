@@ -1,33 +1,142 @@
 // lib/screens/profile_screen.dart
 
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:sasper/data/challenge_repository.dart';
 import 'package:sasper/data/profile_repository.dart';
 import 'package:sasper/models/challenge_model.dart';
 import 'package:sasper/models/profile_model.dart';
 import 'package:sasper/data/achievement_repository.dart';
 import 'package:sasper/models/achievement_model.dart';
+import 'package:sasper/widgets/shared/shareable_profile_card.dart';
+import 'package:screenshot/screenshot.dart'; // <-- Importa el paquete
+import 'package:share_plus/share_plus.dart'; 
 
-class ProfileScreen extends StatelessWidget {
+// Convertimos a StatefulWidget para manejar el estado de "compartiendo"
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  // Controlador para el widget que vamos a capturar
+  final _screenshotController = ScreenshotController();
+  bool _isSharing = false;
+
+  /// Función principal que captura el widget y lo comparte
+  Future<void> _shareProfile(
+    Profile profile,
+    List<Achievement> allAchievements,
+    Set<String> unlockedIds,
+  ) async {
+    // 1. Mostramos un indicador de carga
+    setState(() => _isSharing = true);
+
+    try {
+      // 2. Capturamos el widget usando el controlador. El 'pixelRatio' mejora la calidad.
+      final Uint8List? imageBytes = await _screenshotController.captureFromLongWidget(
+        InheritedTheme.captureAll(
+          context, 
+          ShareableProfileCard(
+            profile: profile,
+            allAchievements: allAchievements,
+            unlockedAchievementIds: unlockedIds,
+          ),
+        ),
+        delay: const Duration(milliseconds: 100),
+        context: context,
+        pixelRatio: 2.0, // Aumenta la resolución de la imagen
+      );
+      
+      if (imageBytes == null) return;
+
+      // 3. Guardamos la imagen en un archivo temporal
+      final directory = await getApplicationDocumentsDirectory();
+      final imagePath = await File('${directory.path}/sasper_progress.png').create();
+      await imagePath.writeAsBytes(imageBytes);
+
+      // 4. Usamos share_plus para abrir el diálogo nativo de compartir
+      await Share.shareXFiles(
+        [XFile(imagePath.path)],
+        text: '¡Mira mi progreso en SasPer! #FinanzasPersonales #SasPerApp',
+      );
+    } catch (e) {
+      print("Error al compartir: $e");
+    } finally {
+      // 5. Ocultamos el indicador de carga, incluso si hay un error
+      setState(() => _isSharing = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text('Mi Progreso', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+        actions: [
+          // Añadimos un StreamBuilder para que el botón de compartir tenga acceso a los datos
+          StreamBuilder<Profile>(
+            stream: ProfileRepository.instance.getUserProfileStream(),
+            builder: (context, profileSnapshot) {
+              if (!profileSnapshot.hasData) return const SizedBox.shrink();
+              return FutureBuilder<List<Achievement>>(
+                future: AchievementRepository.instance.getAllAchievements(),
+                builder: (context, achievementsSnapshot) {
+                  if (!achievementsSnapshot.hasData) return const SizedBox.shrink();
+                  return StreamBuilder<Set<String>>(
+                    stream: AchievementRepository.instance.getUnlockedAchievementIdsStream(),
+                    builder: (context, unlockedSnapshot) {
+                      if (!unlockedSnapshot.hasData) return const SizedBox.shrink();
+                      
+                      // Botón de compartir
+                      return _isSharing
+                          ? const Padding(
+                              padding: EdgeInsets.all(16.0),
+                              child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator()),
+                            )
+                          : IconButton(
+                              icon: const Icon(Iconsax.share),
+                              tooltip: 'Compartir Progreso',
+                              onPressed: () => _shareProfile(
+                                profileSnapshot.data!,
+                                achievementsSnapshot.data!,
+                                unlockedSnapshot.data!,
+                              ),
+                            );
+                    },
+                  );
+                },
+              );
+            },
+          ),
+        ],
       ),
-      body: StreamBuilder<Profile>(
-        stream: ProfileRepository.instance.getUserProfileStream(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final profile = snapshot.data!;
-          return _buildProfileContent(context, profile);
-        },
+      body: Stack(
+        children: [
+          // El 'Screenshot' widget es invisible, solo sirve para capturar su hijo.
+          // NO usamos Offstage para que los temas se capturen correctamente.
+          Screenshot(
+             controller: _screenshotController,
+             child: const SizedBox.shrink() // No es necesario, el widget se pasa directamente en captureFromLongWidget
+          ),
+          
+          // La UI visible para el usuario se mantiene igual
+          StreamBuilder<Profile>(
+            stream: ProfileRepository.instance.getUserProfileStream(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+              final profile = snapshot.data!;
+              return _buildProfileContent(context, profile);
+            },
+          ),
+        ],
       ),
     );
   }
