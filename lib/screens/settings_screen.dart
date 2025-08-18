@@ -9,6 +9,7 @@ import 'package:sasper/services/theme_provider.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:sasper/screens/profile_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -36,7 +37,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          title: Text('Confirmar Cierre de Sesión', style: GoogleFonts.poppins(textStyle: Theme.of(dialogContext).textTheme.titleLarge)),
+          title: Text('Confirmar Cierre de Sesión',
+              style: GoogleFonts.poppins(
+                  textStyle: Theme.of(dialogContext).textTheme.titleLarge)),
           content: const Text('¿Estás seguro de que quieres cerrar tu sesión?'),
           actions: <Widget>[
             TextButton(
@@ -44,7 +47,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: const Text('Cancelar'),
             ),
             TextButton(
-              style: TextButton.styleFrom(foregroundColor: Theme.of(dialogContext).colorScheme.error),
+              style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(dialogContext).colorScheme.error),
               onPressed: () => Navigator.of(dialogContext).pop(true),
               child: const Text('Cerrar Sesión'),
             ),
@@ -74,7 +78,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     // Obtenemos la instancia del ThemeProvider sin escuchar cambios (listen: false)
     // porque solo necesitamos llamar a un método.
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-    
+
     showDialog(
       context: context,
       builder: (context) {
@@ -137,7 +141,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Ajustes', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+        title: Text('Ajustes',
+            style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
       ),
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -152,28 +157,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 backgroundColor: colorScheme.primaryContainer,
                 child: Text(
                   _user?.email?.substring(0, 1).toUpperCase() ?? '?',
-                  style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.onPrimaryContainer),
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onPrimaryContainer),
                 ),
               ),
               title: const Text('Sesión Iniciada como'),
               subtitle: Text(
                 _user?.email ?? 'No autenticado',
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 16),
+                style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w600, fontSize: 16),
               ),
             ),
           ),
           // AÑADE ESTE BOTÓN DE PRUEBA
-    ListTile(
-      leading: const Icon(Icons.science_outlined),
-      title: const Text('Probar Notificación Inmediata'),
-      subtitle: const Text('Recibirás una notificación en 5 segundos'),
-      onTap: () {
-        NotificationService.instance.testImmediateNotification();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Notificación de prueba programada para 5 segundos...')),
-        );
-      },
-    ),
+          ListTile(
+            leading: const Icon(Icons.science_outlined),
+            title: const Text('Probar Notificación Inmediata'),
+            subtitle: const Text('Recibirás una notificación en 5 segundos'),
+            onTap: () {
+              NotificationService.instance.testImmediateNotification();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                    content: Text(
+                        'Notificación de prueba programada para 5 segundos...')),
+              );
+            },
+          ),
           // --- SECCIÓN DE PERSONALIZACIÓN ---
           const SizedBox(height: 16),
           _buildSectionHeader('Personalización'),
@@ -182,6 +192,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
             color: colorScheme.surfaceContainer,
             child: Column(
               children: [
+                // --- ↓↓↓ AÑADE ESTA OPCIÓN, PREFERIBLEMENTE AL INICIO ↓↓↓ ---
+                ListTile(
+                  leading: const Icon(Iconsax.user),
+                  title: const Text('Mi Progreso'),
+                  subtitle: const Text('Ver tu nivel y logros'),
+                  trailing: const Icon(Iconsax.arrow_right_3),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const ProfileScreen()),
+                    );
+                  },
+                ),
+
+                const Divider(),
                 ListTile(
                   leading: const Icon(Iconsax.moon),
                   title: const Text('Modo de la aplicación'),
@@ -212,7 +238,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             color: colorScheme.surfaceContainer,
             child: ListTile(
               leading: Icon(Iconsax.logout, color: colorScheme.error),
-              title: Text('Cerrar Sesión', style: TextStyle(color: colorScheme.error)),
+              title: Text('Cerrar Sesión',
+                  style: TextStyle(color: colorScheme.error)),
               onTap: _showLogoutConfirmationDialog,
             ),
           ),

@@ -11,6 +11,7 @@ import 'package:sasper/screens/budgets_screen.dart';
 import 'package:sasper/screens/debts_screen.dart';
 import 'package:sasper/screens/goals_screen.dart';
 import 'package:sasper/screens/recurring_transactions_screen.dart';
+import 'package:sasper/screens/challenges_screen.dart'; 
 
 class PlanningHubScreen extends StatelessWidget {
   // El constructor ahora es simple y constante. No recibe ningún parámetro.
@@ -79,6 +80,15 @@ class PlanningHubScreen extends StatelessWidget {
             subtitle: 'Automatiza tus ingresos y gastos recurrentes.',
             onTap: () => Navigator.of(context).push(MaterialPageRoute(
               builder: (_) => const RecurringTransactionsScreen(),
+            )),
+          ),
+          _buildHubCard(
+            context,
+            icon: Iconsax.cup, // <-- 1. ICONO CORREGIDO
+            title: 'Retos y Hábitos', // <-- (Opcional) Un título un poco más descriptivo
+            subtitle: 'Mejora tus finanzas con objetivos divertidos.', // <-- (Opcional) Un subtítulo más claro
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => const ChallengesScreen(), // <-- 2. NAVEGACIÓN CORREGIDA
             )),
           ),
         ],

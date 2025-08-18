@@ -3,17 +3,22 @@
 import 'dart:async';
 import 'dart:developer' as developer;
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:lottie/lottie.dart';
+import 'package:sasper/data/challenge_repository.dart';
 import 'package:sasper/data/dashboard_repository.dart';
 import 'package:sasper/data/transaction_repository.dart';
+import 'package:sasper/models/challenge_model.dart';
 import 'package:sasper/models/dashboard_data_model.dart';
 import 'package:sasper/models/transaction_models.dart';
 import 'package:sasper/services/event_service.dart';
 import 'package:sasper/services/widget_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/main.dart';
+import 'package:sasper/widgets/dashboard/active_challenges_widget.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
@@ -47,6 +52,9 @@ class DashboardScreenState extends State<DashboardScreen> {
   StreamSubscription<DashboardData>? _widgetUpdateSubscription;
   Timer? _widgetUpdateDebounce;
 
+  // --- CAMBIO 1: Añadimos una bandera para controlar la celebración ---
+  bool _hasCheckedForCelebrations = false;
+
   // --- ARQUITECTURA DE DATOS ---
   // La lógica de esta pantalla se divide en dos partes:
   // 1. EL STREAM DE LA UI: `_dashboardDataStream` alimenta el `StreamBuilder` para construir la pantalla
@@ -70,6 +78,12 @@ class DashboardScreenState extends State<DashboardScreen> {
     
     // 4. Lanza la actualización de TODOS los widgets en segundo plano. NO se usa 'await'.
     _updateAllBackgroundWidgets();
+
+    _checkChallenges();
+
+    // --- CAMBIO 2: Eliminamos la llamada a la celebración desde aquí ---
+    // La lógica de `_checkChallenges` para actualizar el estado está bien aquí,
+    // pero la de MOSTRAR el diálogo debe moverse.
   }
 
   @override
@@ -79,6 +93,65 @@ class DashboardScreenState extends State<DashboardScreen> {
     super.dispose();
   }
 
+  Future<void> _checkChallengesAndShowCelebration() async {
+    try {
+      final newlyCompleted = await ChallengeRepository.instance.checkUserChallengesStatus();
+      
+      // Si hay retos recién completados, mostramos una celebración por cada uno
+      for (var challenge in newlyCompleted) {
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => _buildCelebrationDialog(challenge),
+          );
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print("Error al chequear retos para celebración: $e");
+      }
+    }
+  }
+
+  Widget _buildCelebrationDialog(UserChallenge userChallenge) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Asume que tienes una animación de celebración. ¡Busca una en LottieFiles!
+          Lottie.asset('assets/animations/confetti_celebration.json', height: 150),
+          const SizedBox(height: 16),
+          Text(
+            '¡Reto Completado!',
+            style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            userChallenge.challengeDetails.title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 16),
+          ),
+          const SizedBox(height: 16),
+          Chip(
+            label: Text('+${userChallenge.challengeDetails.rewardXp} XP', style: const TextStyle(fontWeight: FontWeight.bold)),
+            backgroundColor: Colors.amber.shade200,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _checkChallenges() async {
+    // Sin esperar, para no bloquear la UI
+    try {
+      await ChallengeRepository.instance.checkUserChallengesStatus();
+    } catch (e) {
+      if (kDebugMode) {
+        print("Error al chequear retos: $e");
+      }
+    }
+  }
   // --- LÓGICA DE CARGA Y ACTUALIZACIÓN ---
 
   /// Lanza la actualización de todos los widgets de la pantalla de inicio en paralelo.
@@ -209,6 +282,16 @@ class DashboardScreenState extends State<DashboardScreen> {
             // Usa datos vacíos para el esqueleto o los datos reales si ya llegaron.
             final data = isLoading ? DashboardData.empty() : snapshot.data!;
 
+            // --- CAMBIO 3: Disparamos la celebración en el momento correcto ---
+            if (!isLoading && !_hasCheckedForCelebrations) {
+              // Marcamos la bandera para que solo se ejecute una vez por sesión
+              _hasCheckedForCelebrations = true; 
+              // Usamos un post-frame callback para no interferir con el build actual
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _checkChallengesAndShowCelebration();
+              });
+            }
+            
             // Skeletonizer muestra una UI "fantasma" mientras isLoading es true.
             return Skeletonizer(
               enabled: isLoading,
@@ -260,6 +343,10 @@ class DashboardScreenState extends State<DashboardScreen> {
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
           const SliverToBoxAdapter(child: AiAnalysisSection()),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
+          const SliverToBoxAdapter(
+            child: ActiveChallengesWidget(),
+          ),
+
 
           SliverToBoxAdapter(
             child: RecentTransactionsSection(
