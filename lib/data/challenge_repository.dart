@@ -10,15 +10,51 @@ class ChallengeRepository {
   final _supabase = Supabase.instance.client;
 
   // Obtiene los retos que el usuario aún no ha iniciado
+  /// Obtiene la lista de retos disponibles, excluyendo aquellos que el usuario ya tiene activos.
   Future<List<Challenge>> getAvailableChallenges() async {
-    // --- CORRECCIÓN AQUÍ ---
-    // Se eliminó el <List<Map<String, dynamic>>> de la llamada a select()
-    final response = await _supabase
-        .from('challenges')
-        .select();
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return []; // Si no hay usuario, no hay retos.
+
+    try {
+      // Paso 1: Obtener los IDs de los retos que el usuario ya tiene ACTIVOS.
+      final userChallengesResponse = await _supabase
+          .from('user_challenges')
+          .select('challenge_id') // Solo necesitamos la columna del ID del reto
+          .eq('user_id', userId)
+          .eq('status', 'active');
+
+      // Creamos una lista de los IDs de los retos que queremos excluir.
+      final activeChallengeIds = userChallengesResponse
+          .map((challenge) => challenge['challenge_id'] as String)
+          .toList();
+
+      /// --- CORRECCIÓN CLAVE AQUÍ ---
+    // Paso 2: Construir la consulta de forma encadenada y condicional.
+
+    // Empezamos con la base de la consulta.
+    var query = _supabase.from('challenges').select();
+
+    // Si hay retos activos que excluir, añadimos el filtro A LA MISMA VARIABLE.
+    // El método 'not' devuelve una nueva instancia del query builder, por lo que
+    // debemos reasignarla a nuestra variable 'query'.
+    if (activeChallengeIds.isNotEmpty) {
+      query = query.not('id', 'in', activeChallengeIds);
+    }
+
+
+      // Paso 3: Ejecutar la consulta final, que ahora sí contiene el filtro si era necesario.
+    final availableChallengesResponse = await query;
     
-    // Aquí podrías añadir lógica para filtrar retos ya completados por el usuario
-    return response.map((data) => Challenge.fromMap(data)).toList();
+    // Mapeamos el resultado a nuestros modelos de Dart.
+    return availableChallengesResponse
+        .map((data) => Challenge.fromMap(data))
+        .toList();
+
+    } catch (e) {
+      print('Error al obtener retos disponibles: $e');
+      // Devolvemos una lista vacía en caso de error para no romper la UI.
+      return [];
+    }
   }
 
   // Obtiene los retos activos y completados del usuario
