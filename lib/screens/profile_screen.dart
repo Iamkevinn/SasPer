@@ -7,6 +7,8 @@ import 'package:sasper/data/challenge_repository.dart';
 import 'package:sasper/data/profile_repository.dart';
 import 'package:sasper/models/challenge_model.dart';
 import 'package:sasper/models/profile_model.dart';
+import 'package:sasper/data/achievement_repository.dart';
+import 'package:sasper/models/achievement_model.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -30,6 +32,7 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
+  // Modifica el _buildProfileContent para añadir la nueva sección
   Widget _buildProfileContent(BuildContext context, Profile profile) {
     return ListView(
       padding: const EdgeInsets.all(16.0),
@@ -38,10 +41,101 @@ class ProfileScreen extends StatelessWidget {
         const SizedBox(height: 24),
         _buildXpAndLevelCard(context, profile),
         const SizedBox(height: 24),
+        _buildAchievementsSection(context), // <--- NUEVA SECCIÓN
+        const SizedBox(height: 24),
         _buildCompletedChallenges(context),
       ],
     );
   }
+
+    // --- AÑADE ESTE WIDGET COMPLETAMENTE NUEVO ---
+    Widget _buildAchievementsSection(BuildContext context) {
+    final achievementRepo = AchievementRepository.instance;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Medallas y Logros',
+          style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+        
+        FutureBuilder<List<Achievement>>(
+          future: achievementRepo.getAllAchievements(),
+          builder: (context, snapshotAll) {
+            // --- ¡CORRECCIÓN CLAVE AQUÍ! ---
+            // Si estamos cargando, mostramos un contenedor con un tamaño FIJO.
+            if (snapshotAll.connectionState == ConnectionState.waiting) {
+              return const SizedBox(
+                height: 100, // Le damos una altura fija
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+
+            if (snapshotAll.hasError || !snapshotAll.hasData || snapshotAll.data!.isEmpty) {
+              return const Center(child: Text('No hay logros disponibles.'));
+            }
+            
+            final allAchievements = snapshotAll.data!;
+
+            return StreamBuilder<Set<String>>(
+              stream: achievementRepo.getUnlockedAchievementIdsStream(),
+              builder: (context, snapshotUnlocked) {
+                final unlockedIds = snapshotUnlocked.data ?? {};
+
+                return GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 4,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                  ),
+                  itemCount: allAchievements.length,
+                  itemBuilder: (context, index) {
+                    final achievement = allAchievements[index];
+                    final isUnlocked = unlockedIds.contains(achievement.id);
+
+                    // Mapeo simple de nombre a icono (puedes expandir esto)
+                    final IconData iconData = achievement.iconName.contains('level') 
+                        ? Iconsax.level 
+                        : achievement.iconName.contains('streak')
+                            ? Iconsax.flash_1
+                            : Iconsax.award;
+                    
+                    final iconColor = isUnlocked ? Colors.amber : Colors.grey.shade600;
+
+                    return Tooltip(
+                      message: "${achievement.title}\n${achievement.description}",
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(iconData, size: 32, color: iconColor),
+                          const SizedBox(height: 4),
+                          Text(
+                            achievement.title,
+                            textAlign: TextAlign.center,
+                            maxLines: 2, // Para evitar desbordamientos con títulos largos
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: isUnlocked ? Theme.of(context).colorScheme.onSurface : Colors.grey.shade600,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
+            );
+          },
+        ),
+      ],
+    );
+  }
+
 
   Widget _buildProfileHeader(BuildContext context, Profile profile) {
     return Row(
