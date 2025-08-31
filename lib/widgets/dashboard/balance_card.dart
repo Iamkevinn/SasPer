@@ -1,7 +1,6 @@
 // C:\Proyectos\SasPer\lib\widgets\dashboard\balance_card.dart
 
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 import 'package:lottie/lottie.dart';
 // NOVEDAD: Importamos el paquete para guardar las preferencias.

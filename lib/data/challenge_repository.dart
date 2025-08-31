@@ -1,6 +1,7 @@
 // lib/data/challenge_repository.dart
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sasper/models/challenge_model.dart';
 
@@ -51,7 +52,9 @@ class ChallengeRepository {
         .toList();
 
     } catch (e) {
-      print('Error al obtener retos disponibles: $e');
+      if (kDebugMode) {
+        print('Error al obtener retos disponibles: $e');
+      }
       // Devolvemos una lista vacía en caso de error para no romper la UI.
       return [];
     }
@@ -65,7 +68,9 @@ class ChallengeRepository {
           .delete()
           .eq('id', userChallengeId);
     } catch (e) {
-      print('Error al cancelar el reto de usuario: $e');
+      if (kDebugMode) {
+        print('Error al cancelar el reto de usuario: $e');
+      }
       throw Exception('No se pudo cancelar el reto.');
     }
   }
@@ -97,7 +102,9 @@ class ChallengeRepository {
             return UserChallenge.fromMap(userChallengeData);
           } catch (e) {
             // Si un reto se borra o hay un error, lo omitimos para no romper el stream
-            print('Error al obtener detalles del reto ${userChallengeData['challenge_id']}: $e');
+            if (kDebugMode) {
+              print('Error al obtener detalles del reto ${userChallengeData['challenge_id']}: $e');
+            }
             // Devolvemos un UserChallenge nulo o manejamos el error
             // En este caso, lo mejor es filtrar los resultados nulos después
             return null;

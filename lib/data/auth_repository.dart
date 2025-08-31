@@ -63,7 +63,7 @@ class AuthRepository {
     } on AuthException catch (e) {
       developer.log('🔥 Error de registro: ${e.message}', name: 'AuthRepository');
       // Re-lanzamos la excepción original de Supabase para que la UI pueda manejarla.
-      throw e;
+      rethrow;
     } catch (e) {
       developer.log('🔥 Error inesperado en signUp: $e', name: 'AuthRepository');
       throw Exception('Ocurrió un error inesperado durante el registro.');
@@ -80,7 +80,7 @@ class AuthRepository {
       developer.log('🔥 Error de inicio de sesión: ${e.message}', name: 'AuthRepository');
       // Es mejor relanzar la excepción original para que la UI decida el mensaje exacto.
       // Así, si Supabase cambia el mensaje, tu app se adapta.
-      throw e;
+      rethrow;
     } catch (e) {
       developer.log('🔥 Error inesperado en signIn: $e', name: 'AuthRepository');
       throw Exception('Ocurrió un error inesperado al iniciar sesión.');

@@ -8,7 +8,6 @@ import 'package:provider/provider.dart';
 //import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:sasper/services/theme_provider.dart';
 import 'package:line_awesome_flutter/line_awesome_flutter.dart'; // ¡Asegúrate de importar el paquete!
-import 'package:sasper/screens/auth_check_screen.dart';
 // =================================================================
 //                 SOLUCIÓN DEFINITIVA PARA TREE SHAKING
 //
@@ -16,24 +15,24 @@ import 'package:sasper/screens/auth_check_screen.dart';
 // de Flutter vea estas referencias a iconos durante el análisis y los conserve
 // en la compilación final de la app.
 // =================================================================
-final List<IconData> _usedIconsForTreeShaking = [
-  // Iconos de Gastos
-  LineAwesomeIcons.utensils,      // Comida
-  LineAwesomeIcons.bus,           // Transporte
-  LineAwesomeIcons.gamepad,       // Ocio
-  LineAwesomeIcons.home,          // Hogar
-  LineAwesomeIcons.shopping_cart, // Compras
-  LineAwesomeIcons.plug,          // Servicios
-  LineAwesomeIcons.heart,         // Salud
-  LineAwesomeIcons.grip_horizontal, // Otro (Gasto)
-
-  // Iconos de Ingresos
-  LineAwesomeIcons.money_bill, // Sueldo
-  LineAwesomeIcons.line_chart,      // Inversión
-  LineAwesomeIcons.briefcase,       // Freelance
-  LineAwesomeIcons.gift,            // Regalo
-  // 'Otro' (Ingreso) usa grip_horizontal, que ya está incluido.
-];
+// final List<IconData> _usedIconsForTreeShaking = [
+//   // Iconos de Gastos
+//   LineAwesomeIcons.utensils,      // Comida
+//   LineAwesomeIcons.bus,           // Transporte
+//   LineAwesomeIcons.gamepad,       // Ocio
+//   LineAwesomeIcons.home,          // Hogar
+//   LineAwesomeIcons.shopping_cart, // Compras
+//   LineAwesomeIcons.plug,          // Servicios
+//   LineAwesomeIcons.heart,         // Salud
+//   LineAwesomeIcons.grip_horizontal, // Otro (Gasto)
+// 
+//   // Iconos de Ingresos
+//   LineAwesomeIcons.money_bill, // Sueldo
+//   LineAwesomeIcons.line_chart,      // Inversión
+//   LineAwesomeIcons.briefcase,       // Freelance
+//   LineAwesomeIcons.gift,            // Regalo
+//   // 'Otro' (Ingreso) usa grip_horizontal, que ya está incluido.
+// ];
 
 // La GlobalKey sigue siendo una buena práctica.
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();

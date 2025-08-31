@@ -1,7 +1,6 @@
 // lib/screens/debts_screen.dart
 
 import 'package:flutter/material.dart';
-import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
@@ -13,7 +12,6 @@ import 'package:sasper/screens/add_debt_screen.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/debts/debt_card.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
-import 'package:sasper/widgets/shared/empty_state_card.dart';
 import 'register_payment_screen.dart';
 import 'package:sasper/screens/edit_debt_screen.dart'; // NUEVO: Importamos la pantalla de edición
 import 'package:sasper/widgets/shared/custom_dialog.dart';
@@ -153,8 +151,8 @@ class _DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderStat
 
           // --- ESTADO CON DATOS ---
           // Si hay datos, separamos las listas y construimos la TabBarView.
-          final myDebts = allDebts.where((d) => d.type == DebtType.debt).toList();
-          final loansToOthers = allDebts.where((d) => d.type == DebtType.loan).toList();
+          //final myDebts = allDebts.where((d) => d.type == DebtType.debt).toList();
+          //final loansToOthers = allDebts.where((d) => d.type == DebtType.loan).toList();
           
           return TabBarView(
             controller: _tabController,
@@ -279,29 +277,29 @@ class _DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderStat
     );
   }
 
-  Widget _buildDebtsList(List<Debt> debts, {required bool isMyDebt}) {
-    if (debts.isEmpty) {
-      // Usamos el mismo Lottie para el estado vacío de cada pestaña.
-      return _buildLottieEmptyState(isForTab: true, isMyDebt: isMyDebt);
-    }
-    
-    // --- REEMPLAZO DE STAGGEREDANIMATIONS CON FLUTTER_ANIMATE ---
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 150),
-      itemCount: debts.length,
-      itemBuilder: (context, index) {
-        final debt = debts[index];
-        return DebtCard(
-          debt: debt,
-          onActionSelected: (action) => _handleDebtAction(action, debt),
-        )
-        // Animación de entrada en cascada para cada tarjeta.
-        .animate()
-        .fadeIn(duration: 500.ms, delay: (100 * index).ms)
-        .slideY(begin: 0.3, curve: Curves.easeOutCubic);
-      },
-    );
-  }
+  //Widget _buildDebtsList(List<Debt> debts, {required bool isMyDebt}) {
+  //  if (debts.isEmpty) {
+  //    // Usamos el mismo Lottie para el estado vacío de cada pestaña.
+  //    return _buildLottieEmptyState(isForTab: true, isMyDebt: isMyDebt);
+  //  }
+  //  
+  //  // --- REEMPLAZO DE STAGGEREDANIMATIONS CON FLUTTER_ANIMATE ---
+  //  return ListView.builder(
+  //    padding: const EdgeInsets.fromLTRB(16, 16, 16, 150),
+  //    itemCount: debts.length,
+  //    itemBuilder: (context, index) {
+  //      final debt = debts[index];
+  //      return DebtCard(
+  //        debt: debt,
+  //        onActionSelected: (action) => _handleDebtAction(action, debt),
+  //      )
+  //      // Animación de entrada en cascada para cada tarjeta.
+  //      .animate()
+  //      .fadeIn(duration: 500.ms, delay: (100 * index).ms)
+  //      .slideY(begin: 0.3, curve: Curves.easeOutCubic);
+  //    },
+  //  );
+  //}
 
   // --- NUEVOS WIDGETS AUXILIARES ---
 

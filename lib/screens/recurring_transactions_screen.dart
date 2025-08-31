@@ -11,7 +11,6 @@ import 'package:sasper/screens/add_recurring_transaction_screen.dart';
 import 'package:sasper/screens/edit_recurring_transaction_screen.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
-import 'package:sasper/widgets/shared/empty_state_card.dart';
 import 'package:sasper/services/notification_service.dart'; 
 import 'package:sasper/main.dart'; // Para navigatorKey
 import 'dart:developer' as developer; // Para logging

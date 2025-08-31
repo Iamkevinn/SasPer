@@ -15,8 +15,8 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // NOVEDAD: Importar
-import 'package:supabase_flutter/supabase_flutter.dart'; // NOVEDAD: Importar
-import 'dart:developer' as developer; // NOVEDAD: Importar
+// NOVEDAD: Importar
+// NOVEDAD: Importar
 
 // --- Tus importaciones existentes ---
 import 'package:sasper/config/app_config.dart';
@@ -393,9 +393,9 @@ class NotificationService {
     }
   }
 }
-Future<void> _initializeTimezonesInIsolate() async {
-  // Estas dos líneas se ejecutarán en un hilo separado.
-  tz.initializeTimeZones();
-  final String localTimezone = await FlutterTimezone.getLocalTimezone();
-  tz.setLocalLocation(tz.getLocation(localTimezone));
-}
+//Future<void> _initializeTimezonesInIsolate() async {
+//  // Estas dos líneas se ejecutarán en un hilo separado.
+//  tz.initializeTimeZones();
+//  final String localTimezone = await FlutterTimezone.getLocalTimezone();
+//  tz.setLocalLocation(tz.getLocation(localTimezone));
+//}

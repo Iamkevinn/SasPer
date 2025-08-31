@@ -16,7 +16,6 @@ import 'package:sasper/models/insight_model.dart';
 
 // --- NUEVAS IMPORTACIONES ---
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:skeletonizer/skeletonizer.dart';
 import 'package:lottie/lottie.dart';
 // NOVEDAD: Importa el nuevo widget de análisis que acabamos de crear.
 import 'package:sasper/widgets/analysis_charts/mood_spending_analysis_card.dart';

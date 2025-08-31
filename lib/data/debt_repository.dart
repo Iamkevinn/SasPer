@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'dart:developer' as developer;
+import 'package:flutter/foundation.dart';
 import 'package:sasper/services/event_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sasper/models/debt_model.dart';
@@ -155,7 +156,9 @@ class DebtRepository {
       return totalBalance;
 
     } catch (e) {
-      print('Error al calcular la deuda total por entidad: $e');
+      if (kDebugMode) {
+        print('Error al calcular la deuda total por entidad: $e');
+      }
       throw Exception('No se pudo calcular la deuda de la entidad.');
     }
   }   

@@ -5,7 +5,6 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:io';
 import 'dart:math';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -16,7 +15,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:sasper/data/debt_repository.dart';
 import 'package:sasper/data/recurring_repository.dart';
 import 'package:sasper/models/analysis_models.dart';
-import 'package:sasper/data/analysis_repository.dart';
 import 'package:sasper/models/dashboard_data_model.dart';
 import 'package:sasper/models/upcoming_payment_model.dart';
 import 'package:sasper/data/goal_repository.dart';
@@ -68,8 +66,8 @@ Future<void> backgroundCallback(Uri? uri) async {
 
 /// Clase de servicio que encapsula toda la lógica para los widgets de la pantalla de inicio.
 class WidgetService {
-  static const String _healthWidgetName = 'FinancialHealthWidgetProvider';
-  static const String _comparisonWidgetName = 'MonthlyComparisonWidgetProvider';
+  //static const String _healthWidgetName = 'FinancialHealthWidgetProvider';
+  //static const String _comparisonWidgetName = 'MonthlyComparisonWidgetProvider';
 
   //============================================================================
   // SECCIÓN DE WIDGETS PRINCIPALES (Dashboard: Pequeño, Mediano, Grande)

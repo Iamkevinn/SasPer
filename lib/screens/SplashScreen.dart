@@ -16,7 +16,6 @@ import 'dart:developer' as developer; // NOVEDAD: Importamos developer para logs
 import 'package:sasper/config/app_config.dart';
 import 'package:sasper/config/global_state.dart';
 import 'package:sasper/firebase_options.dart';
-import 'package:sasper/screens/auth_gate.dart';
 import 'package:sasper/services/notification_service.dart';
 import 'package:sasper/services/widget_service.dart';
 

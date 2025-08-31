@@ -6,7 +6,6 @@ import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 import 'package:sasper/data/budget_repository.dart';
 import 'package:sasper/data/category_repository.dart'; // ¡NUEVA IMPORTACIÓN!
-import 'package:sasper/models/budget_models.dart';
 import 'package:sasper/models/category_model.dart'; // ¡NUEVA IMPORTACIÓN!
 import 'package:sasper/services/event_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';

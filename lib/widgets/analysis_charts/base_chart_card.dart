@@ -1,7 +1,6 @@
 // lib/widgets/analysis_charts/base_chart_card.dart
 
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
 
 class BaseChartCard extends StatelessWidget {
   final String title;

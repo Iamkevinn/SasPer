@@ -89,7 +89,9 @@ class _MainScreenState extends State<MainScreen> {
 
      Future.delayed(const Duration(seconds: 15), () {
       if (mounted) { // Comprueba si el widget todavía está en el árbol
-        print("🚀 Ejecutando tarea de mantenimiento retrasada: refreshAllSchedules");
+        if (kDebugMode) {
+          print("🚀 Ejecutando tarea de mantenimiento retrasada: refreshAllSchedules");
+        }
         NotificationService.instance.refreshAllSchedules();
       }
     });

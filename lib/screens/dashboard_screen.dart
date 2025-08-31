@@ -14,7 +14,7 @@ import 'package:sasper/data/transaction_repository.dart';
 import 'package:sasper/models/challenge_model.dart';
 import 'package:sasper/models/dashboard_data_model.dart';
 import 'package:sasper/models/transaction_models.dart';
-import 'package:sasper/services/event_service.dart';
+//import 'package:sasper/services/event_service.dart';
 import 'package:sasper/services/widget_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/main.dart';
@@ -53,7 +53,7 @@ class DashboardScreenState extends State<DashboardScreen> {
   Timer? _widgetUpdateDebounce;
 
   // --- CAMBIO 1: Añadimos una bandera para controlar la celebración ---
-  bool _hasCheckedForCelebrations = false;
+  //final bool _hasCheckedForCelebrations = false;
 
   // Bandera para asegurar que la celebración solo se muestre una vez por sesión.
   bool _hasShownCelebration = false;
@@ -117,25 +117,25 @@ class DashboardScreenState extends State<DashboardScreen> {
     }
   }
   
-  Future<void> _checkChallengesAndShowCelebration() async {
-    try {
-      final newlyCompleted = await ChallengeRepository.instance.checkUserChallengesStatus();
-      
-      // Si hay retos recién completados, mostramos una celebración por cada uno
-      for (var challenge in newlyCompleted) {
-        if (mounted) {
-          showDialog(
-            context: context,
-            builder: (context) => _buildCelebrationDialog(challenge),
-          );
-        }
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print("Error al chequear retos para celebración: $e");
-      }
-    }
-  }
+  //Future<void> _checkChallengesAndShowCelebration() async {
+  //  try {
+  //    final newlyCompleted = await ChallengeRepository.instance.checkUserChallengesStatus();
+  //    
+  //    // Si hay retos recién completados, mostramos una celebración por cada uno
+  //    for (var challenge in newlyCompleted) {
+  //      if (mounted) {
+  //        showDialog(
+  //          context: context,
+  //          builder: (context) => _buildCelebrationDialog(challenge),
+  //        );
+  //      }
+  //    }
+  //  } catch (e) {
+  //    if (kDebugMode) {
+  //      print("Error al chequear retos para celebración: $e");
+  //    }
+  //  }
+  //}
 
   Widget _buildCelebrationDialog(UserChallenge userChallenge) {
     return AlertDialog(
@@ -166,16 +166,16 @@ class DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Future<void> _checkChallenges() async {
-    // Sin esperar, para no bloquear la UI
-    try {
-      await ChallengeRepository.instance.checkUserChallengesStatus();
-    } catch (e) {
-      if (kDebugMode) {
-        print("Error al chequear retos: $e");
-      }
-    }
-  }
+  //uture<void> _checkChallenges() async {
+  // // Sin esperar, para no bloquear la UI
+  // try {
+  //   await ChallengeRepository.instance.checkUserChallengesStatus();
+  // } catch (e) {
+  //   if (kDebugMode) {
+  //     print("Error al chequear retos: $e");
+  //   }
+  // }
+  //
   // --- LÓGICA DE CARGA Y ACTUALIZACIÓN ---
 
   /// Lanza la actualización de todos los widgets de la pantalla de inicio en paralelo.

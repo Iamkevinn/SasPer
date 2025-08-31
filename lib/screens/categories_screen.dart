@@ -3,7 +3,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:sasper/data/category_repository.dart';
@@ -13,7 +12,6 @@ import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/categories/category_list_item.dart';
 import 'package:sasper/widgets/shared/custom_dialog.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
-import 'package:sasper/widgets/shared/empty_state_card.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 import 'package:lottie/lottie.dart';

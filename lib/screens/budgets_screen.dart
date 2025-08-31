@@ -10,7 +10,7 @@ import 'package:sasper/services/event_service.dart';
 import 'package:sasper/screens/add_budget_screen.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
-import 'package:sasper/widgets/shared/empty_state_card.dart';
+//import 'package:sasper/widgets/shared/empty_state_card.dart';
 import 'package:sasper/widgets/shared/budget_card.dart'; // ¡Necesitaremos actualizar este widget!
 import 'package:sasper/main.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -143,12 +143,12 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
             children: [
               if (activeBudgets.isNotEmpty) ...[
                 _buildSectionHeader('Activos'),
-                ...activeBudgets.map((budget) => _buildBudgetListItem(budget)).toList(),
+                ...activeBudgets.map((budget) => _buildBudgetListItem(budget)),
               ],
               if (inactiveBudgets.isNotEmpty) ...[
                 const SizedBox(height: 24),
                 _buildSectionHeader('Próximos y Pasados'),
-                ...inactiveBudgets.map((budget) => _buildBudgetListItem(budget, isActive: false)).toList(),
+                ...inactiveBudgets.map((budget) => _buildBudgetListItem(budget, isActive: false)),
               ],
             ],
           );

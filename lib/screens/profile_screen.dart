@@ -1,7 +1,7 @@
 // lib/screens/profile_screen.dart
 
 import 'dart:io';
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
@@ -36,7 +36,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   ) async {
     setState(() => _isSharing = true);
     try {
-      final Uint8List? imageBytes =
+      final Uint8List imageBytes =
           await _screenshotController.captureFromLongWidget(
         InheritedTheme.captureAll(
           context,
@@ -63,7 +63,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         text: '¡Mira mi progreso en SasPer! #FinanzasPersonales #SasPerApp',
       );
     } catch (e) {
-      print("Error al compartir: $e");
+      if (kDebugMode) {
+        print("Error al compartir: $e");
+      }
     } finally {
       if (mounted) setState(() => _isSharing = false);
     }
@@ -84,14 +86,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
               return FutureBuilder<List<Achievement>>(
                 future: AchievementRepository.instance.getAllAchievements(),
                 builder: (context, achievementsSnapshot) {
-                  if (!achievementsSnapshot.hasData)
+                  if (!achievementsSnapshot.hasData) {
                     return const SizedBox.shrink();
+                  }
                   return StreamBuilder<Set<String>>(
                     stream: AchievementRepository.instance
                         .getUnlockedAchievementIdsStream(),
                     builder: (context, unlockedSnapshot) {
-                      if (!unlockedSnapshot.hasData)
+                      if (!unlockedSnapshot.hasData) {
                         return const SizedBox.shrink();
+                      }
 
                       return _isSharing
                           ? const Padding(
@@ -371,13 +375,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
         StreamBuilder<List<UserChallenge>>(
           stream: ChallengeRepository.instance.getUserChallengesStream(),
           builder: (context, snapshot) {
-            if (!snapshot.hasData)
+            if (!snapshot.hasData) {
               return const Center(child: CircularProgressIndicator());
+            }
             final completed =
                 snapshot.data!.where((c) => c.status == 'completed').toList();
-            if (completed.isEmpty)
+            if (completed.isEmpty) {
               return const Text(
                   '¡Completa tu primer reto para ganar un logro!');
+            }
             return ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),

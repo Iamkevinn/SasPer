@@ -185,13 +185,13 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                                       Navigator.of(context).pop(false),
                                 ),
                                 FilledButton.tonal(
-                                  child: const Text('Sí, cancelar'),
                                   style: FilledButton.styleFrom(
                                     foregroundColor:
                                         Theme.of(context).colorScheme.error,
                                   ),
                                   onPressed: () =>
                                       Navigator.of(context).pop(true),
+                                  child: const Text('Sí, cancelar'),
                                 ),
                               ],
                             ),

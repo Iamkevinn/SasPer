@@ -125,8 +125,9 @@ class SimulationResultScreen extends StatelessWidget {
 
   Widget _buildProgressCircle(String title, double progress, double amount, NumberFormat formatter, BuildContext context, {bool isProjected = false}) {
     Color progressColor;
-    if (progress >= 1.0) progressColor = Colors.red.shade400;
-    else if (progress >= 0.8) progressColor = Colors.orange.shade400;
+    if (progress >= 1.0) {
+      progressColor = Colors.red.shade400;
+    } else if (progress >= 0.8) progressColor = Colors.orange.shade400;
     else progressColor = Colors.green.shade400;
     
     if (isProjected) {

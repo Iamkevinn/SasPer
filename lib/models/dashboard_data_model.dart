@@ -49,7 +49,7 @@ class DashboardData extends Equatable {
     // ¡CORRECCIÓN! Usa el nuevo `Budget.fromMap`.
     final List<Budget> allBudgets = (map['budgets_progress'] as List<dynamic>?)
         ?.map((b) => Budget.fromMap(b as Map<String, dynamic>))
-        .toList() ?? this.budgets; // Usa la lista vieja como fallback
+        .toList() ?? budgets; // Usa la lista vieja como fallback
 
     return DashboardData(
       // Mantenemos los datos de la Etapa 1
@@ -59,11 +59,11 @@ class DashboardData extends Equatable {
       // Poblamos las listas desde el nuevo mapa de detalles
       goals: (map['goals'] as List<dynamic>?)
           ?.map((g) => Goal.fromMap(g as Map<String, dynamic>))
-          .toList() ?? this.goals,
+          .toList() ?? goals,
       
       recentTransactions: (map['recent_transactions'] as List<dynamic>?)
           ?.map((t) => Transaction.fromMap(t as Map<String, dynamic>)) 
-          .toList() ?? this.recentTransactions,
+          .toList() ?? recentTransactions,
       
       budgets: allBudgets, // ¡CORRECCIÓN! Guardamos la lista completa en `budgets`
       
@@ -72,7 +72,7 @@ class DashboardData extends Equatable {
       
       expenseSummaryForWidget: (map['expense_summary_for_widget'] as List<dynamic>?)
           ?.map((e) => ExpenseByCategory.fromMap(e as Map<String, dynamic>))
-          .toList() ?? this.expenseSummaryForWidget,
+          .toList() ?? expenseSummaryForWidget,
       
       isLoading: false, // La carga ha terminado
     );

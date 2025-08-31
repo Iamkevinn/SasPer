@@ -216,7 +216,7 @@ Future<MonthlyComparison> getMonthlySpendingComparisonForWidget() async {
       ]);
       
       // Función auxiliar robusta para parsear los resultados de Future.wait.
-      List<T> _parseResult<T>(dynamic result, T Function(Map<String, dynamic>) fromJson) {
+      List<T> parseResult<T>(dynamic result, T Function(Map<String, dynamic>) fromJson) {
         if (result is List) {
           return result.map((e) => fromJson(e as Map<String, dynamic>)).toList();
         }
@@ -237,12 +237,12 @@ Future<MonthlyComparison> getMonthlySpendingComparisonForWidget() async {
       developer.log('📊 [Repo] Heatmap Data being sent: $heatmapRawData', name: 'AnalysisRepository');
 
       return AnalysisData(
-        expensePieData: _parseResult(results[0], ExpenseByCategory.fromMap),
-        netWorthLineData: _parseResult(results[1], NetWorthDataPoint.fromJson),
-        cashflowBarData: _parseResult(results[2], MonthlyCashflowData.fromJson),
-        categoryComparisonData: _parseResult(results[3], CategorySpendingComparisonData.fromJson),
-        incomePieData: _parseResult(results[4], IncomeByCategory.fromJson),
-        incomeExpenseBarData: _parseResult(results[5], MonthlyIncomeExpenseSummaryData.fromJson),
+        expensePieData: parseResult(results[0], ExpenseByCategory.fromMap),
+        netWorthLineData: parseResult(results[1], NetWorthDataPoint.fromJson),
+        cashflowBarData: parseResult(results[2], MonthlyCashflowData.fromJson),
+        categoryComparisonData: parseResult(results[3], CategorySpendingComparisonData.fromJson),
+        incomePieData: parseResult(results[4], IncomeByCategory.fromJson),
+        incomeExpenseBarData: parseResult(results[5], MonthlyIncomeExpenseSummaryData.fromJson),
          heatmapData: {
           if (results[6] is List)
             for (var item in (results[6] as List))

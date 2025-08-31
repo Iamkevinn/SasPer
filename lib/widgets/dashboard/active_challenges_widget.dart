@@ -1,5 +1,6 @@
 // lib/widgets/dashboard/active_challenges_widget.dart
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
@@ -32,7 +33,9 @@ class _ActiveChallengesWidgetState extends State<ActiveChallengesWidget> {
       // 1. Esperamos a que la función de actualización termine.
       await ChallengeRepository.instance.checkUserChallengesStatus();
     } catch (e) {
-      print("Error inicializando el widget de retos: $e");
+      if (kDebugMode) {
+        print("Error inicializando el widget de retos: $e");
+      }
     }
 
     // 2. Solo después de la actualización, nos suscribimos al stream.
@@ -96,7 +99,7 @@ class _ActiveChallengesWidgetState extends State<ActiveChallengesWidget> {
                   const SizedBox(height: 12),
                   
                   // Creamos la lista de retos con la nueva lógica visual
-                  ...activeChallenges.map((uc) => _buildChallengeRow(context, uc)).toList(),
+                  ...activeChallenges.map((uc) => _buildChallengeRow(context, uc)),
                 ],
               ),
             ),
