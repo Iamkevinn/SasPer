@@ -25,7 +25,8 @@ import 'package:skeletonizer/skeletonizer.dart';
 // Pantallas
 import 'edit_transaction_screen.dart';
 import 'transactions_screen.dart';
-import 'package:sasper/screens/can_i_afford_it_screen.dart'; 
+import 'package:sasper/screens/can_i_afford_it_screen.dart';
+import 'package:sasper/widgets/dashboard/category_spending_chart.dart';
 
 // Widgets
 import 'package:sasper/widgets/dashboard/ai_analysis_section.dart';
@@ -44,7 +45,8 @@ class DashboardScreen extends StatefulWidget {
 class DashboardScreenState extends State<DashboardScreen> {
   // --- DEPENDENCIAS (SINGLETONS) ---
   final DashboardRepository _dashboardRepository = DashboardRepository.instance;
-  final TransactionRepository _transactionRepository = TransactionRepository.instance;
+  final TransactionRepository _transactionRepository =
+      TransactionRepository.instance;
   final WidgetService _widgetService = WidgetService();
 
   // --- GESTIÓN DE STREAMS Y ESTADO ---
@@ -68,7 +70,9 @@ class DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    developer.log("✅ [Dashboard] initState: Configurando streams y carga inicial...", name: "Dashboard");
+    developer.log(
+        "✅ [Dashboard] initState: Configurando streams y carga inicial...",
+        name: "Dashboard");
 
     // 1. Inicializa el stream que alimenta la UI principal.
     _dashboardDataStream = _dashboardRepository.getDashboardDataStream();
@@ -78,7 +82,7 @@ class DashboardScreenState extends State<DashboardScreen> {
 
     // 3. Pide la primera carga de datos para la UI. silent:true evita mostrar un spinner innecesario.
     _dashboardRepository.forceRefresh(silent: true);
-    
+
     // 4. Lanza la actualización de TODOS los widgets en segundo plano. NO se usa 'await'.
     _updateAllBackgroundWidgets();
 
@@ -99,8 +103,9 @@ class DashboardScreenState extends State<DashboardScreen> {
   /// Comprueba si hay retos recién completados y muestra un diálogo de celebración.
   Future<void> _checkAndShowCelebrations() async {
     try {
-      final newlyCompleted = await ChallengeRepository.instance.checkUserChallengesStatus();
-      
+      final newlyCompleted =
+          await ChallengeRepository.instance.checkUserChallengesStatus();
+
       for (var challenge in newlyCompleted) {
         // 'mounted' comprueba si el widget todavía está en el árbol de widgets.
         if (mounted) {
@@ -116,11 +121,11 @@ class DashboardScreenState extends State<DashboardScreen> {
       }
     }
   }
-  
+
   //Future<void> _checkChallengesAndShowCelebration() async {
   //  try {
   //    final newlyCompleted = await ChallengeRepository.instance.checkUserChallengesStatus();
-  //    
+  //
   //    // Si hay retos recién completados, mostramos una celebración por cada uno
   //    for (var challenge in newlyCompleted) {
   //      if (mounted) {
@@ -144,11 +149,13 @@ class DashboardScreenState extends State<DashboardScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           // Asume que tienes una animación de celebración. ¡Busca una en LottieFiles!
-          Lottie.asset('assets/animations/confetti_celebration.json', height: 150),
+          Lottie.asset('assets/animations/confetti_celebration.json',
+              height: 150),
           const SizedBox(height: 16),
           Text(
             '¡Reto Completado!',
-            style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.bold),
+            style:
+                GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
@@ -158,7 +165,8 @@ class DashboardScreenState extends State<DashboardScreen> {
           ),
           const SizedBox(height: 16),
           Chip(
-            label: Text('+${userChallenge.challengeDetails.rewardXp} XP', style: const TextStyle(fontWeight: FontWeight.bold)),
+            label: Text('+${userChallenge.challengeDetails.rewardXp} XP',
+                style: const TextStyle(fontWeight: FontWeight.bold)),
             backgroundColor: Colors.amber.shade200,
           ),
         ],
@@ -182,18 +190,23 @@ class DashboardScreenState extends State<DashboardScreen> {
   /// Se ejecuta en segundo plano sin bloquear la UI.
   Future<void> _updateAllBackgroundWidgets() async {
     try {
-      developer.log("🚀 [Background] Iniciando actualización de TODOS los widgets...", name: "Dashboard");
+      developer.log(
+          "🚀 [Background] Iniciando actualización de TODOS los widgets...",
+          name: "Dashboard");
       // Future.wait ejecuta todas las llamadas en paralelo para máxima eficiencia.
       await Future.wait([
         WidgetService.updateFinancialHealthWidget(),
         WidgetService.updateMonthlyComparisonWidget(),
-        WidgetService.updateGoalsWidget(), // Si el método es estático, se llama así
+        WidgetService
+            .updateGoalsWidget(), // Si el método es estático, se llama así
         WidgetService.updateUpcomingPaymentsWidget(),
         WidgetService.updateNextPaymentWidget(),
       ]);
-      developer.log("✅ [Background] Actualización de widgets completada.", name: "Dashboard");
+      developer.log("✅ [Background] Actualización de widgets completada.",
+          name: "Dashboard");
     } catch (e, stackTrace) {
-      developer.log("🔥🔥🔥 [Background] Error fatal al actualizar widgets: $e", name: "Dashboard", error: e, stackTrace: stackTrace);
+      developer.log("🔥🔥🔥 [Background] Error fatal al actualizar widgets: $e",
+          name: "Dashboard", error: e, stackTrace: stackTrace);
     }
   }
 
@@ -205,7 +218,9 @@ class DashboardScreenState extends State<DashboardScreen> {
       if (!data.isLoading) {
         _widgetUpdateDebounce?.cancel();
         _widgetUpdateDebounce = Timer(const Duration(seconds: 2), () {
-          developer.log("🔄 [Debounce] Actualizando widgets dependientes de datos (Medio/Grande)...", name: "Dashboard");
+          developer.log(
+              "🔄 [Debounce] Actualizando widgets dependientes de datos (Medio/Grande)...",
+              name: "Dashboard");
           // El widget grande que muestra el gráfico y presupuestos sí necesita los datos.
           _widgetService.updateAllWidgets(data, context);
         });
@@ -221,7 +236,7 @@ class DashboardScreenState extends State<DashboardScreen> {
   }
 
   // --- NAVEGACIÓN Y ACCIONES DEL USUARIO ---
-   // ¡NUEVO MÉTODO!
+  // ¡NUEVO MÉTODO!
   void _navigateToCanIAffordIt() {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (context) => const CanIAffordItScreen()),
@@ -249,10 +264,13 @@ class DashboardScreenState extends State<DashboardScreen> {
       builder: (dialogContext) => BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
         child: AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28.0)),
-          backgroundColor: Theme.of(dialogContext).colorScheme.surface.withOpacity(0.9),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(28.0)),
+          backgroundColor:
+              Theme.of(dialogContext).colorScheme.surface.withOpacity(0.9),
           title: const Text('Confirmar Acción'),
-          content: const Text('¿Estás seguro? Esta acción no se puede deshacer.'),
+          content:
+              const Text('¿Estás seguro? Esta acción no se puede deshacer.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -260,8 +278,10 @@ class DashboardScreenState extends State<DashboardScreen> {
             ),
             FilledButton.tonal(
               style: FilledButton.styleFrom(
-                  backgroundColor: Theme.of(dialogContext).colorScheme.errorContainer,
-                  foregroundColor: Theme.of(dialogContext).colorScheme.onErrorContainer),
+                  backgroundColor:
+                      Theme.of(dialogContext).colorScheme.errorContainer,
+                  foregroundColor:
+                      Theme.of(dialogContext).colorScheme.onErrorContainer),
               onPressed: () => Navigator.of(dialogContext).pop(true),
               child: const Text('Confirmar'),
             ),
@@ -273,10 +293,15 @@ class DashboardScreenState extends State<DashboardScreen> {
     if (confirmed == true) {
       try {
         await _transactionRepository.deleteTransaction(transaction.id);
-        if (mounted) NotificationHelper.show(message: 'Transacción eliminada.', type: NotificationType.success);
+        if (mounted)
+          NotificationHelper.show(
+              message: 'Transacción eliminada.',
+              type: NotificationType.success);
         return true;
       } catch (e) {
-        if (mounted) NotificationHelper.show(message: 'Error al eliminar.', type: NotificationType.error);
+        if (mounted)
+          NotificationHelper.show(
+              message: 'Error al eliminar.', type: NotificationType.error);
         return false;
       }
     }
@@ -296,21 +321,22 @@ class DashboardScreenState extends State<DashboardScreen> {
           builder: (context, snapshot) {
             // Caso de error en el stream
             if (snapshot.hasError) {
-              return Center(child: Text('Error al cargar los datos: ${snapshot.error}'));
+              return Center(
+                  child: Text('Error al cargar los datos: ${snapshot.error}'));
             }
-            
+
             // Determina si estamos en estado de carga.
             // Es `true` si no hay datos AÚN, o si los datos que hay tienen la bandera `isLoading`.
             final isLoading = !snapshot.hasData || snapshot.data!.isLoading;
-            
+
             // Usa datos vacíos para el esqueleto o los datos reales si ya llegaron.
             final data = isLoading ? DashboardData.empty() : snapshot.data!;
 
-                        // --- ¡LÓGICA DE CELEBRACIÓN REACTIVADA Y SEGURA! ---
+            // --- ¡LÓGICA DE CELEBRACIÓN REACTIVADA Y SEGURA! ---
             // Si la carga principal del dashboard ha terminado Y aún no hemos mostrado la celebración...
             if (!isLoading && !_hasShownCelebration) {
               // 1. Marcamos la bandera para que esto no se vuelva a ejecutar en esta sesión.
-              _hasShownCelebration = true; 
+              _hasShownCelebration = true;
               // 2. Usamos un post-frame callback para ejecutar nuestra función DESPUÉS de que la UI se haya pintado.
               //    Esto evita cualquier conflicto de renderizado.
               WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -318,7 +344,6 @@ class DashboardScreenState extends State<DashboardScreen> {
               });
             }
 
-            
             // Skeletonizer muestra una UI "fantasma" mientras isLoading es true.
             return Skeletonizer(
               enabled: isLoading,
@@ -330,16 +355,19 @@ class DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-    Widget _buildDashboardContent(DashboardData data) {
+  Widget _buildDashboardContent(DashboardData data) {
     return RefreshIndicator(
       onRefresh: _handleRefresh,
       child: CustomScrollView(
-        physics: data.isLoading ? const NeverScrollableScrollPhysics() : const AlwaysScrollableScrollPhysics(),
+        physics: data.isLoading
+            ? const NeverScrollableScrollPhysics()
+            : const AlwaysScrollableScrollPhysics(),
         slivers: [
           SliverAppBar(
             pinned: true,
             floating: true,
-            backgroundColor: Theme.of(context).scaffoldBackgroundColor.withAlpha(240),
+            backgroundColor:
+                Theme.of(context).scaffoldBackgroundColor.withAlpha(240),
             elevation: 0,
             titleSpacing: 16.0,
             title: DashboardHeader(userName: data.fullName),
@@ -364,9 +392,11 @@ class DashboardScreenState extends State<DashboardScreen> {
             // --- FIN DE LA MODIFICACIÓN ---
           ),
 
-          SliverToBoxAdapter(child: BalanceCard(totalBalance: data.totalBalance)),
-          SliverToBoxAdapter(child: BudgetsSection(budgets: data.featuredBudgets)),
-          
+          SliverToBoxAdapter(
+              child: BalanceCard(totalBalance: data.totalBalance)),
+          SliverToBoxAdapter(
+              child: BudgetsSection(budgets: data.featuredBudgets)),
+
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
           const SliverToBoxAdapter(child: AiAnalysisSection()),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
@@ -374,13 +404,11 @@ class DashboardScreenState extends State<DashboardScreen> {
             child: ActiveChallengesWidget(),
           ),
 
-
+          // Reemplazamos la sección de transacciones por nuestro nuevo gráfico.
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
           SliverToBoxAdapter(
-            child: RecentTransactionsSection(
-              transactions: data.recentTransactions,
-              onTransactionTapped: _handleTransactionTap,
-              onTransactionDeleted: _handleTransactionDelete,
-              onViewAllPressed: _navigateToTransactionsScreen,
+            child: CategorySpendingChart(
+              spendingData: data.categorySpendingSummary,
             ),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 150)),

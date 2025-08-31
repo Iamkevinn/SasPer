@@ -93,6 +93,9 @@ class DashboardRepository {
       DashboardData partialData = DashboardData.fromPartialMap(balanceDataMap);
       if (!_dashboardDataController.isClosed) _dashboardDataController.add(partialData);
 
+      final startDate = DateTime(DateTime.now().year, DateTime.now().month, 1);
+      final endDate = DateTime(DateTime.now().year, DateTime.now().month + 1, 0);
+
       // --- ¡CAMBIO CLAVE! Etapa 2 ahora llama a RPCs individuales ---
       final detailsResults = await Future.wait([
           client.rpc('get_recent_transactions', params: {'user_id_param': userId}).catchError((_) => []),
@@ -101,7 +104,20 @@ class DashboardRepository {
           client.rpc('get_active_budgets_with_progress', params: {'p_user_id': userId}).catchError((_) => []),
           // Añade aquí la RPC para `expense_summary_for_widget` si la tienes
           client.rpc('get_expense_summary_by_category', params: {'p_user_id': userId, 'client_date': DateFormat('yyyy-MM-dd').format(DateTime.now())}).catchError((_) => []),
+          // --- NUEVA LLAMADA A RPC PARA EL GRÁFICO ---
+          client.rpc('get_category_spending_summary', params: {
+            'start_date': startDate.toIso8601String(),
+            'end_date': endDate.toIso8601String(),
+          }).catchError((_) => []),
       ]);
+
+      final categorySummaryData = (detailsResults[4] as List)
+          .map((item) => CategorySpending(
+                categoryName: item['category_name'] as String? ?? 'Sin Categoría',
+                totalAmount: (item['total_amount'] as num? ?? 0).toDouble(),
+                color: item['color'] as String? ?? '#CCCCCC', // Color gris por defecto
+              ))
+          .toList();
 
       // Reconstruimos el mapa que `copyWithDetails` espera.
       final detailsDataMap = {
@@ -115,7 +131,17 @@ class DashboardRepository {
         developer.log('✅ [Repo] Datos DETALLADOS recibidos de Supabase: $detailsDataMap', name: 'DashboardRepository');
       }
 
+      // 1. Creamos nuestro objeto 'fullData' con los detalles principales.
+      //    Este objeto ya contiene las listas de budgets, goals, transactions, etc.
       DashboardData fullData = partialData.copyWithDetails(detailsDataMap);
+      
+      // 2. Usamos nuestro nuevo y completo método 'copyWith' para añadir la última pieza
+      //    y asegurarnos de que el estado de carga sea falso.
+      fullData = fullData.copyWith(
+        categorySpendingSummary: categorySummaryData,
+        isLoading: false,
+      );
+
       _lastKnownData = fullData; // Actualizamos la caché
 
       if (!_dashboardDataController.isClosed) {

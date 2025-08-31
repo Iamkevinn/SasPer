@@ -6,6 +6,19 @@ import 'package:sasper/models/budget_models.dart'; // Mantiene la importación, 
 import 'package:sasper/models/goal_model.dart';
 import 'package:sasper/models/transaction_models.dart';
 
+// --- NUEVA CLASE PARA LOS DATOS DEL GRÁFICO ---
+class CategorySpending {
+  final String categoryName;
+  final double totalAmount;
+  final String color; // Guardaremos el color de la categoría
+
+  CategorySpending({
+    required this.categoryName,
+    required this.totalAmount,
+    required this.color,
+  });
+}
+
 /// Representa el conjunto completo de datos necesarios para el Dashboard.
 class DashboardData extends Equatable {
   final double totalBalance;
@@ -17,6 +30,7 @@ class DashboardData extends Equatable {
   final List<Goal> goals;
   final List<ExpenseByCategory> expenseSummaryForWidget;
   final bool isLoading;
+  final List<CategorySpending> categorySpendingSummary;
 
   const DashboardData({
     required this.totalBalance,
@@ -27,6 +41,7 @@ class DashboardData extends Equatable {
     required this.goals,
     required this.expenseSummaryForWidget,
     this.isLoading = false,
+    this.categorySpendingSummary = const [],
   });
 
   /// **ETAPA 1:** Crea una instancia con solo los datos esenciales.
@@ -40,6 +55,7 @@ class DashboardData extends Equatable {
       featuredBudgets: const [],
       expenseSummaryForWidget: const [],
       isLoading: loadingDetails,
+      categorySpendingSummary: [],
     );
   }
 
@@ -74,7 +90,8 @@ class DashboardData extends Equatable {
           ?.map((e) => ExpenseByCategory.fromMap(e as Map<String, dynamic>))
           .toList() ?? expenseSummaryForWidget,
       
-      isLoading: false, // La carga ha terminado
+      isLoading: false, 
+      categorySpendingSummary: [], // La carga ha terminado
     );
   }
 
@@ -88,7 +105,8 @@ class DashboardData extends Equatable {
       featuredBudgets: [],
       goals: [],
       expenseSummaryForWidget: [],
-      isLoading: true,
+      isLoading: true, 
+      categorySpendingSummary: [],
     );
   }
 
@@ -97,11 +115,12 @@ class DashboardData extends Equatable {
     double? totalBalance,
     String? fullName,
     List<Transaction>? recentTransactions,
-    List<Budget>? budgets, // Corregido
-    List<Budget>? featuredBudgets, // Corregido
+    List<Budget>? budgets,
+    List<Budget>? featuredBudgets,
     List<Goal>? goals,
     List<ExpenseByCategory>? expenseSummaryForWidget,
     bool? isLoading,
+    List<CategorySpending>? categorySpendingSummary, // <-- Parámetro añadido
   }) {
     return DashboardData(
       totalBalance: totalBalance ?? this.totalBalance,
@@ -111,7 +130,8 @@ class DashboardData extends Equatable {
       featuredBudgets: featuredBudgets ?? this.featuredBudgets,
       goals: goals ?? this.goals,
       expenseSummaryForWidget: expenseSummaryForWidget ?? this.expenseSummaryForWidget,
-      isLoading: isLoading ?? this.isLoading,
+      isLoading: isLoading ?? this.isLoading, 
+      categorySpendingSummary: categorySpendingSummary ?? this.categorySpendingSummary, 
     );
   }
 
@@ -126,5 +146,6 @@ class DashboardData extends Equatable {
         goals,
         expenseSummaryForWidget,
         isLoading,
+        categorySpendingSummary,
       ];
 }
