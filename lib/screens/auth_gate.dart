@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:sasper/services/notification_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
+import 'package:sasper/screens/biometric_gate.dart'; 
 
 // Pantallas
 import 'loading_screen.dart';
@@ -51,7 +51,9 @@ class _AuthGateState extends State<AuthGate> {
             builder: (context, futureSnapshot) {
               // Una vez que los servicios están listos, mostramos la pantalla principal.
               if (futureSnapshot.connectionState == ConnectionState.done) {
-                return const MainScreen();
+                // --- 2. ¡CAMBIO CLAVE AQUÍ! ---
+                // En lugar de ir a MainScreen, vamos a nuestro BiometricGate.
+                return const BiometricGate(); 
               } else {
                 // Mientras se inicializan, seguimos mostrando la pantalla de carga.
                 return const LoadingScreen();

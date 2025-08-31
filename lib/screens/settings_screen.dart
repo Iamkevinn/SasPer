@@ -10,6 +10,8 @@ import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sasper/screens/profile_screen.dart';
+import 'package:sasper/services/preferences_service.dart';
+import 'package:local_auth/local_auth.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -21,6 +23,10 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   // Accedemos a la única instancia (Singleton) del repositorio de autenticación.
   final AuthRepository _authRepository = AuthRepository.instance;
+  // --- 3. NUEVAS PROPIEDADES PARA EL SWITCH ---
+  bool _isBiometricLockEnabled = true; // Valor por defecto
+  bool _isLoadingBiometricStatus = true; // Para mostrar un loader
+
   User? _user;
 
   @override
@@ -28,6 +34,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.initState();
     // Obtenemos el usuario actual desde el repositorio al iniciar la pantalla.
     _user = _authRepository.currentUser;
+    _loadBiometricStatus();
+  }
+
+  // --- 5. NUEVO MÉTODO PARA CARGAR LA PREFERENCIA ---
+  Future<void> _loadBiometricStatus() async {
+    final isEnabled =
+        await PreferencesService.instance.isBiometricLockEnabled();
+    if (mounted) {
+      setState(() {
+        _isBiometricLockEnabled = isEnabled;
+        _isLoadingBiometricStatus = false;
+      });
+    }
+  }
+
+  // --- 6. NUEVO MÉTODO PARA CAMBIAR Y GUARDAR LA PREFERENCIA ---
+  Future<void> _onBiometricLockChanged(bool newValue) async {
+    // Si el usuario quiere ACTIVAR el bloqueo, primero verificamos que tenga hardware compatible.
+    if (newValue == true) {
+      final LocalAuthentication auth = LocalAuthentication();
+      final bool canAuthenticate =
+          await auth.canCheckBiometrics || await auth.isDeviceSupported();
+      if (!canAuthenticate && mounted) {
+        NotificationHelper.show(
+            message:
+                'Tu dispositivo no es compatible con el bloqueo biométrico.',
+            type: NotificationType.error);
+        return; // No continuamos
+      }
+    }
+
+    // Guardamos la nueva preferencia
+    await PreferencesService.instance.setBiometricLock(isEnabled: newValue);
+    // Actualizamos la UI
+    setState(() {
+      _isBiometricLockEnabled = newValue;
+    });
   }
 
   /// Muestra un diálogo para confirmar el cierre de sesión.
@@ -215,6 +258,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   trailing: const Icon(Iconsax.arrow_down_1, size: 18),
                   onTap: _showThemeDialog,
                 ),
+                const Divider(height: 1, indent: 16, endIndent: 16),
+                // --- 7. EL NUEVO SWITCHTILE PARA EL BLOQUEO ---
+                if (_isLoadingBiometricStatus)
+                  const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Center(child: CircularProgressIndicator()))
+                else
+                  SwitchListTile(
+                    title: const Text('Bloqueo de la aplicación'),
+                    subtitle: const Text('Requerir PIN o huella al abrir.'),
+                    value: _isBiometricLockEnabled,
+                    onChanged: _onBiometricLockChanged,
+                    secondary: const Icon(Iconsax.finger_scan),
+                  ),
                 const Divider(height: 1, indent: 16, endIndent: 16),
                 ListTile(
                   leading: const Icon(Iconsax.shapes_1),
