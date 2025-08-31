@@ -27,12 +27,15 @@ class SimulationResultScreen extends StatelessWidget {
             _buildBudgetImpactCard(context, result.budgetImpact!),
             const SizedBox(height: 24),
           ],
-          _buildSavingsImpactCard(context),
+          _buildSavingsImpactCard(context, result.savingsImpact),
           const SizedBox(height: 32),
           Center(
             child: Text(
               'Esta es una simulación y no afecta tus registros.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: Colors.grey),
             ),
           )
         ],
@@ -78,12 +81,16 @@ class SimulationResultScreen extends StatelessWidget {
           children: [
             Icon(icon, size: 48, color: color),
             const SizedBox(height: 12),
-            Text(title, style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.bold, color: color)),
+            Text(title,
+                style: GoogleFonts.poppins(
+                    fontSize: 22, fontWeight: FontWeight.bold, color: color)),
             const SizedBox(height: 8),
             Text(
               result.verdictMessage,
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+              style: TextStyle(
+                  fontSize: 16,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
           ],
         ),
@@ -92,7 +99,8 @@ class SimulationResultScreen extends StatelessWidget {
   }
 
   Widget _buildBudgetImpactCard(BuildContext context, BudgetImpact impact) {
-    final currencyFmt = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+    final currencyFmt =
+        NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
 
     return Card(
       child: Padding(
@@ -100,21 +108,41 @@ class SimulationResultScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Impacto en Presupuesto', style: Theme.of(context).textTheme.titleLarge),
+            Text('Impacto en Presupuesto',
+                style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildProgressCircle('Actual', impact.currentProgress, impact.currentSpent, currencyFmt, context),
+                _buildProgressCircle(
+                    'Actual',
+                    impact
+                        .currentProgress, // El progreso actual no necesita formateo especial
+                    '${(impact.currentProgress * 100).toStringAsFixed(0)}%',
+                    impact.currentSpent,
+                    currencyFmt,
+                    context),
                 const Icon(Iconsax.arrow_right_3, color: Colors.grey),
-                _buildProgressCircle('Proyectado', impact.projectedProgress, impact.projectedSpent, currencyFmt, context, isProjected: true),
+                _buildProgressCircle(
+                    'Proyectado',
+                    impact
+                        .clampedProjectedProgress, // <--- CAMBIO 1: Usa el valor limitado para el círculo
+                    impact
+                        .formattedProjectedProgress, // <--- CAMBIO 2: Usa el String formateado para el texto
+                    impact.projectedSpent,
+                    currencyFmt,
+                    context,
+                    isProjected: true),
               ],
             ),
             const SizedBox(height: 12),
             Center(
               child: Text(
                 'Presupuesto para "${impact.categoryName}": ${currencyFmt.format(impact.budgetAmount)}',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey),
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(color: Colors.grey),
               ),
             ),
           ],
@@ -123,17 +151,36 @@ class SimulationResultScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildProgressCircle(String title, double progress, double amount, NumberFormat formatter, BuildContext context, {bool isProjected = false}) {
+  Widget _buildProgressCircle(
+      String title,
+      double
+          progressValue, // El valor para la animación del círculo (0.0 a 1.0)
+      String
+          progressText, // El texto para mostrar en el centro (ej: "150%" o "+999%")
+      double amount,
+      NumberFormat formatter,
+      BuildContext context,
+      {bool isProjected = false}) {
     Color progressColor;
-    if (progress >= 1.0) {
+    // La lógica de color ahora se basa en el valor del progreso (que siempre estará entre 0 y 1)
+    if (progressValue >= 1.0) {
       progressColor = Colors.red.shade400;
-    } else if (progress >= 0.8) progressColor = Colors.orange.shade400;
-    else progressColor = Colors.green.shade400;
-    
-    if (isProjected) {
-      // Usa un estilo diferente para la proyección
+    } else if (progressValue >= 0.8) {
+      progressColor = Colors.orange.shade400;
+    } else {
+      progressColor = Colors.green.shade400;
     }
-    
+
+    // Si es el proyectado, le damos un estilo visual diferente para que destaque
+    final ringColor =
+        isProjected ? progressColor : progressColor.withOpacity(0.2);
+    final centerTextStyle = isProjected
+        ? TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 20.0,
+            color: Theme.of(context).colorScheme.primary)
+        : const TextStyle(fontWeight: FontWeight.bold, fontSize: 20.0);
+
     return Column(
       children: [
         Text(title, style: Theme.of(context).textTheme.titleMedium),
@@ -141,73 +188,68 @@ class SimulationResultScreen extends StatelessWidget {
         CircularPercentIndicator(
           radius: 50.0,
           lineWidth: 10.0,
-          percent: progress.clamp(0.0, 1.0),
+          percent:
+              progressValue, // <--- CAMBIO 3: Siempre usa un valor seguro (0.0 a 1.0)
           center: Text(
-            '${(progress * 100).toStringAsFixed(0)}%',
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20.0),
+            progressText, // <--- CAMBIO 4: Muestra el texto ya formateado y limitado
+            style: centerTextStyle,
           ),
           circularStrokeCap: CircularStrokeCap.round,
           progressColor: progressColor,
-          backgroundColor: progressColor.withOpacity(0.2),
+          backgroundColor: ringColor,
         ),
         const SizedBox(height: 8),
-        Text(formatter.format(amount), style: Theme.of(context).textTheme.bodyLarge),
+        Text(formatter.format(amount),
+            style: Theme.of(context).textTheme.bodyLarge),
       ],
     );
   }
+}
 
-  Widget _buildSavingsImpactCard(BuildContext context) {
-    final currencyFmt = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
-    final impact = result.savingsImpact;
-    final difference = impact.currentEOMBalance - impact.projectedEOMBalance;
+Widget _buildSavingsImpactCard(BuildContext context, SavingsImpact impact) {
+  final currencyFmt =
+      NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+  final difference = impact.currentEOMBalance - impact.projectedEOMBalance;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Impacto en Flujo de Caja', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 16),
-            _buildImpactRow(
-              'Balance Proyectado (Fin de Mes)', 
-              currencyFmt.format(impact.currentEOMBalance), 
-              context
-            ),
-            const SizedBox(height: 8),
-            _buildImpactRow(
-              'Gasto Simulado', 
-              '- ${currencyFmt.format(difference)}', 
-              context, 
-              isNegative: true
-            ),
-            const Divider(height: 24),
-            _buildImpactRow(
-              'Nuevo Balance Proyectado', 
-              currencyFmt.format(impact.projectedEOMBalance), 
-              context, 
-              isBold: true
-            ),
-          ],
-        ),
+  return Card(
+    child: Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Impacto en Flujo de Caja',
+              style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 16),
+          _buildImpactRow('Balance Proyectado (Fin de Mes)',
+              currencyFmt.format(impact.currentEOMBalance), context),
+          const SizedBox(height: 8),
+          _buildImpactRow(
+              'Gasto Simulado', '- ${currencyFmt.format(difference)}', context,
+              isNegative: true),
+          const Divider(height: 24),
+          _buildImpactRow('Nuevo Balance Proyectado',
+              currencyFmt.format(impact.projectedEOMBalance), context,
+              isBold: true),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 
-  Widget _buildImpactRow(String label, String value, BuildContext context, {bool isNegative = false, bool isBold = false}) {
-    final textTheme = Theme.of(context).textTheme;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: textTheme.bodyLarge),
-        Text(
-          value, 
+Widget _buildImpactRow(String label, String value, BuildContext context,
+    {bool isNegative = false, bool isBold = false}) {
+  final textTheme = Theme.of(context).textTheme;
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Text(label, style: textTheme.bodyLarge),
+      Text(value,
           style: textTheme.bodyLarge?.copyWith(
             fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-            color: isNegative ? Colors.red.shade400 : (isBold ? Theme.of(context).colorScheme.primary : null),
-          )
-        ),
-      ],
-    );
-  }
+            color: isNegative
+                ? Colors.red.shade400
+                : (isBold ? Theme.of(context).colorScheme.primary : null),
+          )),
+    ],
+  );
 }

@@ -1,4 +1,5 @@
 // lib/models/simulation_models.dart
+import 'package:intl/intl.dart';
 
 // Para el veredicto general
 enum SimulationVerdict { recommended, withCaution, notRecommended }
@@ -59,6 +60,34 @@ class BudgetImpact {
 
   double get currentProgress => (budgetAmount > 0) ? (currentSpent / budgetAmount) : 0;
   double get projectedProgress => (budgetAmount > 0) ? (projectedSpent / budgetAmount) : 0;
+
+    // --- ¡NUEVOS GETTERS FORMATEADOS PARA LA UI! ---
+
+  /// Devuelve el progreso proyectado como un String formateado (ej: "150%").
+  /// Tiene un límite superior para evitar valores absurdos en la UI.
+  String get formattedProjectedProgress {
+    // Si el presupuesto es 0 o negativo, no tiene sentido calcular un porcentaje.
+    if (budgetAmount <= 0) return "N/A";
+
+    final progress = projectedSpent / budgetAmount;
+    
+    // Si el progreso es extremadamente alto (ej: más de 1000%), lo limitamos visualmente.
+    if (progress > 10.0) { // 10.0 equivale a 1000%
+      return "+999%";
+    }
+
+    // Usamos NumberFormat para formatear el número como un porcentaje limpio.
+    return NumberFormat.percentPattern('es_CO').format(progress);
+  }
+
+  /// Devuelve un valor de progreso "limitado" para usar en indicadores visuales
+  /// como CircularProgressIndicator. El valor siempre estará entre 0.0 y 1.0.
+  double get clampedProjectedProgress {
+    if (budgetAmount <= 0) return 0.0;
+    
+    // La función .clamp() asegura que el valor nunca sea menor que 0.0 ni mayor que 1.0.
+    return (projectedSpent / budgetAmount).clamp(0.0, 1.0);
+  }
 
   factory BudgetImpact.fromMap(Map<String, dynamic> map) {
     return BudgetImpact(
