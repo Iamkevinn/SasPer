@@ -2,7 +2,9 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:sasper/models/dashboard_data_model.dart';
+import 'package:sasper/screens/analysis_screen.dart';
 
 class CategorySpendingChart extends StatefulWidget {
   final List<CategorySpending> spendingData;
@@ -45,17 +47,51 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- TÍTULO ---
-            Padding(
-              padding: const EdgeInsets.only(left: 4.0),
-              child: Text(
-                'Tus Gastos este Mes',
-                style: GoogleFonts.poppins(
-                    textStyle: Theme.of(context).textTheme.titleLarge,
-                    fontWeight: FontWeight.bold),
-              ),
+            // --- ¡NUEVO TÍTULO CON BOTÓN! ---
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // El título sigue igual
+                Padding(
+                  padding: const EdgeInsets.only(left: 4.0),
+                  child: Text(
+                    'Tus Gastos este Mes',
+                    style: GoogleFonts.poppins(
+                        textStyle: Theme.of(context).textTheme.titleLarge,
+                        fontWeight: FontWeight.bold),
+                  ),
+                ),
+                // El nuevo botón para ver detalles
+                TextButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const AnalysisScreen()),
+                    );
+                  },
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Detalles',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        Iconsax.arrow_right_3,
+                        size: 16,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-
             // --- GRÁFICO CENTRADO ---
             const SizedBox(height: 50),
             SizedBox(
@@ -87,12 +123,12 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
             // --- LEYENDA MEJORADA (DEBAJO) ---
             const SizedBox(height: 50),
             const Divider(),
-            const SizedBox(height: 10),
+            const SizedBox(height:5),
             Center(
               child: Wrap(
                 alignment: WrapAlignment.center,
-                spacing: 12.0,
-                runSpacing: 8.0,
+                spacing: 10.0,
+                runSpacing: 1.0,
                 children: widget.spendingData.asMap().entries.map((entry) {
                   final isTouched = entry.key == touchedIndex;
                   final data = entry.value;
