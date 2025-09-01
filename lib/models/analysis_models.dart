@@ -1,9 +1,34 @@
 // lib/models/analysis_models.dart
 import 'package:equatable/equatable.dart';
 import 'package:sasper/models/mood_analysis_model.dart';
-import 'package:sasper/models/mood_by_day_analysis_model.dart'; 
+import 'package:sasper/models/mood_by_day_analysis_model.dart';
 
 // --- MODELOS INDIVIDUALES PARA CADA GRÁFICO ---
+
+// Modelo para el resultado del promedio mensual total
+class MonthlyAverageResult with EquatableMixin {
+  final double averageSpending;
+  final int monthCount;
+
+  const MonthlyAverageResult(
+      {required this.averageSpending, required this.monthCount});
+
+  @override
+  List<Object?> get props => [averageSpending, monthCount];
+}
+
+// Modelo para el resultado del promedio por categoría
+class CategoryAverageResult with EquatableMixin {
+  final String categoryName;
+  final double averageAmount;
+  final String? color;
+
+  const CategoryAverageResult(
+      {required this.categoryName, required this.averageAmount, this.color});
+
+  @override
+  List<Object?> get props => [categoryName, averageAmount, color];
+}
 
 // Usamos el mixin Equatable en lugar de extenderlo para clases más simples.
 class ExpenseByCategory with EquatableMixin {
@@ -37,6 +62,7 @@ class ExpenseByCategory with EquatableMixin {
       'total_spent': totalSpent,
     };
   }
+
   @override
   List<Object?> get props => [category, totalSpent];
 }
@@ -87,7 +113,7 @@ class MonthlyCashflowData with EquatableMixin {
       throw FormatException('Error al parsear MonthlyCashflowData: $e', json);
     }
   }
-  
+
   @override
   List<Object?> get props => [monthStart, income, expense, cashFlow];
 }
@@ -107,66 +133,69 @@ class CategorySpendingComparisonData with EquatableMixin {
     try {
       return CategorySpendingComparisonData(
         category: json['category'] as String? ?? 'Sin Categoría',
-        currentMonthSpent: (json['current_month_spent'] as num? ?? 0).toDouble(),
-        previousMonthSpent: (json['previous_month_spent'] as num? ?? 0).toDouble(),
+        currentMonthSpent:
+            (json['current_month_spent'] as num? ?? 0).toDouble(),
+        previousMonthSpent:
+            (json['previous_month_spent'] as num? ?? 0).toDouble(),
       );
     } catch (e) {
-      throw FormatException('Error al parsear CategorySpendingComparisonData: $e', json);
+      throw FormatException(
+          'Error al parsear CategorySpendingComparisonData: $e', json);
     }
   }
-  
+
   @override
   List<Object?> get props => [category, currentMonthSpent, previousMonthSpent];
 }
 
 class IncomeByCategory with EquatableMixin {
-    final String category;
-    final double totalIncome;
+  final String category;
+  final double totalIncome;
 
-    const IncomeByCategory({required this.category, required this.totalIncome});
+  const IncomeByCategory({required this.category, required this.totalIncome});
 
-    factory IncomeByCategory.fromJson(Map<String, dynamic> json) {
-      try {
-        return IncomeByCategory(
-            category: json['category'] as String? ?? 'Sin Categoría',
-            totalIncome: (json['total_income'] as num? ?? 0).toDouble(),
-        );
-      } catch (e) {
-        throw FormatException('Error al parsear IncomeByCategory: $e', json);
-      }
+  factory IncomeByCategory.fromJson(Map<String, dynamic> json) {
+    try {
+      return IncomeByCategory(
+        category: json['category'] as String? ?? 'Sin Categoría',
+        totalIncome: (json['total_income'] as num? ?? 0).toDouble(),
+      );
+    } catch (e) {
+      throw FormatException('Error al parsear IncomeByCategory: $e', json);
     }
+  }
 
-    @override
-    List<Object?> get props => [category, totalIncome];
+  @override
+  List<Object?> get props => [category, totalIncome];
 }
 
 class MonthlyIncomeExpenseSummaryData with EquatableMixin {
-    final DateTime monthStart;
-    final double totalIncome;
-    final double totalExpense;
+  final DateTime monthStart;
+  final double totalIncome;
+  final double totalExpense;
 
-    const MonthlyIncomeExpenseSummaryData({
-        required this.monthStart,
-        required this.totalIncome,
-        required this.totalExpense,
-    });
+  const MonthlyIncomeExpenseSummaryData({
+    required this.monthStart,
+    required this.totalIncome,
+    required this.totalExpense,
+  });
 
-    factory MonthlyIncomeExpenseSummaryData.fromJson(Map<String, dynamic> json) {
-      try {
-        return MonthlyIncomeExpenseSummaryData(
-            monthStart: DateTime.parse(json['month_start'] as String),
-            totalIncome: (json['total_income'] as num? ?? 0).toDouble(),
-            totalExpense: (json['total_expense'] as num? ?? 0).toDouble(),
-        );
-      } catch (e) {
-        throw FormatException('Error al parsear MonthlyIncomeExpenseSummaryData: $e', json);
-      }
+  factory MonthlyIncomeExpenseSummaryData.fromJson(Map<String, dynamic> json) {
+    try {
+      return MonthlyIncomeExpenseSummaryData(
+        monthStart: DateTime.parse(json['month_start'] as String),
+        totalIncome: (json['total_income'] as num? ?? 0).toDouble(),
+        totalExpense: (json['total_expense'] as num? ?? 0).toDouble(),
+      );
+    } catch (e) {
+      throw FormatException(
+          'Error al parsear MonthlyIncomeExpenseSummaryData: $e', json);
     }
+  }
 
-    @override
-    List<Object?> get props => [monthStart, totalIncome, totalExpense];
+  @override
+  List<Object?> get props => [monthStart, totalIncome, totalExpense];
 }
-
 
 // --- MODELO CONTENEDOR PRINCIPAL ---
 
@@ -178,8 +207,10 @@ class AnalysisData extends Equatable {
   final List<IncomeByCategory> incomePieData;
   final List<MonthlyIncomeExpenseSummaryData> incomeExpenseBarData;
   final Map<DateTime, int> heatmapData;
-  final List<MoodAnalysis> moodAnalysisData; 
+  final List<MoodAnalysis> moodAnalysisData;
   final List<MoodByDayAnalysis> moodByDayData; // NOVEDAD: Añadir propiedad6
+  final MonthlyAverageResult monthlyAverage;
+  final List<CategoryAverageResult> categoryAverages;
 
   const AnalysisData({
     required this.expensePieData,
@@ -191,6 +222,8 @@ class AnalysisData extends Equatable {
     required this.heatmapData,
     required this.moodAnalysisData,
     required this.moodByDayData, // NOVEDAD: Añadir al constructor
+    required this.monthlyAverage,
+    required this.categoryAverages,
   });
 
   // Constructor "vacío" para usar en estados iniciales o de carga.
@@ -204,8 +237,10 @@ class AnalysisData extends Equatable {
       incomePieData: [],
       incomeExpenseBarData: [],
       heatmapData: {},
-       moodAnalysisData: [],
-       moodByDayData: [],
+      moodAnalysisData: [],
+      moodByDayData: [],
+      monthlyAverage: MonthlyAverageResult(averageSpending: 0, monthCount: 0),
+      categoryAverages: [],
     );
   }
 
@@ -220,6 +255,8 @@ class AnalysisData extends Equatable {
         heatmapData,
         moodAnalysisData,
         moodByDayData,
+        monthlyAverage,
+        categoryAverages,
       ];
 }
 
@@ -228,7 +265,7 @@ class AnalysisData extends Equatable {
 // Modelo para el Widget de "Salud Financiera"
 class FinancialHealthInsight extends Equatable {
   final double spendingPace; // Gasto promedio por día este mes
-  final double savingsRate;  // Porcentaje de ingresos ahorrado este mes
+  final double savingsRate; // Porcentaje de ingresos ahorrado este mes
   final String topCategoryName;
   final double topCategoryAmount;
 
@@ -240,7 +277,8 @@ class FinancialHealthInsight extends Equatable {
   });
 
   @override
-  List<Object?> get props => [spendingPace, savingsRate, topCategoryName, topCategoryAmount];
+  List<Object?> get props =>
+      [spendingPace, savingsRate, topCategoryName, topCategoryAmount];
 }
 
 // Modelo para el Widget de "Comparativa Mensual"
@@ -253,7 +291,7 @@ class MonthlyComparison extends Equatable {
     required this.currentMonthSpending,
     required this.previousMonthSpending,
   });
-  
+
   @override
   List<Object?> get props => [currentMonthSpending, previousMonthSpending];
 }

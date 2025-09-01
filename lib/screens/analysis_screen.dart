@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:sasper/widgets/analysis_charts/average_analysis_section.dart';
 import 'package:sasper/widgets/analysis_charts/mood_by_day_chart.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:iconsax/iconsax.dart';
@@ -12,7 +13,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 // Repositorios y Modelos
 import 'package:sasper/data/analysis_repository.dart';
 import 'package:sasper/models/analysis_models.dart';
-import 'package:sasper/models/insight_model.dart'; 
+import 'package:sasper/models/insight_model.dart';
 
 // --- NUEVAS IMPORTACIONES ---
 import 'package:flutter_animate/flutter_animate.dart';
@@ -33,7 +34,6 @@ import 'package:sasper/widgets/analysis/insight_card.dart';
 
 // Placeholder para el modelo de Insight. Reemplázalo cuando lo crees.
 
-
 class AnalysisScreen extends StatefulWidget {
   const AnalysisScreen({super.key});
 
@@ -46,7 +46,7 @@ class AnalysisScreenState extends State<AnalysisScreen> {
 
   // Usamos un "Record" para manejar ambos futuros en un solo estado.
   late Future<({AnalysisData charts, List<Insight> insights})> _analysisFuture;
-  
+
   RealtimeChannel? _realtimeChannel;
   Timer? _debounce;
 
@@ -59,23 +59,29 @@ class AnalysisScreenState extends State<AnalysisScreen> {
 
   /// Carga en paralelo los datos de los gráficos y los insights para una carga más rápida.
   /// Carga en paralelo los datos de los gráficos y los insights de forma resiliente.
-Future<({AnalysisData charts, List<Insight> insights})> _fetchAllScreenData() async {
+  Future<({AnalysisData charts, List<Insight> insights})>
+      _fetchAllScreenData() async {
     // Usamos Future.wait con manejo de errores individual, similar a como lo
     // hace tu AnalysisRepository. Esto asegura que si una parte falla, la otra no.
     final results = await Future.wait([
       _repository.fetchAllAnalysisData().catchError((e) {
         // Si falla la carga de gráficos, logueamos el error y devolvemos datos vacíos.
-        developer.log('Fallo al cargar datos de gráficos', name: 'AnalysisScreen', error: e);
+        developer.log('Fallo al cargar datos de gráficos',
+            name: 'AnalysisScreen', error: e);
         return AnalysisData.empty();
       }),
       _repository.getInsights().catchError((e) {
         // Si falla la carga de insights, logueamos y devolvemos una lista vacía.
-        developer.log('Fallo al cargar insights', name: 'AnalysisScreen', error: e);
+        developer.log('Fallo al cargar insights',
+            name: 'AnalysisScreen', error: e);
         return <Insight>[];
       }),
     ]);
-    
-    return (charts: results[0] as AnalysisData, insights: results[1] as List<Insight>);
+
+    return (
+      charts: results[0] as AnalysisData,
+      insights: results[1] as List<Insight>
+    );
   }
 
   /// Configura la escucha de cambios en tiempo real en la base de datos.
@@ -98,7 +104,7 @@ Future<({AnalysisData charts, List<Insight> insights})> _fetchAllScreenData() as
         )
         .subscribe();
   }
-  
+
   /// Agrupa múltiples llamadas de refresco en una sola para evitar sobrecargar la red.
   void _triggerRefreshWithDebounce() {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
@@ -135,7 +141,8 @@ Future<({AnalysisData charts, List<Insight> insights})> _fetchAllScreenData() as
         child: FutureBuilder<({AnalysisData charts, List<Insight> insights})>(
           future: _analysisFuture,
           builder: (context, snapshot) {
-            final isLoading = snapshot.connectionState == ConnectionState.waiting;
+            final isLoading =
+                snapshot.connectionState == ConnectionState.waiting;
 
             // Usamos Skeletonizer para el estado de carga
             if (isLoading) {
@@ -162,14 +169,17 @@ Future<({AnalysisData charts, List<Insight> insights})> _fetchAllScreenData() as
             return CustomScrollView(
               slivers: [
                 SliverAppBar(
-                  title: Text('Análisis', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+                  title: Text('Análisis',
+                      style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
                   centerTitle: false,
                   elevation: 0,
                   pinned: true, // El título se queda fijo al hacer scroll.
-                  floating: true, // El appbar reaparece al hacer scroll hacia arriba.
-                  backgroundColor: Theme.of(context).scaffoldBackgroundColor.withAlpha(240),
+                  floating:
+                      true, // El appbar reaparece al hacer scroll hacia arriba.
+                  backgroundColor:
+                      Theme.of(context).scaffoldBackgroundColor.withAlpha(240),
                 ),
-                
+
                 // --- SECCIÓN DE INSIGHTS ---
                 // Solo se muestra si la lista de insights no está vacía.
                 if (insights.isNotEmpty) ...[
@@ -178,11 +188,13 @@ Future<({AnalysisData charts, List<Insight> insights})> _fetchAllScreenData() as
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
                     sliver: SliverList.separated(
                       itemCount: insights.length,
-                      itemBuilder: (context, index) => InsightCard(insight: insights[index])
-                          .animate()
-                          .fadeIn(duration: 500.ms, delay: (100 * index).ms)
-                          .slideY(begin: 0.2, curve: Curves.easeOutCubic),
-                      separatorBuilder: (context, index) => const SizedBox(height: 12),
+                      itemBuilder: (context, index) =>
+                          InsightCard(insight: insights[index])
+                              .animate()
+                              .fadeIn(duration: 500.ms, delay: (100 * index).ms)
+                              .slideY(begin: 0.2, curve: Curves.easeOutCubic),
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 12),
                     ),
                   ),
                 ],
@@ -195,11 +207,13 @@ Future<({AnalysisData charts, List<Insight> insights})> _fetchAllScreenData() as
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 150),
                     sliver: SliverList.separated(
                       itemCount: _getChartCount(chartData),
-                      itemBuilder: (context, index) => _buildChartWidget(chartData, index)
-                          .animate()
-                          .fadeIn(duration: 600.ms, delay: (200 * index).ms)
-                          .moveY(begin: 30, curve: Curves.easeOutCubic),
-                      separatorBuilder: (context, index) => const SizedBox(height: 32),
+                      itemBuilder: (context, index) =>
+                          _buildChartWidget(chartData, index)
+                              .animate()
+                              .fadeIn(duration: 600.ms, delay: (200 * index).ms)
+                              .moveY(begin: 30, curve: Curves.easeOutCubic),
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 32),
                     ),
                   ),
                 ],
@@ -210,7 +224,7 @@ Future<({AnalysisData charts, List<Insight> insights})> _fetchAllScreenData() as
       ),
     );
   }
-  
+
   // --- WIDGETS AUXILIARES PARA MANTENER EL `build` LIMPIO Y LEGIBLE ---
 
   Widget _buildSectionHeader(String title) {
@@ -227,6 +241,7 @@ Future<({AnalysisData charts, List<Insight> insights})> _fetchAllScreenData() as
 
   int _getChartCount(AnalysisData data) {
     int count = 0;
+    if (data.monthlyAverage.monthCount > 0 && data.categoryAverages.isNotEmpty) count++;
     if (data.moodAnalysisData.isNotEmpty) count++;
     if (data.moodByDayData.isNotEmpty) count++;
     if (data.heatmapData.isNotEmpty) count++;
@@ -241,20 +256,38 @@ Future<({AnalysisData charts, List<Insight> insights})> _fetchAllScreenData() as
 
   Widget _buildChartWidget(AnalysisData data, int index) {
     final widgets = [
+      if (data.monthlyAverage.monthCount > 0 && data.categoryAverages.isNotEmpty)
+        AverageAnalysisSection(
+          monthlyData: data.monthlyAverage,
+          categoryData: data.categoryAverages,
+        ),
       // NOVEDAD: Añadimos nuestro nuevo widget a la lista, preferiblemente al principio.
-      if (data.moodAnalysisData.isNotEmpty) MoodSpendingAnalysisCard(analysisData: data.moodAnalysisData),
-      if (data.moodByDayData.isNotEmpty) MoodByDayChart(analysisData: data.moodByDayData),
-      if (data.heatmapData.isNotEmpty) HeatmapSection(data: data.heatmapData, startDate: DateTime.now().subtract(const Duration(days: 119)), endDate: DateTime.now()),
-      if (data.cashflowBarData.isNotEmpty) MonthlyCashflowChart(data: data.cashflowBarData),
-      if (data.netWorthLineData.isNotEmpty) NetWorthTrendChart(data: data.netWorthLineData),
-      if (data.incomeExpenseBarData.isNotEmpty) IncomeExpenseBarChart(data: data.incomeExpenseBarData),
-      if (data.categoryComparisonData.isNotEmpty) CategoryComparisonChart(data: data.categoryComparisonData),
-      if (data.expensePieData.isNotEmpty) ExpensePieChart(data: data.expensePieData),
-      if (data.incomePieData.isNotEmpty) IncomePieChart(data: data.incomePieData),
+      if (data.moodAnalysisData.isNotEmpty)
+        MoodSpendingAnalysisCard(analysisData: data.moodAnalysisData),
+      if (data.moodByDayData.isNotEmpty)
+        MoodByDayChart(analysisData: data.moodByDayData),
+      if (data.heatmapData.isNotEmpty)
+        HeatmapSection(
+            data: data.heatmapData,
+            startDate: DateTime.now().subtract(const Duration(days: 119)),
+            endDate: DateTime.now()),
+      if (data.cashflowBarData.isNotEmpty)
+        MonthlyCashflowChart(data: data.cashflowBarData),
+      if (data.netWorthLineData.isNotEmpty)
+        NetWorthTrendChart(data: data.netWorthLineData),
+      if (data.incomeExpenseBarData.isNotEmpty)
+        IncomeExpenseBarChart(data: data.incomeExpenseBarData),
+      if (data.categoryComparisonData.isNotEmpty)
+        CategoryComparisonChart(data: data.categoryComparisonData),
+      if (data.expensePieData.isNotEmpty)
+        ExpensePieChart(data: data.expensePieData),
+      if (data.incomePieData.isNotEmpty)
+        IncomePieChart(data: data.incomePieData),
     ];
     // Devuelve un contenedor vacío temporalmente para que no haya errores
     if (widgets.isEmpty) {
-      return const SizedBox(height: 1, child: Text("Gráfico desactivado temporalmente"));
+      return const SizedBox(
+          height: 1, child: Text("Gráfico desactivado temporalmente"));
     }
     return widgets[index];
   }
@@ -262,21 +295,20 @@ Future<({AnalysisData charts, List<Insight> insights})> _fetchAllScreenData() as
   Widget _buildErrorState(Object? error) {
     // NOVEDAD: Logueamos el error para verlo completo en la consola.
     developer.log(
-      'Error capturado por FutureBuilder en AnalysisScreen', 
-      name: 'AnalysisScreen', 
+      'Error capturado por FutureBuilder en AnalysisScreen',
+      name: 'AnalysisScreen',
       error: error,
       // Si tienes el stackTrace del snapshot, añádelo también:
       // stackTrace: snapshot.stackTrace,
     );
 
     return Center(
-      child: EmptyStateCard(
-        title: 'Ocurrió un Error', 
-        // NOVEDAD: Mostramos el error real en la UI.
-        message: 'No se pudieron cargar los datos de análisis.\n\nError: $error', 
-        icon: Iconsax.warning_2
-      )
-    );
+        child: EmptyStateCard(
+            title: 'Ocurrió un Error',
+            // NOVEDAD: Mostramos el error real en la UI.
+            message:
+                'No se pudieron cargar los datos de análisis.\n\nError: $error',
+            icon: Iconsax.warning_2));
   }
 
   Widget _buildShimmer() {
@@ -300,9 +332,17 @@ Future<({AnalysisData charts, List<Insight> insights})> _fetchAllScreenData() as
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Column(
               children: [
-                Container(height: 80, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16))),
+                Container(
+                    height: 80,
+                    decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16))),
                 const SizedBox(height: 12),
-                Container(height: 80, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16))),
+                Container(
+                    height: 80,
+                    decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16))),
               ],
             ),
           ),
@@ -316,9 +356,17 @@ Future<({AnalysisData charts, List<Insight> insights})> _fetchAllScreenData() as
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Column(
               children: [
-                Container(height: 250, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20))),
+                Container(
+                    height: 250,
+                    decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20))),
                 const SizedBox(height: 32),
-                Container(height: 300, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20))),
+                Container(
+                    height: 300,
+                    decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20))),
               ],
             ),
           ),
@@ -350,13 +398,17 @@ Future<({AnalysisData charts, List<Insight> insights})> _fetchAllScreenData() as
                     const SizedBox(height: 16),
                     Text(
                       'Sin Datos Suficientes',
-                      style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w600),
+                      style: GoogleFonts.poppins(
+                          fontSize: 22, fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'Registra algunas transacciones para empezar a ver tus análisis inteligentes.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                      style: TextStyle(
+                          fontSize: 16,
+                          color:
+                              Theme.of(context).colorScheme.onSurfaceVariant),
                     ),
                   ],
                 ),
@@ -367,15 +419,14 @@ Future<({AnalysisData charts, List<Insight> insights})> _fetchAllScreenData() as
       ),
     ).animate().fadeIn(duration: 400.ms);
   }
-
 }
 
 /// Extensión para simplificar la comprobación de si hay datos de gráficos para mostrar.
 extension on AnalysisData {
   bool get hasData =>
-  // NOVEDAD: Añadimos el nuevo análisis a la comprobación general.
+      // NOVEDAD: Añadimos el nuevo análisis a la comprobación general.
       moodByDayData.isNotEmpty ||
-      moodAnalysisData.isNotEmpty || 
+      moodAnalysisData.isNotEmpty ||
       expensePieData.isNotEmpty ||
       cashflowBarData.isNotEmpty ||
       netWorthLineData.isNotEmpty ||
