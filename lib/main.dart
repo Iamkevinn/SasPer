@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:sasper/config/app_config.dart';
 import 'package:sasper/screens/SplashScreen.dart';
 import 'package:provider/provider.dart';
 //import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -63,6 +64,7 @@ Future<void> main() async {
   await initializeDateFormatting('es_CO', null);
   // 3. ¡Ejecuta la app INMEDIATAMENTE!
   //    Toda la carga pesada ahora está dentro de SplashScreen.
+  AppConfig.checkKeys();
   runApp(
     // Envolvemos la app con un ChangeNotifierProvider
     ChangeNotifierProvider(

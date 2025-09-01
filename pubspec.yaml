@@ -82,6 +82,11 @@ dependencies:
   share_plus: ^10.1.4   # Para abrir el diálogo de compartir nativo
   image_picker: ^1.2.0
   
+  # Geolocalización
+  google_places_flutter: ^2.1.1
+  uuid: ^4.5.1
+  geolocator: ^14.0.2
+  
 # Dependencias que solo se usan durante el desarrollo.
 dev_dependencies:
   flutter_test:

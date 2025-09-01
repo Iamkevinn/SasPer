@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:iconsax/iconsax.dart';
+import 'package:sasper/config/app_config.dart';
 import 'package:sasper/data/account_repository.dart';
 import 'package:sasper/data/transaction_repository.dart';
 import 'package:sasper/data/budget_repository.dart';
@@ -18,6 +19,8 @@ import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:developer' as developer;
+import 'package:sasper/screens/place_search_screen.dart';
+import 'package:geolocator/geolocator.dart';
 
 class AddTransactionScreen extends StatefulWidget {
   const AddTransactionScreen({super.key});
@@ -43,11 +46,83 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   int? _selectedBudgetId; // Mantenemos el ID del presupuesto a vincular
   TransactionMood? _selectedMood;
   
+  String? _selectedLocationName;
+  double? _selectedLat;
+  double? _selectedLng;
+
+
   late Future<List<Account>> _accountsFuture;
   // --- ¡CORRECCIÓN! El Future ahora espera una lista del nuevo modelo `Budget` ---
   late Future<List<Budget>> _budgetsFuture;
   late Future<List<Category>> _categoriesFuture;
 
+  // --- NUEVA VARIABLE DE ESTADO ---
+  bool _isFetchingLocation = false; // Para mostrar un loader
+
+  // --- NUEVO MÉTODO PARA OBTENER UBICACIÓN ---
+  Future<void> _getCurrentLocation() async {
+    setState(() => _isFetchingLocation = true);
+
+    try {
+      // 1. Verificar y solicitar permisos
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          NotificationHelper.show(message: 'Permiso de ubicación denegado.', type: NotificationType.warning);
+          setState(() => _isFetchingLocation = false);
+          return;
+        }
+      }
+      
+      if (permission == LocationPermission.deniedForever) {
+        NotificationHelper.show(message: 'Permiso de ubicación denegado permanentemente.', type: NotificationType.error);
+        setState(() => _isFetchingLocation = false);
+        return;
+      } 
+
+      // 2. Obtener las coordenadas del GPS
+      final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+
+      // 3. Convertir coordenadas a un nombre de lugar (Geocodificación Inversa)
+      final locationName = await _getPlaceNameFromCoordinates(position.latitude, position.longitude);
+
+      if (mounted) {
+        setState(() {
+          _selectedLat = position.latitude;
+          _selectedLng = position.longitude;
+          _selectedLocationName = locationName;
+          _isFetchingLocation = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        NotificationHelper.show(message: 'No se pudo obtener la ubicación.', type: NotificationType.error);
+        setState(() => _isFetchingLocation = false);
+      }
+    }
+  }
+
+  // --- NUEVO MÉTODO AUXILIAR PARA LA GEOCODIFICACIÓN INVERSA ---
+  Future<String> _getPlaceNameFromCoordinates(double lat, double lng) async {
+    final apiKey = AppConfig.googlePlacesApiKey;
+    final url = Uri.parse('https://maps.googleapis.com/maps/api/geocode/json?latlng=$lat,$lng&key=$apiKey');
+
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['status'] == 'OK' && data['results'].isNotEmpty) {
+          // Devolvemos la primera dirección formateada, que suele ser la más completa.
+          return data['results'][0]['formatted_address'];
+        }
+      }
+      return "Ubicación Desconocida";
+    } catch (e) {
+      return "Ubicación Desconocida";
+    }
+  }
+  
   @override
   void initState() {
     super.initState();
@@ -109,6 +184,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         transactionDate: DateTime.now(),
         budgetId: _selectedBudgetId,
         mood: _selectedMood,
+        locationName: _selectedLocationName,
+        latitude: _selectedLat,
+        longitude: _selectedLng,
       );
       
       if (mounted) {
@@ -325,6 +403,55 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 decoration: InputDecoration(labelText: 'Descripción (Opcional)', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), prefixIcon: const Icon(Iconsax.document_text)),
                 maxLines: 2,
               ),
+
+              // --- NUEVO WIDGET: SELECTOR DE UBICACIÓN ---
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: _isFetchingLocation 
+                    ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Iconsax.location),
+                title: Text(_selectedLocationName ?? 'Añadir Ubicación (Opcional)'),
+                subtitle: _selectedLocationName != null ? const Text('Toca para buscar otro lugar') : null,
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // --- CORRECCIONES APLICADAS ---
+                    // 1. Se eliminó el 'const' antes de IconButton.
+                    // 2. Se cambió Iconsax.my_location por Iconsax.gps.
+                    IconButton(
+                      icon: const Icon(Iconsax.gps), 
+                      tooltip: 'Usar mi ubicación actual',
+                      onPressed: _isFetchingLocation ? null : _getCurrentLocation,
+                    ),
+                    if (_selectedLocationName != null)
+                      IconButton(
+                        icon: const Icon(Iconsax.close_circle, color: Colors.grey),
+                        tooltip: 'Quitar ubicación',
+                        onPressed: () {
+                          setState(() {
+                            _selectedLocationName = null;
+                            _selectedLat = null;
+                            _selectedLng = null;
+                          });
+                        },
+                      ),
+                  ],
+                ),
+                onTap: () async {
+                  final result = await Navigator.push<Map<String, dynamic>>(
+                    context,
+                    MaterialPageRoute(builder: (context) => const PlaceSearchScreen()),
+                  );
+                  if (result != null && mounted) {
+                    setState(() {
+                      _selectedLocationName = result['name'];
+                      _selectedLat = result['lat'];
+                      _selectedLng = result['lng'];
+                    });
+                  }
+                },
+              ),
+
               const SizedBox(height: 32),
               
               ElevatedButton.icon(

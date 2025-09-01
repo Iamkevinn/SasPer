@@ -62,6 +62,9 @@ class TransactionRepository {
     required DateTime transactionDate,
     int? budgetId,
     TransactionMood? mood, 
+    String? locationName,
+    double? latitude,
+    double? longitude,
   }) async {
     try {
       await client.from('transactions').insert({
@@ -74,6 +77,9 @@ class TransactionRepository {
         'transaction_date': transactionDate.toIso8601String(),
         'budget_id': budgetId,
         'mood': mood?.name,
+        'location_name': locationName,
+        'latitude': latitude,
+        'longitude': longitude,
       });
     } catch (e) {
       developer.log('🔥 Error al añadir transacción: $e', name: 'TransactionRepository');
@@ -91,6 +97,9 @@ class TransactionRepository {
     required String description,
     required DateTime transactionDate,
     TransactionMood? mood,
+    String? locationName,
+    double? latitude,
+    double? longitude,
   }) async {
     try {
       await client.from('transactions').update({
@@ -101,6 +110,9 @@ class TransactionRepository {
         'description': description,
         'transaction_date': transactionDate.toIso8601String(),
         'mood': mood?.name,
+        'location_name': locationName,
+        'latitude': latitude,
+        'longitude': longitude,
       }).eq('id', transactionId);
     } catch (e) {
       developer.log('🔥 Error al actualizar transacción: $e', name: 'TransactionRepository');

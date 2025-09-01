@@ -30,6 +30,11 @@
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
+	<!-- Permisos de Ubicación -->
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Necesitamos tu ubicación para ayudarte a registrar rápidamente dónde realizas tus transacciones.</string>
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>Necesitamos tu ubicación para ayudarte a registrar rápidamente dónde realizas tus transacciones.</string>
 	<key>CFBundleName</key>
 	<string>SasPer</string>
 	<key>CFBundlePackageType</key>

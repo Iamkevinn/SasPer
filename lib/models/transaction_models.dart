@@ -18,6 +18,9 @@ class Transaction extends Equatable {
   final String? goalId;
   final String? transferId;
   final TransactionMood? mood; // NOVEDAD: Añadimos el nuevo campo.
+  final String? locationName;
+  final double? latitude;
+  final double? longitude;
 
   const Transaction({
     required this.id,
@@ -33,6 +36,9 @@ class Transaction extends Equatable {
     this.goalId,
     this.transferId,
     this.mood, // NOVEDAD: Añadimos al constructor.
+    this.locationName,
+    this.latitude,
+    this.longitude,
   });
 
   factory Transaction.empty() {
@@ -100,6 +106,9 @@ class Transaction extends Equatable {
         goalId: map['goal_id'] as String?,
         transferId: map['transfer_id'] as String?,
         mood: parsedMood, // NOVEDAD: Asignamos el mood parseado.
+        locationName: map['location_name'] as String?,
+        latitude: (map['latitude'] as num?)?.toDouble(),
+        longitude: (map['longitude'] as num?)?.toDouble(),
       );
     } catch (e, stackTrace) {
       if (kDebugMode) {
