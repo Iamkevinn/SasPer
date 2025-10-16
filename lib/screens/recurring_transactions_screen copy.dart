@@ -190,41 +190,80 @@ class _RecurringTransactionsScreenState
           }
           final items = snapshot.data ?? [];
           if (items.isEmpty) {
+            // --- REEMPLAZO DE EMPTYSTATECARD CON LOTTIE ---
             return _buildLottieEmptyState();
           }
+          return ListView.builder(
+            padding: const EdgeInsets.all(8.0),
+            itemCount: items.length,
+            itemBuilder: (context, index) {
+              final item = items[index];
+              final status = _getStatus(item.nextDueDate);
+              Color statusColor;
+              IconData statusIcon;
+              switch (status) {
+                case RecurringStatus.due:
+                  statusColor = Colors.red.shade400;
+                  statusIcon = Iconsax.warning_2;
+                  break;
+                case RecurringStatus.upcoming:
+                  statusColor = Colors.orange.shade400;
+                  statusIcon = Iconsax.clock;
+                  break;
+                case RecurringStatus.scheduled:
+                  statusColor = Theme.of(context).colorScheme.onSurfaceVariant;
+                  statusIcon = Iconsax.calendar_1;
+                  break;
+              }
 
-          final now = DateTime.now();
-          final today = DateTime(now.year, now.month, now.day);
-
-          final overdue = items.where((i) => i.nextDueDate.isBefore(today)).toList();
-          final dueToday = items.where((i) => i.nextDueDate.year == today.year && i.nextDueDate.month == today.month && i.nextDueDate.day == today.day).toList();
-          final upcoming = items.where((i) => i.nextDueDate.isAfter(today)).toList();
-
-          return RefreshIndicator(
-            onRefresh: () => _repository.refreshData(),
-            child: ListView(
-              padding: const EdgeInsets.all(16.0),
-              children: [
-                if (overdue.isNotEmpty) _buildSection('Vencidos', overdue),
-                if (dueToday.isNotEmpty) _buildSection('Para Hoy', dueToday),
-                if (upcoming.isNotEmpty) _buildSection('Próximos', upcoming),
-              ],
-            ),
+              return Card(
+                elevation: 0,
+                color: Theme.of(context).colorScheme.surfaceContainer,
+                margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                child: ListTile(
+                  onTap: () => _navigateToEdit(item),
+                  leading: CircleAvatar(
+                    backgroundColor: statusColor.withOpacity(0.1),
+                    child: Icon(statusIcon, color: statusColor, size: 20),
+                  ),
+                  title: Text(item.description,
+                      style: GoogleFonts.poppins(fontWeight: FontWeight.w500)),
+                  subtitle: Text(
+                    'Próximo: ${DateFormat.yMMMd('es_CO').format(item.nextDueDate)} - ${toBeginningOfSentenceCase(item.frequency)}',
+                    style: GoogleFonts.poppins(
+                        color: statusColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500),
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${item.type == 'Gasto' ? '-' : '+'}${NumberFormat.currency(locale: 'es_CO', symbol: '\$').format(item.amount)}',
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.bold,
+                          color: item.type == 'Gasto'
+                              ? Colors.red.shade300
+                              : Colors.green.shade400,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Iconsax.trash),
+                        onPressed: () => _handleDelete(item),
+                        tooltip: 'Eliminar',
+                        color: Theme.of(context).colorScheme.error,
+                      )
+                    ],
+                  ),
+                ),
+              )
+                  .animate()
+                  .fadeIn(duration: 500.ms, delay: (100 * index).ms)
+                  .slideY(begin: 0.2, curve: Curves.easeOutCubic);
+            },
           );
         },
       ),
-    );
-  }
-
-  Widget _buildSection(String title, List<RecurringTransaction> items) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
-        const SizedBox(height: 8),
-        ...items.map((item) => _PaymentCard(item: item)).toList(),
-        const SizedBox(height: 24),
-      ],
     );
   }
 
@@ -274,7 +313,6 @@ class _RecurringTransactionsScreenState
       ),
     ).animate().fadeIn(duration: 400.ms);
   }
-  
 }
 
 // --- NUEVO WIDGET DE TARJETA INTERACTIVA ---

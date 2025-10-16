@@ -27,6 +27,42 @@ class RecurringRepository {
     }
   }
 
+  /// Llama al RPC para procesar un pago recurrente.
+  Future<void> processPayment(String recurringId) async {
+    try {
+      await client.rpc('process_recurring_payment', params: {'recurring_id': recurringId});
+      developer.log('✅ [Repo] Pago procesado para $recurringId', name: 'RecurringRepository');
+    } catch (e) {
+      developer.log('🔥 [Repo] Error procesando pago: $e', name: 'RecurringRepository');
+      throw Exception('No se pudo registrar el pago.');
+    }
+  }
+
+  /// Llama al RPC para omitir un pago recurrente.
+  Future<void> skipPayment(String recurringId) async {
+    try {
+      await client.rpc('skip_recurring_payment', params: {'recurring_id': recurringId});
+      developer.log('✅ [Repo] Pago omitido para $recurringId', name: 'RecurringRepository');
+    } catch (e) {
+      developer.log('🔥 [Repo] Error omitiendo pago: $e', name: 'RecurringRepository');
+      throw Exception('No se pudo omitir el pago.');
+    }
+  }
+
+  /// Llama al RPC para posponer un pago recurrente.
+  Future<void> snoozePayment(String recurringId, DateTime newDate) async {
+    try {
+      await client.rpc('snooze_recurring_payment', params: {
+        'recurring_id': recurringId,
+        'new_date': newDate.toIso8601String(),
+      });
+      developer.log('✅ [Repo] Pago pospuesto para $recurringId', name: 'RecurringRepository');
+    } catch (e) {
+      developer.log('🔥 [Repo] Error posponiendo pago: $e', name: 'RecurringRepository');
+      throw Exception('No se pudo posponer el pago.');
+    }
+  }
+  
   /// Getter público para el cliente de Supabase.
   SupabaseClient get client {
     _ensureInitialized();

@@ -1,7 +1,7 @@
 // lib/models/recurring_transaction_model.dart (NUEVO ARCHIVO)
 
 import 'package:equatable/equatable.dart';
-
+enum RecurringStatus { active, paused }
 class RecurringTransaction extends Equatable {
   final String id;
   final String userId;
@@ -16,6 +16,7 @@ class RecurringTransaction extends Equatable {
   final DateTime nextDueDate;
   final DateTime? endDate;
   final DateTime createdAt;
+  final RecurringStatus status;
 
   const RecurringTransaction({
     required this.id,
@@ -31,6 +32,7 @@ class RecurringTransaction extends Equatable {
     required this.nextDueDate,
     this.endDate,
     required this.createdAt,
+    required this.status,
   });
 
   /// Crea una instancia "vacía" de RecurringTransaction.
@@ -50,6 +52,7 @@ class RecurringTransaction extends Equatable {
       startDate: DateTime.now(),
       nextDueDate: DateTime.now(),
       createdAt: DateTime.now(),
+      status: RecurringStatus.active,
     );
   }
   
@@ -69,6 +72,7 @@ class RecurringTransaction extends Equatable {
       nextDueDate: DateTime.parse(map['next_due_date'] as String),
       endDate: map['end_date'] != null ? DateTime.parse(map['end_date'] as String) : null,
       createdAt: DateTime.parse(map['created_at'] as String),
+          status: map['status'] == 'paused' ? RecurringStatus.paused : RecurringStatus.active,
     );
   }
 
@@ -88,7 +92,7 @@ class RecurringTransaction extends Equatable {
     };
   }
   
-  // ---- AÑADIMOS MÉTODO copyWith ----
+  // ---- MÉTODO copyWith CORREGIDO Y COMPLETO ----
   RecurringTransaction copyWith({
     String? id,
     String? description,
@@ -98,11 +102,15 @@ class RecurringTransaction extends Equatable {
     String? accountId,
     String? frequency,
     int? interval,
-    // ... otros campos
+    DateTime? startDate,
+    DateTime? nextDueDate,
+    DateTime? endDate,
+    DateTime? createdAt,
+    RecurringStatus? status, // <-- 1. AÑADIR status A LOS PARÁMETROS
   }) {
     return RecurringTransaction(
       id: id ?? this.id,
-      userId: userId, // El userId no debería cambiar
+      userId: this.userId, // CORREGIDO: Usar this.userId
       description: description ?? this.description,
       amount: amount ?? this.amount,
       type: type ?? this.type,
@@ -110,13 +118,14 @@ class RecurringTransaction extends Equatable {
       accountId: accountId ?? this.accountId,
       frequency: frequency ?? this.frequency,
       interval: interval ?? this.interval,
-      startDate: startDate, // La fecha de inicio no debería cambiar
-      nextDueDate: nextDueDate, // La próxima fecha la calcula el backend
-      endDate: endDate,
-      createdAt: createdAt,
+      startDate: startDate ?? this.startDate, // CORREGIDO: Usar this y permitir cambio
+      nextDueDate: nextDueDate ?? this.nextDueDate, // CORREGIDO: Usar this y permitir cambio
+      endDate: endDate ?? this.endDate, // CORREGIDO: Usar this y permitir cambio
+      createdAt: createdAt ?? this.createdAt, // CORREGIDO: Usar this y permitir cambio
+      status: status ?? this.status, // <-- 2. AÑADIR ARGUMENTO PARA status
     );
   }
   
   @override
-  List<Object?> get props => [id, userId, description, amount, type, category, accountId, frequency, interval, startDate, nextDueDate, endDate, createdAt];
+  List<Object?> get props => [id, userId, description, amount, type, category, accountId, frequency, interval, startDate, nextDueDate, endDate, createdAt,status];
 }
