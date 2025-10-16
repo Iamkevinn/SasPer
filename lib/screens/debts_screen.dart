@@ -4,115 +4,141 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:screenshot/screenshot.dart';
+import 'package:share_plus/share_plus.dart';
+import 'dart:io';
+import 'dart:typed_data';
 
-// Importamos la arquitectura limpia
 import 'package:sasper/data/debt_repository.dart';
 import 'package:sasper/models/debt_model.dart';
 import 'package:sasper/screens/add_debt_screen.dart';
+import 'package:sasper/screens/edit_debt_screen.dart';
+import 'package:sasper/screens/register_payment_screen.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/debts/debt_card.dart';
-import 'package:sasper/widgets/shared/custom_notification_widget.dart';
-import 'register_payment_screen.dart';
-import 'package:sasper/screens/edit_debt_screen.dart'; // NUEVO: Importamos la pantalla de edición
+import 'package:sasper/widgets/debts/shareable_debt_summary.dart';
 import 'package:sasper/widgets/shared/custom_dialog.dart';
+import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 
-// --- NUEVAS IMPORTACIONES ---
-import 'package:sasper/models/contact_debt_summary_model.dart'; // El nuevo modelo
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:skeletonizer/skeletonizer.dart';
 import 'package:lottie/lottie.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 
 class DebtsScreen extends StatefulWidget {
-  // El constructor ahora es simple y constante. No recibe ningún parámetro.
   const DebtsScreen({super.key});
 
   @override
   State<DebtsScreen> createState() => _DebtsScreenState();
 }
 
-class _DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderStateMixin {
-  late final TabController _tabController;
+class _DebtsScreenState extends State<DebtsScreen> with TickerProviderStateMixin {
+  late final TabController _mainTabController;
   late final Stream<List<Debt>> _debtsStream;
-
-  // Accedemos a la única instancia (Singleton) del repositorio.
   final DebtRepository _repository = DebtRepository.instance;
+  final ScreenshotController _screenshotController = ScreenshotController();
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    // Obtenemos el stream del Singleton.
+    _mainTabController = TabController(length: 2, vsync: this);
     _debtsStream = _repository.getDebtsStream();
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _mainTabController.dispose();
     super.dispose();
   }
 
+  // --- MANEJADORES DE ACCIONES Y NAVEGACIÓN ---
+
   void _navigateToAddDebt() {
-    Navigator.of(context).push(MaterialPageRoute(
-      // La pantalla de "Añadir" tampoco necesita repositorios en el constructor.
-      // Ella misma obtendrá los Singletons que necesite.
-      builder: (_) => const AddDebtScreen(),
-    ));
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AddDebtScreen()));
   }
 
-  // --- NUEVO: Lógica para agrupar deudas por contacto ---
-  List<ContactDebtSummary> _groupDebtsByContact(List<Debt> allDebts) {
-    final Map<String, List<Debt>> groupedByEntity = {};
+  void _navigateToEdit(Debt debt) {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => EditDebtScreen(debt: debt)));
+  }
 
-    // 1. Agrupar todas las deudas por el nombre de la entidad
-    for (final debt in allDebts) {
-      final key = debt.entityName?.trim() ?? 'Sin Asignar';
-      if (key.isEmpty) {
-         groupedByEntity.putIfAbsent('Sin Asignar', () => []).add(debt);
-      } else {
-         groupedByEntity.putIfAbsent(key, () => []).add(debt);
+  void _navigateToRegisterPayment(Debt debt) {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => RegisterPaymentScreen(debt: debt)));
+  }
+
+  Future<void> _handleDelete(Debt debt) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => CustomDialog(
+        title: '¿Confirmar Eliminación?',
+        content: 'Estás a punto de eliminar "${debt.name}". Esta acción no se puede deshacer.',
+        confirmText: 'Sí, Eliminar',
+        onConfirm: () => Navigator.of(dialogContext).pop(true),
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        await _repository.deleteDebt(debt.id);
+        NotificationHelper.show(message: 'Deuda eliminada.', type: NotificationType.success);
+      } catch (e) {
+        NotificationHelper.show(message: e.toString(), type: NotificationType.error);
       }
     }
-
-    // 2. Transformar el mapa en una lista de resúmenes
-    final List<ContactDebtSummary> summaries = [];
-    groupedByEntity.forEach((name, debts) {
-      final myDebts = debts.where((d) => d.type == DebtType.debt).toList();
-      final myLoans = debts.where((d) => d.type == DebtType.loan).toList();
-
-      final totalOwedToMe = myLoans.fold<double>(0, (sum, loan) => sum + loan.currentBalance);
-      final totalIOwe = myDebts.fold<double>(0, (sum, debt) => sum + debt.currentBalance);
-
-      final netBalance = totalOwedToMe - totalIOwe;
-
-      summaries.add(ContactDebtSummary(
-        contactName: name,
-        netBalance: netBalance,
-        debts: myDebts,
-        loans: myLoans,
-      ));
-    });
-    
-    // Ordenar: primero los balances más grandes (quienes más te deben o a quienes más les debes)
-    summaries.sort((a, b) => b.netBalance.abs().compareTo(a.netBalance.abs()));
-    
-    return summaries;
   }
 
+  Future<void> _handleShare(Debt debt) async {
+    try {
+      final Uint8List? imageBytes = await _screenshotController.captureFromWidget(
+        ShareableDebtSummary(debt: debt),
+        delay: const Duration(milliseconds: 100),
+      );
+
+      if (imageBytes == null) return;
+
+      final directory = await getTemporaryDirectory();
+      final imagePath = await File('${directory.path}/debt_summary.png').create();
+      await imagePath.writeAsBytes(imageBytes);
+
+      await Share.shareXFiles(
+        [XFile(imagePath.path)],
+        text: 'Resumen de deuda/préstamo: ${debt.name}',
+      );
+    } catch (e) {
+      if (mounted) {
+        NotificationHelper.show(message: 'No se pudo compartir la imagen.', type: NotificationType.error);
+      }
+    }
+  }
+
+  void _handleDebtAction(DebtCardAction action, Debt debt) {
+    switch (action) {
+      case DebtCardAction.registerPayment:
+        _navigateToRegisterPayment(debt);
+        break;
+      case DebtCardAction.edit:
+        _navigateToEdit(debt);
+        break;
+      case DebtCardAction.delete:
+        _handleDelete(debt);
+        break;
+      case DebtCardAction.share:
+        _handleShare(debt);
+        break;
+    }
+  }
+  
+  // --- WIDGETS DE CONSTRUCCIÓN ---
+
   @override
-    Widget build(BuildContext context) {
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text('Deudas y Préstamos', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
         bottom: TabBar(
-          controller: _tabController,
+          controller: _mainTabController,
           labelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w600),
           unselectedLabelStyle: GoogleFonts.poppins(),
-          tabs: const [
-            Tab(text: 'Yo Debo (Deudas)'),
-            Tab(text: 'Me Deben (Préstamos)'),
-          ],
+          tabs: const [Tab(text: 'Yo Debo'), Tab(text: 'Me Deben')],
         ),
         actions: [
           IconButton(
@@ -125,40 +151,26 @@ class _DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderStat
       body: StreamBuilder<List<Debt>>(
         stream: _debtsStream,
         builder: (context, snapshot) {
-          // --- ESTADO DE CARGA ---
           if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
             return _buildSkeletonizer();
           }
-
-          // --- ESTADO DE ERROR ---
           if (snapshot.hasError) {
             return Center(child: Text('Error: ${snapshot.error}'));
           }
           
           final allDebts = snapshot.data ?? [];
-
-          // --- ESTADO VACÍO GENERAL ---
-          // Si la lista COMPLETA está vacía, mostramos la animación Lottie principal.
           if (allDebts.isEmpty) {
-            return _buildLottieEmptyState(); // <-- CORRECCIÓN #1
+            return _buildLottieEmptyState(isForTab: false);
           }
-          
-          // --- NUEVO: Procesamos la lista para agruparla ---
-          final groupedSummaries = _groupDebtsByContact(allDebts);
-          
-          final peopleIOwe = groupedSummaries.where((s) => s.netBalance < 0).toList();
-          final peopleWhoOweMe = groupedSummaries.where((s) => s.netBalance > 0).toList();
 
-          // --- ESTADO CON DATOS ---
-          // Si hay datos, separamos las listas y construimos la TabBarView.
-          //final myDebts = allDebts.where((d) => d.type == DebtType.debt).toList();
-          //final loansToOthers = allDebts.where((d) => d.type == DebtType.loan).toList();
-          
+          final myDebts = allDebts.where((d) => d.type == DebtType.debt).toList();
+          final loansToOthers = allDebts.where((d) => d.type == DebtType.loan).toList();
+
           return TabBarView(
-            controller: _tabController,
+            controller: _mainTabController,
             children: [
-              _buildGroupedList(peopleIOwe, isMyDebt: true),
-              _buildGroupedList(peopleWhoOweMe, isMyDebt: false),
+              _DebtCategoryView(debts: myDebts, onActionSelected: _handleDebtAction),
+              _DebtCategoryView(debts: loansToOthers, onActionSelected: _handleDebtAction),
             ],
           );
         },
@@ -166,53 +178,17 @@ class _DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderStat
     );
   }
 
-  // --- MÉTODOS PARA MANEJAR LAS ACCIONES ---
-
-  // --- NUEVO: Widget que construye la lista de resúmenes agrupados ---
-  Widget _buildGroupedList(List<ContactDebtSummary> summaries, {required bool isMyDebt}) {
-    if (summaries.isEmpty) {
-      return _buildLottieEmptyState(isForTab: true, isMyDebt: isMyDebt);
-    }
-    
-    final numberFormatter = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
-
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 150),
-      itemCount: summaries.length,
-      itemBuilder: (context, index) {
-        final summary = summaries[index];
-        final allRelatedDebts = [...summary.debts, ...summary.loans];
-        
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          elevation: 0.5,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          clipBehavior: Clip.antiAlias, // Importante para que el ExpansionTile no se salga de los bordes
-          child: ExpansionTile(
-            title: Text(summary.contactName, style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
-            subtitle: Text(
-              'Balance total: ${numberFormatter.format(summary.netBalance.abs())}',
-              style: TextStyle(
-                color: isMyDebt ? Colors.red.shade700 : Colors.green.shade700,
-                fontWeight: FontWeight.w500
-              ),
-            ),
-            children: allRelatedDebts.map((debt) => DebtCard(
-              debt: debt,
-              onActionSelected: (action) => _handleDebtAction(action, debt),
-              isInsideList: true, // Propiedad opcional para quitar márgenes/elevación si es necesario
-            )).toList(),
-          ),
-        )
-        .animate()
-        .fadeIn(duration: 500.ms, delay: (100 * index).ms)
-        .slideY(begin: 0.3, curve: Curves.easeOutCubic);
-      },
+  Widget _buildSkeletonizer() {
+    return Skeletonizer(
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: 4,
+        itemBuilder: (context, index) => DebtCard(debt: Debt.empty(), onActionSelected: (_) {}),
+      ),
     );
   }
 
-  Widget _buildLottieEmptyState({bool isForTab = false, bool isMyDebt = true}) {
-    // Personalizamos el texto según si es el estado vacío general o de una pestaña.
+  Widget _buildLottieEmptyState({required bool isForTab, bool isMyDebt = true}) {
     final title = isForTab
         ? (isMyDebt ? '¡Sin deudas pendientes!' : '¡Nadie te debe!')
         : 'Todo en Orden';
@@ -228,11 +204,7 @@ class _DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderStat
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Lottie.asset(
-                'assets/animations/add_item_animation.json',
-                width: 250,
-                height: 250,
-              ),
+              Lottie.asset('assets/animations/add_item_animation.json', width: 250, height: 250),
               const SizedBox(height: 16),
               Text(title, style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
@@ -247,105 +219,97 @@ class _DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderStat
       ),
     ).animate().fadeIn(duration: 400.ms);
   }
+}
 
-  void _handleDebtAction(DebtCardAction action, Debt debt) {
-    switch (action) {
-      case DebtCardAction.registerPayment:
-        _navigateToRegisterPayment(debt);
-        break;
-      case DebtCardAction.edit:
-        _navigateToEdit(debt);
-        break;
-      case DebtCardAction.delete:
-        _handleDelete(debt);
-        break;
-    }
+// --- WIDGET INTERNO PARA GESTIONAR LAS PESTAÑAS DE HISTORIAL ---
+class _DebtCategoryView extends StatefulWidget {
+  final List<Debt> debts;
+  final void Function(DebtCardAction, Debt) onActionSelected;
+
+  const _DebtCategoryView({required this.debts, required this.onActionSelected});
+
+  @override
+  State<_DebtCategoryView> createState() => _DebtCategoryViewState();
+}
+
+class _DebtCategoryViewState extends State<_DebtCategoryView> with TickerProviderStateMixin {
+  late final TabController _historyTabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _historyTabController = TabController(length: 2, vsync: this);
   }
 
-
-  void _navigateToRegisterPayment(Debt debt) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => RegisterPaymentScreen(debt: debt)),
-    );
-  }
-
-  void _navigateToEdit(Debt debt) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => EditDebtScreen(debt: debt)),
-    );
-  }
-
-  //Widget _buildDebtsList(List<Debt> debts, {required bool isMyDebt}) {
-  //  if (debts.isEmpty) {
-  //    // Usamos el mismo Lottie para el estado vacío de cada pestaña.
-  //    return _buildLottieEmptyState(isForTab: true, isMyDebt: isMyDebt);
-  //  }
-  //  
-  //  // --- REEMPLAZO DE STAGGEREDANIMATIONS CON FLUTTER_ANIMATE ---
-  //  return ListView.builder(
-  //    padding: const EdgeInsets.fromLTRB(16, 16, 16, 150),
-  //    itemCount: debts.length,
-  //    itemBuilder: (context, index) {
-  //      final debt = debts[index];
-  //      return DebtCard(
-  //        debt: debt,
-  //        onActionSelected: (action) => _handleDebtAction(action, debt),
-  //      )
-  //      // Animación de entrada en cascada para cada tarjeta.
-  //      .animate()
-  //      .fadeIn(duration: 500.ms, delay: (100 * index).ms)
-  //      .slideY(begin: 0.3, curve: Curves.easeOutCubic);
-  //    },
-  //  );
-  //}
-
-  // --- NUEVOS WIDGETS AUXILIARES ---
-
-  Widget _buildSkeletonizer() {
-    return Skeletonizer(
-      child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 150),
-        itemCount: 4,
-        itemBuilder: (context, index) => DebtCard(
-          debt: Debt.empty(), // Usa el modelo vacío como molde
-          onActionSelected: (_) {},
-        ),
-      ),
-    );
+  @override
+  void dispose() {
+    _historyTabController.dispose();
+    super.dispose();
   }
   
-  void _handleDelete(Debt debt) {
-    // Es una buena práctica pedir confirmación antes de una acción destructiva.
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return CustomDialog(
-          title: '¿Confirmar Eliminación?',
-          content: 'Estás a punto de eliminar "${debt.name}". Esta acción no se puede deshacer.',
-          confirmText: 'Sí, Eliminar',
-          onConfirm: () async {
-            try {
-              Navigator.of(dialogContext).pop(); // Cerrar el diálogo
-              await _repository.deleteDebt(debt.id);
-              if (!mounted) return;
-              NotificationHelper.show(
-                message: 'Deuda eliminada.',
-                type: NotificationType.success,
-              );
-            } catch (e) {
-              if (!mounted) return;
-              NotificationHelper.show(
-                message: e.toString().replaceFirst("Exception: ", ""),
-                type: NotificationType.error,
-              );
-            }
-          },
-        );
+  @override
+  Widget build(BuildContext context) {
+    final activeDebts = widget.debts.where((d) => d.status == DebtStatus.active).toList();
+    final paidDebts = widget.debts.where((d) => d.status == DebtStatus.paid).toList();
+    
+    // Si no hay deudas de ningún tipo en esta categoría, mostramos un estado vacío.
+    if (widget.debts.isEmpty) {
+        final isMyDebtTab = widget.debts.any((d) => d.type == DebtType.debt);
+        return (context.findAncestorStateOfType<_DebtsScreenState>())!
+            ._buildLottieEmptyState(isForTab: true, isMyDebt: isMyDebtTab);
+    }
+    
+    return Column(
+      children: [
+        TabBar(
+          controller: _historyTabController,
+          labelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+          unselectedLabelStyle: GoogleFonts.poppins(),
+          tabs: [
+            Tab(text: 'Activas (${activeDebts.length})'),
+            Tab(text: 'Historial (${paidDebts.length})'),
+          ],
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _historyTabController,
+            children: [
+              _buildList(activeDebts, isHistory: false),
+              _buildList(paidDebts, isHistory: true),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildList(List<Debt> debts, {required bool isHistory}) {
+    if (debts.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Text(
+            isHistory ? 'Aquí aparecerán las deudas y préstamos que completes.' : '¡Todo al día! No tienes nada pendiente aquí.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+      itemCount: debts.length,
+      itemBuilder: (context, index) {
+        final debt = debts[index];
+        return Opacity(
+          opacity: isHistory ? 0.75 : 1.0,
+          child: DebtCard(
+            debt: debt,
+            onActionSelected: (action) => widget.onActionSelected(action, debt),
+          ),
+        ).animate().fadeIn(delay: (50 * index).ms).slideY(begin: 0.1);
       },
     );
   }
-  
-
 }

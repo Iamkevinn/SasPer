@@ -5,40 +5,35 @@ import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 import 'package:sasper/models/debt_model.dart';
 
-enum DebtCardAction { registerPayment, edit, delete }
+// 1. El enum ya está correctamente actualizado
+enum DebtCardAction { registerPayment, edit, delete, share }
 
 class DebtCard extends StatelessWidget {
   final Debt debt;
   final Function(DebtCardAction) onActionSelected;
-  final bool isInsideList;
+  
   const DebtCard({
     super.key,
     required this.debt,
     required this.onActionSelected,
-    this.isInsideList = false, 
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    //final textTheme = theme.textTheme;
-
-    // 1. Lógica de presentación basada en el tipo de deuda
+    
+    // Simplificamos la lógica de presentación
     final isDebt = debt.type == DebtType.debt;
     final progressColor = isDebt ? colorScheme.primary : colorScheme.secondary;
-    final title = isDebt ? debt.name : 'Préstamo a ${debt.name}';
-    
-    // 3. USA LA PROPIEDAD PARA CAMBIAR EL ESTILO
+    final title = debt.name; // Usamos el nombre directo
+
     return Card(
-      // Si está dentro de una lista, quita la elevación y el margen vertical.
-      elevation: isInsideList ? 0 : 1,
-      margin: isInsideList 
-        ? EdgeInsets.zero 
-        : const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      color: colorScheme.surface.withAlpha(100),
-      clipBehavior: Clip.antiAlias, // Asegura que el InkWell respete los bordes
+      elevation: 0.5,
+      margin: const EdgeInsets.only(bottom: 12.0), // Margen estándar para cada tarjeta
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: colorScheme.surfaceContainer,
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => onActionSelected(DebtCardAction.registerPayment),
         child: Padding(
@@ -46,7 +41,7 @@ class DebtCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildHeader(context, title, isDebt),
+              _buildHeader(context, title),
               const SizedBox(height: 16),
               _buildProgressSection(context, progressColor),
               const SizedBox(height: 12),
@@ -58,9 +53,9 @@ class DebtCard extends StatelessWidget {
     );
   }
 
-  // --- WIDGETS HELPER PARA UNA ESTRUCTURA LIMPIA ---
+  // --- WIDGETS HELPER ---
 
-  Widget _buildHeader(BuildContext context, String title, bool isDebt) {
+  Widget _buildHeader(BuildContext context, String title) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -74,12 +69,11 @@ class DebtCard extends StatelessWidget {
             children: [
               Text(
                 title,
-                // 2. Usamos la tipografía del tema
                 style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-              if (debt.entityName != null) ...[
+              if (debt.entityName != null && debt.entityName!.isNotEmpty) ...[
                 const SizedBox(height: 4),
                 Text(
                   debt.entityName!,
@@ -90,7 +84,8 @@ class DebtCard extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        // 3. Indicador visual del tipo de deuda
+        
+        // --- POPUPMENU ACTUALIZADO ---
         PopupMenuButton<DebtCardAction>(
           onSelected: onActionSelected,
           icon: Icon(Iconsax.more, color: colorScheme.onSurfaceVariant),
@@ -107,6 +102,14 @@ class DebtCard extends StatelessWidget {
               child: ListTile(
                 leading: Icon(Iconsax.edit),
                 title: Text('Editar Información'),
+              ),
+            ),
+            // 2. AÑADIMOS LA OPCIÓN DE COMPARTIR
+            const PopupMenuItem<DebtCardAction>(
+              value: DebtCardAction.share,
+              child: ListTile(
+                leading: Icon(Iconsax.share),
+                title: Text('Compartir Resumen'),
               ),
             ),
             const PopupMenuDivider(),
@@ -162,7 +165,7 @@ class DebtCard extends StatelessWidget {
     final currencyFormat = NumberFormat.currency(locale: 'es_CO', symbol: '\$');
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
-    final isOverdue = debt.dueDate != null && debt.dueDate!.isBefore(DateTime.now());
+    final isOverdue = debt.dueDate != null && debt.status == DebtStatus.active && debt.dueDate!.isBefore(DateTime.now());
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
