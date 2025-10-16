@@ -9,6 +9,9 @@ import 'package:sasper/services/event_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'dart:developer' as developer;
+import 'package:sasper/data/category_repository.dart';
+import 'package:sasper/models/category_model.dart';
+import 'package:sasper/models/goal_model.dart';
 
 class AddGoalScreen extends StatefulWidget {
   // El constructor es constante y no recibe parámetros.
@@ -20,8 +23,29 @@ class AddGoalScreen extends StatefulWidget {
 
 class _AddGoalScreenState extends State<AddGoalScreen> {
   // Accedemos a la única instancia (Singleton) del repositorio.
+  final CategoryRepository _categoryRepository = CategoryRepository.instance;
   final GoalRepository _goalRepository = GoalRepository.instance;
   
+  GoalTimeframe _timeframe = GoalTimeframe.short;
+  GoalPriority _priority = GoalPriority.medium;
+  String? _selectedCategoryId;
+  List<Category>? _categories; // Lista para el dropdown
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCategories(); // Cargar categorías al iniciar
+  }
+
+  Future<void> _loadCategories() async {
+    final categories = await _categoryRepository.getCategories();
+    if (mounted) {
+      setState(() {
+        _categories = categories.where((c) => c.type == CategoryType.expense).toList();
+      });
+    }
+  }
+
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _targetAmountController = TextEditingController();
@@ -59,6 +83,9 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
         name: _nameController.text.trim(),
         targetAmount: double.parse(_targetAmountController.text.trim().replaceAll(',', '.')),
         targetDate: _targetDate,
+        timeframe: _timeframe,
+        priority: _priority,
+        categoryId: _selectedCategoryId,
       );
 
       if (mounted) {
@@ -132,6 +159,67 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                 },
               ),
               const SizedBox(height: 16),
+              // --- NUEVO DROPDOWN PARA CATEGORÍA ---
+              if (_categories == null)
+                const Center(child: CircularProgressIndicator())
+              else
+                DropdownButtonFormField<String>(
+                  value: _selectedCategoryId,
+                  decoration: InputDecoration(
+                    labelText: 'Categoría (Opcional)',
+                    prefixIcon: const Icon(Iconsax.folder_2),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  items: _categories!.map((Category category) {
+                    return DropdownMenuItem<String>(
+                      value: category.id,
+                      child: Text(category.name),
+                    );
+                  }).toList(),
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      _selectedCategoryId = newValue;
+                    });
+                  },
+                ),
+              const SizedBox(height: 16),
+
+              // --- NUEVOS SEGMENTED BUTTONS PARA PLAZO Y PRIORIDAD ---
+              const Text('Plazo', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              SegmentedButton<GoalTimeframe>(
+                segments: const <ButtonSegment<GoalTimeframe>>[
+                  ButtonSegment(value: GoalTimeframe.short, label: Text('Corto'), icon: Icon(Iconsax.clock)),
+                  ButtonSegment(value: GoalTimeframe.medium, label: Text('Medio'), icon: Icon(Iconsax.calendar_1)),
+                  ButtonSegment(value: GoalTimeframe.long, label: Text('Largo'), icon: Icon(Iconsax.calendar_tick)),
+                ],
+                selected: {_timeframe},
+                onSelectionChanged: (Set<GoalTimeframe> newSelection) {
+                  setState(() {
+                    _timeframe = newSelection.first;
+                  });
+                },
+              ),
+              const SizedBox(height: 16),
+
+              const Text('Prioridad', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              SegmentedButton<GoalPriority>(
+                segments: const <ButtonSegment<GoalPriority>>[
+                  ButtonSegment(value: GoalPriority.low, label: Text('Baja')),
+                  ButtonSegment(value: GoalPriority.medium, label: Text('Media')),
+                  ButtonSegment(value: GoalPriority.high, label: Text('Alta')),
+                ],
+                selected: {_priority},
+                onSelectionChanged: (Set<GoalPriority> newSelection) {
+                  setState(() {
+                    _priority = newSelection.first;
+                  });
+                },
+              ),
+
+              const SizedBox(height: 16),
+
               ListTile(
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12.0),

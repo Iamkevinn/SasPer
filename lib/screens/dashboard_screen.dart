@@ -33,7 +33,6 @@ import 'package:sasper/widgets/dashboard/ai_analysis_section.dart';
 import 'package:sasper/widgets/dashboard/balance_card.dart';
 import 'package:sasper/widgets/dashboard/budgets_section.dart';
 import 'package:sasper/widgets/dashboard/dashboard_header.dart';
-import 'package:sasper/widgets/dashboard/recent_transactions_section.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -293,15 +292,17 @@ class DashboardScreenState extends State<DashboardScreen> {
     if (confirmed == true) {
       try {
         await _transactionRepository.deleteTransaction(transaction.id);
-        if (mounted)
+        if (mounted) {
           NotificationHelper.show(
               message: 'Transacción eliminada.',
               type: NotificationType.success);
+        }
         return true;
       } catch (e) {
-        if (mounted)
+        if (mounted) {
           NotificationHelper.show(
               message: 'Error al eliminar.', type: NotificationType.error);
+        }
         return false;
       }
     }

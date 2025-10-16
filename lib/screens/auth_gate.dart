@@ -6,7 +6,6 @@ import 'package:sasper/screens/biometric_gate.dart';
 
 // Pantallas
 import 'loading_screen.dart';
-import 'main_screen.dart';
 import 'login_screen.dart';
 
 /// Un widget "guardián" que gestiona el estado de autenticación de la aplicación.

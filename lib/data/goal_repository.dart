@@ -90,6 +90,9 @@ class GoalRepository {
     required double targetAmount,
     DateTime? targetDate,
     String? iconName,
+    required GoalTimeframe timeframe,
+    required GoalPriority priority,
+    String? categoryId,
   }) async {
     try {
       final userId = client.auth.currentUser!.id;
@@ -101,6 +104,9 @@ class GoalRepository {
         'status': 'active',
         'target_date': targetDate?.toIso8601String(),
         'icon_name': iconName,
+        'timeframe': timeframe.name, // 'short', 'medium', 'long'
+        'priority': priority.name,   // 'low', 'medium', 'high'
+        'category_id': categoryId,
       });
       developer.log('✅ [Repo] Meta "$name" añadida con éxito.', name: 'GoalRepository');
     } catch (e) {
@@ -119,6 +125,9 @@ class GoalRepository {
             'target_amount': goal.targetAmount,
             'target_date': goal.targetDate?.toIso8601String(),
             'icon_name': goal.iconName,
+            'timeframe': goal.timeframe.name,
+            'priority': goal.priority.name,
+            'category_id': goal.categoryId,
           })
           .eq('id', goal.id);
       developer.log('✅ [Repo] Meta actualizada con éxito.', name: 'GoalRepository');
@@ -203,7 +212,10 @@ class GoalRepository {
       
       final data = await client
           .from('goals')
-          .select()
+          // --- CONSULTA MODIFICADA ---
+          // Le decimos a Supabase que traiga todos los campos de 'goals'
+          // Y también los campos de la tabla 'categories' relacionada.
+          .select('*, categories(*)') 
           .eq('user_id', userId)
           .order('target_date', ascending: true);
           

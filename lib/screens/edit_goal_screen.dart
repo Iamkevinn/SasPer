@@ -10,6 +10,8 @@ import 'package:sasper/services/event_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'dart:developer' as developer;
+import 'package:sasper/data/category_repository.dart'; 
+import 'package:sasper/models/category_model.dart';
 
 class EditGoalScreen extends StatefulWidget {
   // Solo necesita recibir el objeto de la meta a editar.
@@ -27,6 +29,8 @@ class EditGoalScreen extends StatefulWidget {
 class _EditGoalScreenState extends State<EditGoalScreen> {
   // Accedemos a la única instancia (Singleton) del repositorio.
   final GoalRepository _goalRepository = GoalRepository.instance;
+  final CategoryRepository _categoryRepository = CategoryRepository.instance;
+
   
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
@@ -34,13 +38,35 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
   DateTime? _targetDate;
   bool _isLoading = false;
 
+  // --- NUEVAS VARIABLES DE ESTADO ---
+  late GoalTimeframe _timeframe;
+  late GoalPriority _priority;
+  String? _selectedCategoryId;
+  List<Category>? _categories;
+
   @override
   void initState() {
     super.initState();
+    // Inicializar los valores con los de la meta existente
     _nameController = TextEditingController(text: widget.goal.name);
     _targetAmountController = TextEditingController(text: widget.goal.targetAmount.toStringAsFixed(0));
     _targetDate = widget.goal.targetDate;
+    _timeframe = widget.goal.timeframe;
+    _priority = widget.goal.priority;
+    _selectedCategoryId = widget.goal.categoryId;
+
+    _loadCategories(); // Cargar categorías
   }
+
+  Future<void> _loadCategories() async {
+    final categories = await _categoryRepository.getCategories();
+    if (mounted) {
+      setState(() {
+        _categories = categories.where((c) => c.type == CategoryType.expense).toList();
+      });
+    }
+  }
+  
 
   @override
   void dispose() {

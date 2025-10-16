@@ -21,6 +21,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:developer' as developer;
 import 'package:sasper/screens/place_search_screen.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:intl/intl.dart'; // <-- NUEVA IMPORTACIÓN para formatear la fecha
 
 class AddTransactionScreen extends StatefulWidget {
   const AddTransactionScreen({super.key});
@@ -34,7 +35,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   final AccountRepository _accountRepository = AccountRepository.instance;
   final BudgetRepository _budgetRepository = BudgetRepository.instance;
   final CategoryRepository _categoryRepository = CategoryRepository.instance;
-
+  DateTime _selectedDate = DateTime.now();
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
   final _descriptionController = TextEditingController();
@@ -130,6 +131,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     // ¡CORRECCIÓN! Usamos el método `getBudgets` que devuelve los nuevos modelos.
     _budgetsFuture = _budgetRepository.getBudgets();
     _categoriesFuture = _categoryRepository.getCategories();
+    _selectedDate = DateTime.now(); 
   }
 
   @override
@@ -181,7 +183,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         type: _transactionType,
         category: _selectedCategory!.name, 
         description: _descriptionController.text.trim(),
-        transactionDate: DateTime.now(),
+       // Usamos la fecha seleccionada por el usuario.
+        transactionDate: _selectedDate, 
         budgetId: _selectedBudgetId,
         mood: _selectedMood,
         locationName: _selectedLocationName,
@@ -213,7 +216,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     }
   }
 
-  // ... (El resto de la clase, incluyendo `_checkBudgetOnBackend` y `build`, se mantiene igual)
   // ... Pegar el resto del código desde el original
   Future<void> _checkBudgetOnBackend({
     required String userId, 
@@ -229,6 +231,22 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       developer.log('Backend response (budget check): ${response.statusCode} - ${response.body}', name: 'AddTransactionScreen');
     } catch (e) {
       developer.log('Error calling budget check backend: $e', name: 'AddTransactionScreen');
+    }
+  }
+
+  
+  // --- NUEVO MÉTODO PARA MOSTRAR EL SELECTOR DE FECHA ---
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2020), // Límite inferior
+      lastDate: DateTime.now(),   // Límite superior (no se pueden registrar gastos futuros)
+    );
+    if (picked != null && picked != _selectedDate) {
+      setState(() {
+        _selectedDate = picked;
+      });
     }
   }
 
@@ -365,6 +383,18 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   );
                 },
               ),
+              // --- NUEVO WIDGET: SELECTOR DE FECHA ---
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Iconsax.calendar_1),
+                title: const Text('Fecha de la Transacción'),
+                // Usamos el paquete intl para formatear la fecha de forma legible
+                subtitle: Text(DateFormat.yMMMd('es_CO').format(_selectedDate)),
+                trailing: const Icon(Iconsax.arrow_right_3),
+                onTap: () => _selectDate(context),
+              ),
+
+              const SizedBox(height: 24),
               const SizedBox(height: 24),
               
               if (_transactionType == 'Gasto') ...[

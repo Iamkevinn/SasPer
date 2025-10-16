@@ -35,7 +35,7 @@ class _PlaceSearchScreenState extends State<PlaceSearchScreen> {
   bool _isLoading = false;
   String? _errorMessage;
   Timer? _debounce;
-  String _sessionToken = const Uuid().v4(); // Token de sesión para autocompletado
+  final String _sessionToken = const Uuid().v4(); // Token de sesión para autocompletado
 
   @override
   void initState() {

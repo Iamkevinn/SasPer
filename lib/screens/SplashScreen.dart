@@ -21,7 +21,6 @@ import 'package:sasper/services/widget_service.dart';
 
 // --- Repositorios CRÍTICOS (solo los que se inicializan tempranamente) ---
 import 'package:sasper/data/dashboard_repository.dart';
-import 'package:sasper/screens/auth_check_screen.dart';
 import 'package:sasper/screens/auth_gate.dart';
 
 // Función auxiliar para guardar colores de Material You.

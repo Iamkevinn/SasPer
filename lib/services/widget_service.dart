@@ -30,15 +30,18 @@ const String _logName = 'WidgetService';
 /// ejecutan cuando la app está cerrada.
 @pragma('vm:entry-point')
 Future<void> backgroundCallback(Uri? uri) async {
-  developer.log('🚀 [BACKGROUND] Callback de HomeWidget iniciado.', name: _logName);
-  
+  developer.log('🚀 [BACKGROUND] Callback de HomeWidget iniciado.',
+      name: _logName);
+
   // 1. Leer las claves guardadas desde SharedPreferences.
   final prefs = await SharedPreferences.getInstance();
   final supabaseUrl = prefs.getString('supabase_url');
   final supabaseApiKey = prefs.getString('supabase_api_key');
 
   if (supabaseUrl == null || supabaseApiKey == null) {
-    developer.log('🔥 [BACKGROUND] ERROR: No se encontraron las claves de Supabase en SharedPreferences. Abortando actualización.', name: _logName);
+    developer.log(
+        '🔥 [BACKGROUND] ERROR: No se encontraron las claves de Supabase en SharedPreferences. Abortando actualización.',
+        name: _logName);
     return; // No podemos continuar sin las claves.
   }
 
@@ -47,7 +50,9 @@ Future<void> backgroundCallback(Uri? uri) async {
     // Usamos `Supabase.initialize` para configurar el singleton para este hilo.
     // Esto es SEGURO y NECESARIO.
     await Supabase.initialize(url: supabaseUrl, anonKey: supabaseApiKey);
-    developer.log('✅ [BACKGROUND] Supabase inicializado correctamente en segundo plano.', name: _logName);
+    developer.log(
+        '✅ [BACKGROUND] Supabase inicializado correctamente en segundo plano.',
+        name: _logName);
 
     // 3. Ahora que Supabase está listo, llamamos a nuestros métodos de actualización.
     // Estos métodos ahora pueden usar `Supabase.instance.client` de forma segura.
@@ -56,11 +61,14 @@ Future<void> backgroundCallback(Uri? uri) async {
     await WidgetService.updateGoalsWidget();
     await WidgetService.updateUpcomingPaymentsWidget();
     await WidgetService.updateNextPaymentWidget();
-    
-    developer.log('✅ [BACKGROUND] Todas las tareas de actualización de widgets han sido llamadas.', name: _logName);
 
+    developer.log(
+        '✅ [BACKGROUND] Todas las tareas de actualización de widgets han sido llamadas.',
+        name: _logName);
   } catch (e) {
-    developer.log('🔥 [BACKGROUND] ERROR FATAL durante la actualización de widgets en segundo plano: $e', name: _logName);
+    developer.log(
+        '🔥 [BACKGROUND] ERROR FATAL durante la actualización de widgets en segundo plano: $e',
+        name: _logName);
   }
 }
 
@@ -309,99 +317,159 @@ class WidgetService {
   static Future<Uint8List?> _createChartImageFromData(
     List<ExpenseByCategory> data, {
     required bool isDarkMode,
-  }) async {
+}) async {
     try {
-      final textColor = isDarkMode ? Colors.white : Colors.black;
-      final subTextColor =
-          isDarkMode ? Colors.grey.shade400 : Colors.grey.shade700;
-      final positiveData = data
-          .map((e) => ExpenseByCategory(
-              category: e.category, totalSpent: e.totalSpent.abs()))
-          .toList();
+        final textColor = isDarkMode ? Colors.white : Colors.black;
+        final subTextColor = isDarkMode ? Colors.grey.shade400 : Colors.grey.shade700;
+        final positiveData = data
+            .map((e) => ExpenseByCategory(
+                category: e.category, totalSpent: e.totalSpent.abs()))
+            .toList();
 
-      const double width = 400;
-      const double height = 200;
+        // -----------------------------------------------------------
+        // Ajustes de Dimensiones y Layout para CENTRAR
+        // -----------------------------------------------------------
+        const double widgetWidth = 400; // Ancho total del área de dibujo
+        const double widgetHeight = 200; // Alto total del área de dibujo
 
-      final recorder = ui.PictureRecorder();
-      final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, width, height));
-      canvas.drawPaint(Paint()..color = Colors.transparent);
+        // Definimos el espacio que ocupará el gráfico de pastel
+        const double pieChartAreaWidth = widgetWidth * 0.55; // 55% del ancho para el pastel
+        const double legendAreaWidth = widgetWidth * 0.45; // 45% del ancho para la leyenda
 
-      final colors = [
-        Colors.blue.shade400,
-        Colors.red.shade400,
-        Colors.green.shade400,
-        Colors.orange.shade400,
-        Colors.purple.shade400,
-        Colors.yellow.shade700,
-      ];
-      final total =
-          positiveData.fold<double>(0.0, (sum, e) => sum + e.totalSpent);
-      if (total <= 0) return null;
+        // Diámetro del pastel, ajustado para caber en su área y con un pequeño margen
+        // Usamos el mínimo entre el ancho de su área y el alto total para asegurar que es un círculo
+        const double chartPadding = 40; // Espacio alrededor del pastel dentro de su área
+        final double chartDiameter = min(pieChartAreaWidth, widgetHeight) - chartPadding;
+        final double chartRadius = chartDiameter / 2;
 
-      final chartCenter = Offset(height / 2, height / 2);
-      final chartRadius = height / 2 * 0.85;
-      double startAngle = -pi / 2;
-      final dataToShow = positiveData.take(5).toList();
+        // Calcular el centro del pastel para que esté centrado DENTRO de su 'pieChartAreaWidth'
+        // El punto de inicio de la 'pieChartAreaWidth' es 0, así que el centro es (pieChartAreaWidth / 2)
+        final chartCenter = Offset(pieChartAreaWidth / 2, widgetHeight / 2);
 
-      for (var i = 0; i < dataToShow.length; i++) {
-        final item = dataToShow[i];
-        if (item.totalSpent <= 0) continue;
-        final sweepAngle = (item.totalSpent / total) * 2 * pi;
-        final paint = Paint()..color = colors[i % colors.length];
-        canvas.drawArc(
-            Rect.fromCircle(center: chartCenter, radius: chartRadius),
-            startAngle,
-            sweepAngle,
-            true,
-            paint);
-        startAngle += sweepAngle;
-      }
+        // Calcular el punto de inicio X de la leyenda para que empiece después del área del pastel
+        final double legendStartX = pieChartAreaWidth + chartPadding / 4;
+        // Ancho disponible para el texto de la leyenda dentro de su propia área
+        final double legendTextMaxWidth = legendAreaWidth - (chartPadding * 2); // Dejar margen a ambos lados
+        // -----------------------------------------------------------
 
-      double legendY = 25.0;
-      const double legendX = height + 15;
-      for (var i = 0; i < dataToShow.length; i++) {
-        final item = dataToShow[i];
-        if (item.totalSpent <= 0) continue;
-        final pct = (item.totalSpent / total) * 100;
-        final colorPaint = Paint()..color = colors[i % colors.length];
-        canvas.drawCircle(Offset(legendX, legendY), 6, colorPaint);
 
-        final textStyle = TextStyle(
-            color: textColor, fontSize: 15, fontWeight: FontWeight.w500);
-        final pctStyle = TextStyle(
-            color: subTextColor, fontSize: 14, fontWeight: FontWeight.normal);
+        final recorder = ui.PictureRecorder();
+        final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, widgetWidth, widgetHeight));
+        canvas.drawPaint(Paint()..color = Colors.transparent); // Fondo transparente
 
-        final textSpan = TextSpan(
-            style: textStyle,
-            text: '${item.category} ',
-            children: [
-              TextSpan(text: '(${pct.toStringAsFixed(0)}%)', style: pctStyle)
-            ]);
-        final textPainter = TextPainter(
-            text: textSpan,
-            textDirection: ui.TextDirection.ltr,
-            maxLines: 1,
-            ellipsis: '...');
-        textPainter.layout(minWidth: 0, maxWidth: width - legendX - 25);
-        textPainter.paint(
-            canvas, Offset(legendX + 20, legendY - textPainter.height / 2));
-        legendY += 30.0;
-      }
+        final colors = [
+            Colors.blue.shade400,
+            Colors.red.shade400,
+            Colors.green.shade400,
+            Colors.orange.shade400,
+            Colors.purple.shade400,
+            Colors.yellow.shade700,
+            Colors.teal.shade400,
+            Colors.indigo.shade400,
+            Colors.brown.shade400,
+            Colors.cyan.shade400,
+        ];
 
-      final picture = recorder.endRecording();
-      final image = await picture.toImage(width.toInt(), height.toInt());
-      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      return byteData?.buffer.asUint8List();
+        final total = positiveData.fold<double>(0.0, (sum, e) => sum + e.totalSpent);
+        if (total <= 0) return null;
+
+        positiveData.sort((a, b) => b.totalSpent.compareTo(a.totalSpent));
+        final int maxIndividualItems = 4;
+        List<ExpenseByCategory> dataToDraw = positiveData.take(maxIndividualItems).toList();
+
+        double othersAmount = 0.0;
+        if (positiveData.length > maxIndividualItems) {
+            othersAmount = positiveData
+                .skip(maxIndividualItems)
+                .fold<double>(0.0, (sum, e) => sum + e.totalSpent);
+            if (othersAmount > 0) {
+                dataToDraw.add(ExpenseByCategory(category: 'Otros', totalSpent: othersAmount));
+            }
+        }
+
+        double startAngle = -pi / 2;
+
+        // -----------------------------------------------------------
+        // Dibujo del Gráfico de Pastel (sin cambios en la lógica de dibujo, solo en su centro y radio)
+        // -----------------------------------------------------------
+        for (var i = 0; i < dataToDraw.length; i++) {
+            final item = dataToDraw[i];
+            if (item.totalSpent <= 0) continue;
+            final sweepAngle = (item.totalSpent / total) * 2 * pi;
+            final paint = Paint()..color = colors[i % colors.length];
+            canvas.drawArc(
+                Rect.fromCircle(center: chartCenter, radius: chartRadius),
+                startAngle,
+                sweepAngle,
+                true,
+                paint);
+            startAngle += sweepAngle;
+        }
+
+        // -----------------------------------------------------------
+        // Dibujo de la Leyenda (ajustes en el posicionamiento)
+        // -----------------------------------------------------------
+        // Calcular el espacio total que ocupará la leyenda verticalmente
+        final double totalLegendHeight = dataToDraw.length * 25.0; // 25.0 es el alto de cada línea de leyenda
+
+        // Centrar la leyenda verticalmente dentro del widgetHeight
+        double legendY = (widgetHeight - totalLegendHeight) / 2;
+        if (legendY < 5) legendY = 5; // Asegurar que no se salga por arriba
+
+        for (var i = 0; i < dataToDraw.length; i++) {
+            final item = dataToDraw[i];
+            if (item.totalSpent <= 0) continue;
+            final pct = (item.totalSpent / total) * 100;
+
+            final colorPaint = Paint()..color = colors[i % colors.length];
+            canvas.drawCircle(Offset(legendStartX, legendY), 6, colorPaint);
+
+            final textStyle = TextStyle(
+                color: textColor,
+                fontSize: 13,
+                fontWeight: FontWeight.w500);
+            final pctStyle = TextStyle(
+                color: subTextColor,
+                fontSize: 12,
+                fontWeight: FontWeight.normal);
+
+            final textSpan = TextSpan(
+                style: textStyle,
+                text: '${item.category} ',
+                children: [
+                    TextSpan(text: '(${pct.toStringAsFixed(0)}%)', style: pctStyle)
+                ]);
+            final textPainter = TextPainter(
+                text: textSpan,
+                textDirection: ui.TextDirection.ltr,
+                maxLines: 1,
+                ellipsis: '...');
+
+            textPainter.layout(minWidth: 0, maxWidth: legendTextMaxWidth);
+            textPainter.paint(
+                canvas, Offset(legendStartX + 15, legendY - textPainter.height / 2));
+
+            legendY += 25.0;
+
+            if (legendY + 20 > widgetHeight) {
+                developer.log('⚠️ [ChartCreator] Leyenda cortada por falta de espacio.', name: _logName);
+                break;
+            }
+        }
+
+        final picture = recorder.endRecording();
+        final image = await picture.toImage(widgetWidth.toInt(), widgetHeight.toInt());
+        final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+        return byteData?.buffer.asUint8List();
     } catch (e, stackTrace) {
-      // Este log es crucial para capturar errores de renderizado.
-      developer.log(
-          '🔥🔥🔥 [ChartCreator] ERROR FATAL al crear la imagen del gráfico: $e',
-          name: _logName,
-          error: e,
-          stackTrace: stackTrace);
-      return null;
+        developer.log(
+            '🔥🔥🔥 [ChartCreator] ERROR FATAL al crear la imagen del gráfico: $e',
+            name: _logName,
+            error: e,
+            stackTrace: stackTrace);
+        return null;
     }
-  }
+}
 
   //============================================================================
   // SECCIÓN DE WIDGET DE PRÓXIMOS PAGOS
@@ -482,16 +550,16 @@ class WidgetService {
       if (allPayments.isNotEmpty) {
         // 2. Tomamos solo el primer elemento de la lista.
         final nextPayment = allPayments.first;
-        
+
         // 3. Lo convertimos a JSON.
         final jsonString = jsonEncode(nextPayment.toJson());
 
         // 4. Lo guardamos en SharedPreferences con una clave ÚNICA para este widget.
-        await HomeWidget.saveWidgetData<String>('next_payment_data', jsonString);
+        await HomeWidget.saveWidgetData<String>(
+            'next_payment_data', jsonString);
         developer.log(
             '✅ [WidgetService] Próximo pago ("${nextPayment.concept}") guardado para el widget.',
             name: _logName);
-
       } else {
         // 5. Si no hay pagos, guardamos un valor nulo o vacío para que Kotlin lo sepa.
         await HomeWidget.saveWidgetData<String?>('next_payment_data', null);
@@ -502,16 +570,16 @@ class WidgetService {
 
       // 6. Notificamos al widget específico que debe actualizarse.
       await HomeWidget.updateWidget(
-        name: 'NextPaymentWidgetProvider', // Debe coincidir con el nombre de la clase en Kotlin
+        name:
+            'NextPaymentWidgetProvider', // Debe coincidir con el nombre de la clase en Kotlin
         androidName: 'NextPaymentWidgetProvider',
       );
-
     } catch (e, st) {
       developer.log('🔥🔥🔥 Error en updateNextPaymentWidget: $e',
           name: _logName, error: e, stackTrace: st);
     }
   }
-  
+
   // La función `updateUpcomingPaymentsWidget` se mantiene igual, ya que solo llama a la anterior.
   static Future<void> updateUpcomingPaymentsWidget() async {
     developer.log(

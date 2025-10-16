@@ -1,6 +1,37 @@
 // lib/models/goal_model.dart
 
 import 'package:equatable/equatable.dart';
+import 'package:sasper/models/category_model.dart'; 
+
+enum GoalTimeframe {
+  short,
+  medium,
+  long;
+
+  static GoalTimeframe fromString(String? timeframe) {
+    switch (timeframe?.toLowerCase()) {
+      case 'short': return GoalTimeframe.short;
+      case 'medium': return GoalTimeframe.medium;
+      case 'long': return GoalTimeframe.long;
+      default: return GoalTimeframe.short;
+    }
+  }
+}
+
+enum GoalPriority {
+  low,
+  medium,
+  high;
+
+  static GoalPriority fromString(String? priority) {
+    switch (priority?.toLowerCase()) {
+      case 'low': return GoalPriority.low;
+      case 'medium': return GoalPriority.medium;
+      case 'high': return GoalPriority.high;
+      default: return GoalPriority.medium;
+    }
+  }
+}
 
 // 1. Creamos un enum para el estado de la meta.
 enum GoalStatus {
@@ -35,7 +66,10 @@ class Goal extends Equatable {
   final DateTime createdAt;
   final GoalStatus status;
   final String? iconName;
-
+  final GoalTimeframe timeframe;
+  final GoalPriority priority;
+  final String? categoryId;
+  final Category? category; // Para almacenar el objeto completo de la categoría
   
   const Goal({
     required this.id,
@@ -47,6 +81,10 @@ class Goal extends Equatable {
     required this.createdAt,
     required this.status,
     this.iconName,
+    required this.timeframe,
+    required this.priority,
+    this.categoryId,
+    this.category,
   });
 
   /// Crea una instancia "vacía" de Goal.
@@ -63,6 +101,10 @@ class Goal extends Equatable {
       status: GoalStatus.active,
       iconName: null,
       targetDate: null,
+      timeframe: GoalTimeframe.short,
+      priority: GoalPriority.medium,
+      categoryId: null,
+      category: null,
     );
   }
 
@@ -79,6 +121,11 @@ class Goal extends Equatable {
         createdAt: DateTime.parse(map['created_at'] as String),
         status: GoalStatus.fromString(map['status'] as String?),
         iconName: map['icon_name'] as String?,
+        timeframe: GoalTimeframe.fromString(map['timeframe'] as String?),
+        priority: GoalPriority.fromString(map['priority'] as String?),
+        categoryId: map['category_id'] as String?,
+        // Si la consulta de Supabase incluye la categoría, la parseamos aquí.
+        category: map['categories'] != null ? Category.fromMap(map['categories']) : null,
       );
     } catch (e) {
       throw FormatException('Error al parsear Goal: $e', map);
@@ -96,6 +143,10 @@ class Goal extends Equatable {
     DateTime? createdAt,
     GoalStatus? status,
     String? iconName,
+    GoalTimeframe? timeframe,
+    GoalPriority? priority,
+    String? categoryId,
+    Category? category,
   }) {
     return Goal(
       id: id ?? this.id,
@@ -107,6 +158,10 @@ class Goal extends Equatable {
       createdAt: createdAt ?? this.createdAt,
       status: status ?? this.status,
       iconName: iconName ?? this.iconName,
+      timeframe: timeframe ?? this.timeframe,
+      priority: priority ?? this.priority,
+      categoryId: categoryId ?? this.categoryId,
+      category: category ?? this.category,
     );
   }
 
@@ -129,5 +184,9 @@ class Goal extends Equatable {
         createdAt,
         status,
         iconName,
+        timeframe,
+        priority,
+        categoryId,
+        category,
       ];
 }

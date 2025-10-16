@@ -51,8 +51,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         pixelRatio: 2.0,
       );
 
-      if (imageBytes == null) return;
-
       final directory = await getApplicationDocumentsDirectory();
       final imagePath =
           await File('${directory.path}/sasper_progress.png').create();

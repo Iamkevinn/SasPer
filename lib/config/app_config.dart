@@ -9,7 +9,7 @@ class AppConfig {
   static void checkKeys() {
     if (kDebugMode) {
       print("--- VERIFICANDO CLAVES DE AppConfig ---");
-      print("Clave de Places API: '${googlePlacesApiKey}'");
+      print("Clave de Places API: '$googlePlacesApiKey'");
       print("¿Está vacía la clave?: ${googlePlacesApiKey.isEmpty}");
       print("------------------------------------");
     }
