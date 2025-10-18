@@ -90,29 +90,66 @@ class AccountRepository {
   /// Llama a un RPC para eliminar una cuenta de forma segura.
   Future<void> deleteAccountSafely(String accountId) async {
     try {
-      await client.rpc(
-        'delete_account_safely',
-        params: {'account_id_to_delete': accountId},
-      );
+      await client.rpc('delete_account_safely', params: {'account_id_to_delete': accountId});
+    } on PostgrestException catch (e) {
+      // Capturamos la excepción de Supabase y la transformamos en un error legible.
+      if (e.message.contains('account_has_transactions')) {
+        throw Exception('No se puede eliminar: la cuenta tiene movimientos relacionados.');
+      }
+      if (e.message.contains('balance_not_zero')) {
+        throw Exception('No se puede eliminar: el saldo de la cuenta no es cero.');
+      }
+      rethrow; // Si es otro error, lo relanzamos.
     } catch (e) {
       developer.log('🔥 Error en RPC delete_account_safely: $e', name: 'AccountRepository');
-      throw Exception('No se pudo eliminar la cuenta. Asegúrate de que no tenga transacciones.');
+      throw Exception('Ocurrió un error inesperado al intentar eliminar la cuenta.');
     }
   }
 
-  /// Obtiene una lista simple de todas las cuentas (sin balance calculado por RPC).
+  // --- NUEVOS MÉTODOS ---
+  Future<void> archiveAccount(String accountId) async {
+    try {
+      await client.rpc('archive_account', params: {'p_account_id': accountId});
+      
+      // AÑADIDO: Forzamos el refresco de datos para actualizar la UI inmediatamente.
+      await refreshData(); 
+
+    } catch (e) {
+      developer.log('🔥 Error archivando cuenta: $e', name: 'AccountRepository');
+      throw Exception('No se pudo archivar la cuenta.');
+    }
+  }
+
+  Future<void> unarchiveAccount(String accountId) async {
+    try {
+      await client.rpc('unarchive_account', params: {'p_account_id': accountId});
+      
+      // AÑADIDO: Forzamos el refresco de datos para actualizar la UI inmediatamente.
+      await refreshData();
+
+    } catch (e) {
+      developer.log('🔥 Error desarchivando cuenta: $e', name: 'AccountRepository');
+      throw Exception('No se pudo desarchivar la cuenta.');
+    }
+  }
+
+  /// Obtiene una lista de cuentas ACTIVAS (sin balance calculado por RPC).
+  /// Este es el método que usarán los selectores en otras partes de la app.
   Future<List<Account>> getAccounts() async {
     try {
       final userId = client.auth.currentUser?.id;
       if (userId == null) throw Exception('Usuario no autenticado');
 
-      final response = await client
-          .from('accounts')
-          .select()
-          .eq('user_id', userId)
-          .order('name', ascending: true);
+      final response = await client.rpc(
+        'get_accounts_with_balance',
+        params: {'p_user_id': userId}
+      );
 
-      return (response as List).map((data) => Account.fromMap(data)).toList();
+      final allAccounts = (response as List).map((data) => Account.fromMap(data)).toList();
+      // --- FILTRO IMPORTANTE ---
+      // Solo devolvemos las cuentas activas para los selectores.
+      return allAccounts.where((acc) => acc.status == AccountStatus.active).toList();
+
     } catch (e) {
       developer.log('🔥 Error obteniendo lista de cuentas: $e', name: 'AccountRepository');
       return [];

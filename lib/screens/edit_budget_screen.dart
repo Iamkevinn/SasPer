@@ -115,11 +115,7 @@ class _EditBudgetScreenState extends State<EditBudgetScreen> {
       // Usamos el método `updateBudget` del repositorio con todos los parámetros.
       await _budgetRepository.updateBudget(
         budgetId: widget.budget.id,
-        // La categoría no se puede cambiar, así que usamos la que ya tenía.
-        // Asumiendo que `widget.budget.category` es el nombre. Necesitaríamos el ID.
-        // Para simplificar, vamos a asumir que el repositorio puede manejar esto.
-        // NOTA: Para una solución ideal, el objeto `Budget` debería tener `categoryId`.
-        categoryName: 'name', // ¡¡¡VER NOTA IMPORTANTE ABAJO!!!
+        categoryName: widget.budget.category, 
         amount: double.parse(_amountController.text.replaceAll(',', '.')),
         startDate: _startDate,
         endDate: _endDate,

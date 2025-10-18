@@ -38,51 +38,31 @@ class _BudgetDetailsScreenState extends State<BudgetDetailsScreen> {
   final BudgetRepository _budgetRepository = BudgetRepository.instance;
   final TransactionRepository _transactionRepository = TransactionRepository.instance;
   
-  // --- ¡CORRECCIÓN! El Stream ahora emite el nuevo modelo `Budget` ---
-  late Stream<Budget?> _budgetStream;
-  late Stream<List<Transaction>> _transactionsStream;
-  StreamSubscription? _eventSubscription;
+  // Declaramos los streams que la UI usará. Serán inicializados en el build.
+  late final Stream<Budget?> _budgetStream;
+  late final Stream<List<Transaction>> _transactionsStream;
 
   @override
   void initState() {
     super.initState();
+    
+    // 1. Obtenemos el stream de TODOS los presupuestos
     _budgetStream = _budgetRepository.getBudgetsStream().map(
       (budgets) {
-        // La lógica de búsqueda sigue siendo la misma, pero ahora con `budget.id`
-        final matchingBudgets = budgets.where((b) => b.id == widget.budgetId);
-        return matchingBudgets.isNotEmpty ? matchingBudgets.first : null;
+        try {
+          // Buscamos nuestro presupuesto específico en la lista
+          return budgets.firstWhere((b) => b.id == widget.budgetId);
+        } catch (e) {
+          // Si no se encuentra (p. ej., fue eliminado), devolvemos null
+          return null;
+        }
       },
     );
 
-    // La lógica de transacciones no cambia.
-    _transactionsStream = _transactionRepository.getTransactionsForBudget(widget.budgetId.toString()).asStream();
-    
-    _eventSubscription = EventService.instance.eventStream.listen((event) {
-      final refreshEvents = {
-        AppEvent.transactionCreated,
-        AppEvent.transactionUpdated,
-        AppEvent.transactionDeleted,
-      };
-      if (refreshEvents.contains(event)) {
-        _refreshTransactions();
-        _budgetRepository.refreshData();
-      }
-    });
+    // 2. Usamos el NUEVO método reactivo del repositorio de transacciones
+    _transactionsStream = _transactionRepository.getTransactionsStreamForBudget(widget.budgetId);
   }
   
-  @override
-  void dispose() {
-    _eventSubscription?.cancel();
-    super.dispose();
-  }
-
-  void _refreshTransactions() {
-    if (mounted) {
-      setState(() {
-        _transactionsStream = _transactionRepository.getTransactionsForBudget(widget.budgetId.toString()).asStream();
-      });
-    }
-  }
 
   void _navigateToEditTransaction(Transaction transaction) async {
     await Navigator.of(context).push<bool>(
@@ -138,9 +118,8 @@ class _BudgetDetailsScreenState extends State<BudgetDetailsScreen> {
     return false;
   }
 
-  @override
+   @override
   Widget build(BuildContext context) {
-    // --- ¡CORRECCIÓN! El StreamBuilder ahora espera un `Budget` ---
     return StreamBuilder<Budget?>(
       stream: _budgetStream,
       builder: (context, budgetSnapshot) {
@@ -150,6 +129,7 @@ class _BudgetDetailsScreenState extends State<BudgetDetailsScreen> {
 
         final budget = budgetSnapshot.data;
         if (budget == null) {
+          // Si el presupuesto es nulo (fue eliminado), cerramos la pantalla.
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) Navigator.of(context).pop();
           });
@@ -158,16 +138,12 @@ class _BudgetDetailsScreenState extends State<BudgetDetailsScreen> {
 
         return Scaffold(
           appBar: AppBar(
-            // Mostramos el nombre de la categoría y el periodo
             title: Text(budget.category, style: GoogleFonts.poppins()),
             bottom: PreferredSize(
               preferredSize: const Size.fromHeight(20.0),
               child: Text(
-                budget.periodText, // Usamos el nuevo getter
-                style: GoogleFonts.poppins(
-                  color: Theme.of(context).textTheme.bodySmall?.color,
-                  fontSize: 14,
-                ),
+                budget.periodText,
+                style: GoogleFonts.poppins(color: Theme.of(context).textTheme.bodySmall?.color),
               ),
             ),
           ),
@@ -175,7 +151,7 @@ class _BudgetDetailsScreenState extends State<BudgetDetailsScreen> {
             children: [
               _buildBudgetSummaryCard(budget),
               const Divider(height: 1, thickness: 0.5),
-               Padding(
+              Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                 child: Align(
                   alignment: Alignment.centerLeft,
@@ -185,6 +161,7 @@ class _BudgetDetailsScreenState extends State<BudgetDetailsScreen> {
                   ),
                 ),
               ),
+              // El `Expanded` ahora contiene el StreamBuilder de las transacciones
               Expanded(
                 child: _buildTransactionsList(),
               ),
@@ -268,9 +245,9 @@ class _BudgetDetailsScreenState extends State<BudgetDetailsScreen> {
   }
 
   Widget _buildTransactionsList() {
-    // ... (Tu lógica aquí no necesita cambios)
+    // ¡Aquí está la magia! Usamos un StreamBuilder que se actualiza solo.
     return StreamBuilder<List<Transaction>>(
-      stream: _transactionsStream,
+      stream: _transactionsStream, // Usamos el stream que definimos en initState
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -287,6 +264,7 @@ class _BudgetDetailsScreenState extends State<BudgetDetailsScreen> {
             ),
           );
         }
+
         final transactions = snapshot.data!;
         return ListView.builder(
           padding: const EdgeInsets.fromLTRB(8, 0, 8, 80),

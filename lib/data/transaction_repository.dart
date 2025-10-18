@@ -91,31 +91,32 @@ class TransactionRepository {
   Future<void> updateTransaction({
     required int transactionId,
     required String accountId,
-    required double amount,
+    //required double amount,
     required String type,
     required String category,
     required String description,
     required DateTime transactionDate,
     TransactionMood? mood,
-    String? locationName,
-    double? latitude,
-    double? longitude,
+    // Los campos de ubicación no se editan por ahora, se podrían añadir después
+    // String? locationName,
+    // double? latitude,
+    // double? longitude,
   }) async {
     try {
-      await client.from('transactions').update({
-        'account_id': accountId,
-        'amount': amount,
-        'type': type,
-        'category': category,
-        'description': description,
-        'transaction_date': transactionDate.toIso8601String(),
-        'mood': mood?.name,
-        'location_name': locationName,
-        'latitude': latitude,
-        'longitude': longitude,
-      }).eq('id', transactionId);
+      // Llamamos a nuestra nueva función RPC con todos los parámetros nuevos.
+      await client.rpc('update_transaction_and_relational_data', params: {
+        'p_transaction_id': transactionId,
+        'p_new_account_id': accountId,
+        //'p_new_amount': amount,
+        'p_new_type': type,
+        'p_new_category': category,
+        'p_new_description': description,
+        'p_new_mood': mood?.name, // Pasamos el nombre del enum o null
+        'p_new_transaction_date': transactionDate.toIso8601String(),
+      });
+      developer.log('✅ [Repo] Transacción $transactionId actualizada con éxito vía RPC.', name: 'TransactionRepository');
     } catch (e) {
-      developer.log('🔥 Error al actualizar transacción: $e', name: 'TransactionRepository');
+      developer.log('🔥 Error al actualizar transacción vía RPC: $e', name: 'TransactionRepository');
       throw Exception('No se pudo actualizar la transacción.');
     }
   }
@@ -149,6 +150,32 @@ class TransactionRepository {
     } catch (e, stackTrace) {
       developer.log('🔥 [Repo] ERROR obteniendo transacciones de presupuesto: $e', name: 'TransactionRepository', error: e, stackTrace: stackTrace);
       throw Exception('Error al conectar con la base de datos.');
+    }
+  }
+
+
+   // --- NUEVO MÉTODO REACTIVO ---
+  /// Devuelve un stream de transacciones para un presupuesto específico.
+  /// Escucha cambios en tiempo real.
+  Stream<List<Transaction>> getTransactionsStreamForBudget(int budgetId) {
+    developer.log('📡 [Repo] Suscribiéndose al stream de transacciones para el presupuesto ID: $budgetId', name: 'TransactionRepository');
+    try {
+      // Usamos el método .stream() de Supabase, que es la base de la reactividad.
+      return client
+          .from('transactions')
+          .stream(primaryKey: ['id']) // La clave primaria de tu tabla de transacciones
+          .eq('budget_id', budgetId)
+          .order('transaction_date', ascending: false)
+          .map((listOfMaps) {
+            // Cada vez que Supabase notifica un cambio, este 'map' se ejecuta.
+            final transactions = listOfMaps.map((data) => Transaction.fromMap(data)).toList();
+            developer.log('✅ [Repo] Stream del presupuesto $budgetId actualizado con ${transactions.length} elementos.', name: 'TransactionRepository');
+            return transactions;
+          });
+    } catch (e) {
+      developer.log('🔥 [Repo] Error al crear el stream para el presupuesto $budgetId: $e', name: 'TransactionRepository');
+      // En caso de error, devolvemos un stream que emite una lista vacía.
+      return Stream.value([]);
     }
   }
 

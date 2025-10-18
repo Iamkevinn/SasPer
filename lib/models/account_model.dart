@@ -3,6 +3,8 @@
 import 'package:flutter/material.dart';
 import 'package:equatable/equatable.dart';
 
+enum AccountStatus { active, archived }
+
 // 1. Hacemos que la clase extienda Equatable para simplificar la comparación.
 class Account extends Equatable {
   final String id;
@@ -14,7 +16,7 @@ class Account extends Equatable {
   final DateTime createdAt;
   final String? iconName;
   final String? color;
-
+  final AccountStatus status;
   
   // El constructor ahora es `const`.
   const Account({
@@ -27,68 +29,44 @@ class Account extends Equatable {
     required this.createdAt,
     this.iconName,
     this.color,
+    required this.status,
   });
 
-  factory Account.empty() {
-  return Account(
-    id: '',
-    userId: '',
-    name: 'Nombre de Cuenta',
-    type: 'Efectivo',
-    balance: 0.0,
-    initialBalance: 0.0,
-    createdAt: DateTime.now(),
-  );
-}
-  // 2. Método factory `fromMap` mejorado para ser más estricto.
-  factory Account.fromMap(Map<String, dynamic> map) {
-    try {
-      // Usamos 'ArgumentError.checkNotNull' para fallar rápido si faltan datos críticos.
-      ArgumentError.checkNotNull(map['id'], 'id');
-      ArgumentError.checkNotNull(map['user_id'], 'user_id');
-
-      final currentBalance = (map['current_balance'] as num?);
-      final initialBalance = (map['initial_balance'] as num? ?? 0.0);
-
-      return Account(
-        id: map['id'].toString(),
-        userId: map['user_id'].toString(),
-        name: map['name'] as String? ?? 'Cuenta sin nombre',
-        type: map['type'] as String? ?? 'Sin tipo',
-        balance: (currentBalance ?? initialBalance).toDouble(),
-        initialBalance: initialBalance.toDouble(),
-        createdAt: DateTime.parse(map['created_at'] as String),
-        iconName: map['icon_name'] as String?,
-        color: map['color'] as String?,
-      );
-    } catch (e) {
-      // Si algo falla (un campo nulo, un parseo incorrecto), lanzamos un error claro.
-      // Esto hace que la depuración sea 100 veces más fácil.
-      throw FormatException('Error al parsear Account desde el mapa: $e', map);
-    }
+   factory Account.empty() {
+    return Account(
+      id: '',
+      userId: '',
+      name: 'Cargando...',
+      type: 'Efectivo',
+      balance: 0.0,
+      initialBalance: 0.0,
+      createdAt: DateTime.now(),
+      status: AccountStatus.active,
+    );
   }
 
-  /// Constructor alternativo para parsear desde la tabla 'accounts' directamente,
-  /// que no siempre tiene el 'current_balance' calculado por la función RPC.
-  factory Account.fromMapSimple(Map<String, dynamic> map) {
+  // 2. Método factory `fromMap` mejorado para ser más estricto.
+   // --- CONSTRUCTOR fromMap SIMPLIFICADO Y CORREGIDO ---
+  factory Account.fromMap(Map<String, dynamic> map) {
     try {
-      ArgumentError.checkNotNull(map['id'], 'id');
-      ArgumentError.checkNotNull(map['user_id'], 'user_id');
+      // El RPC nos da 'current_balance'. La tabla nos da 'balance'.
+      // Aceptamos cualquiera de los dos para máxima compatibilidad.
+      final currentBalance = (map['current_balance'] as num? ?? map['balance'] as num? ?? 0.0).toDouble();
 
       return Account(
         id: map['id'].toString(),
         userId: map['user_id'].toString(),
         name: map['name'] as String? ?? 'Cuenta sin nombre',
         type: map['type'] as String? ?? 'Sin tipo',
-        // Para el 'balance', usamos el que viene en la tabla, o el inicial como fallback.
-        balance: (map['balance'] as num? ?? map['initial_balance'] as num? ?? 0.0).toDouble(),
+        balance: currentBalance, // Usamos el saldo calculado o el de la tabla
         initialBalance: (map['initial_balance'] as num? ?? 0.0).toDouble(),
         createdAt: DateTime.parse(map['created_at'] as String),
         iconName: map['icon_name'] as String?,
         color: map['color'] as String?,
+        status: map['status'] == 'archived' ? AccountStatus.archived : AccountStatus.active,
       );
     } catch (e) {
-      throw FormatException('Error al parsear Account desde el mapa simple: $e', map);
+      throw FormatException('Error al parsear Account desde el mapa: $e', map);
     }
   }
   
@@ -114,6 +92,7 @@ class Account extends Equatable {
       createdAt: createdAt ?? this.createdAt,
       iconName: iconName ?? this.iconName,
       color: color ?? this.color,
+      status: status,
     );
   }
 
@@ -144,5 +123,6 @@ class Account extends Equatable {
         createdAt,
         iconName,
         color,
+        status 
       ];
 }

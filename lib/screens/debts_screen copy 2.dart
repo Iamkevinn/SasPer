@@ -350,7 +350,7 @@ class _DebtsScreenState extends State<DebtsScreen> with TickerProviderStateMixin
               ),
             ),
             const SizedBox(height: 24),
-                        // --- CORRECCIÓN AQUÍ ---
+            // --- CORRECCIÓN AQUÍ ---
             // Simplemente eliminamos el botón. Como usamos un stream,
             // si la conexión se restaura, los datos llegarán automáticamente.
             // Si el error es persistente (ej. de permiso), un botón de reintento
@@ -396,16 +396,6 @@ class _DebtCategoryViewState extends State<_DebtCategoryView>
     super.dispose();
   }
 
-  // Agrupa las deudas por contacto
-  Map<String, List<Debt>> _groupDebtsByContact(List<Debt> debts) {
-    final Map<String, List<Debt>> grouped = {};
-    for (final debt in debts) {
-      final contact = debt.entityName ?? 'Sin contacto';
-      grouped.putIfAbsent(contact, () => []).add(debt);
-    }
-    return grouped;
-  }
-
   @override
   Widget build(BuildContext context) {
     final activeDebts = widget.debts.where((d) => d.status == DebtStatus.active).toList();
@@ -439,8 +429,8 @@ class _DebtCategoryViewState extends State<_DebtCategoryView>
           child: TabBarView(
             controller: _historyTabController,
             children: [
-              _buildGroupedDebtsList(activeDebts, isHistory: false),
-              _buildGroupedDebtsList(paidDebts, isHistory: true),
+              _buildDebtsList(activeDebts, isHistory: false),
+              _buildDebtsList(paidDebts, isHistory: true),
             ],
           ),
         ),
@@ -544,7 +534,7 @@ class _DebtCategoryViewState extends State<_DebtCategoryView>
     ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.2);
   }
 
-  Widget _buildGroupedDebtsList(List<Debt> debts, {required bool isHistory}) {
+  Widget _buildDebtsList(List<Debt> debts, {required bool isHistory}) {
     if (debts.isEmpty) {
       return Center(
         child: Padding(
@@ -582,9 +572,6 @@ class _DebtCategoryViewState extends State<_DebtCategoryView>
       );
     }
 
-    final groupedDebts = _groupDebtsByContact(debts);
-    final contactNames = groupedDebts.keys.toList()..sort();
-
     return RefreshIndicator(
       // Cambiamos la llamada a un Future vacío que se completa después de 1 segundo.
       // Esto permite que la animación de "refrescar" se muestre, dando al usuario
@@ -593,20 +580,18 @@ class _DebtCategoryViewState extends State<_DebtCategoryView>
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
         physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-        itemCount: contactNames.length,
+        itemCount: debts.length,
         itemBuilder: (context, index) {
-          final contactName = contactNames[index];
-          final contactDebts = groupedDebts[contactName]!;
-          
-          return _ContactDebtGroup(
-            contactName: contactName,
-            debts: contactDebts,
-            isHistory: isHistory,
-            type: widget.type,
-            onActionSelected: widget.onActionSelected,
+          final debt = debts[index];
+          return Opacity(
+            opacity: isHistory ? 0.7 : 1.0,
+            child: DebtCard(
+              debt: debt,
+              onActionSelected: (action) => widget.onActionSelected(action, debt),
+            ),
           )
               .animate()
-              .fadeIn(duration: 400.ms, delay: (100 * index).ms)
+              .fadeIn(duration: 400.ms, delay: (80 * index).ms)
               .slideX(begin: -0.1, curve: Curves.easeOutCubic);
         },
       ),
@@ -652,226 +637,6 @@ class _DebtCategoryViewState extends State<_DebtCategoryView>
         ),
       ),
     ).animate().fadeIn(duration: 500.ms);
-  }
-}
-
-// ============================================================================
-// WIDGET PARA GRUPO DE DEUDAS POR CONTACTO (EXPANDIBLE)
-// ============================================================================
-class _ContactDebtGroup extends StatefulWidget {
-  final String contactName;
-  final List<Debt> debts;
-  final bool isHistory;
-  final DebtType type;
-  final void Function(DebtCardAction, Debt) onActionSelected;
-
-  const _ContactDebtGroup({
-    required this.contactName,
-    required this.debts,
-    required this.isHistory,
-    required this.type,
-    required this.onActionSelected,
-  });
-
-  @override
-  State<_ContactDebtGroup> createState() => _ContactDebtGroupState();
-}
-
-class _ContactDebtGroupState extends State<_ContactDebtGroup> {
-  bool _isExpanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    
-    // Calcular totales para este contacto
-    final totalAmount = widget.debts.fold<double>(0, (sum, d) => sum + d.initialAmount);
-    final totalPaid = widget.debts.fold<double>(0, (sum, d) => sum + d.paidAmount);
-    final totalRemaining = totalAmount - totalPaid;
-    
-    final currencyFormat = NumberFormat.compactCurrency(
-      locale: 'es_CO',
-      symbol: '\$',
-      decimalDigits: 0,
-    );
-
-    final accentColor = widget.type == DebtType.debt ? Colors.red : Colors.green;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: _isExpanded
-              ? accentColor.withOpacity(0.4)
-              : colorScheme.outlineVariant,
-          width: _isExpanded ? 2 : 1,
-        ),
-        boxShadow: _isExpanded
-            ? [
-                BoxShadow(
-                  color: accentColor.withOpacity(0.15),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ]
-            : null,
-      ),
-      child: Column(
-        children: [
-          // Header del contacto (siempre visible)
-          InkWell(
-            onTap: () => setState(() => _isExpanded = !_isExpanded),
-            borderRadius: BorderRadius.circular(20),
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  // Avatar con inicial
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          accentColor.withOpacity(0.8),
-                          accentColor.withOpacity(0.6),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: accentColor.withOpacity(0.3),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Center(
-                      child: Text(
-                        widget.contactName[0].toUpperCase(),
-                        style: GoogleFonts.poppins(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  
-                  // Información del contacto
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                widget.contactName,
-                                style: GoogleFonts.poppins(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: colorScheme.primaryContainer,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Text(
-                                '${widget.debts.length}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: colorScheme.onPrimaryContainer,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Icon(
-                              widget.isHistory ? Iconsax.tick_circle : Iconsax.wallet_money,
-                              size: 14,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              widget.isHistory
-                                  ? 'Completado'
-                                  : 'Pendiente: ${currencyFormat.format(totalRemaining)}',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: widget.isHistory
-                                    ? colorScheme.onSurfaceVariant
-                                    : accentColor,
-                                fontWeight: widget.isHistory ? FontWeight.normal : FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  
-                  // Indicador de expansión
-                  AnimatedRotation(
-                    turns: _isExpanded ? 0.5 : 0,
-                    duration: const Duration(milliseconds: 300),
-                    child: Icon(
-                      Iconsax.arrow_down_1,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          
-          // Contenido expandible (lista de deudas)
-          AnimatedCrossFade(
-            firstChild: const SizedBox.shrink(),
-            secondChild: Column(
-              children: [
-                const Divider(height: 1),
-                Opacity(
-                  opacity: widget.isHistory ? 0.7 : 1.0,
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(16),
-                    itemCount: widget.debts.length,
-                    separatorBuilder: (context, index) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final debt = widget.debts[index];
-                      return DebtCard(
-                        debt: debt,
-                        onActionSelected: (action) => widget.onActionSelected(action, debt),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-            crossFadeState: _isExpanded
-                ? CrossFadeState.showSecond
-                : CrossFadeState.showFirst,
-            duration: const Duration(milliseconds: 300),
-          ),
-        ],
-      ),
-    );
   }
 }
 
