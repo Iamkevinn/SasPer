@@ -1,17 +1,19 @@
-// lib/screens/add_transaction_screen.dart (VERSIÓN CORREGIDA Y ADAPTADA)
+// lib/screens/add_transaction_screen.dart
 
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:iconsax/iconsax.dart';
+import 'package:intl/intl.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:sasper/config/app_config.dart';
 import 'package:sasper/data/account_repository.dart';
 import 'package:sasper/data/transaction_repository.dart';
 import 'package:sasper/data/budget_repository.dart';
 import 'package:sasper/models/account_model.dart';
 import 'package:sasper/models/enums/transaction_mood_enum.dart';
-import 'package:sasper/models/budget_models.dart'; // Importa el nuevo modelo `Budget`
+import 'package:sasper/models/budget_models.dart';
 import 'package:sasper/data/category_repository.dart';
 import 'package:sasper/models/category_model.dart';
 import 'package:sasper/services/event_service.dart';
@@ -21,7 +23,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:developer' as developer;
 import 'package:sasper/screens/place_search_screen.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:intl/intl.dart'; // <-- NUEVA IMPORTACIÓN para formatear la fecha
 
 class AddTransactionScreen extends StatefulWidget {
   const AddTransactionScreen({super.key});
@@ -30,63 +31,93 @@ class AddTransactionScreen extends StatefulWidget {
   State<AddTransactionScreen> createState() => _AddTransactionScreenState();
 }
 
-class _AddTransactionScreenState extends State<AddTransactionScreen> {
-  final TransactionRepository _transactionRepository = TransactionRepository.instance;
+class _AddTransactionScreenState extends State<AddTransactionScreen>
+    with SingleTickerProviderStateMixin {
+  final TransactionRepository _transactionRepository =
+      TransactionRepository.instance;
   final AccountRepository _accountRepository = AccountRepository.instance;
   final BudgetRepository _budgetRepository = BudgetRepository.instance;
   final CategoryRepository _categoryRepository = CategoryRepository.instance;
+
   DateTime _selectedDate = DateTime.now();
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
   final _descriptionController = TextEditingController();
-  
+  late AnimationController _shakeController;
+
   String _transactionType = 'Gasto';
   Category? _selectedCategory;
   bool _isLoading = false;
   String? _selectedAccountId;
-  int? _selectedBudgetId; // Mantenemos el ID del presupuesto a vincular
+  int? _selectedBudgetId;
   TransactionMood? _selectedMood;
-  
+
   String? _selectedLocationName;
   double? _selectedLat;
   double? _selectedLng;
-
+  bool _isFetchingLocation = false;
 
   late Future<List<Account>> _accountsFuture;
-  // --- ¡CORRECCIÓN! El Future ahora espera una lista del nuevo modelo `Budget` ---
   late Future<List<Budget>> _budgetsFuture;
   late Future<List<Category>> _categoriesFuture;
 
-  // --- NUEVA VARIABLE DE ESTADO ---
-  bool _isFetchingLocation = false; // Para mostrar un loader
+  final int _currentStep = 0;
 
-  // --- NUEVO MÉTODO PARA OBTENER UBICACIÓN ---
+  @override
+  void initState() {
+    super.initState();
+    _accountsFuture = _accountRepository.getAccounts();
+    _budgetsFuture = _budgetRepository.getBudgets();
+    _categoriesFuture = _categoryRepository.getCategories();
+    _selectedDate = DateTime.now();
+    _shakeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+  }
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _descriptionController.dispose();
+    _shakeController.dispose();
+    super.dispose();
+  }
+
   Future<void> _getCurrentLocation() async {
     setState(() => _isFetchingLocation = true);
 
     try {
-      // 1. Verificar y solicitar permisos
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          NotificationHelper.show(message: 'Permiso de ubicación denegado.', type: NotificationType.warning);
+          NotificationHelper.show(
+            message: 'Permiso de ubicación denegado.',
+            type: NotificationType.warning,
+          );
           setState(() => _isFetchingLocation = false);
           return;
         }
       }
-      
+
       if (permission == LocationPermission.deniedForever) {
-        NotificationHelper.show(message: 'Permiso de ubicación denegado permanentemente.', type: NotificationType.error);
+        NotificationHelper.show(
+          message: 'Permiso de ubicación denegado permanentemente.',
+          type: NotificationType.error,
+        );
         setState(() => _isFetchingLocation = false);
         return;
-      } 
+      }
 
-      // 2. Obtener las coordenadas del GPS
-      final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
 
-      // 3. Convertir coordenadas a un nombre de lugar (Geocodificación Inversa)
-      final locationName = await _getPlaceNameFromCoordinates(position.latitude, position.longitude);
+      final locationName = await _getPlaceNameFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
 
       if (mounted) {
         setState(() {
@@ -98,23 +129,26 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       }
     } catch (e) {
       if (mounted) {
-        NotificationHelper.show(message: 'No se pudo obtener la ubicación.', type: NotificationType.error);
+        NotificationHelper.show(
+          message: 'No se pudo obtener la ubicación.',
+          type: NotificationType.error,
+        );
         setState(() => _isFetchingLocation = false);
       }
     }
   }
 
-  // --- NUEVO MÉTODO AUXILIAR PARA LA GEOCODIFICACIÓN INVERSA ---
   Future<String> _getPlaceNameFromCoordinates(double lat, double lng) async {
     final apiKey = AppConfig.googlePlacesApiKey;
-    final url = Uri.parse('https://maps.googleapis.com/maps/api/geocode/json?latlng=$lat,$lng&key=$apiKey');
+    final url = Uri.parse(
+      'https://maps.googleapis.com/maps/api/geocode/json?latlng=$lat,$lng&key=$apiKey',
+    );
 
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['status'] == 'OK' && data['results'].isNotEmpty) {
-          // Devolvemos la primera dirección formateada, que suele ser la más completa.
           return data['results'][0]['formatted_address'];
         }
       }
@@ -123,52 +157,40 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       return "Ubicación Desconocida";
     }
   }
-  
-  @override
-  void initState() {
-    super.initState();
-    _accountsFuture = _accountRepository.getAccounts();
-    // ¡CORRECCIÓN! Usamos el método `getBudgets` que devuelve los nuevos modelos.
-    _budgetsFuture = _budgetRepository.getBudgets();
-    _categoriesFuture = _categoryRepository.getCategories();
-    _selectedDate = DateTime.now(); 
-  }
 
-  @override
-  void dispose() {
-    _amountController.dispose();
-    _descriptionController.dispose();
-    super.dispose();
-  }
-
-  // --- ¡CORRECCIÓN! La función ahora recibe una lista de `Budget` ---
   void _onCategorySelected(Category category, List<Budget> budgets) {
     setState(() {
       _selectedCategory = category;
       try {
-        // La lógica de búsqueda sigue siendo válida.
-        // Buscamos un presupuesto ACTIVO que coincida con la categoría seleccionada.
         final foundBudget = budgets.firstWhere(
-          (b) => b.category == category.name && b.isActive
+          (b) => b.category == category.name && b.isActive,
         );
         _selectedBudgetId = foundBudget.id;
       } catch (e) {
-        // Si no se encuentra un presupuesto activo para esa categoría, no se vincula ninguno.
         _selectedBudgetId = null;
       }
     });
   }
 
   Future<void> _saveTransaction() async {
-    // --- ¡CORRECCIÓN! Añadimos un ! para solucionar el error de tipo nullable ---
-    if (!_formKey.currentState!.validate() || _selectedCategory == null || _selectedAccountId == null) {
-      NotificationHelper.show(message: 'Por favor rellena todos los campos!', type: NotificationType.error);
+    if (!_formKey.currentState!.validate() ||
+        _selectedCategory == null ||
+        _selectedAccountId == null) {
+      _shakeController.forward().then((_) => _shakeController.reverse());
+      NotificationHelper.show(
+        message: 'Por favor completa todos los campos',
+        type: NotificationType.error,
+      );
       return;
     }
-    
+
     setState(() => _isLoading = true);
 
-    double amount = (double.tryParse(_amountController.text.trim().replaceAll(',', '.')) ?? 0.0);
+    double amount = (double.tryParse(
+          _amountController.text.trim().replaceAll(',', '.'),
+        ) ??
+        0.0);
+
     if (_transactionType == 'Gasto') {
       amount = -amount.abs();
     } else {
@@ -176,329 +198,794 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     }
 
     try {
-      // La llamada al repositorio ya era correcta.
       await _transactionRepository.addTransaction(
         accountId: _selectedAccountId!,
         amount: amount,
         type: _transactionType,
-        category: _selectedCategory!.name, 
+        category: _selectedCategory!.name,
         description: _descriptionController.text.trim(),
-       // Usamos la fecha seleccionada por el usuario.
-        transactionDate: _selectedDate, 
+        transactionDate: _selectedDate,
         budgetId: _selectedBudgetId,
         mood: _selectedMood,
         locationName: _selectedLocationName,
         latitude: _selectedLat,
         longitude: _selectedLng,
       );
-      
+
       if (mounted) {
         final userId = Supabase.instance.client.auth.currentUser?.id;
-        // --- ¡CORRECCIÓN! Añadimos un ! aquí también ---
-        if (_transactionType == 'Gasto' && userId != null && _selectedCategory != null) {
-            _checkBudgetOnBackend(userId: userId, categoryName: _selectedCategory!.name);
+        if (_transactionType == 'Gasto' &&
+            userId != null &&
+            _selectedCategory != null) {
+          _checkBudgetOnBackend(
+            userId: userId,
+            categoryName: _selectedCategory!.name,
+          );
         }
 
         EventService.instance.fire(AppEvent.transactionCreated);
         Navigator.of(context).pop(true);
 
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          NotificationHelper.show(message: 'Transacción guardada!', type: NotificationType.success);
+          NotificationHelper.show(
+            message: 'Transacción guardada exitosamente',
+            type: NotificationType.success,
+          );
         });
       }
     } catch (e) {
-      developer.log('🔥 FALLO AL GUARDAR TRANSACCIÓN: $e', name: 'AddTransactionScreen');
+      developer.log('🔥 FALLO AL GUARDAR: $e', name: 'AddTransactionScreen');
       if (mounted) {
-        NotificationHelper.show(message: 'Error al guardar la transacción.', type: NotificationType.error);
+        NotificationHelper.show(
+          message: 'Error al guardar',
+          type: NotificationType.error,
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // ... Pegar el resto del código desde el original
   Future<void> _checkBudgetOnBackend({
-    required String userId, 
-    required String categoryName
+    required String userId,
+    required String categoryName,
   }) async {
-    final url = Uri.parse('https://sasper.onrender.com/check-budget-on-transaction');
+    final url =
+        Uri.parse('https://sasper.onrender.com/check-budget-on-transaction');
     try {
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'user_id': userId, 'category': categoryName}),
       );
-      developer.log('Backend response (budget check): ${response.statusCode} - ${response.body}', name: 'AddTransactionScreen');
+      developer.log(
+        'Backend response (budget check): ${response.statusCode} - ${response.body}',
+        name: 'AddTransactionScreen',
+      );
     } catch (e) {
-      developer.log('Error calling budget check backend: $e', name: 'AddTransactionScreen');
+      developer.log(
+        'Error calling budget check backend: $e',
+        name: 'AddTransactionScreen',
+      );
     }
   }
 
-  
-  // --- NUEVO MÉTODO PARA MOSTRAR EL SELECTOR DE FECHA ---
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
-      firstDate: DateTime(2020), // Límite inferior
-      lastDate: DateTime.now(),   // Límite superior (no se pueden registrar gastos futuros)
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            dialogBackgroundColor: Theme.of(context).colorScheme.surface,
+          ),
+          child: child!,
+        );
+      },
     );
     if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
-      });
+      setState(() => _selectedDate = picked);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final isExpense = _transactionType == 'Gasto';
 
     return Scaffold(
-      appBar: AppBar(title: Text('Añadir Transacción', style: GoogleFonts.poppins())),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextFormField(
-                controller: _amountController,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(fontSize: 56, fontWeight: FontWeight.bold, color: _transactionType == 'Gasto' ? colorScheme.error : Colors.green.shade600),
-                decoration: InputDecoration(
-                  prefixText: '\$',
-                  hintText: '0.00',
-                  hintStyle: TextStyle(color: Colors.grey.withOpacity(0.5)),
-                  border: InputBorder.none,
-                  prefixStyle: GoogleFonts.poppins(fontSize: 40, fontWeight: FontWeight.w300, color: _transactionType == 'Gasto' ? colorScheme.error.withOpacity(0.7) : Colors.green.shade600.withOpacity(0.7)),
-                ),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                validator: (value) {
-                  if (value == null || value.isEmpty) return 'Introduce un monto';
-                  if (double.tryParse(value.replaceAll(',', '.')) == null) return 'Introduce un monto válido';
-                  return null;
-                },
-              ),
-
-              SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(value: 'Gasto', label: Text('Gasto'), icon: Icon(Iconsax.arrow_down)),
-                  ButtonSegment(value: 'Ingreso', label: Text('Ingreso'), icon: Icon(Iconsax.arrow_up)),
-                ],
-                selected: {_transactionType},
-                onSelectionChanged: (newSelection) => setState(() {
-                  _transactionType = newSelection.first;
-                  _selectedCategory = null; 
-                  _selectedBudgetId = null;
-                }),
-              ),
-              const SizedBox(height: 24),
-              
-              FutureBuilder<List<Account>>(
-                future: _accountsFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) return const LinearProgressIndicator();
-                  if (snapshot.hasError) return Text('Error al cargar cuentas: ${snapshot.error}');
-                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return const Center(child: Text('No tienes cuentas. Crea una primero.'));
-                  }
-                  final accounts = snapshot.data!;
-                  return DropdownButtonFormField<String>(
-                    value: _selectedAccountId,
-                    decoration: InputDecoration(labelText: 'Cuenta', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), prefixIcon: const Icon(Iconsax.wallet_3)),
-                    items: accounts.map((account) {
-                      return DropdownMenuItem<String>(
-                        value: account.id, 
-                        child: Text(account.name),
-                      );
-                    }).toList(),
-                    onChanged: (value) => setState(() => _selectedAccountId = value),
-                    validator: (value) => value == null ? 'Debes seleccionar una cuenta' : null,
-                  );
-                },
-              ),
-              const SizedBox(height: 24),
-
-              Text('Categorías', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              
-              FutureBuilder<List<Category>>(
-                future: _categoriesFuture,
-                builder: (context, categorySnapshot) {
-                  if (categorySnapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: Padding(padding: EdgeInsets.all(8.0), child: CircularProgressIndicator()));
-                  }
-                  if (categorySnapshot.hasError) {
-                    developer.log(
-                      'Error en FutureBuilder<List<Category>>',
-                      name: 'AddTransactionScreen',
-                      error: categorySnapshot.error,
-                      stackTrace: categorySnapshot.stackTrace,
-                    );
-                    return Center( child: Text('Error al cargar categorías: ${categorySnapshot.error}'));
-                  }
-                  if (!categorySnapshot.hasData || categorySnapshot.data!.isEmpty) {
-                    return const Text('No tienes categorías. Créalas en Ajustes.');
-                  }
-                  final allUserCategories = categorySnapshot.data!;
-                  final expectedTypeName = _transactionType == 'Gasto' ? 'expense' : 'income';
-                  final currentCategories = allUserCategories
-                      .where((c) => c.type.name == expectedTypeName)
-                      .toList();
-
-                  // --- ¡CORRECCIÓN! El FutureBuilder anidado ahora espera una lista de `Budget` ---
-                  return FutureBuilder<List<Budget>>(
-                    future: _budgetsFuture,
-                    builder: (context, budgetSnapshot) {
-                      final budgets = budgetSnapshot.data ?? [];
-                      return Wrap(
-                        spacing: 8.0,
-                        runSpacing: 8.0,
-                        children: currentCategories.map((category) {
-                          return FilterChip(
-                            label: Text(category.name, style: GoogleFonts.poppins()),
-                            avatar: Icon(
-                              category.icon ?? Iconsax.category,
-                              color: _selectedCategory == category ? Theme.of(context).colorScheme.onSecondaryContainer : category.colorAsObject,
-                            ),
-                            selected: _selectedCategory == category,
-                            onSelected: (selected) {
-                              if (selected) {
-                                _onCategorySelected(category, budgets);
-                              } else {
-                                setState(() {
-                                  _selectedCategory = null;
-                                  _selectedBudgetId = null;
-                                });
-                              }
-                            },
-                            selectedColor: Theme.of(context).colorScheme.secondaryContainer,
-                            checkmarkColor: Theme.of(context).colorScheme.onSecondaryContainer,
-                          );
-                        }).toList(),
-                      );
-                    },
-                  );
-                },
-              ),
-              // --- NUEVO WIDGET: SELECTOR DE FECHA ---
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Iconsax.calendar_1),
-                title: const Text('Fecha de la Transacción'),
-                // Usamos el paquete intl para formatear la fecha de forma legible
-                subtitle: Text(DateFormat.yMMMd('es_CO').format(_selectedDate)),
-                trailing: const Icon(Iconsax.arrow_right_3),
-                onTap: () => _selectDate(context),
-              ),
-
-              const SizedBox(height: 24),
-              const SizedBox(height: 24),
-              
-              if (_transactionType == 'Gasto') ...[
-                Text('¿Cómo te sentiste con este gasto? (Opcional)', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8.0,
-                  runSpacing: 8.0,
-                  children: TransactionMood.values.map((mood) {
-                    return FilterChip(
-                      label: Text(mood.displayName, style: GoogleFonts.poppins()),
-                      avatar: Icon(
-                        mood.icon,
-                        color: _selectedMood == mood ? colorScheme.onSecondaryContainer : colorScheme.onSurfaceVariant,
-                      ),
-                      selected: _selectedMood == mood,
-                      onSelected: (selected) {
-                        setState(() {
-                          if (selected) {
-                            _selectedMood = mood;
-                          } else {
-                            _selectedMood = null;
-                          }
-                        });
-                      },
-                      selectedColor: colorScheme.secondaryContainer,
-                      checkmarkColor: colorScheme.onSecondaryContainer,
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 24),
-              ],
-              
-              TextFormField(
-                controller: _descriptionController,
-                decoration: InputDecoration(labelText: 'Descripción (Opcional)', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), prefixIcon: const Icon(Iconsax.document_text)),
-                maxLines: 2,
-              ),
-
-              // --- NUEVO WIDGET: SELECTOR DE UBICACIÓN ---
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: _isFetchingLocation 
-                    ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Iconsax.location),
-                title: Text(_selectedLocationName ?? 'Añadir Ubicación (Opcional)'),
-                subtitle: _selectedLocationName != null ? const Text('Toca para buscar otro lugar') : null,
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // --- CORRECCIONES APLICADAS ---
-                    // 1. Se eliminó el 'const' antes de IconButton.
-                    // 2. Se cambió Iconsax.my_location por Iconsax.gps.
-                    IconButton(
-                      icon: const Icon(Iconsax.gps), 
-                      tooltip: 'Usar mi ubicación actual',
-                      onPressed: _isFetchingLocation ? null : _getCurrentLocation,
+      backgroundColor: colorScheme.surface,
+      body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          // AppBar moderna
+          SliverAppBar(
+            expandedHeight: 120,
+            floating: false,
+            pinned: true,
+            elevation: 0,
+            backgroundColor: colorScheme.surface,
+            flexibleSpace: FlexibleSpaceBar(
+              titlePadding: const EdgeInsets.only(left: 30, bottom: 14),
+              title: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Nueva',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: colorScheme.onSurfaceVariant,
                     ),
-                    if (_selectedLocationName != null)
-                      IconButton(
-                        icon: const Icon(Iconsax.close_circle, color: Colors.grey),
-                        tooltip: 'Quitar ubicación',
-                        onPressed: () {
-                          setState(() {
-                            _selectedLocationName = null;
-                            _selectedLat = null;
-                            _selectedLng = null;
-                          });
-                        },
-                      ),
-                  ],
-                ),
-                onTap: () async {
-                  final result = await Navigator.push<Map<String, dynamic>>(
-                    context,
-                    MaterialPageRoute(builder: (context) => const PlaceSearchScreen()),
-                  );
-                  if (result != null && mounted) {
-                    setState(() {
-                      _selectedLocationName = result['name'];
-                      _selectedLat = result['lat'];
-                      _selectedLng = result['lng'];
-                    });
-                  }
-                },
+                  ),
+                  Text(
+                    'Transacción',
+                    style: GoogleFonts.poppins(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                ],
               ),
+              background: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      isExpense
+                          ? Colors.red.withOpacity(0.1)
+                          : Colors.green.withOpacity(0.1),
+                      colorScheme.surface,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
 
-              const SizedBox(height: 32),
-              
-              ElevatedButton.icon(
-                icon: _isLoading ? const SizedBox.shrink() : const Icon(Iconsax.send_1),
-                label: _isLoading ? const CircularProgressIndicator(strokeWidth: 2, color: Colors.white) : const Text('Guardar Transacción'),
-                onPressed: _isLoading ? null : _saveTransaction,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  textStyle: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          // Contenido
+          SliverToBoxAdapter(
+            child: Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  // Input de monto destacado
+                  _buildAmountInput(colorScheme, isExpense)
+                      .animate()
+                      .fadeIn(duration: 400.ms)
+                      .scale(delay: 100.ms),
+
+                  // Selector de tipo
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: _buildTypeSelector(colorScheme)
+                        .animate()
+                        .fadeIn(delay: 200.ms),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Contenido principal
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Column(
+                      children: [
+                        _buildAccountSelector()
+                            .animate()
+                            .fadeIn(delay: 300.ms)
+                            .slideX(begin: -0.1),
+                        const SizedBox(height: 24),
+                        _buildDateSelector(colorScheme)
+                            .animate()
+                            .fadeIn(delay: 400.ms)
+                            .slideX(begin: -0.1),
+                        const SizedBox(height: 24),
+                        _buildCategorySelector()
+                            .animate()
+                            .fadeIn(delay: 500.ms)
+                            .slideX(begin: -0.1),
+                        const SizedBox(height: 24),
+                        if (isExpense) ...[
+                          _buildMoodSelector(colorScheme)
+                              .animate()
+                              .fadeIn(delay: 600.ms)
+                              .slideX(begin: -0.1),
+                          const SizedBox(height: 24),
+                        ],
+                        _buildDescriptionField()
+                            .animate()
+                            .fadeIn(delay: 700.ms)
+                            .slideX(begin: -0.1),
+                        const SizedBox(height: 24),
+                        _buildLocationSelector(colorScheme)
+                            .animate()
+                            .fadeIn(delay: 800.ms)
+                            .slideX(begin: -0.1),
+                        const SizedBox(height: 32),
+                        _buildSaveButton(colorScheme)
+                            .animate()
+                            .fadeIn(delay: 900.ms)
+                            .scale(),
+                        const SizedBox(height: 100),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAmountInput(ColorScheme colorScheme, bool isExpense) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+      child: Column(
+        children: [
+          Text(
+            'Monto',
+            style: TextStyle(
+              fontSize: 14,
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _amountController,
+            textAlign: TextAlign.center,
+            autofocus: true,
+            style: GoogleFonts.poppins(
+              fontSize: 56,
+              fontWeight: FontWeight.bold,
+              color: isExpense ? Colors.red : Colors.green,
+              height: 1.2,
+            ),
+            decoration: InputDecoration(
+              prefix: Align(
+                alignment: Alignment.center,
+                widthFactor: 0, // 🔥 El truco para que no desplaze el texto
+                child: Text(
+                  '\$',
+                  style: GoogleFonts.poppins(
+                    fontSize: 48,
+                    fontWeight: FontWeight.w300,
+                    color: isExpense
+                        ? Colors.red.withOpacity(0.7)
+                        : Colors.green.withOpacity(0.7),
+                  ),
                 ),
               ),
-              const SizedBox(height: 20),
-            ],
+              hintText: '0',
+              hintStyle: TextStyle(
+                color: Colors.grey.withOpacity(0.3),
+              ),
+              border: InputBorder.none,
+            ),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            validator: (value) {
+              if (value == null || value.isEmpty) return 'Introduce un monto';
+              if (double.tryParse(value.replaceAll(',', '.')) == null) {
+                return 'Introduce un monto válido';
+              }
+              return null;
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTypeSelector(ColorScheme colorScheme) {
+    return SegmentedButton<String>(
+      style: SegmentedButton.styleFrom(
+        textStyle: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+        side: BorderSide(
+          // Borde general alrededor del segmento
+          color: colorScheme.outline.withOpacity(0.4),
+          width: 1.2,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16), // Bordes redondeados bonitos
+        ),
+        selectedBackgroundColor: _transactionType == 'Gasto'
+            ? Colors.red.withOpacity(0.15)
+            : Colors.green.withOpacity(0.15),
+        selectedForegroundColor:
+            _transactionType == 'Gasto' ? Colors.red : Colors.green,
+      ),
+      segments: const [
+        ButtonSegment(
+          value: 'Gasto',
+          label: Text('Gasto'),
+          icon: Icon(Iconsax.arrow_down_2),
+        ),
+        ButtonSegment(
+          value: 'Ingreso',
+          label: Text('Ingreso'),
+          icon: Icon(Iconsax.arrow_up_1),
+        ),
+      ],
+      selected: {_transactionType},
+      onSelectionChanged: (newSelection) => setState(() {
+        _transactionType = newSelection.first;
+        _selectedCategory = null;
+        _selectedBudgetId = null;
+      }),
+    );
+  }
+
+  Widget _buildAccountSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Iconsax.wallet,
+                size: 20, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 8),
+            Text(
+              'Cuenta',
+              style: GoogleFonts.poppins(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        FutureBuilder<List<Account>>(
+          future: _accountsFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError ||
+                !snapshot.hasData ||
+                snapshot.data!.isEmpty) {
+              return Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.errorContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text('No tienes cuentas. Crea una primero.'),
+              );
+            }
+
+            final accounts = snapshot.data!;
+            return Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
+              ),
+              child: DropdownButtonFormField<String>(
+                value: _selectedAccountId,
+                items: accounts.map((account) {
+                  final currencyFormat = NumberFormat.currency(
+                    locale: 'es_CO',
+                    symbol: '\$',
+                    decimalDigits: 0,
+                  );
+                  return DropdownMenuItem<String>(
+                    value: account.id,
+                    child: Row(
+                      children: [
+                        Icon(Iconsax.wallet_3, size: 18),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(account.name),
+                              Text(
+                                currencyFormat.format(account.balance),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: account.balance < 0
+                                      ? Colors.red
+                                      : Colors.green,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+                onChanged: (value) =>
+                    setState(() => _selectedAccountId = value),
+                decoration: InputDecoration(
+                  border: InputBorder.none,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  hintText: 'Selecciona una cuenta',
+                ),
+                validator: (value) =>
+                    value == null ? 'Debes seleccionar una cuenta' : null,
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDateSelector(ColorScheme colorScheme) {
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: ListTile(
+        leading: Icon(Iconsax.calendar_1, color: colorScheme.primary),
+        title: const Text('Fecha'),
+        subtitle: Text(
+          DateFormat.yMMMd('es_CO').format(_selectedDate),
+          style: TextStyle(
+            color: colorScheme.primary,
+            fontWeight: FontWeight.w600,
           ),
         ),
+        trailing: const Icon(Iconsax.arrow_right_3),
+        onTap: () => _selectDate(context),
       ),
+    );
+  }
+
+  Widget _buildCategorySelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Iconsax.category,
+                size: 20, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 8),
+            Text(
+              'Categoría',
+              style: GoogleFonts.poppins(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            if (_selectedCategory != null) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '✓',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 12),
+        FutureBuilder<List<Category>>(
+          future: _categoriesFuture,
+          builder: (context, categorySnapshot) {
+            if (categorySnapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (categorySnapshot.hasError) {
+              return const Text('Error al cargar categorías');
+            }
+            if (!categorySnapshot.hasData || categorySnapshot.data!.isEmpty) {
+              return const Text('No tienes categorías. Créalas en Ajustes.');
+            }
+
+            final allUserCategories = categorySnapshot.data!;
+            final expectedTypeName =
+                _transactionType == 'Gasto' ? 'expense' : 'income';
+            final currentCategories = allUserCategories
+                .where((c) => c.type.name == expectedTypeName)
+                .toList();
+
+            return FutureBuilder<List<Budget>>(
+              future: _budgetsFuture,
+              builder: (context, budgetSnapshot) {
+                final budgets = budgetSnapshot.data ?? [];
+                return Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: currentCategories.map((category) {
+                    final isSelected = _selectedCategory == category;
+                    return Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: isSelected
+                              ? category.colorAsObject
+                              : Theme.of(context).colorScheme.outlineVariant,
+                          width: isSelected ? 2 : 1,
+                        ),
+                        color: isSelected
+                            ? category.colorAsObject.withOpacity(0.15)
+                            : Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest,
+                      ),
+                      child: InkWell(
+                        onTap: () {
+                          if (isSelected) {
+                            setState(() {
+                              _selectedCategory = null;
+                              _selectedBudgetId = null;
+                            });
+                          } else {
+                            _onCategorySelected(category, budgets);
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(14),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                category.icon ?? Iconsax.category,
+                                size: 20,
+                                color: isSelected
+                                    ? category.colorAsObject
+                                    : Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                category.name,
+                                style: TextStyle(
+                                  fontWeight: isSelected
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
+                                  color: isSelected
+                                      ? category.colorAsObject
+                                      : Theme.of(context).colorScheme.onSurface,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                );
+              },
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMoodSelector(ColorScheme colorScheme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Iconsax.emoji_happy, size: 20, color: colorScheme.primary),
+            const SizedBox(width: 8),
+            Text(
+              'Estado de ánimo (Opcional)',
+              style: GoogleFonts.poppins(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: TransactionMood.values.map((mood) {
+            final isSelected = _selectedMood == mood;
+            return Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: isSelected
+                      ? colorScheme.primary
+                      : colorScheme.outlineVariant,
+                  width: isSelected ? 2 : 1,
+                ),
+                color: isSelected
+                    ? colorScheme.primaryContainer
+                    : colorScheme.surfaceContainerHighest,
+              ),
+              child: InkWell(
+                onTap: () => setState(() {
+                  _selectedMood = isSelected ? null : mood;
+                }),
+                borderRadius: BorderRadius.circular(14),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        mood.icon,
+                        size: 20,
+                        color: isSelected
+                            ? colorScheme.onPrimaryContainer
+                            : colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        mood.displayName,
+                        style: TextStyle(
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.normal,
+                          color: isSelected
+                              ? colorScheme.onPrimaryContainer
+                              : colorScheme.onSurface,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDescriptionField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Iconsax.note_text,
+                size: 20, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 8),
+            Text(
+              'Descripción (Opcional)',
+              style: GoogleFonts.poppins(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: _descriptionController,
+          maxLines: 3,
+          decoration: InputDecoration(
+            hintText: 'Añade una nota sobre esta transacción...',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+            filled: true,
+            fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLocationSelector(ColorScheme colorScheme) {
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: ListTile(
+        leading: _isFetchingLocation
+            ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Icon(Iconsax.location, color: colorScheme.primary),
+        title: Text(_selectedLocationName ?? 'Ubicación (Opcional)'),
+        subtitle: _selectedLocationName != null
+            ? const Text('Toca para cambiar')
+            : null,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Iconsax.gps),
+              tooltip: 'Usar mi ubicación',
+              onPressed: _isFetchingLocation ? null : _getCurrentLocation,
+            ),
+            if (_selectedLocationName != null)
+              IconButton(
+                icon: const Icon(Iconsax.close_circle, color: Colors.grey),
+                tooltip: 'Quitar ubicación',
+                onPressed: () {
+                  setState(() {
+                    _selectedLocationName = null;
+                    _selectedLat = null;
+                    _selectedLng = null;
+                  });
+                },
+              ),
+          ],
+        ),
+        onTap: () async {
+          final result = await Navigator.push<Map<String, dynamic>>(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const PlaceSearchScreen(),
+            ),
+          );
+          if (result != null && mounted) {
+            setState(() {
+              _selectedLocationName = result['name'];
+              _selectedLat = result['lat'];
+              _selectedLng = result['lng'];
+            });
+          }
+        },
+      ),
+    );
+  }
+
+  Widget _buildSaveButton(ColorScheme colorScheme) {
+    return FilledButton(
+      onPressed: _isLoading ? null : _saveTransaction,
+      style: FilledButton.styleFrom(
+        padding: const EdgeInsets.symmetric(vertical: 18),
+        minimumSize: const Size(double.infinity, 56),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+      ),
+      child: _isLoading
+          ? const SizedBox(
+              height: 20,
+              width: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.white,
+              ),
+            )
+          : Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Iconsax.tick_circle, size: 24),
+                const SizedBox(width: 12),
+                Text(
+                  'Guardar Transacción',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }

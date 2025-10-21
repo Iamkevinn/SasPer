@@ -32,7 +32,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   late StreamSubscription<Uri?> _linkSub;
   late AnimationController _fabAnimationController;
   late Animation<double> _fabScaleAnimation;
-  bool _isFabExpanded = false;
+  final bool _isFabExpanded = false;
 
   final List<Widget> _widgetOptions = const <Widget>[
     DashboardScreen(),

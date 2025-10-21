@@ -96,7 +96,7 @@ class _DebtsScreenState extends State<DebtsScreen> with TickerProviderStateMixin
 
   Future<void> _handleShare(Debt debt) async {
     try {
-      final Uint8List? imageBytes = await _screenshotController.captureFromWidget(
+      final Uint8List imageBytes = await _screenshotController.captureFromWidget(
         ShareableDebtSummary(debt: debt),
         delay: const Duration(milliseconds: 100),
       );

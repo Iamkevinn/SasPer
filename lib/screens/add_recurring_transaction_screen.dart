@@ -54,70 +54,59 @@ class _AddRecurringTransactionScreenState extends State<AddRecurringTransactionS
   }
 
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate() || _selectedAccountId == null) {
+  // La validación se mantiene igual
+  if (!_formKey.currentState!.validate() || _selectedAccountId == null) {
+    NotificationHelper.show(
+      message: 'Por favor, completa todos los campos requeridos.',
+      type: NotificationType.error,
+    );
+    return;
+  }
+  
+  setState(() => _isLoading = true);
+
+  try {
+    // 1. Llamamos a guardar UNA SOLA VEZ y guardamos el resultado.
+    final newTransaction = await _repository.addRecurringTransaction(
+      description: _descriptionController.text.trim(),
+      amount: double.parse(_amountController.text.replaceAll(',', '.')),
+      type: _type,
+      category: _category,
+      accountId: _selectedAccountId!,
+      frequency: _frequency,
+      interval: 1,
+      startDate: _startDate,
+    );
+
+    // 2. Usamos el resultado para programar las notificaciones.
+    await NotificationService.instance.scheduleRecurringReminders(newTransaction);
+    developer.log('✅ Notificaciones programadas para: ${newTransaction.description}', name: 'AddRecurringScreen');
+    
+    // 3. SE ELIMINA LA SEGUNDA LLAMADA REDUNDANTE.
+
+    if (mounted) {
+      Navigator.of(context).pop(true);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        NotificationHelper.show(
+          message: 'Gasto fijo creado correctamente.',
+          type: NotificationType.success,
+        );
+      });
+    }
+  } catch (e) {
+    developer.log('🔥 FALLO AL GUARDAR GASTO FIJO: $e', name: 'AddRecurringScreen');
+    if (mounted) {
       NotificationHelper.show(
-        message: 'Por favor, completa todos los campos requeridos.',
+        message: 'Error al guardar: ${e.toString().replaceFirst("Exception: ", "")}',
         type: NotificationType.error,
       );
-      return;
     }
-    
-    setState(() => _isLoading = true);
-
-    try {
-      // 2. AHORA CAPTURAMOS EL RESULTADO DE LA LLAMADA AL REPOSITORIO
-      final newTransaction = await _repository.addRecurringTransaction(
-        description: _descriptionController.text.trim(),
-        amount: double.parse(_amountController.text.replaceAll(',', '.')),
-        type: _type,
-        category: _category,
-        accountId: _selectedAccountId!,
-        frequency: _frequency,
-        interval: 1,
-        startDate: _startDate,
-      );
-
-      // 3. PASAMOS LA NUEVA TRANSACCIÓN AL SERVICIO DE NOTIFICACIONES
-      await NotificationService.instance.scheduleRecurringReminders(newTransaction);
-      developer.log('✅ Notificaciones programadas para: ${newTransaction.description}', name: 'AddRecurringScreen');
-      
-      // Usamos la instancia del Singleton para llamar al método.
-      await _repository.addRecurringTransaction(
-        description: _descriptionController.text.trim(),
-        amount: double.parse(_amountController.text.replaceAll(',', '.')),
-        type: _type,
-        category: _category,
-        accountId: _selectedAccountId!,
-        frequency: _frequency,
-        interval: 1,
-        startDate: _startDate,
-      );
-
-      if (mounted) {
-        // Devolvemos 'true' para que la pantalla anterior sepa que hubo un cambio.
-        Navigator.of(context).pop(true);
-        // Mostramos la notificación después de que la navegación haya terminado.
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          NotificationHelper.show(
-            message: 'Gasto fijo creado correctamente.',
-            type: NotificationType.success,
-          );
-        });
-      }
-    } catch (e) {
-      developer.log('🔥 FALLO AL GUARDAR GASTO FIJO: $e', name: 'AddRecurringScreen');
-      if (mounted) {
-        NotificationHelper.show(
-          message: 'Error al guardar: ${e.toString().replaceFirst("Exception: ", "")}',
-          type: NotificationType.error,
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+  } finally {
+    if (mounted) {
+      setState(() => _isLoading = false);
     }
   }
+}
   
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(

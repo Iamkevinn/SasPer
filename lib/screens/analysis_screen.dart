@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'dart:developer' as developer;
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sasper/widgets/analysis_charts/average_analysis_section.dart';
@@ -15,10 +16,8 @@ import 'package:sasper/data/analysis_repository.dart';
 import 'package:sasper/models/analysis_models.dart';
 import 'package:sasper/models/insight_model.dart';
 
-// --- NUEVAS IMPORTACIONES ---
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:lottie/lottie.dart';
-// NOVEDAD: Importa el nuevo widget de análisis que acabamos de crear.
 import 'package:sasper/widgets/analysis_charts/mood_spending_analysis_card.dart';
 
 // Widgets de la Pantalla
@@ -32,8 +31,6 @@ import 'package:sasper/widgets/analysis_charts/income_pie_chart.dart';
 import 'package:sasper/widgets/shared/empty_state_card.dart';
 import 'package:sasper/widgets/analysis/insight_card.dart';
 
-// Placeholder para el modelo de Insight. Reemplázalo cuando lo crees.
-
 class AnalysisScreen extends StatefulWidget {
   const AnalysisScreen({super.key});
 
@@ -41,37 +38,45 @@ class AnalysisScreen extends StatefulWidget {
   State<AnalysisScreen> createState() => AnalysisScreenState();
 }
 
-class AnalysisScreenState extends State<AnalysisScreen> {
+class AnalysisScreenState extends State<AnalysisScreen>
+    with SingleTickerProviderStateMixin {
   final AnalysisRepository _repository = AnalysisRepository.instance;
 
-  // Usamos un "Record" para manejar ambos futuros en un solo estado.
   late Future<({AnalysisData charts, List<Insight> insights})> _analysisFuture;
 
   RealtimeChannel? _realtimeChannel;
   Timer? _debounce;
+
+  // Animación para el ícono de IA
+  late AnimationController _aiPulseController;
+  late Animation<double> _aiPulseAnimation;
 
   @override
   void initState() {
     super.initState();
     _analysisFuture = _fetchAllScreenData();
     _setupRealtimeSubscription();
+
+    // Inicializar animación del ícono IA
+    _aiPulseController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _aiPulseAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
+      CurvedAnimation(parent: _aiPulseController, curve: Curves.easeInOut),
+    );
   }
 
-  /// Carga en paralelo los datos de los gráficos y los insights para una carga más rápida.
-  /// Carga en paralelo los datos de los gráficos y los insights de forma resiliente.
   Future<({AnalysisData charts, List<Insight> insights})>
       _fetchAllScreenData() async {
-    // Usamos Future.wait con manejo de errores individual, similar a como lo
-    // hace tu AnalysisRepository. Esto asegura que si una parte falla, la otra no.
     final results = await Future.wait([
       _repository.fetchAllAnalysisData().catchError((e) {
-        // Si falla la carga de gráficos, logueamos el error y devolvemos datos vacíos.
         developer.log('Fallo al cargar datos de gráficos',
             name: 'AnalysisScreen', error: e);
         return AnalysisData.empty();
       }),
       _repository.getInsights().catchError((e) {
-        // Si falla la carga de insights, logueamos y devolvemos una lista vacía.
         developer.log('Fallo al cargar insights',
             name: 'AnalysisScreen', error: e);
         return <Insight>[];
@@ -84,7 +89,6 @@ class AnalysisScreenState extends State<AnalysisScreen> {
     );
   }
 
-  /// Configura la escucha de cambios en tiempo real en la base de datos.
   void _setupRealtimeSubscription() {
     final client = Supabase.instance.client;
     _realtimeChannel = client
@@ -95,7 +99,6 @@ class AnalysisScreenState extends State<AnalysisScreen> {
           table: 'transactions',
           callback: (_) => _triggerRefreshWithDebounce(),
         )
-        // Descomenta cuando crees la tabla 'insights'.
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
@@ -105,7 +108,6 @@ class AnalysisScreenState extends State<AnalysisScreen> {
         .subscribe();
   }
 
-  /// Agrupa múltiples llamadas de refresco en una sola para evitar sobrecargar la red.
   void _triggerRefreshWithDebounce() {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce = Timer(const Duration(milliseconds: 700), () {
@@ -119,10 +121,10 @@ class AnalysisScreenState extends State<AnalysisScreen> {
       Supabase.instance.client.removeChannel(_realtimeChannel!);
     }
     _debounce?.cancel();
+    _aiPulseController.dispose();
     super.dispose();
   }
 
-  /// Vuelve a cargar todos los datos de la pantalla.
   Future<void> _handleRefresh() async {
     if (mounted) {
       setState(() {
@@ -134,181 +136,584 @@ class AnalysisScreenState extends State<AnalysisScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Usamos un CustomScrollView para combinar diferentes tipos de listas (Slivers),
-      // lo que nos da un control superior sobre el scroll y las cabeceras.
-      body: RefreshIndicator(
-        onRefresh: _handleRefresh,
-        child: FutureBuilder<({AnalysisData charts, List<Insight> insights})>(
-          future: _analysisFuture,
-          builder: (context, snapshot) {
-            final isLoading =
-                snapshot.connectionState == ConnectionState.waiting;
+      body: SafeArea(
+        bottom: false,
+        child: RefreshIndicator(
+          onRefresh: _handleRefresh,
+          child: FutureBuilder<({AnalysisData charts, List<Insight> insights})>(
+            future: _analysisFuture,
+            builder: (context, snapshot) {
+              final isLoading =
+                  snapshot.connectionState == ConnectionState.waiting;
 
-            // Usamos Skeletonizer para el estado de carga
-            if (isLoading) {
-              return _buildShimmer();
-            }
+              if (isLoading) {
+                return _buildShimmer();
+              }
 
-            if (snapshot.hasError) {
-              return _buildErrorState(snapshot.error);
-            }
-            if (!snapshot.hasData) {
-              return _buildLottieEmptyState(onRefresh: _handleRefresh);
-            }
+              if (snapshot.hasError) {
+                return _buildErrorState(snapshot.error);
+              }
+              
+              if (!snapshot.hasData) {
+                return _buildLottieEmptyState(onRefresh: _handleRefresh);
+              }
 
-            final data = snapshot.data!;
-            final chartData = data.charts;
-            final insights = data.insights;
+              final data = snapshot.data!;
+              final chartData = data.charts;
+              final insights = data.insights;
 
-            final bool hasAnyData = insights.isNotEmpty || chartData.hasData;
+              final bool hasAnyData = insights.isNotEmpty || chartData.hasData;
 
-            if (!hasAnyData) {
-              return _buildLottieEmptyState(onRefresh: _handleRefresh);
-            }
+              if (!hasAnyData) {
+                return _buildLottieEmptyState(onRefresh: _handleRefresh);
+              }
 
-            return CustomScrollView(
-              slivers: [
-                SliverAppBar(
-                  title: Text('Análisis',
-                      style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
-                  centerTitle: false,
-                  elevation: 0,
-                  pinned: true, // El título se queda fijo al hacer scroll.
-                  floating:
-                      true, // El appbar reaparece al hacer scroll hacia arriba.
-                  backgroundColor:
-                      Theme.of(context).scaffoldBackgroundColor.withAlpha(240),
-                ),
-
-                // --- SECCIÓN DE INSIGHTS ---
-                // Solo se muestra si la lista de insights no está vacía.
-                if (insights.isNotEmpty) ...[
-                  _buildSectionHeader("Tus Descubrimientos"),
-                  SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    sliver: SliverList.separated(
-                      itemCount: insights.length,
-                      itemBuilder: (context, index) =>
-                          InsightCard(insight: insights[index])
-                              .animate()
-                              .fadeIn(duration: 500.ms, delay: (100 * index).ms)
-                              .slideY(begin: 0.2, curve: Curves.easeOutCubic),
-                      separatorBuilder: (context, index) =>
-                          const SizedBox(height: 12),
-                    ),
-                  ),
-                ],
-
-                // --- SECCIÓN DE GRÁFICOS ---
-                // Solo se muestra si hay datos para al menos un gráfico.
-                if (chartData.hasData) ...[
-                  _buildSectionHeader("Explora tus Datos"),
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 150),
-                    sliver: SliverList.separated(
-                      itemCount: _getChartCount(chartData),
-                      itemBuilder: (context, index) =>
-                          _buildChartWidget(chartData, index)
-                              .animate()
-                              .fadeIn(duration: 600.ms, delay: (200 * index).ms)
-                              .moveY(begin: 30, curve: Curves.easeOutCubic),
-                      separatorBuilder: (context, index) =>
-                          const SizedBox(height: 32),
-                    ),
-                  ),
-                ],
-              ],
-            );
-          },
+              return _buildAnalysisContent(chartData, insights);
+            },
+          ),
         ),
       ),
     );
   }
 
-  // --- WIDGETS AUXILIARES PARA MANTENER EL `build` LIMPIO Y LEGIBLE ---
+  // ==================== CONTENIDO PRINCIPAL ====================
+  Widget _buildAnalysisContent(AnalysisData chartData, List<Insight> insights) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-  Widget _buildSectionHeader(String title) {
+    return CustomScrollView(
+      physics: const BouncingScrollPhysics(),
+      slivers: [
+        // HEADER PREMIUM CON IA
+        _buildPremiumHeader(colorScheme, isDark, insights),
+
+        // INSIGHT HERO CARD (EL MÁS IMPORTANTE)
+        if (insights.isNotEmpty)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              child: _buildHeroInsightCard(insights.first, colorScheme, isDark),
+            ),
+          ),
+
+        // QUICK STATS (3 MÉTRICAS CLAVE)
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+            child: _buildQuickStats(chartData, colorScheme, isDark),
+          ),
+        ),
+
+        // SECCIÓN: INSIGHTS SECUNDARIOS
+        if (insights.length > 1) ...[
+          _buildSectionHeader('Descubrimientos Clave', colorScheme),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            sliver: SliverList.separated(
+              itemCount: insights.length - 1, // Excluimos el hero
+              itemBuilder: (context, index) =>
+                  InsightCard(insight: insights[index + 1])
+                      .animate()
+                      .fadeIn(duration: 500.ms, delay: (100 * index).ms)
+                      .slideY(begin: 0.2, curve: Curves.easeOutCubic),
+              separatorBuilder: (context, index) => const SizedBox(height: 12),
+            ),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+        ],
+
+        // SECCIÓN: GRÁFICOS PRIORITARIOS
+        if (chartData.hasData) ...[
+          _buildSectionHeader('Análisis Detallado', colorScheme),
+          
+          // GRÁFICO 1: Balance proyectado (NetWorth)
+          if (chartData.netWorthLineData.isNotEmpty)
+            _buildChartSection(
+              title: 'Tendencia Patrimonial',
+              subtitle: 'Tu evolución financiera en el tiempo',
+              icon: Iconsax.trend_up,
+              child: NetWorthTrendChart(data: chartData.netWorthLineData),
+              colorScheme: colorScheme,
+            ),
+
+          // GRÁFICO 2: Comportamiento emocional (PRIORIDAD ALTA)
+          if (chartData.moodAnalysisData.isNotEmpty)
+            _buildChartSection(
+              title: 'Análisis Emocional de Gastos',
+              subtitle: 'Cómo tu estado de ánimo afecta tus finanzas',
+              icon: Iconsax.emoji_happy,
+              child: MoodSpendingAnalysisCard(
+                  analysisData: chartData.moodAnalysisData),
+              colorScheme: colorScheme,
+              isHighlight: true,
+            ),
+
+          // GRÁFICO 3: Flujo de caja
+          if (chartData.cashflowBarData.isNotEmpty)
+            _buildChartSection(
+              title: 'Flujo de Efectivo Mensual',
+              subtitle: 'Balance entre ingresos y gastos',
+              icon: Iconsax.chart_21,
+              child: MonthlyCashflowChart(data: chartData.cashflowBarData),
+              colorScheme: colorScheme,
+            ),
+
+          // GRÁFICO 4: Comparativa de categorías
+          if (chartData.categoryComparisonData.isNotEmpty)
+            _buildChartSection(
+              title: 'Comparativa por Categoría',
+              subtitle: 'Tus patrones de gasto mensuales',
+              icon: Iconsax.category,
+              child: CategoryComparisonChart(
+                  data: chartData.categoryComparisonData),
+              colorScheme: colorScheme,
+            ),
+
+          // GRÁFICO 5: Promedios y análisis
+          if (chartData.monthlyAverage.monthCount > 0 &&
+              chartData.categoryAverages.isNotEmpty)
+            _buildChartSection(
+              title: 'Análisis de Promedios',
+              subtitle: 'Tu comportamiento financiero promedio',
+              icon: Iconsax.chart_square,
+              child: AverageAnalysisSection(
+                monthlyData: chartData.monthlyAverage,
+                categoryData: chartData.categoryAverages,
+              ),
+              colorScheme: colorScheme,
+            ),
+
+          // GRÁFICO 6: Ingresos vs Gastos
+          if (chartData.incomeExpenseBarData.isNotEmpty)
+            _buildChartSection(
+              title: 'Ingresos vs Gastos',
+              subtitle: 'Comparativa mensual detallada',
+              icon: Iconsax.money_recive,
+              child:
+                  IncomeExpenseBarChart(data: chartData.incomeExpenseBarData),
+              colorScheme: colorScheme,
+            ),
+
+          // GRÁFICO 7: Distribución de gastos (Pie)
+          if (chartData.expensePieData.isNotEmpty)
+            _buildChartSection(
+              title: 'Distribución de Gastos',
+              subtitle: 'Dónde se va tu dinero',
+              icon: Iconsax.chart_1,
+              child: ExpensePieChart(data: chartData.expensePieData),
+              colorScheme: colorScheme,
+            ),
+
+          // GRÁFICO 8: Distribución de ingresos (Pie)
+          if (chartData.incomePieData.isNotEmpty)
+            _buildChartSection(
+              title: 'Fuentes de Ingreso',
+              subtitle: 'De dónde proviene tu dinero',
+              icon: Iconsax.wallet_money,
+              child: IncomePieChart(data: chartData.incomePieData),
+              colorScheme: colorScheme,
+            ),
+
+          // GRÁFICO 9: Estado de ánimo por día
+          if (chartData.moodByDayData.isNotEmpty)
+            _buildChartSection(
+              title: 'Ánimo por Día de la Semana',
+              subtitle: 'Patrones emocionales semanales',
+              icon: Iconsax.calendar,
+              child: MoodByDayChart(analysisData: chartData.moodByDayData),
+              colorScheme: colorScheme,
+            ),
+
+          // GRÁFICO 10: Heatmap de actividad
+          if (chartData.heatmapData.isNotEmpty)
+            _buildChartSection(
+              title: 'Mapa de Calor de Actividad',
+              subtitle: 'Tu comportamiento financiero diario',
+              icon: Iconsax.grid_1,
+              child: HeatmapSection(
+                data: chartData.heatmapData,
+                startDate: DateTime.now().subtract(const Duration(days: 119)),
+                endDate: DateTime.now(),
+              ),
+              colorScheme: colorScheme,
+            ),
+
+          // SPACING PARA NAVIGATION BAR
+          const SliverToBoxAdapter(child: SizedBox(height: 100)),
+        ],
+      ],
+    );
+  }
+
+  // ==================== HEADER PREMIUM ====================
+  Widget _buildPremiumHeader(
+      ColorScheme colorScheme, bool isDark, List<Insight> insights) {
+    return SliverAppBar(
+      pinned: true,
+      floating: true,
+      elevation: 0,
+      backgroundColor: colorScheme.surface.withOpacity(0.95),
+      toolbarHeight: 100,
+      flexibleSpace: ClipRRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(color: Colors.transparent),
+        ),
+      ),
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                'Inteligencia Financiera',
+                style: GoogleFonts.poppins(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(width: 8),
+              AnimatedBuilder(
+                animation: _aiPulseAnimation,
+                builder: (context, child) {
+                  return Transform.scale(
+                    scale: _aiPulseAnimation.value,
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [colorScheme.primary, colorScheme.tertiary],
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Iconsax.magic_star,
+                        size: 16,
+                        color: colorScheme.onPrimary,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            _getFinancialStatusMessage(insights),
+            style: GoogleFonts.poppins(
+              fontSize: 13,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getFinancialStatusMessage(List<Insight> insights) {
+    if (insights.isEmpty) return 'Analizando tu situación financiera...';
+    
+    final positiveInsights =
+        insights.where((i) => i.type == 'opportunity' || i.type == 'achievement');
+    
+    if (positiveInsights.isNotEmpty) {
+      return '${positiveInsights.length} oportunidades detectadas';
+    }
+    
+    return '${insights.length} insights disponibles';
+  }
+
+  // ==================== HERO INSIGHT CARD ====================
+  Widget _buildHeroInsightCard(
+      Insight insight, ColorScheme colorScheme, bool isDark) {
+    Color cardColor;
+    Color iconColor;
+    IconData icon;
+
+    switch (insight.type) {
+      case 'warning':
+        cardColor = Colors.orange;
+        iconColor = Colors.orange.shade700;
+        icon = Iconsax.warning_2;
+        break;
+      case 'opportunity':
+        cardColor = Colors.green;
+        iconColor = Colors.green.shade700;
+        icon = Iconsax.lamp_on;
+        break;
+      case 'achievement':
+        cardColor = Colors.amber;
+        iconColor = Colors.amber.shade700;
+        icon = Iconsax.medal_star;
+        break;
+      default:
+        cardColor = colorScheme.primary;
+        iconColor = colorScheme.primary;
+        icon = Iconsax.info_circle;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            cardColor.withOpacity(0.15),
+            cardColor.withOpacity(0.05),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: cardColor.withOpacity(0.3),
+          width: 2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: cardColor.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: iconColor, size: 24),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Insight Principal',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    Text(
+                      insight.title,
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: iconColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            insight.description,
+            style: GoogleFonts.poppins(
+              fontSize: 15,
+              height: 1.5,
+              color: colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 16),
+          FilledButton.tonal(
+            onPressed: () {},
+            style: FilledButton.styleFrom(
+              backgroundColor: cardColor.withOpacity(0.2),
+              foregroundColor: iconColor,
+            ),
+            child: const Text('Ver detalles'),
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 600.ms).slideY(begin: 0.3);
+  }
+
+  // ==================== QUICK STATS ====================
+  Widget _buildQuickStats(
+      AnalysisData data, ColorScheme colorScheme, bool isDark) {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildStatCard(
+            'Balance',
+            data.netWorthLineData.isNotEmpty
+                ? '\$${data.netWorthLineData.last.totalBalance.toStringAsFixed(0)}'
+                : '\$0',
+            Iconsax.wallet_3,
+            colorScheme.primary,
+            colorScheme,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildStatCard(
+            'Este Mes',
+            data.cashflowBarData.isNotEmpty
+                ? '\$${data.cashflowBarData.last.cashFlow.toStringAsFixed(0)}'
+                : '\$0',
+            Iconsax.trend_up,
+            Colors.green,
+            colorScheme,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildStatCard(
+            'Gastos',
+            data.expensePieData.isNotEmpty
+                ? '\$${data.expensePieData.fold<double>(0, (sum, item) => sum + item.totalSpent).toStringAsFixed(0)}'
+                : '\$0',
+            Iconsax.card,
+            Colors.orange,
+            colorScheme,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatCard(String label, String value, IconData icon,
+      Color accentColor, ColorScheme colorScheme) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: accentColor),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: GoogleFonts.poppins(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: colorScheme.onSurface,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 11,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==================== SECTION HEADER ====================
+  Widget _buildSectionHeader(String title, ColorScheme colorScheme) {
     return SliverToBoxAdapter(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
         child: Text(
           title,
-          style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w600),
+          style: GoogleFonts.poppins(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: colorScheme.onSurface,
+          ),
         ),
       ),
     );
   }
 
-  int _getChartCount(AnalysisData data) {
-    int count = 0;
-    if (data.monthlyAverage.monthCount > 0 && data.categoryAverages.isNotEmpty) count++;
-    if (data.moodAnalysisData.isNotEmpty) count++;
-    if (data.moodByDayData.isNotEmpty) count++;
-    if (data.heatmapData.isNotEmpty) count++;
-    if (data.cashflowBarData.isNotEmpty) count++;
-    if (data.netWorthLineData.isNotEmpty) count++;
-    if (data.incomeExpenseBarData.isNotEmpty) count++;
-    if (data.categoryComparisonData.isNotEmpty) count++;
-    if (data.expensePieData.isNotEmpty) count++;
-    if (data.incomePieData.isNotEmpty) count++;
-    return count;
+  // ==================== CHART SECTION ====================
+  Widget _buildChartSection({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Widget child,
+    required ColorScheme colorScheme,
+    bool isHighlight = false,
+  }) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+        child: Container(
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainer,
+            borderRadius: BorderRadius.circular(24),
+            border: isHighlight
+                ? Border.all(color: colorScheme.primary.withOpacity(0.3), width: 2)
+                : Border.all(color: colorScheme.outlineVariant),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(icon, size: 20, color: colorScheme.primary),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: GoogleFonts.poppins(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.onSurface,
+                            ),
+                          ),
+                          Text(
+                            subtitle,
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              child,
+            ],
+          ),
+        ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.2),
+      ),
+    );
   }
 
-  Widget _buildChartWidget(AnalysisData data, int index) {
-    final widgets = [
-      if (data.monthlyAverage.monthCount > 0 && data.categoryAverages.isNotEmpty)
-        AverageAnalysisSection(
-          monthlyData: data.monthlyAverage,
-          categoryData: data.categoryAverages,
-        ),
-      // NOVEDAD: Añadimos nuestro nuevo widget a la lista, preferiblemente al principio.
-      if (data.moodAnalysisData.isNotEmpty)
-        MoodSpendingAnalysisCard(analysisData: data.moodAnalysisData),
-      if (data.moodByDayData.isNotEmpty)
-        MoodByDayChart(analysisData: data.moodByDayData),
-      if (data.heatmapData.isNotEmpty)
-        HeatmapSection(
-            data: data.heatmapData,
-            startDate: DateTime.now().subtract(const Duration(days: 119)),
-            endDate: DateTime.now()),
-      if (data.cashflowBarData.isNotEmpty)
-        MonthlyCashflowChart(data: data.cashflowBarData),
-      if (data.netWorthLineData.isNotEmpty)
-        NetWorthTrendChart(data: data.netWorthLineData),
-      if (data.incomeExpenseBarData.isNotEmpty)
-        IncomeExpenseBarChart(data: data.incomeExpenseBarData),
-      if (data.categoryComparisonData.isNotEmpty)
-        CategoryComparisonChart(data: data.categoryComparisonData),
-      if (data.expensePieData.isNotEmpty)
-        ExpensePieChart(data: data.expensePieData),
-      if (data.incomePieData.isNotEmpty)
-        IncomePieChart(data: data.incomePieData),
-    ];
-    // Devuelve un contenedor vacío temporalmente para que no haya errores
-    if (widgets.isEmpty) {
-      return const SizedBox(
-          height: 1, child: Text("Gráfico desactivado temporalmente"));
-    }
-    return widgets[index];
-  }
+  // ==================== ESTADOS DE CARGA Y ERROR ====================
 
   Widget _buildErrorState(Object? error) {
-    // NOVEDAD: Logueamos el error para verlo completo en la consola.
     developer.log(
       'Error capturado por FutureBuilder en AnalysisScreen',
       name: 'AnalysisScreen',
       error: error,
-      // Si tienes el stackTrace del snapshot, añádelo también:
-      // stackTrace: snapshot.stackTrace,
     );
 
     return Center(
-        child: EmptyStateCard(
-            title: 'Ocurrió un Error',
-            // NOVEDAD: Mostramos el error real en la UI.
-            message:
-                'No se pudieron cargar los datos de análisis.\n\nError: $error',
-            icon: Iconsax.warning_2));
+      child: EmptyStateCard(
+        title: 'Ocurrió un Error',
+        message: 'No se pudieron cargar los datos de análisis.\n\nError: $error',
+        icon: Iconsax.warning_2,
+      ),
+    );
   }
 
   Widget _buildShimmer() {
@@ -322,51 +727,53 @@ class AnalysisScreenState extends State<AnalysisScreen> {
       child: ListView(
         physics: const NeverScrollableScrollPhysics(),
         children: [
-          // Shimmer para la cabecera de Insights
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
             child: Container(width: 250, height: 28.0, color: Colors.white),
           ),
-          // Shimmer para 2 tarjetas de Insight
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            padding: const EdgeInsets.symmetric(horizontal: 20.0),
             child: Column(
               children: [
                 Container(
-                    height: 80,
-                    decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16))),
-                const SizedBox(height: 12),
-                Container(
-                    height: 80,
-                    decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16))),
-              ],
-            ),
-          ),
-          // Shimmer para la cabecera de Gráficos
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
-            child: Container(width: 220, height: 28.0, color: Colors.white),
-          ),
-          // Shimmer para 3 bloques de Gráficos
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Column(
-              children: [
-                Container(
-                    height: 250,
-                    decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20))),
+                  height: 160,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        height: 100,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Container(
+                        height: 100,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 32),
                 Container(
-                    height: 300,
-                    decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20))),
+                  height: 250,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                ),
               ],
             ),
           ),
@@ -375,13 +782,12 @@ class AnalysisScreenState extends State<AnalysisScreen> {
     );
   }
 
-  // --- WIDGET DE ESTADO VACÍO CON LOTTIE ---
   Widget _buildLottieEmptyState({required Future<void> Function() onRefresh}) {
     return RefreshIndicator(
       onRefresh: onRefresh,
       child: Stack(
         children: [
-          ListView(), // Para habilitar pull-to-refresh
+          ListView(),
           Center(
             child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
@@ -399,16 +805,18 @@ class AnalysisScreenState extends State<AnalysisScreen> {
                     Text(
                       'Sin Datos Suficientes',
                       style: GoogleFonts.poppins(
-                          fontSize: 22, fontWeight: FontWeight.w600),
+                        fontSize: 22,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'Registra algunas transacciones para empezar a ver tus análisis inteligentes.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                          fontSize: 16,
-                          color:
-                              Theme.of(context).colorScheme.onSurfaceVariant),
+                        fontSize: 16,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
@@ -421,10 +829,9 @@ class AnalysisScreenState extends State<AnalysisScreen> {
   }
 }
 
-/// Extensión para simplificar la comprobación de si hay datos de gráficos para mostrar.
+// ==================== EXTENSIÓN ====================
 extension on AnalysisData {
   bool get hasData =>
-      // NOVEDAD: Añadimos el nuevo análisis a la comprobación general.
       moodByDayData.isNotEmpty ||
       moodAnalysisData.isNotEmpty ||
       expensePieData.isNotEmpty ||

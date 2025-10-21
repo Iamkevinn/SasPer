@@ -343,7 +343,7 @@ class AccountsScreenState extends State<AccountsScreen> {
                     setState(() => _selectedFilter = filter),
               ),
             );
-          }).toList(),
+          }),
 
           // --- NUEVO FILTRO PARA ARCHIVADAS ---
           if (hasArchivedAccounts)

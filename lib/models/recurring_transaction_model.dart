@@ -110,7 +110,7 @@ class RecurringTransaction extends Equatable {
   }) {
     return RecurringTransaction(
       id: id ?? this.id,
-      userId: this.userId, // CORREGIDO: Usar this.userId
+      userId: userId, // CORREGIDO: Usar this.userId
       description: description ?? this.description,
       amount: amount ?? this.amount,
       type: type ?? this.type,

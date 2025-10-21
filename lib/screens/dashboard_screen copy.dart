@@ -4,7 +4,6 @@ import 'dart:async';
 import 'dart:developer' as developer;
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
-import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
@@ -12,12 +11,9 @@ import 'package:lottie/lottie.dart';
 import 'package:sasper/data/challenge_repository.dart';
 import 'package:sasper/data/dashboard_repository.dart';
 import 'package:sasper/data/transaction_repository.dart';
-import 'package:sasper/models/budget_models.dart';
 import 'package:sasper/models/challenge_model.dart';
 import 'package:sasper/models/dashboard_data_model.dart';
 import 'package:sasper/models/transaction_models.dart';
-import 'package:sasper/screens/budget_details_screen.dart';
-import 'package:sasper/screens/budgets_screen%20copy.dart';
 import 'package:sasper/services/widget_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/main.dart';
@@ -33,6 +29,9 @@ import 'package:sasper/widgets/dashboard/category_spending_chart.dart';
 
 // Widgets
 import 'package:sasper/widgets/dashboard/ai_analysis_section.dart';
+import 'package:sasper/widgets/dashboard/balance_card.dart';
+import 'package:sasper/widgets/dashboard/budgets_section.dart';
+import 'package:sasper/widgets/dashboard/dashboard_header.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -41,12 +40,11 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => DashboardScreenState();
 }
 
-class DashboardScreenState extends State<DashboardScreen>
+class DashboardScreenState extends State<DashboardScreen> 
     with SingleTickerProviderStateMixin {
   // --- DEPENDENCIAS (SINGLETONS) ---
   final DashboardRepository _dashboardRepository = DashboardRepository.instance;
-  final TransactionRepository _transactionRepository =
-      TransactionRepository.instance;
+  final TransactionRepository _transactionRepository = TransactionRepository.instance;
   final WidgetService _widgetService = WidgetService();
 
   // --- GESTIÓN DE STREAMS Y ESTADO ---
@@ -85,7 +83,7 @@ class DashboardScreenState extends State<DashboardScreen>
       duration: const Duration(seconds: 2),
       vsync: this,
     )..repeat(reverse: true);
-
+    
     _pulseAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
@@ -131,8 +129,8 @@ class DashboardScreenState extends State<DashboardScreen>
           const SizedBox(height: 16),
           Text(
             '¡Reto Completado!',
-            style:
-                GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.bold),
+            style: GoogleFonts.poppins(
+                fontSize: 22, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
@@ -220,8 +218,8 @@ class DashboardScreenState extends State<DashboardScreen>
       builder: (dialogContext) => BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
         child: AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(28.0)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(28.0)),
           backgroundColor:
               Theme.of(dialogContext).colorScheme.surface.withOpacity(0.9),
           title: const Text('Confirmar Acción'),
@@ -319,11 +317,7 @@ class DashboardScreenState extends State<DashboardScreen>
 
           // BALANCE CARD (TU WIDGET EXISTENTE)
           SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-              // Llamamos a nuestro nuevo método refactorizado
-              child: _buildBalanceHeroCard(colorScheme, isDark, data),
-            ),
+            child: BalanceCard(totalBalance: data.totalBalance),
           ),
 
           // QUICK ACTIONS
@@ -336,9 +330,7 @@ class DashboardScreenState extends State<DashboardScreen>
 
           // BUDGETS SECTION (TU WIDGET EXISTENTE)
           SliverToBoxAdapter(
-            // Pasamos los datos de presupuestos directamente a nuestro nuevo método.
-            child:
-                _buildBudgetsSection(colorScheme, isDark, data.featuredBudgets),
+            child: BudgetsSection(budgets: data.featuredBudgets),
           ),
 
           // AI ANALYSIS (TU WIDGET EXISTENTE)
@@ -369,322 +361,9 @@ class DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  // ==================== BUDGETS SECTION (NUEVO Y REFACTORIZADO) ====================
-  Widget _buildBudgetsSection(
-      ColorScheme colorScheme, bool isDark, List<Budget> budgets) {
-    // --- ¡CAMBIO CLAVE! ---
-    // Si no hay presupuestos destacados, simplemente no mostramos la sección.
-    if (budgets.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'PRESUPUESTOS ACTIVOS',
-                style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.onSurfaceVariant,
-                  letterSpacing: 0.8,
-                ),
-              ),
-              TextButton(
-                onPressed: () {
-                  // Mantenemos la navegación a la pantalla principal de presupuestos.
-                  Navigator.of(context).push(MaterialPageRoute(
-                      builder: (context) => const BudgetsScreen()));
-                },
-                child: Text(
-                  'Ver todos',
-                  style: GoogleFonts.poppins(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: colorScheme.primary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: 140, // Altura de la lista horizontal
-          // --- ¡CAMBIO CLAVE! ---
-          // Usamos ListView.separated para construir la lista dinámicamente
-          // a partir de los datos reales.
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            itemCount: budgets.length,
-            separatorBuilder: (context, index) => const SizedBox(width: 12),
-            itemBuilder: (context, index) {
-              final budget = budgets[index];
-
-              // Calculamos el progreso usando las propiedades correctas de tu modelo.
-              // Tu modelo ya tiene un getter para esto, así que lo usamos.
-              final progress = budget.progress.clamp(0.0, 1.0);
-
-              return InkWell(
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      // Usamos 'budget.id' que es correcto según tu modelo.
-                      builder: (context) =>
-                          BudgetDetailsScreen(budgetId: budget.id),
-                    ),
-                  );
-                },
-                borderRadius: BorderRadius.circular(24),
-                child: _buildBudgetCard(
-                  colorScheme,
-                  isDark,
-                  budget.category, // Propiedad correcta: 'category'
-                  budget.spentAmount, // Propiedad correcta: 'spentAmount'
-                  budget.amount, // Propiedad correcta: 'amount'
-                  _getIconForCategory(budget.category),
-                  progress,
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildBudgetCard(
-    ColorScheme colorScheme,
-    bool isDark,
-    String category,
-    double spent,
-    double limit,
-    IconData icon,
-    double progress,
-  ) {
-    final currencyFormat =
-        NumberFormat.compactCurrency(locale: 'es_CO', symbol: '\$');
-    Color progressColor = progress < 0.7
-        ? Colors.green
-        : progress < 0.9
-            ? Colors.orange
-            : Colors.red;
-
-    return Container(
-      width: 200,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.7)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: colorScheme.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, size: 20, color: colorScheme.primary),
-              ),
-              Text(
-                '${(progress * 100).toStringAsFixed(0)}%',
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: progressColor,
-                ),
-              ),
-            ],
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                category,
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.onSurface,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                // Usamos un formato compacto para que quepa mejor.
-                '${currencyFormat.format(spent)} / ${currencyFormat.format(limit)}',
-                style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 6,
-              backgroundColor: colorScheme.surfaceContainerHighest,
-              valueColor: AlwaysStoppedAnimation<Color>(progressColor),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-// --- FUNCIÓN DE AYUDA ---
-// Debes adaptar este mapa a las categorías que manejas en tu app.
-  IconData _getIconForCategory(String categoryName) {
-    switch (categoryName.toLowerCase()) {
-      case 'alimentación':
-        return Iconsax.shopping_cart;
-      case 'transporte':
-        return Iconsax.car;
-      case 'entretenimiento':
-        return Iconsax.game;
-      case 'servicios':
-        return Iconsax.receipt;
-      case 'salud':
-        return Iconsax.health;
-      default:
-        return Iconsax.wallet_3;
-    }
-  }
-
-  // ==================== BALANCE HERO CARD (NUEVO Y REFACTORIZADO) ====================
-  Widget _buildBalanceHeroCard(
-      ColorScheme colorScheme, bool isDark, DashboardData data) {
-    // Usamos el formateador de moneda para un manejo correcto de la localización.
-    final currencyFormat = NumberFormat.currency(locale: 'es_CO', symbol: '\$');
-
-    return Container(
-      padding: const EdgeInsets.all(28),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isDark
-              ? [
-                  const Color(0xFF0D9488),
-                  const Color(0xFF0EA5A5),
-                ]
-              : [
-                  const Color(0xFF0D9488),
-                  const Color(0xFF14B8A6),
-                ],
-        ),
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: (isDark ? const Color(0xFF0EA5A5) : const Color(0xFF0D9488))
-                .withOpacity(0.3),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Balance Total',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.white.withOpacity(0.9),
-                ),
-              ),
-              // --- NOTA ---
-              // Estos datos son estáticos en el nuevo diseño.
-              // Para hacerlos dinámicos, necesitarías agregar esta lógica
-              // y los campos correspondientes a tu `DashboardData` model.
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Iconsax.arrow_up_3,
-                        size: 14, color: Colors.white.withOpacity(0.9)),
-                    const SizedBox(width: 4),
-                    Text(
-                      '+12.5%', // TODO: Conectar a datos reales
-                      style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white.withOpacity(0.9),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          // --- ¡CAMBIO CLAVE! ---
-          // El TweenAnimationBuilder ahora usa el balance REAL de tus datos.
-          TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0, end: data.totalBalance),
-            duration: const Duration(milliseconds: 1500),
-            curve: Curves.easeOutCubic,
-            builder: (context, value, child) {
-              return Text(
-                // Usamos el formateador de moneda para un resultado más limpio.
-                currencyFormat.format(value),
-                style: GoogleFonts.poppins(
-                  fontSize: 42,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  height: 1.1,
-                  letterSpacing: -1,
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Proyección mensual: \$3,125,000', // TODO: Conectar a datos reales
-            style: GoogleFonts.poppins(
-              fontSize: 13,
-              color: Colors.white.withOpacity(0.8),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   // ==================== HEADER PREMIUM ====================
-  // ==================== HEADER PREMIUM (NUEVO Y REFACTORIZADO) ====================
   Widget _buildPremiumHeader(
       ColorScheme colorScheme, bool isDark, DashboardData data) {
-    // Función auxiliar para obtener solo el primer nombre
-    String getFirstName(String fullName) {
-      if (fullName.trim().isEmpty) return 'Usuario';
-      return fullName.trim().split(' ').first;
-    }
-
     return SliverAppBar(
       pinned: true,
       floating: true,
@@ -697,34 +376,9 @@ class DashboardScreenState extends State<DashboardScreen>
           child: Container(color: Colors.transparent),
         ),
       ),
-      // --- ¡CAMBIO CLAVE! ---
-      // Integramos el título directamente y usamos los datos dinámicos.
-      title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            // Usamos la función para obtener el nombre y mostrar el saludo.
-            'Hola, ${getFirstName(data.fullName)} 👋',
-            style: GoogleFonts.poppins(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            'Tu Central Financiera',
-            style: GoogleFonts.poppins(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: colorScheme.onSurface,
-            ),
-          ),
-        ],
-      ),
+      title: DashboardHeader(userName: data.fullName),
       actions: [
-        // El botón de IA se mantiene, ya que la animación está controlada
-        // por el _pulseController que ya tienes en tu State.
+        // AI Button con animación de pulso
         AnimatedBuilder(
           animation: _pulseAnimation,
           builder: (context, child) {
@@ -734,16 +388,13 @@ class DashboardScreenState extends State<DashboardScreen>
                 margin: const EdgeInsets.only(right: 8),
                 child: IconButton(
                   onPressed: () {
-                    // TODO: Agregar acción para el botón de IA
+                    // Navegar a análisis IA o mostrar insights
                   },
                   icon: Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [
-                          colorScheme.primary,
-                          colorScheme.tertiary,
-                        ],
+                        colors: [colorScheme.primary, colorScheme.tertiary],
                       ),
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
@@ -765,20 +416,19 @@ class DashboardScreenState extends State<DashboardScreen>
             );
           },
         ),
-        // --- ¡NUEVO! ---
-        // Añadimos el botón de notificaciones del nuevo diseño.
-        //IconButton(
-        //onPressed: () {
-        // TODO: Agregar navegación a la pantalla de notificaciones
-        //},
-        //icon: Badge(
-        //smallSize: 8,
-        //child: Icon(Iconsax.notification, color: colorScheme.onSurface),
-        //),
-        //),
-        const SizedBox(width: 8),
-        // NOTA: El botón "Simular" se ha quitado de aquí.
-        // Según el nuevo diseño, lo pondremos en la sección "Quick Actions".
+        // Botón de simulación
+        Padding(
+          padding: const EdgeInsets.only(right: 16.0),
+          child: FilledButton.tonalIcon(
+            onPressed: _navigateToCanIAffordIt,
+            icon: const Icon(Iconsax.calculator, size: 18),
+            label: const Text('Simular'),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              textStyle: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -790,10 +440,8 @@ class DashboardScreenState extends State<DashboardScreen>
         Expanded(
           child: _buildQuickActionButton(
             colorScheme,
-            isDark,
             Iconsax.calculator,
             'Simular',
-            // --- ¡CAMBIO CLAVE! --- Conectamos la función de navegación existente.
             _navigateToCanIAffordIt,
           ),
         ),
@@ -801,10 +449,8 @@ class DashboardScreenState extends State<DashboardScreen>
         Expanded(
           child: _buildQuickActionButton(
             colorScheme,
-            isDark,
             Iconsax.add_circle,
             'Agregar',
-            // --- ¡CAMBIO CLAVE! --- Conectamos la función de navegación existente.
             _navigateToTransactionsScreen,
           ),
         ),
@@ -812,12 +458,10 @@ class DashboardScreenState extends State<DashboardScreen>
         Expanded(
           child: _buildQuickActionButton(
             colorScheme,
-            isDark,
             Iconsax.chart_21,
             'Análisis',
             () {
-              // TODO: Navegar a la pantalla de análisis detallado.
-              // Por ahora, mantenemos el comportamiento de tu código original.
+              // Navegar a análisis detallado
             },
           ),
         ),
@@ -827,7 +471,6 @@ class DashboardScreenState extends State<DashboardScreen>
 
   Widget _buildQuickActionButton(
     ColorScheme colorScheme,
-    bool isDark,
     IconData icon,
     String label,
     VoidCallback onTap,
