@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:equatable/equatable.dart';
+import 'package:iconsax/iconsax.dart';
 
 enum AccountStatus { active, archived }
 
@@ -32,6 +33,27 @@ class Account extends Equatable {
     required this.status,
   });
 
+  /// Getter dinámico que convierte el `iconName` (String) en un `IconData` real.
+  IconData get icon {
+    // Usa la función helper para buscar el ícono en el mapa.
+    // Proporciona Iconsax.wallet como un ícono de respaldo seguro.
+    return _iconMap[iconName?.toLowerCase()] ?? Iconsax.wallet;
+  }
+
+  // Mapa estático que asocia los nombres de los íconos (en minúsculas) con los objetos IconData.
+  // Esto es mucho más eficiente que un switch gigante.
+  static const Map<String, IconData> _iconMap = {
+    'money_3': Iconsax.money_3,
+    'building_4': Iconsax.building_4,
+    'card': Iconsax.card,
+    'safe_home': Iconsax.safe_home,
+    'chart_1': Iconsax.chart_1,
+    'wallet': Iconsax.wallet,
+    // --- Añade aquí más íconos de Iconsax si los necesitas en el futuro ---
+    'bank': Iconsax.bank,
+    'dollar_circle': Iconsax.dollar_circle,
+  };
+  
    factory Account.empty() {
     return Account(
       id: '',

@@ -117,3 +117,31 @@ class SavingsImpact {
     );
   }
 }
+class FinancialProjection {
+  final double newMonthlyContribution;
+  final DateTime newEstimatedDate;
+
+  FinancialProjection({
+    required this.newMonthlyContribution,
+    required this.newEstimatedDate,
+  });
+
+   factory FinancialProjection.fromMap(Map<String, dynamic> map) {
+    try {
+      return FinancialProjection(
+        newMonthlyContribution: (map['newMonthlyContribution'] as num? ?? 0).toDouble(),
+        newEstimatedDate: DateTime.parse(map['newEstimatedDate'] as String),
+      );
+    } catch (e) {
+      throw FormatException('Error al parsear FinancialProjection desde el mapa: $e', map);
+    }
+  }
+  
+  // Opcional: Puedes añadir un factory fromMap si tu API va a devolver este objeto
+  // factory FinancialProjection.fromMap(Map<String, dynamic> map) {
+  //   return FinancialProjection(
+  //     newMonthlyContribution: (map['newMonthlyContribution'] as num).toDouble(),
+  //     newEstimatedDate: DateTime.parse(map['newEstimatedDate'] as String),
+  //   );
+  //}
+}

@@ -163,7 +163,7 @@ class _BudgetsScreenState extends State<BudgetsScreen> with TickerProviderStateM
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
           SliverAppBar(
-            expandedHeight: 140,
+            expandedHeight: 200,
             floating: false,
             pinned: true,
             elevation: 0,

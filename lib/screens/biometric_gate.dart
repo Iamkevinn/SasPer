@@ -1,5 +1,6 @@
 // lib/screens/biometric_gate.dart
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:sasper/screens/main_screen.dart';
@@ -39,7 +40,9 @@ class _BiometricGateState extends State<BiometricGate> {
         }
       } catch (e) {
         // Manejar errores (ej: no hay biometría configurada)
-        print("Error de autenticación: $e");
+        if (kDebugMode) {
+          print("Error de autenticación: $e");
+        }
         _navigateToMainScreen(); // En caso de error, por seguridad, lo dejamos pasar por ahora
       }
     } else {

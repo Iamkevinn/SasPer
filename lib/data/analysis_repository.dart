@@ -46,6 +46,35 @@ class AnalysisRepository {
 
   // --- MÉTODOS PÚBLICOS DEL REPOSITORIO ---
 
+  // <-- NUEVO MÉTODO -->
+  /// Obtiene el ingreso mensual promedio del usuario.
+  /// Se apoya en una función RPC de Supabase para eficiencia.
+  Future<double> getAverageMonthlyIncome() async {
+    developer.log("💰 [Repo] Obteniendo ingreso mensual promedio...",
+        name: 'AnalysisRepository');
+    try {
+      final userId = client.auth.currentUser?.id;
+      if (userId == null) throw Exception("Usuario no autenticado");
+
+      // Debes crear una función RPC en Supabase llamada 'get_average_monthly_income'
+      // que devuelva un solo valor, ej: SELECT avg(total) FROM (SELECT sum(amount) as total FROM transactions WHERE type = 'income' AND user_id = user_id_param GROUP BY strftime('%Y-%m', date))
+      final result = await client.rpc('get_average_monthly_income',
+          params: {'user_id_param': userId});
+
+      // El resultado de una RPC simple puede ser un número directamente
+      if (result is num) {
+        developer.log('✅ [Repo] Ingreso promedio recibido: ${result.toDouble()}',
+            name: 'AnalysisRepository');
+        return result.toDouble();
+      }
+      return 0.0;
+    } catch (e, stackTrace) {
+      developer.log('🔥 [Repo] Error en getAverageMonthlyIncome: $e',
+          name: 'AnalysisRepository', stackTrace: stackTrace);
+      return 0.0; // Devolver 0 en caso de error para no romper la UI.
+    }
+  }
+  
   /// Obtiene los datos para el widget de "Salud Financiera".
   Future<FinancialHealthInsight> getFinancialHealthInsightForWidget() async {
     developer.log("🩺 [Repo] Obteniendo datos para widget con RPC...",
@@ -249,8 +278,10 @@ class AnalysisRepository {
           'end_date': endDate
         }).catchError((_) => []),
         // NOVEDAD: Añadimos nuestra nueva función a la lista de llamadas en paralelo.
+        // ignore: invalid_return_type_for_catch_error
         getMoodSpendingAnalysis().catchError((_) => []),
         // Ahora la lista tiene 9 elementos, con índices del 0 al 8.
+        // ignore: invalid_return_type_for_catch_error
         getMoodSpendingByDayOfWeek().catchError((_) => []), // Índice 8
         client
             .rpc('get_average_monthly_spending')

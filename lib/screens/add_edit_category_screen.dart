@@ -17,7 +17,8 @@ class AddEditCategoryScreen extends StatefulWidget {
   final CategoryType? type; // Requerido solo si se crea una nueva
 
   const AddEditCategoryScreen({super.key, this.categoryToEdit, this.type})
-      : assert(categoryToEdit != null || type != null, 'Debes proveer una categoría para editar o un tipo para crear una nueva.');
+      : assert(categoryToEdit != null || type != null,
+            'Debes proveer una categoría para editar o un tipo para crear una nueva.');
 
   @override
   State<AddEditCategoryScreen> createState() => _AddEditCategoryScreenState();
@@ -54,11 +55,17 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
   }
 
   Future<void> _pickIcon() async {
+    // 1. Guarda una referencia al FocusScope ANTES del await.
+    // La comprobación 'mounted' aquí sigue siendo una buena práctica.
     if (!mounted) return;
+    final focusScope = FocusScope.of(context);
 
-    IconPickerIcon? icon = await showIconPicker(
+    // 2. Llama al picker. Pasarle el 'context' aquí es seguro
+    //    porque ocurre ANTES del 'await'. El 'showIconPicker' usa el
+    //    context para encontrar el Navigator y el Theme en ese instante.
+    final IconPickerIcon? icon = await showIconPicker(
       context,
-      configuration: SinglePickerConfiguration(
+      configuration: const SinglePickerConfiguration(
         iconPackModes: [
           IconPack.material,
           IconPack.cupertino,
@@ -68,12 +75,15 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
       ),
     );
 
-    if (icon != null) {
-      setState(() => _selectedIcon = icon.data); // Nota: usa icon.data
-      FocusScope.of(context).unfocus();
-    }
-}
+    // 3. Cuando el código se reanuda, volvemos a comprobar si el widget
+    //    sigue montado. Esta es la comprobación de seguridad más importante.
+    if (!mounted || icon == null) return;
 
+    // 4. Si todo está bien, actualizamos el estado y usamos la referencia
+    //    guardada de FocusScope, lo cual es 100% seguro.
+    setState(() => _selectedIcon = icon.data);
+    focusScope.unfocus();
+  }
 
   void _pickColor() {
     showDialog(
@@ -107,7 +117,8 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
           userId: widget.categoryToEdit!.userId, // No cambia
           name: _nameController.text.trim(),
           icon: _selectedIcon,
-          color: '#${_selectedColor.value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}',
+          color:
+              '#${_selectedColor.value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}',
           type: widget.categoryToEdit!.type, // No se puede cambiar el tipo
           createdAt: widget.categoryToEdit!.createdAt, // No cambia
         );
@@ -118,19 +129,21 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
           userId: '', // El repositorio lo añade
           name: _nameController.text.trim(),
           icon: _selectedIcon,
-          color: '#${_selectedColor.value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}',
+          color:
+              '#${_selectedColor.value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}',
           type: widget.type!,
           createdAt: DateTime.now(),
         );
         await _repository.addCategory(newCategory);
       }
       if (!mounted) return;
-      NotificationHelper.show(message: 'Categoría guardada!', type: NotificationType.success);
+      NotificationHelper.show(
+          message: 'Categoría guardada!', type: NotificationType.success);
       Navigator.of(context).pop();
-
     } catch (e) {
       if (!mounted) return;
-      NotificationHelper.show(message: e.toString(), type: NotificationType.error);
+      NotificationHelper.show(
+          message: e.toString(), type: NotificationType.error);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -140,7 +153,8 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEditing ? 'Editar Categoría' : 'Nueva Categoría', style: GoogleFonts.poppins()),
+        title: Text(_isEditing ? 'Editar Categoría' : 'Nueva Categoría',
+            style: GoogleFonts.poppins()),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -150,21 +164,34 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
             children: [
               TextFormField(
                 controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Nombre de la Categoría', border: OutlineInputBorder(), prefixIcon: Icon(Iconsax.text)),
-                validator: (value) => (value == null || value.isEmpty) ? 'El nombre es obligatorio' : null,
+                decoration: const InputDecoration(
+                    labelText: 'Nombre de la Categoría',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Iconsax.text)),
+                validator: (value) => (value == null || value.isEmpty)
+                    ? 'El nombre es obligatorio'
+                    : null,
               ),
               const SizedBox(height: 20),
               ListTile(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: Theme.of(context).colorScheme.outline)),
-                leading: Icon(_selectedIcon ?? Iconsax.category, color: _selectedColor),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    side: BorderSide(
+                        color: Theme.of(context).colorScheme.outline)),
+                leading: Icon(_selectedIcon ?? Iconsax.category,
+                    color: _selectedColor),
                 title: const Text('Icono'),
                 trailing: const Icon(Iconsax.arrow_right_3),
                 onTap: _pickIcon,
               ),
               const SizedBox(height: 16),
               ListTile(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: Theme.of(context).colorScheme.outline)),
-                leading: CircleAvatar(backgroundColor: _selectedColor, radius: 12),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    side: BorderSide(
+                        color: Theme.of(context).colorScheme.outline)),
+                leading:
+                    CircleAvatar(backgroundColor: _selectedColor, radius: 12),
                 title: const Text('Color'),
                 trailing: const Icon(Iconsax.arrow_right_3),
                 onTap: _pickColor,
@@ -174,9 +201,16 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: _isLoading ? null : _submitForm,
-                  icon: _isLoading ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Iconsax.save_2),
+                  icon: _isLoading
+                      ? const SizedBox.square(
+                          dimension: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Iconsax.save_2),
                   label: Text(_isLoading ? 'Guardando...' : 'Guardar'),
-                  style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), textStyle: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      textStyle: GoogleFonts.poppins(
+                          fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               ),
             ],

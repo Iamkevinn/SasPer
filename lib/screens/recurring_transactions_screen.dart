@@ -136,7 +136,7 @@ class _RecurringTransactionsScreenState
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
           SliverAppBar(
-            expandedHeight: 140,
+            expandedHeight: 200,
             floating: false,
             pinned: true,
             elevation: 0,

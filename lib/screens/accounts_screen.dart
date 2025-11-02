@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'dart:developer' as developer;
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 import 'package:lottie/lottie.dart';
@@ -17,7 +18,6 @@ import 'package:sasper/screens/add_transfer_screen.dart';
 import 'package:sasper/screens/account_details_screen.dart';
 import 'package:sasper/screens/edit_account_screen.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
-import 'package:sasper/widgets/accounts/projection_card.dart';
 import 'package:sasper/main.dart';
 
 class AccountsScreen extends StatefulWidget {
@@ -62,7 +62,9 @@ class AccountsScreenState extends State<AccountsScreen> {
   @override
   void initState() {
     super.initState();
+    developer.log('✅ AccountsScreen: initState() ejecutado.', name: 'AccountsScreen');
     _accountsStream = _accountRepository.getAccountsStream();
+    _accountRepository.refreshData(); 
   }
 
   Future<void> _handleRefresh() async {
@@ -282,7 +284,7 @@ class AccountsScreenState extends State<AccountsScreen> {
         activeAccounts.fold<double>(0, (sum, acc) => sum + acc.balance);
 
     return RefreshIndicator(
-      onRefresh: () => _accountRepository.refreshData(),
+      onRefresh: () async => _handleRefresh,
       child: CustomScrollView(
         physics: const BouncingScrollPhysics(
             parent: AlwaysScrollableScrollPhysics()),

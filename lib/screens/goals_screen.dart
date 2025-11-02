@@ -1,5 +1,3 @@
-// lib/screens/goals_screen.dart
-
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -31,7 +29,6 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
   late final TabController _tabController;
   bool _showFilters = false;
 
-  // Filtros separados por pestaña
   final _activeFilters = _GoalFilters();
   final _completedFilters = _GoalFilters();
 
@@ -73,23 +70,18 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
         filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
         child: AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Theme.of(dialogContext).colorScheme.errorContainer,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  Iconsax.trash,
-                  color: Theme.of(dialogContext).colorScheme.error,
-                ),
+          title: Row(children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Theme.of(dialogContext).colorScheme.errorContainer,
+                borderRadius: BorderRadius.circular(12),
               ),
-              const SizedBox(width: 12),
-              const Text('Eliminar meta'),
-            ],
-          ),
+              child: Icon(Iconsax.trash, color: Theme.of(dialogContext).colorScheme.error),
+            ),
+            const SizedBox(width: 12),
+            const Text('Eliminar meta'),
+          ]),
           content: Text('¿Estás seguro de eliminar "${goal.name}"? Esta acción no se puede deshacer.'),
           actions: [
             TextButton(
@@ -97,9 +89,7 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
               child: const Text('Cancelar'),
             ),
             FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: Theme.of(dialogContext).colorScheme.error,
-              ),
+              style: FilledButton.styleFrom(backgroundColor: Theme.of(dialogContext).colorScheme.error),
               onPressed: () => Navigator.of(dialogContext).pop(true),
               child: const Text('Eliminar'),
             ),
@@ -113,15 +103,9 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
         await _repository.deleteGoalSafely(goal.id);
         _repository.refreshData();
         EventService.instance.fire(AppEvent.goalsChanged);
-        NotificationHelper.show(
-          message: 'Meta eliminada exitosamente',
-          type: NotificationType.success,
-        );
+        NotificationHelper.show(message: 'Meta eliminada exitosamente', type: NotificationType.success);
       } catch (e) {
-        NotificationHelper.show(
-          message: e.toString().replaceFirst("Exception: ", ""),
-          type: NotificationType.error,
-        );
+        NotificationHelper.show(message: e.toString().replaceFirst("Exception: ", ""), type: NotificationType.error);
       }
     }
   }
@@ -144,11 +128,7 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
               titlePadding: const EdgeInsets.only(left: 20, bottom: 60),
               title: Text(
                 'Mis Metas',
-                style: GoogleFonts.poppins(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 28,
-                  color: colorScheme.onSurface,
-                ),
+                style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 28, color: colorScheme.onSurface),
               ),
               expandedTitleScale: 1.05,
             ),
@@ -163,9 +143,7 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
                 onPressed: _navigateToAddGoal,
                 icon: const Icon(Iconsax.add, size: 20),
                 label: const Text('Nueva'),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                ),
+                style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10)),
               ),
               const SizedBox(width: 16),
             ],
@@ -178,14 +156,8 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
                   indicatorSize: TabBarIndicatorSize.label,
                   indicatorWeight: 3,
                   dividerColor: Colors.transparent,
-                  labelStyle: GoogleFonts.poppins(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  tabs: const [
-                    Tab(text: 'Activas'),
-                    Tab(text: 'Completadas'),
-                  ],
+                  labelStyle: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600),
+                  tabs: const [Tab(text: 'Activas'), Tab(text: 'Completadas')],
                 ),
               ),
             ),
@@ -197,59 +169,144 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
             if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
               return _buildSkeletonLoader();
             }
-
             if (snapshot.hasError) {
               return _buildErrorState(snapshot.error.toString());
             }
 
             final allGoals = snapshot.data ?? [];
-            
             if (allGoals.isEmpty) {
               return _buildEmptyState();
             }
 
-            final activeGoals = _filterGoals(
-              allGoals.where((g) => g.status == GoalStatus.active).toList(),
-              _activeFilters,
-            );
+            final activeGoals = _filterGoals(allGoals.where((g) => g.status == GoalStatus.active).toList(), _activeFilters);
+            final completedGoals = _filterGoals(allGoals.where((g) => g.status != GoalStatus.active).toList(), _completedFilters);
 
-            final completedGoals = _filterGoals(
-              allGoals.where((g) => g.status != GoalStatus.active).toList(),
-              _completedFilters,
-            );
-
+            // --- INICIO DE LA CORRECCIÓN ESTRUCTURAL ---
             return TabBarView(
               controller: _tabController,
               children: [
-                _GoalsTab(
-                  goals: activeGoals,
-                  filters: _activeFilters,
-                  showFilters: _showFilters,
+                // Cada hijo del TabBarView es ahora un CustomScrollView que recibe una lista de slivers.
+                RefreshIndicator(
                   onRefresh: _handleRefresh,
-                  onFilterChanged: () => setState(() {}),
-                  onEdit: _navigateToEditGoal,
-                  onDelete: _handleDeleteGoal,
-                  isCompletedTab: false,
+                  child: CustomScrollView(
+                    physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+                    slivers: _buildSliversForTab(
+                      context: context,
+                      goals: activeGoals,
+                      filters: _activeFilters,
+                      isCompletedTab: false,
+                    ),
+                  ),
                 ),
-                _GoalsTab(
-                  goals: completedGoals,
-                  filters: _completedFilters,
-                  showFilters: _showFilters,
+                RefreshIndicator(
                   onRefresh: _handleRefresh,
-                  onFilterChanged: () => setState(() {}),
-                  isCompletedTab: true,
+                  child: CustomScrollView(
+                    physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+                    slivers: _buildSliversForTab(
+                      context: context,
+                      goals: completedGoals,
+                      filters: _completedFilters,
+                      isCompletedTab: true,
+                    ),
+                  ),
                 ),
               ],
             );
+            // --- FIN DE LA CORRECCIÓN ESTRUCTURAL ---
           },
         ),
       ),
     );
   }
 
+  // --- NUEVO MÉTODO HELPER QUE GENERA LOS SLIVERS PARA CADA TAB ---
+  List<Widget> _buildSliversForTab({
+    required BuildContext context,
+    required List<Goal> goals,
+    required _GoalFilters filters,
+    required bool isCompletedTab,
+  }) {
+    // Si la lista está vacía (después de filtrar), devolvemos un único sliver que llena la pantalla.
+    if (goals.isEmpty) {
+      return [
+        SliverFillRemaining(
+          child: _buildEmptyFilterState(context, filters),
+        )
+      ];
+    }
+    
+    // Si la lista NO está vacía, devolvemos la lista de slivers normal.
+    return [
+      if (_showFilters)
+        SliverToBoxAdapter(
+          child: _FilterSection(
+            filters: filters,
+            onChanged: () => setState(() {}),
+          ).animate().fadeIn(duration: 300.ms).slideY(begin: -0.2),
+        ),
+      
+      if (!isCompletedTab)
+        SliverToBoxAdapter(
+          child: _QuickStats(goals: goals),
+        ),
+      
+      SliverPadding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
+        sliver: SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) {
+              final goal = goals[index];
+              return _GoalCard(
+                goal: goal,
+                isCompleted: isCompletedTab,
+                onEdit: isCompletedTab ? null : () => _navigateToEditGoal(goal),
+                onDelete: isCompletedTab ? null : () => _handleDeleteGoal(goal),
+                onContributeSuccess: _handleRefresh,
+              )
+                  .animate()
+                  .fadeIn(duration: 400.ms, delay: (80 * index).ms)
+                  .slideX(begin: -0.1, curve: Curves.easeOutCubic);
+            },
+            childCount: goals.length,
+          ),
+        ),
+      ),
+    ];
+  }
+
+  // El método para construir el estado vacío ahora recibe los filtros
+  Widget _buildEmptyFilterState(BuildContext context, _GoalFilters filters) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Iconsax.search_status, size: 80, color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.5)),
+            const SizedBox(height: 24),
+            Text('Sin resultados', style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            Text('No hay metas que coincidan con los filtros seleccionados', textAlign: TextAlign.center, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 15)),
+            if (filters.hasActiveFilters) ...[
+              const SizedBox(height: 24),
+              TextButton.icon(
+                onPressed: () {
+                  filters.clear();
+                  setState(() {});
+                },
+                icon: const Icon(Iconsax.refresh),
+                label: const Text('Limpiar filtros'),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- El resto de tus widgets (_filterGoals, _buildSkeletonLoader, etc.) permanecen iguales ---
   List<Goal> _filterGoals(List<Goal> goals, _GoalFilters filters) {
     if (filters.timeframe == null && filters.priority == null) return goals;
-    
     return goals.where((goal) {
       final timeframeMatch = filters.timeframe == null || goal.timeframe == filters.timeframe;
       final priorityMatch = filters.priority == null || goal.priority == filters.priority;
@@ -262,11 +319,7 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
       child: ListView.builder(
         padding: const EdgeInsets.all(20),
         itemCount: 3,
-        itemBuilder: (context, index) => _GoalCard(
-          goal: Goal.empty(),
-          isCompleted: false,
-          onContributeSuccess: () {},
-        ),
+        itemBuilder: (context, index) => _GoalCard(goal: Goal.empty(), isCompleted: false, onContributeSuccess: () {}),
       ),
     );
   }
@@ -276,44 +329,20 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
       child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.all(40),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Lottie.asset(
-              'assets/animations/trophy_animation.json',
-              width: 280,
-              height: 280,
-            ),
-            const SizedBox(height: 24),
-            Text(
-              '¡Comienza tu viaje!',
-              style: GoogleFonts.poppins(
-                fontSize: 26,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Crea tu primera meta y empieza a ahorrar para alcanzar tus sueños',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
-                fontSize: 16,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 32),
-            FilledButton.icon(
-              onPressed: _navigateToAddGoal,
-              icon: const Icon(Iconsax.add_circle),
-              label: const Text('Crear mi primera meta'),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                textStyle: const TextStyle(fontSize: 16),
-              ),
-            ),
-          ],
-        ),
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Lottie.asset('assets/animations/trophy_animation.json', width: 280, height: 280),
+          const SizedBox(height: 24),
+          Text('¡Comienza tu viaje!', style: GoogleFonts.poppins(fontSize: 26, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          Text('Crea tu primera meta y empieza a ahorrar para alcanzar tus sueños', textAlign: TextAlign.center, style: GoogleFonts.inter(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant, height: 1.5)),
+          const SizedBox(height: 32),
+          FilledButton.icon(
+            onPressed: _navigateToAddGoal,
+            icon: const Icon(Iconsax.add_circle),
+            label: const Text('Crear mi primera meta'),
+            style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16), textStyle: const TextStyle(fontSize: 16)),
+          ),
+        ]),
       ),
     ).animate().fadeIn(duration: 600.ms).scale(delay: 200.ms);
   }
@@ -322,42 +351,20 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(40),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Iconsax.danger,
-              size: 80,
-              color: Theme.of(context).colorScheme.error,
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Algo salió mal',
-              style: GoogleFonts.poppins(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              error,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: _handleRefresh,
-              icon: const Icon(Iconsax.refresh),
-              label: const Text('Reintentar'),
-            ),
-          ],
-        ),
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(Iconsax.danger, size: 80, color: Theme.of(context).colorScheme.error),
+          const SizedBox(height: 24),
+          Text('Algo salió mal', style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          Text(error, textAlign: TextAlign.center, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+          const SizedBox(height: 24),
+          FilledButton.icon(onPressed: _handleRefresh, icon: const Icon(Iconsax.refresh), label: const Text('Reintentar')),
+        ]),
       ),
     );
   }
 }
+
 
 // ============================================================================
 // CLASE AUXILIAR PARA FILTROS
@@ -375,129 +382,9 @@ class _GoalFilters {
 }
 
 // ============================================================================
-// WIDGET DE PESTAÑA
+// (SE ELIMINÓ EL WIDGET _GoalsTab PORQUE SU LÓGICA SE MOVIÓ A _buildSliversForTab)
 // ============================================================================
-class _GoalsTab extends StatelessWidget {
-  final List<Goal> goals;
-  final _GoalFilters filters;
-  final bool showFilters;
-  final Future<void> Function() onRefresh;
-  final VoidCallback onFilterChanged;
-  final void Function(Goal)? onEdit;
-  final void Function(Goal)? onDelete;
-  final bool isCompletedTab;
 
-  const _GoalsTab({
-    required this.goals,
-    required this.filters,
-    required this.showFilters,
-    required this.onRefresh,
-    required this.onFilterChanged,
-    required this.isCompletedTab,
-    this.onEdit,
-    this.onDelete,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return RefreshIndicator(
-      onRefresh: onRefresh,
-      child: CustomScrollView(
-        physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-        slivers: [
-          // Filtros (animados)
-          if (showFilters)
-            SliverToBoxAdapter(
-              child: _FilterSection(
-                filters: filters,
-                onChanged: onFilterChanged,
-              ).animate().fadeIn(duration: 300.ms).slideY(begin: -0.2),
-            ),
-          
-          // Estadísticas rápidas (solo para activas)
-          if (!isCompletedTab && goals.isNotEmpty)
-            SliverToBoxAdapter(
-              child: _QuickStats(goals: goals),
-            ),
-          
-          // Lista de metas
-          if (goals.isEmpty)
-            SliverFillRemaining(
-              child: _buildEmptyFilterState(context),
-            )
-          else
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final goal = goals[index];
-                    return _GoalCard(
-                      goal: goal,
-                      isCompleted: isCompletedTab,
-                      onEdit: onEdit != null ? () => onEdit!(goal) : null,
-                      onDelete: onDelete != null ? () => onDelete!(goal) : null,
-                      onContributeSuccess: onRefresh,
-                    )
-                        .animate()
-                        .fadeIn(duration: 400.ms, delay: (80 * index).ms)
-                        .slideX(begin: -0.1, curve: Curves.easeOutCubic);
-                  },
-                  childCount: goals.length,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyFilterState(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(40),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Iconsax.search_status,
-              size: 80,
-              color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.5),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Sin resultados',
-              style: GoogleFonts.poppins(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'No hay metas que coincidan con los filtros seleccionados',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                fontSize: 15,
-              ),
-            ),
-            if (filters.hasActiveFilters) ...[
-              const SizedBox(height: 24),
-              TextButton.icon(
-                onPressed: () {
-                  filters.clear();
-                  onFilterChanged();
-                },
-                icon: const Icon(Iconsax.refresh),
-                label: const Text('Limpiar filtros'),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 // ============================================================================
 // ESTADÍSTICAS RÁPIDAS
@@ -509,9 +396,9 @@ class _QuickStats extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final totalTarget = goals.fold<double>(0, (sum, g) => sum + g.targetAmount);
+    //final totalTarget = goals.fold<double>(0, (sum, g) => sum + g.targetAmount);
     final totalSaved = goals.fold<double>(0, (sum, g) => sum + g.currentAmount);
-    final avgProgress = goals.fold<double>(0, (sum, g) => sum + g.progress) / goals.length;
+    final avgProgress = goals.isNotEmpty ? goals.fold<double>(0, (sum, g) => sum + g.progress) / goals.length : 0;
 
     return Container(
       margin: const EdgeInsets.all(15),
@@ -700,7 +587,7 @@ class _FilterSection extends StatelessWidget {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: GoalTimeframe.values.map((timeframe) {
+            children: GoalTimeframe.values.where((tf) => tf != GoalTimeframe.custom).map((timeframe) {
               final isSelected = filters.timeframe == timeframe;
               return ChoiceChip(
                 label: Text(GoalHelpers.getTimeframeText(timeframe)),
@@ -801,7 +688,6 @@ class _GoalCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         child: Stack(
           children: [
-            // Barra de prioridad lateral
             Positioned(
               left: 0,
               top: 0,
@@ -912,23 +798,11 @@ class _GoalCard extends StatelessWidget {
             itemBuilder: (context) => [
               const PopupMenuItem(
                 value: 'edit',
-                child: Row(
-                  children: [
-                    Icon(Iconsax.edit, size: 20),
-                    SizedBox(width: 12),
-                    Text('Editar'),
-                  ],
-                ),
+                child: Row(children: [Icon(Iconsax.edit, size: 20), SizedBox(width: 12), Text('Editar')]),
               ),
               const PopupMenuItem(
                 value: 'delete',
-                child: Row(
-                  children: [
-                    Icon(Iconsax.trash, size: 20),
-                    SizedBox(width: 12),
-                    Text('Eliminar'),
-                  ],
-                ),
+                child: Row(children: [Icon(Iconsax.trash, size: 20), SizedBox(width: 12), Text('Eliminar')]),
               ),
             ],
             icon: const Icon(Iconsax.more),
@@ -961,11 +835,7 @@ class _GoalCard extends StatelessWidget {
         if (isCompleted)
           _InfoChip(
             icon: Iconsax.wallet_money,
-            label: NumberFormat.compactCurrency(
-              locale: 'es_CO',
-              symbol: '\$',
-              decimalDigits: 0,
-            ).format(goal.targetAmount),
+            label: NumberFormat.compactCurrency(locale: 'es_CO', symbol: '\$', decimalDigits: 0).format(goal.targetAmount),
             color: Theme.of(context).colorScheme.primary,
           ),
       ],
@@ -982,102 +852,47 @@ class _GoalCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withOpacity(0.5),
-        ),
+        border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
       ),
       child: Column(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Ahorrado',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    currencyFormat.format(goal.currentAmount),
-                    style: GoogleFonts.poppins(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: colorScheme.primary,
-                    ),
-                  ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                decoration: BoxDecoration(
-                  color: colorScheme.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  children: [
-                    Text(
-                      'Falta',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      currencyFormat.format(remaining),
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.primary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Ahorrado', style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500)),
+              const SizedBox(height: 4),
+              Text(currencyFormat.format(goal.currentAmount), style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold, color: colorScheme.primary)),
+            ]),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(color: colorScheme.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+              child: Column(children: [
+                Text('Falta', style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant)),
+                const SizedBox(height: 2),
+                Text(currencyFormat.format(remaining), style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.bold, color: colorScheme.primary)),
+              ]),
+            ),
+          ]),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _showContributeDialog(context),
-                  icon: const Icon(Iconsax.add_circle, size: 18),
-                  label: const Text('Aportar'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
+          Row(children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => _showContributeDialog(context),
+                icon: const Icon(Iconsax.add_circle, size: 18),
+                label: const Text('Aportar'),
+                style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
               ),
-              const SizedBox(width: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  color: colorScheme.secondaryContainer,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Iconsax.tag, size: 16),
-                    const SizedBox(width: 6),
-                    Text(
-                      currencyFormat.format(goal.targetAmount),
-                      style: GoogleFonts.poppins(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(color: colorScheme.secondaryContainer, borderRadius: BorderRadius.circular(12)),
+              child: Row(children: [
+                const Icon(Iconsax.tag, size: 16),
+                const SizedBox(width: 6),
+                Text(currencyFormat.format(goal.targetAmount), style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600)),
+              ]),
+            ),
+          ]),
         ],
       ),
     );
@@ -1089,61 +904,25 @@ class _GoalCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Progreso',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-            Text(
-              '${(goal.progress * 100).toStringAsFixed(1)}%',
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: colorScheme.primary,
-              ),
-            ),
-          ],
-        ),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          Text('Progreso', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: colorScheme.onSurfaceVariant)),
+          Text('${(goal.progress * 100).toStringAsFixed(1)}%', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: colorScheme.primary)),
+        ]),
         const SizedBox(height: 8),
-        Stack(
-          children: [
-            Container(
+        Stack(children: [
+          Container(height: 12, decoration: BoxDecoration(color: colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(6))),
+          FractionallySizedBox(
+            widthFactor: goal.progress.clamp(0.0, 1.0),
+            child: Container(
               height: 12,
               decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest,
+                gradient: LinearGradient(colors: [colorScheme.primary, colorScheme.primary.withOpacity(0.7)]),
                 borderRadius: BorderRadius.circular(6),
+                boxShadow: [BoxShadow(color: colorScheme.primary.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 2))],
               ),
             ),
-            FractionallySizedBox(
-              widthFactor: goal.progress.clamp(0.0, 1.0),
-              child: Container(
-                height: 12,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      colorScheme.primary,
-                      colorScheme.primary.withOpacity(0.7),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(6),
-                  boxShadow: [
-                    BoxShadow(
-                      color: colorScheme.primary.withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ]),
       ],
     );
   }
@@ -1157,32 +936,18 @@ class _GoalCard extends StatelessWidget {
           Expanded(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Iconsax.calendar_1,
-                    size: 16,
-                    color: colorScheme.onSurfaceVariant,
+              decoration: BoxDecoration(color: colorScheme.surfaceContainerHighest.withOpacity(0.5), borderRadius: BorderRadius.circular(10)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Iconsax.calendar_1, size: 16, color: colorScheme.onSurfaceVariant),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    DateFormat.yMMMd('es_CO').format(goal.targetDate!),
+                    style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13, fontWeight: FontWeight.w500),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
-                      DateFormat.yMMMd('es_CO').format(goal.targetDate!),
-                      style: TextStyle(
-                        color: colorScheme.onSurfaceVariant,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ]),
             ),
           ),
       ],
@@ -1197,14 +962,8 @@ class _GoalCard extends StatelessWidget {
       builder: (ctx) => BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).cardColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          child: ContributeToGoalDialog(
-            goal: goal,
-            onSuccess: onContributeSuccess,
-          ),
+          decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: const BorderRadius.vertical(top: Radius.circular(28))),
+          child: ContributeToGoalDialog(goal: goal, onSuccess: onContributeSuccess),
         ),
       ),
     );
@@ -1219,11 +978,7 @@ class _InfoChip extends StatelessWidget {
   final String label;
   final Color color;
 
-  const _InfoChip({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
+  const _InfoChip({required this.icon, required this.label, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -1232,26 +987,13 @@ class _InfoChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: color.withOpacity(0.12),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: color.withOpacity(0.3),
-          width: 1,
-        ),
+        border: Border.all(color: color.withOpacity(0.3), width: 1),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: GoogleFonts.inter(
-              color: color,
-              fontWeight: FontWeight.w600,
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 6),
+        Text(label, style: GoogleFonts.inter(color: color, fontWeight: FontWeight.w600, fontSize: 12)),
+      ]),
     );
   }
 }
@@ -1262,45 +1004,34 @@ class _InfoChip extends StatelessWidget {
 class GoalHelpers {
   static String getPriorityText(GoalPriority priority) {
     switch (priority) {
-      case GoalPriority.low:
-        return 'Baja';
-      case GoalPriority.medium:
-        return 'Media';
-      case GoalPriority.high:
-        return 'Alta';
+      case GoalPriority.low: return 'Baja';
+      case GoalPriority.medium: return 'Media';
+      case GoalPriority.high: return 'Alta';
     }
   }
 
   static IconData getPriorityIcon(GoalPriority priority) {
     switch (priority) {
-      case GoalPriority.low:
-        return Iconsax.arrow_down;
-      case GoalPriority.medium:
-        return Iconsax.minus;
-      case GoalPriority.high:
-        return Iconsax.arrow_up_3;
+      case GoalPriority.low: return Iconsax.arrow_down;
+      case GoalPriority.medium: return Iconsax.minus;
+      case GoalPriority.high: return Iconsax.arrow_up_3;
     }
   }
 
   static Color getPriorityColor(BuildContext context, GoalPriority priority) {
     switch (priority) {
-      case GoalPriority.low:
-        return Colors.blue;
-      case GoalPriority.medium:
-        return Colors.orange;
-      case GoalPriority.high:
-        return Colors.red;
+      case GoalPriority.low: return Colors.blue;
+      case GoalPriority.medium: return Colors.orange;
+      case GoalPriority.high: return Colors.red;
     }
   }
 
   static String getTimeframeText(GoalTimeframe timeframe) {
     switch (timeframe) {
-      case GoalTimeframe.short:
-        return 'Corto Plazo';
-      case GoalTimeframe.medium:
-        return 'Medio Plazo';
-      case GoalTimeframe.long:
-        return 'Largo Plazo';
+      case GoalTimeframe.short: return 'Corto Plazo';
+      case GoalTimeframe.medium: return 'Medio Plazo';
+      case GoalTimeframe.long: return 'Largo Plazo';
+      case GoalTimeframe.custom: return 'Personalizado';
     }
   }
 }

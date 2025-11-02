@@ -775,7 +775,6 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
   Widget _buildDivider() {
         final colorScheme = Theme.of(context).colorScheme;
 
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       height: 1,
       margin: const EdgeInsets.symmetric(horizontal: 20),

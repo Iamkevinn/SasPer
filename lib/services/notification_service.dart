@@ -79,9 +79,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   }
 }
 
-class NotificationService {
-  // ... (El resto del archivo no cambia)
-  
+class NotificationService {  
   // --- DEPENDENCIAS Y SINGLETON ---
   late final SupabaseClient _supabase;
   late final FirebaseMessaging _firebaseMessaging;

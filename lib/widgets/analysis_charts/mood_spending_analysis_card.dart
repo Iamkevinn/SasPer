@@ -47,7 +47,6 @@ class _MoodSpendingAnalysisCardState extends State<MoodSpendingAnalysisCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ... (Título y selector de mood - SIN CAMBIOS)
             Text('Gastos por Estado de Ánimo', style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Text('Descubre en qué categorías gastas más según cómo te sientes.', style: TextStyle(color: colorScheme.onSurfaceVariant)),
@@ -102,7 +101,6 @@ class _MoodSpendingAnalysisCardState extends State<MoodSpendingAnalysisCard> {
                         },
                       ),
                     ),
-                    // ... (El resto del código del gráfico es correcto y no necesita cambios)
                     titlesData: FlTitlesData(
                       show: true,
                       topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),

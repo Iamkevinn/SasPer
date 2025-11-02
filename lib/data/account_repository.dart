@@ -244,6 +244,7 @@ class AccountRepository {
 
   /// Carga todas las cuentas con su balance calculado y las emite en el stream.
   Future<void> _fetchAccountsWithBalance() async {
+    developer.log('--- INTENTANDO OBTENER CUENTAS ---', name: 'AccountRepository');
     developer.log('🔄 [Repo] Obteniendo cuentas con balance...', name: 'AccountRepository');
     try {
       final userId = client.auth.currentUser?.id;

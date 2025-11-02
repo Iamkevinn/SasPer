@@ -15,7 +15,6 @@ import 'package:sasper/screens/settings_screen.dart';
 import 'package:sasper/screens/transactions_screen.dart';
 import 'package:sasper/services/event_service.dart';
 import 'package:sasper/services/notification_service.dart';
-import 'package:sasper/utils/custom_page_route.dart';
 import 'add_transaction_screen.dart';
 
 class MainScreen extends StatefulWidget {
@@ -32,7 +31,6 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   late StreamSubscription<Uri?> _linkSub;
   late AnimationController _fabAnimationController;
   late Animation<double> _fabScaleAnimation;
-  final bool _isFabExpanded = false;
 
   final List<Widget> _widgetOptions = const <Widget>[
     DashboardScreen(),

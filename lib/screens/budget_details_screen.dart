@@ -73,7 +73,6 @@ class _BudgetDetailsScreenState extends State<BudgetDetailsScreen> {
   }
 
   Future<bool> _handleDeleteTransaction(Transaction transaction) async {
-    // ... (Tu lógica de borrado aquí, no necesita cambios)
     final bool? confirmed = await showDialog<bool>(
       context: navigatorKey.currentContext!,
       builder: (dialogContext) => BackdropFilter(

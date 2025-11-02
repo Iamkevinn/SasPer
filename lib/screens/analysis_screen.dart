@@ -153,7 +153,7 @@ class AnalysisScreenState extends State<AnalysisScreen>
               if (snapshot.hasError) {
                 return _buildErrorState(snapshot.error);
               }
-              
+
               if (!snapshot.hasData) {
                 return _buildLottieEmptyState(onRefresh: _handleRefresh);
               }
@@ -178,6 +178,20 @@ class AnalysisScreenState extends State<AnalysisScreen>
 
   // ==================== CONTENIDO PRINCIPAL ====================
   Widget _buildAnalysisContent(AnalysisData chartData, List<Insight> insights) {
+    developer.log(
+      '--- ESTADO DE DATOS PARA GRÁFICOS ---\n'
+      'Tendencia Patrimonial: ${chartData.netWorthLineData.length} items\n'
+      'Análisis Emocional: ${chartData.moodAnalysisData.length} items\n'
+      'Flujo de Efectivo: ${chartData.cashflowBarData.length} items\n'
+      'Comparativa Categoría: ${chartData.categoryComparisonData.length} items\n'
+      'Análisis de Promedios: ${chartData.monthlyAverage.monthCount} meses\n'
+      'Ingresos vs Gastos: ${chartData.incomeExpenseBarData.length} items\n'
+      'Gráfico Gastos (Pie): ${chartData.expensePieData.length} items\n'
+      'Gráfico Ingresos (Pie): ${chartData.incomePieData.length} items\n'
+      'Ánimo por Día: ${chartData.moodByDayData.length} items\n'
+      'Mapa de Calor: ${chartData.heatmapData.length} items',
+      name: 'AnalysisScreen',
+    );
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -225,7 +239,7 @@ class AnalysisScreenState extends State<AnalysisScreen>
         // SECCIÓN: GRÁFICOS PRIORITARIOS
         if (chartData.hasData) ...[
           _buildSectionHeader('Análisis Detallado', colorScheme),
-          
+
           // GRÁFICO 1: Balance proyectado (NetWorth)
           if (chartData.netWorthLineData.isNotEmpty)
             _buildChartSection(
@@ -413,45 +427,28 @@ class AnalysisScreenState extends State<AnalysisScreen>
 
   String _getFinancialStatusMessage(List<Insight> insights) {
     if (insights.isEmpty) return 'Analizando tu situación financiera...';
-    
+
+    // Filtra por la SEVERIDAD del insight, no por su tipo.
     final positiveInsights =
-        insights.where((i) => i.type == 'opportunity' || i.type == 'achievement');
-    
+        insights.where((i) => i.severity == InsightSeverity.success);
+
     if (positiveInsights.isNotEmpty) {
-      return '${positiveInsights.length} oportunidades detectadas';
+      // Puedes personalizar el mensaje si quieres.
+      return '${positiveInsights.length} buenas noticias detectadas';
     }
-    
+
     return '${insights.length} insights disponibles';
   }
 
   // ==================== HERO INSIGHT CARD ====================
   Widget _buildHeroInsightCard(
       Insight insight, ColorScheme colorScheme, bool isDark) {
-    Color cardColor;
-    Color iconColor;
-    IconData icon;
+    // 1. Obtiene el color principal y el icono directamente desde la extensión.
+    final Color iconColor = insight.severity.getColor(context);
+    final IconData icon = insight.severity.icon;
 
-    switch (insight.type) {
-      case 'warning':
-        cardColor = Colors.orange;
-        iconColor = Colors.orange.shade700;
-        icon = Iconsax.warning_2;
-        break;
-      case 'opportunity':
-        cardColor = Colors.green;
-        iconColor = Colors.green.shade700;
-        icon = Iconsax.lamp_on;
-        break;
-      case 'achievement':
-        cardColor = Colors.amber;
-        iconColor = Colors.amber.shade700;
-        icon = Iconsax.medal_star;
-        break;
-      default:
-        cardColor = colorScheme.primary;
-        iconColor = colorScheme.primary;
-        icon = Iconsax.info_circle;
-    }
+    // 2. El color de fondo del card puede ser el mismo color con baja opacidad.
+    final Color cardColor = iconColor;
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -646,8 +643,9 @@ class AnalysisScreenState extends State<AnalysisScreen>
             color: colorScheme.surfaceContainer,
             borderRadius: BorderRadius.circular(24),
             border: isHighlight
-                ? Border.all(color: colorScheme.primary.withOpacity(0.3), width: 2)
-                : Border.all(color: colorScheme.outlineVariant),
+                ? Border.all(
+                    color: colorScheme.primary.withOpacity(0.3), width: 2)
+                : null,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -710,7 +708,8 @@ class AnalysisScreenState extends State<AnalysisScreen>
     return Center(
       child: EmptyStateCard(
         title: 'Ocurrió un Error',
-        message: 'No se pudieron cargar los datos de análisis.\n\nError: $error',
+        message:
+            'No se pudieron cargar los datos de análisis.\n\nError: $error',
         icon: Iconsax.warning_2,
       ),
     );

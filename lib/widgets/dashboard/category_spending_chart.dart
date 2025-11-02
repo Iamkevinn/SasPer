@@ -18,6 +18,29 @@ class CategorySpendingChart extends StatefulWidget {
 class _CategorySpendingChartState extends State<CategorySpendingChart> {
   int touchedIndex = -1;
 
+  List<CategorySpending> get processedSpendingData {
+    if (widget.spendingData.length <= 5) {
+      return widget.spendingData;
+    }
+
+    final sortedData = List<CategorySpending>.from(widget.spendingData)
+      ..sort((a, b) => b.totalAmount.compareTo(a.totalAmount));
+
+    final top4 = sortedData.take(4).toList();
+    final others = sortedData.skip(4).toList();
+
+    if (others.isNotEmpty) {
+      final othersTotal =
+          others.fold<double>(0, (sum, item) => sum + item.totalAmount);
+      top4.add(CategorySpending(
+        categoryName: 'Otros',
+        totalAmount: othersTotal,
+        color: '#808080',
+      ));
+    }
+    return top4;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.spendingData.isEmpty) {
@@ -38,32 +61,28 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
       );
     }
 
+    final displayData = processedSpendingData;
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       elevation: 0,
       color: Theme.of(context).colorScheme.surfaceContainer,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 20.0, horizontal: 16.0),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- ¡NUEVO TÍTULO CON BOTÓN! ---
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // El título sigue igual
-                Padding(
-                  padding: const EdgeInsets.only(left: 4.0),
-                  child: Text(
-                    'Tus Gastos este Mes',
-                    style: GoogleFonts.poppins(
-                        textStyle: Theme.of(context).textTheme.titleLarge,
-                        fontWeight: FontWeight.bold),
-                  ),
+                Text(
+                  'Tus Gastos este Mes',
+                  style: GoogleFonts.poppins(
+                      textStyle: Theme.of(context).textTheme.titleLarge,
+                      fontWeight: FontWeight.bold),
                 ),
-                // El nuevo botón para ver detalles
-                TextButton(
+                TextButton.icon(
                   onPressed: () {
                     Navigator.push(
                       context,
@@ -71,90 +90,69 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
                           builder: (context) => const AnalysisScreen()),
                     );
                   },
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Detalles',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.primary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(
-                        Iconsax.arrow_right_3,
-                        size: 16,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ],
+                  icon: Text(
+                    'Detalles',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  label: Icon(
+                    Iconsax.arrow_right_3,
+                    size: 16,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
               ],
             ),
-            // --- GRÁFICO CENTRADO ---
-            const SizedBox(height: 50),
-            SizedBox(
-              height: 200, // Aumentamos un poco la altura para que respire
-              child: PieChart(
-                PieChartData(
-                  pieTouchData: PieTouchData(
-                    touchCallback: (FlTouchEvent event, pieTouchResponse) {
-                      setState(() {
-                        if (!event.isInterestedForInteractions ||
-                            pieTouchResponse == null ||
-                            pieTouchResponse.touchedSection == null) {
-                          touchedIndex = -1;
-                          return;
-                        }
-                        touchedIndex = pieTouchResponse
-                            .touchedSection!.touchedSectionIndex;
-                      });
-                    },
-                  ),
-                  borderData: FlBorderData(show: false),
-                  sectionsSpace: 3, // Un poco más de espacio entre secciones
-                  centerSpaceRadius: 50, // Un centro un poco más grande
-                  sections: _buildChartSections(),
-                ),
-              ),
-            ),
-
-            // --- LEYENDA MEJORADA (DEBAJO) ---
-            const SizedBox(height: 50),
-            const Divider(),
-            const SizedBox(height:5),
-            Center(
-              child: Wrap(
-                alignment: WrapAlignment.center,
-                spacing: 10.0,
-                runSpacing: 1.0,
-                children: widget.spendingData.asMap().entries.map((entry) {
-                  final isTouched = entry.key == touchedIndex;
-                  final data = entry.value;
-
-                  return Chip(
-                    avatar: CircleAvatar(
-                      backgroundColor: _hexToColor(data.color),
-                      // Hacemos el avatar más grande si está tocado
-                      radius: isTouched ? 8 : 6,
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: SizedBox(
+                    height: 180,
+                    child: PieChart(
+                      PieChartData(
+                        pieTouchData: PieTouchData(
+                          touchCallback:
+                              (FlTouchEvent event, pieTouchResponse) {
+                            setState(() {
+                              if (!event.isInterestedForInteractions ||
+                                  pieTouchResponse == null ||
+                                  pieTouchResponse.touchedSection == null) {
+                                touchedIndex = -1;
+                                return;
+                              }
+                              touchedIndex = pieTouchResponse
+                                  .touchedSection!.touchedSectionIndex;
+                            });
+                          },
+                        ),
+                        borderData: FlBorderData(show: false),
+                        sectionsSpace: 2,
+                        centerSpaceRadius: 40,
+                        sections: _buildChartSections(displayData),
+                      ),
                     ),
-                    label: Text(data.categoryName),
-                    // Cambiamos el estilo del chip si está seleccionado
-                    backgroundColor: isTouched
-                        ? _hexToColor(data.color).withOpacity(0.3)
-                        : Theme.of(context).colorScheme.surfaceContainerHighest,
-                    shape: const StadiumBorder(),
-                    side: BorderSide(
-                        color: isTouched
-                            ? _hexToColor(data.color)
-                            : Theme.of(context)
-                                .colorScheme
-                                .outlineVariant
-                                .withOpacity(0.5)),
-                  );
-                }).toList(),
-              ),
+                  ),
+                ),
+                const SizedBox(width: 20),
+                Expanded(
+                  flex: 1,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: displayData.asMap().entries.map((entry) {
+                      return _Indicator(
+                        color: _hexToColor(entry.value.color),
+                        text: entry.value.categoryName,
+                        isTouched: entry.key == touchedIndex,
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -162,29 +160,29 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
     );
   }
 
-  // --- MÉTODOS AUXILIARES (iguales que antes, pero con valores ajustados) ---
-
-  List<PieChartSectionData> _buildChartSections() {
-    final totalValue =
-        widget.spendingData.fold<double>(0, (sum, d) => sum + d.totalAmount);
+  List<PieChartSectionData> _buildChartSections(List<CategorySpending> data) {
+    final totalValue = data.fold<double>(0, (sum, d) => sum + d.totalAmount);
     if (totalValue == 0) return [];
 
-    return widget.spendingData.asMap().entries.map((entry) {
+    return data.asMap().entries.map((entry) {
       final isTouched = entry.key == touchedIndex;
-      final fontSize = isTouched ? 18.0 : 14.0;
-      final radius = isTouched ? 100.0 : 90.0;
-      final data = entry.value;
+      final fontSize = isTouched ? 16.0 : 12.0;
+      final radius = isTouched ? 70.0 : 60.0;
+      final sectionData = entry.value;
+      final sectionColor = _hexToColor(sectionData.color);
+
+      final percentage = (sectionData.totalAmount / totalValue * 100);
+      final title = percentage > 5 ? '${percentage.toStringAsFixed(0)}%' : '';
 
       return PieChartSectionData(
-        color: _hexToColor(data.color),
-        value: data.totalAmount,
-        title: '${(data.totalAmount / totalValue * 100).toStringAsFixed(0)}%',
+        color: sectionColor,
+        value: sectionData.totalAmount,
+        title: title,
         radius: radius,
         titleStyle: TextStyle(
           fontSize: fontSize,
           fontWeight: FontWeight.bold,
-          color: Colors.white,
-          shadows: const [Shadow(color: Colors.black, blurRadius: 3)],
+          color: _getTextColorForBackground(sectionColor),
         ),
       );
     }).toList();
@@ -196,5 +194,56 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
     } catch (e) {
       return Colors.grey;
     }
+  }
+
+  Color _getTextColorForBackground(Color backgroundColor) {
+    if (ThemeData.estimateBrightnessForColor(backgroundColor) ==
+        Brightness.light) {
+      return Colors.black87;
+    }
+    return Colors.white;
+  }
+}
+
+class _Indicator extends StatelessWidget {
+  final Color color;
+  final String text;
+  final bool isTouched;
+
+  const _Indicator({
+    required this.color,
+    required this.text,
+    required this.isTouched,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        children: <Widget>[
+          Container(
+            width: isTouched ? 12 : 8,
+            height: isTouched ? 12 : 8,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: color,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: isTouched ? FontWeight.bold : FontWeight.normal,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          )
+        ],
+      ),
+    );
   }
 }

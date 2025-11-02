@@ -44,7 +44,6 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
   String? _selectedAccountId;
   bool _isLoading = false;
   TransactionMood? _selectedMood;
-  final bool _showDeleteConfirmation = false;
 
   late Future<List<Account>> _accountsFuture;
   late Future<List<Category>> _categoriesFuture;

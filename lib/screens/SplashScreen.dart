@@ -1,5 +1,7 @@
 // lib/screens/SplashScreen.dart
 
+// ignore_for_file: file_names
+
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';

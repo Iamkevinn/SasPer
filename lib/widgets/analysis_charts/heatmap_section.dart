@@ -202,7 +202,6 @@ class _HeatmapSectionState extends State<HeatmapSection> {
   }
 
   Widget _buildLegend(BuildContext context) {
-    // ... (sin cambios)
      final textStyle = GoogleFonts.poppins(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant);
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -230,7 +229,6 @@ class _HeatmapSectionState extends State<HeatmapSection> {
   }
 
   Widget _buildHeader(BuildContext context) {
-    // ... (sin cambios)
     return Row(
       children: [
         const Icon(Iconsax.calendar_1, size: 20, color: Colors.grey),
@@ -244,7 +242,6 @@ class _HeatmapSectionState extends State<HeatmapSection> {
   }
 
   void _showActivitySnackBar(BuildContext context, DateTime date) {
-    // ... (sin cambios)
      final value = _completeDatasets[date] ?? 0;
     
     final currencyFmt = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);

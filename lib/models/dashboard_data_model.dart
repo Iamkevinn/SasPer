@@ -2,15 +2,14 @@
 
 import 'package:equatable/equatable.dart';
 import 'package:sasper/models/analysis_models.dart';
-import 'package:sasper/models/budget_models.dart'; // Mantiene la importación, pero ahora importa la clase `Budget`
+import 'package:sasper/models/budget_models.dart';
 import 'package:sasper/models/goal_model.dart';
 import 'package:sasper/models/transaction_models.dart';
 
-// --- NUEVA CLASE PARA LOS DATOS DEL GRÁFICO ---
 class CategorySpending {
   final String categoryName;
   final double totalAmount;
-  final String color; // Guardaremos el color de la categoría
+  final String color;
 
   CategorySpending({
     required this.categoryName,
@@ -19,60 +18,98 @@ class CategorySpending {
   });
 }
 
-/// Representa el conjunto completo de datos necesarios para el Dashboard.
+class DashboardAlert extends Equatable {
+  final String id;
+  final String type;
+  final String message;
+
+  const DashboardAlert({
+    required this.id,
+    required this.type,
+    required this.message,
+  });
+
+  factory DashboardAlert.fromMap(Map<String, dynamic> map) {
+    return DashboardAlert(
+      id: map['id'] as String? ?? '',
+      type: map['type'] as String? ?? 'general',
+      message: map['message'] as String? ?? 'Alerta no especificada',
+    );
+  }
+  
+  @override
+  List<Object?> get props => [id, type, message];
+}
+
 class DashboardData extends Equatable {
   final double totalBalance;
   final String fullName;
+  final double healthScore;
+  final List<DashboardAlert> alerts;
   final List<Transaction> recentTransactions;
-  // --- ¡CORRECCIÓN! Cambiamos BudgetProgress a Budget ---
-  final List<Budget> budgets; 
+  final List<Budget> budgets;
   final List<Budget> featuredBudgets;
   final List<Goal> goals;
   final List<ExpenseByCategory> expenseSummaryForWidget;
   final bool isLoading;
   final List<CategorySpending> categorySpendingSummary;
+  final double monthlyProjection;
 
   const DashboardData({
     required this.totalBalance,
     required this.fullName,
+    required this.healthScore,
+    required this.alerts,
     required this.recentTransactions,
-    required this.budgets, // Corregido
+    required this.budgets,
     required this.featuredBudgets,
     required this.goals,
     required this.expenseSummaryForWidget,
     this.isLoading = false,
     this.categorySpendingSummary = const [],
+    required this.monthlyProjection,
   });
 
   /// **ETAPA 1:** Crea una instancia con solo los datos esenciales.
   factory DashboardData.fromPartialMap(Map<String, dynamic> map, {bool loadingDetails = true}) {
+    // --- 👇 ESTE ES EL ÚNICO MÉTODO MODIFICADO ---
     return DashboardData(
       fullName: map['full_name'] as String? ?? 'Usuario',
       totalBalance: (map['total_balance'] as num?)?.toDouble() ?? 0.0,
+      healthScore: (map['health_score'] as num?)?.toDouble() ?? 0.0,
+      monthlyProjection: (map['monthly_projection'] as num?)?.toDouble() ?? 0.0,
+      
+      // En la Etapa 1, las alertas y otras listas siempre están vacías.
+      // Se cargarán en la Etapa 2.
+      alerts: const [], // <-- CORRECCIÓN CLAVE
+      
       goals: const [],
       recentTransactions: const [],
-      budgets: const [], // Corregido
+      budgets: const [],
       featuredBudgets: const [],
       expenseSummaryForWidget: const [],
       isLoading: loadingDetails,
-      categorySpendingSummary: [],
+      categorySpendingSummary: const [],
     );
   }
 
   /// **ETAPA 2:** Crea una copia del objeto actual, pero poblando las listas.
    DashboardData copyWithDetails(Map<String, dynamic> map) {
-    // Parsea la lista completa de presupuestos.
-    // ¡CORRECCIÓN! Usa el nuevo `Budget.fromMap`.
     final List<Budget> allBudgets = (map['budgets_progress'] as List<dynamic>?)
         ?.map((b) => Budget.fromMap(b as Map<String, dynamic>))
-        .toList() ?? budgets; // Usa la lista vieja como fallback
+        .toList() ?? budgets;
 
     return DashboardData(
-      // Mantenemos los datos de la Etapa 1
       fullName: fullName,
       totalBalance: totalBalance,
+      healthScore: (map['health_score'] as num?)?.toDouble() ?? healthScore,
+      monthlyProjection: (map['monthly_projection'] as num?)?.toDouble() ?? monthlyProjection,
+      
+      // Aquí sí leemos las alertas, porque vienen en la Etapa 2.
+      alerts: (map['alerts'] as List<dynamic>?)
+          ?.map((a) => DashboardAlert.fromMap(a as Map<String, dynamic>))
+          .toList() ?? alerts,
 
-      // Poblamos las listas desde el nuevo mapa de detalles
       goals: (map['goals'] as List<dynamic>?)
           ?.map((g) => Goal.fromMap(g as Map<String, dynamic>))
           .toList() ?? goals,
@@ -81,17 +118,14 @@ class DashboardData extends Equatable {
           ?.map((t) => Transaction.fromMap(t as Map<String, dynamic>)) 
           .toList() ?? recentTransactions,
       
-      budgets: allBudgets, // ¡CORRECCIÓN! Guardamos la lista completa en `budgets`
-      
-      // La lógica para destacar presupuestos ahora filtra los que están activos y toma los 2 primeros.
+      budgets: allBudgets,
       featuredBudgets: allBudgets.where((b) => b.isActive).take(2).toList(),
-      
       expenseSummaryForWidget: (map['expense_summary_for_widget'] as List<dynamic>?)
           ?.map((e) => ExpenseByCategory.fromMap(e as Map<String, dynamic>))
           .toList() ?? expenseSummaryForWidget,
       
       isLoading: false, 
-      categorySpendingSummary: [], // La carga ha terminado
+      categorySpendingSummary: const [],
     );
   }
 
@@ -100,8 +134,11 @@ class DashboardData extends Equatable {
     return const DashboardData(
       totalBalance: 0.0,
       fullName: 'Cargando...',
+      healthScore: 0.0,
+      monthlyProjection: 0.0,
+      alerts: [],
       recentTransactions: [],
-      budgets: [], // Corregido
+      budgets: [],
       featuredBudgets: [],
       goals: [],
       expenseSummaryForWidget: [],
@@ -114,38 +151,46 @@ class DashboardData extends Equatable {
   DashboardData copyWith({
     double? totalBalance,
     String? fullName,
+    double? healthScore,
+    List<DashboardAlert>? alerts,
     List<Transaction>? recentTransactions,
     List<Budget>? budgets,
     List<Budget>? featuredBudgets,
     List<Goal>? goals,
     List<ExpenseByCategory>? expenseSummaryForWidget,
     bool? isLoading,
-    List<CategorySpending>? categorySpendingSummary, // <-- Parámetro añadido
+    List<CategorySpending>? categorySpendingSummary,
+    double? monthlyProjection,
   }) {
     return DashboardData(
       totalBalance: totalBalance ?? this.totalBalance,
       fullName: fullName ?? this.fullName,
+      healthScore: healthScore ?? this.healthScore,
+      alerts: alerts ?? this.alerts,
       recentTransactions: recentTransactions ?? this.recentTransactions,
-      budgets: budgets ?? this.budgets, // Corregido
+      budgets: budgets ?? this.budgets,
       featuredBudgets: featuredBudgets ?? this.featuredBudgets,
       goals: goals ?? this.goals,
       expenseSummaryForWidget: expenseSummaryForWidget ?? this.expenseSummaryForWidget,
       isLoading: isLoading ?? this.isLoading, 
       categorySpendingSummary: categorySpendingSummary ?? this.categorySpendingSummary, 
+      monthlyProjection: monthlyProjection ?? this.monthlyProjection,
     );
   }
 
-  // Las propiedades para que `Equatable` pueda comparar instancias.
   @override
   List<Object?> get props => [
         totalBalance,
         fullName,
+        healthScore,
+        alerts,
         recentTransactions,
-        budgets, // Corregido
+        budgets,
         featuredBudgets,
         goals,
         expenseSummaryForWidget,
         isLoading,
         categorySpendingSummary,
+        monthlyProjection,
       ];
 }

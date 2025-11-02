@@ -1,14 +1,12 @@
-// lib/screens/debts_screen.dart
-
+import 'dart:io';
+import 'dart:ui' as ui; // Import necesario para la captura de imagen
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart'; // Import necesario para RenderRepaintBoundary
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:screenshot/screenshot.dart';
 import 'package:share_plus/share_plus.dart';
-import 'dart:io';
-import 'dart:typed_data';
 import 'package:sasper/data/debt_repository.dart';
 import 'package:sasper/models/debt_model.dart';
 import 'package:sasper/screens/add_debt_screen.dart';
@@ -30,11 +28,17 @@ class DebtsScreen extends StatefulWidget {
   State<DebtsScreen> createState() => _DebtsScreenState();
 }
 
-class _DebtsScreenState extends State<DebtsScreen> with TickerProviderStateMixin {
+class _DebtsScreenState extends State<DebtsScreen>
+    with TickerProviderStateMixin {
   late final TabController _mainTabController;
   late final Stream<List<Debt>> _debtsStream;
   final DebtRepository _repository = DebtRepository.instance;
-  final ScreenshotController _screenshotController = ScreenshotController();
+
+  // Clave global para apuntar al widget que queremos capturar
+  final GlobalKey _shareBoundaryKey = GlobalKey();
+  // Variables de estado para gestionar el proceso de compartir
+  Debt? _debtToShare;
+  bool _isSharing = false;
 
   @override
   void initState() {
@@ -72,7 +76,8 @@ class _DebtsScreenState extends State<DebtsScreen> with TickerProviderStateMixin
       context: context,
       builder: (dialogContext) => CustomDialog(
         title: '¿Confirmar Eliminación?',
-        content: 'Estás a punto de eliminar "${debt.name}". Esta acción no se puede deshacer.',
+        content:
+            'Estás a punto de eliminar "${debt.name}". Esta acción no se puede deshacer.',
         confirmText: 'Sí, Eliminar',
         onConfirm: () => Navigator.of(dialogContext).pop(true),
       ),
@@ -94,29 +99,61 @@ class _DebtsScreenState extends State<DebtsScreen> with TickerProviderStateMixin
     }
   }
 
-  Future<void> _handleShare(Debt debt) async {
+  /// Función principal para capturar y compartir la imagen de la deuda.
+  Future<void> _shareDebt(Debt debt) async {
+    if (_isSharing) return; // Evita múltiples ejecuciones simultáneas
+
+    // 1. Preparamos el estado: le decimos a la UI que muestre el widget de captura (oculto) y el indicador de carga.
+    setState(() {
+      _debtToShare = debt;
+      _isSharing = true;
+    });
+
+    // 2. Forzamos una pausa. Esto es CRUCIAL. Le da tiempo al framework para
+    //    construir, maquetar y pintar el widget 'ShareableDebtSummary' en el fondo.
+    await Future.delayed(const Duration(milliseconds: 300));
+
     try {
-      final Uint8List imageBytes = await _screenshotController.captureFromWidget(
-        ShareableDebtSummary(debt: debt),
-        delay: const Duration(milliseconds: 100),
-      );
+      // 3. Ahora que el widget está listo, procedemos a capturarlo.
+      final boundary = _shareBoundaryKey.currentContext?.findRenderObject()
+          as RenderRepaintBoundary?;
 
-      if (imageBytes == null) return;
+      if (boundary == null) {
+        throw Exception('No se pudo encontrar el RenderRepaintBoundary.');
+      }
 
-      final directory = await getTemporaryDirectory();
-      final imagePath = await File('${directory.path}/debt_summary.png').create();
-      await imagePath.writeAsBytes(imageBytes);
+      final image = await boundary.toImage(pixelRatio: 2.0); // Alta resolución
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
 
+      if (byteData == null) {
+        throw Exception('No se pudieron obtener los bytes de la imagen.');
+      }
+
+      final pngBytes = byteData.buffer.asUint8List();
+
+      final tempDir = await getTemporaryDirectory();
+      final file = await File('${tempDir.path}/debt_summary.png').create();
+      await file.writeAsBytes(pngBytes);
+
+      // 4. Compartimos el archivo generado.
       await Share.shareXFiles(
-        [XFile(imagePath.path)],
-        text: 'Resumen de deuda/préstamo: ${debt.name}',
+        [XFile(file.path)],
+        text: '¡Mira mi progreso con mi deuda: ${debt.name}!',
       );
     } catch (e) {
       if (mounted) {
         NotificationHelper.show(
-          message: 'No se pudo compartir',
+          message: 'No se pudo compartir la imagen',
           type: NotificationType.error,
         );
+      }
+    } finally {
+      // 5. Limpiamos el estado, sin importar si tuvo éxito o falló.
+      if (mounted) {
+        setState(() {
+          _isSharing = false;
+          _debtToShare = null;
+        });
       }
     }
   }
@@ -133,7 +170,7 @@ class _DebtsScreenState extends State<DebtsScreen> with TickerProviderStateMixin
         _handleDelete(debt);
         break;
       case DebtCardAction.share:
-        _handleShare(debt);
+        _shareDebt(debt); // Llamamos a la nueva función unificada
         break;
     }
   }
@@ -144,119 +181,178 @@ class _DebtsScreenState extends State<DebtsScreen> with TickerProviderStateMixin
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) => [
-          SliverAppBar(
-            expandedHeight: 140,
-            floating: false,
-            pinned: true,
-            elevation: 0,
-            backgroundColor: colorScheme.surface,
-            flexibleSpace: FlexibleSpaceBar(
-              titlePadding: const EdgeInsets.only(left: 20, bottom: 60),
-              title: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Deudas y',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  Text(
-                    'Préstamos',
-                    style: GoogleFonts.poppins(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: colorScheme.onSurface,
-                    ),
-                  ),
-                ],
+      // Usamos el Stack para poder superponer el widget de captura (oculto) y el loader.
+      body: Stack(
+        children: [
+          // --- INICIO DE LA CORRECCIÓN ---
+          // Widget de captura invisible
+          // Se construye solo cuando _debtToShare tiene datos.
+          if (_debtToShare != null)
+            Positioned(
+              // Lo movemos muy arriba, fuera de la vista del usuario.
+              top: -1921, 
+              left: 0,
+              child: RepaintBoundary(
+                key: _shareBoundaryKey,
+                // ¡LA CLAVE ESTÁ AQUÍ!
+                // Envolvemos el widget en un Material para darle el contexto
+                // de tema necesario para que el texto y los íconos se rendericen
+                // con colores visibles.
+                child: Material(
+                  // Lo hacemos transparente para que no añada un fondo propio.
+                  type: MaterialType.transparency,
+                  child: ShareableDebtSummary(debt: _debtToShare!),
+                ),
               ),
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Colors.red.withOpacity(0.1),
-                      colorScheme.surface,
+            ),
+          // --- FIN DE LA CORRECCIÓN ---
+
+          // Tu UI visible original
+          NestedScrollView(
+            headerSliverBuilder: (context, innerBoxIsScrolled) => [
+              SliverAppBar(
+                expandedHeight: 200,
+                floating: false,
+                pinned: true,
+                elevation: 0,
+                backgroundColor: colorScheme.surface,
+                flexibleSpace: FlexibleSpaceBar(
+                  titlePadding: const EdgeInsets.only(left: 20, bottom: 60),
+                  title: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Deudas y',
+                        style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      Text(
+                        'Préstamos',
+                        style: GoogleFonts.poppins(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                    ],
+                  ),
+                  background: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Colors.red.withOpacity(0.1),
+                          colorScheme.surface,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                actions: [
+                  FilledButton.tonalIcon(
+                    onPressed: _navigateToAddDebt,
+                    icon: const Icon(Iconsax.add, size: 20),
+                    label: const Text('Nuevo'),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                ],
+                bottom: PreferredSize(
+                  preferredSize: const Size.fromHeight(48),
+                  child: Container(
+                    color: colorScheme.surface,
+                    child: TabBar(
+                      controller: _mainTabController,
+                      indicatorSize: TabBarIndicatorSize.label,
+                      indicatorWeight: 3,
+                      dividerColor: Colors.transparent,
+                      labelStyle: GoogleFonts.poppins(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      tabs: const [
+                        Tab(text: 'Yo Debo'),
+                        Tab(text: 'Me Deben'),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+            body: StreamBuilder<List<Debt>>(
+              stream: _debtsStream,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting &&
+                    !snapshot.hasData) {
+                  return _buildSkeletonizer();
+                }
+                if (snapshot.hasError) {
+                  return _buildErrorState(snapshot.error.toString());
+                }
+
+                final allDebts = snapshot.data ?? [];
+                if (allDebts.isEmpty) {
+                  return _buildGlobalEmptyState();
+                }
+
+                final myDebts = allDebts
+                    .where((d) => d.type == DebtType.debt)
+                    .toList();
+                final loansToOthers = allDebts
+                    .where((d) => d.type == DebtType.loan)
+                    .toList();
+
+                return TabBarView(
+                  controller: _mainTabController,
+                  children: [
+                    _DebtCategoryView(
+                      debts: myDebts,
+                      onActionSelected: _handleDebtAction,
+                      type: DebtType.debt,
+                    ),
+                    _DebtCategoryView(
+                      debts: loansToOthers,
+                      onActionSelected: _handleDebtAction,
+                      type: DebtType.loan,
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+
+          // Indicador de carga mientras se comparte
+          if (_isSharing)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black.withOpacity(0.5),
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const CircularProgressIndicator(),
+                      const SizedBox(height: 20),
+                      Text(
+                        'Generando imagen...',
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 16,
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ),
             ),
-            actions: [
-              FilledButton.tonalIcon(
-                onPressed: _navigateToAddDebt,
-                icon: const Icon(Iconsax.add, size: 20),
-                label: const Text('Nuevo'),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                ),
-              ),
-              const SizedBox(width: 16),
-            ],
-            bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(48),
-              child: Container(
-                color: colorScheme.surface,
-                child: TabBar(
-                  controller: _mainTabController,
-                  indicatorSize: TabBarIndicatorSize.label,
-                  indicatorWeight: 3,
-                  dividerColor: Colors.transparent,
-                  labelStyle: GoogleFonts.poppins(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  tabs: const [
-                    Tab(text: 'Yo Debo'),
-                    Tab(text: 'Me Deben'),
-                  ],
-                ),
-              ),
-            ),
-          ),
         ],
-        body: StreamBuilder<List<Debt>>(
-          stream: _debtsStream,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-              return _buildSkeletonizer();
-            }
-            if (snapshot.hasError) {
-              return _buildErrorState(snapshot.error.toString());
-            }
-
-            final allDebts = snapshot.data ?? [];
-            if (allDebts.isEmpty) {
-              return _buildGlobalEmptyState();
-            }
-
-            final myDebts = allDebts.where((d) => d.type == DebtType.debt).toList();
-            final loansToOthers = allDebts.where((d) => d.type == DebtType.loan).toList();
-
-            return TabBarView(
-              controller: _mainTabController,
-              children: [
-                _DebtCategoryView(
-                  debts: myDebts,
-                  onActionSelected: _handleDebtAction,
-                  type: DebtType.debt,
-                ),
-                _DebtCategoryView(
-                  debts: loansToOthers,
-                  onActionSelected: _handleDebtAction,
-                  type: DebtType.loan,
-                ),
-              ],
-            );
-          },
-        ),
       ),
     );
   }
@@ -311,7 +407,8 @@ class _DebtsScreenState extends State<DebtsScreen> with TickerProviderStateMixin
               icon: const Icon(Iconsax.add_circle),
               label: const Text('Añadir Deuda o Préstamo'),
               style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                 textStyle: const TextStyle(fontSize: 16),
               ),
             ),
@@ -349,12 +446,6 @@ class _DebtsScreenState extends State<DebtsScreen> with TickerProviderStateMixin
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
-            const SizedBox(height: 24),
-                        // --- CORRECCIÓN AQUÍ ---
-            // Simplemente eliminamos el botón. Como usamos un stream,
-            // si la conexión se restaura, los datos llegarán automáticamente.
-            // Si el error es persistente (ej. de permiso), un botón de reintento
-            // no lo solucionará. La UI se reconstruirá sola.
           ],
         ),
       ),
@@ -408,8 +499,10 @@ class _DebtCategoryViewState extends State<_DebtCategoryView>
 
   @override
   Widget build(BuildContext context) {
-    final activeDebts = widget.debts.where((d) => d.status == DebtStatus.active).toList();
-    final paidDebts = widget.debts.where((d) => d.status == DebtStatus.paid).toList();
+    final activeDebts =
+        widget.debts.where((d) => d.status == DebtStatus.active).toList();
+    final paidDebts =
+        widget.debts.where((d) => d.status == DebtStatus.paid).toList();
 
     if (widget.debts.isEmpty) {
       return _buildCategoryEmptyState();
@@ -451,8 +544,10 @@ class _DebtCategoryViewState extends State<_DebtCategoryView>
   Widget _buildQuickStats(List<Debt> activeDebts) {
     if (activeDebts.isEmpty) return const SizedBox.shrink();
 
-    final totalAmount = activeDebts.fold<double>(0, (sum, debt) => sum + debt.initialAmount);
-    final totalPaid = activeDebts.fold<double>(0, (sum, debt) => sum + debt.paidAmount);
+    final totalAmount = activeDebts.fold<double>(
+        0, (sum, debt) => sum + debt.initialAmount);
+    final totalPaid =
+        activeDebts.fold<double>(0, (sum, debt) => sum + debt.paidAmount);
     final totalRemaining = totalAmount - totalPaid;
 
     final currencyFormat = NumberFormat.compactCurrency(
@@ -499,14 +594,18 @@ class _DebtCategoryViewState extends State<_DebtCategoryView>
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
-                  widget.type == DebtType.debt ? Iconsax.card_remove : Iconsax.card_tick,
+                  widget.type == DebtType.debt
+                      ? Iconsax.card_remove
+                      : Iconsax.card_tick,
                   color: widget.type == DebtType.debt ? Colors.red : Colors.green,
                   size: 24,
                 ),
               ),
               const SizedBox(width: 12),
               Text(
-                widget.type == DebtType.debt ? 'Total que Debo' : 'Total que me Deben',
+                widget.type == DebtType.debt
+                    ? 'Total que Debo'
+                    : 'Total que me Deben',
                 style: GoogleFonts.poppins(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
@@ -525,13 +624,15 @@ class _DebtCategoryViewState extends State<_DebtCategoryView>
                 color: widget.type == DebtType.debt ? Colors.red : Colors.green,
                 isLarge: true,
               ),
-              Container(width: 1, height: 40, color: Colors.grey.withOpacity(0.3)),
+              Container(
+                  width: 1, height: 40, color: Colors.grey.withOpacity(0.3)),
               _StatColumn(
                 label: 'Pagado',
                 value: currencyFormat.format(totalPaid),
                 color: Theme.of(context).colorScheme.primary,
               ),
-              Container(width: 1, height: 40, color: Colors.grey.withOpacity(0.3)),
+              Container(
+                  width: 1, height: 40, color: Colors.grey.withOpacity(0.3)),
               _StatColumn(
                 label: 'Total',
                 value: currencyFormat.format(totalAmount),
@@ -555,7 +656,10 @@ class _DebtCategoryViewState extends State<_DebtCategoryView>
               Icon(
                 isHistory ? Iconsax.document_text : Iconsax.tick_circle,
                 size: 80,
-                color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.5),
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurfaceVariant
+                    .withOpacity(0.5),
               ),
               const SizedBox(height: 24),
               Text(
@@ -586,18 +690,16 @@ class _DebtCategoryViewState extends State<_DebtCategoryView>
     final contactNames = groupedDebts.keys.toList()..sort();
 
     return RefreshIndicator(
-      // Cambiamos la llamada a un Future vacío que se completa después de 1 segundo.
-      // Esto permite que la animación de "refrescar" se muestre, dando al usuario
-      // una sensación de control, aunque el stream se actualiza solo.
       onRefresh: () => Future<void>.delayed(const Duration(seconds: 1)),
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
-        physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+        physics:
+            const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
         itemCount: contactNames.length,
         itemBuilder: (context, index) {
           final contactName = contactNames[index];
           final contactDebts = groupedDebts[contactName]!;
-          
+
           return _ContactDebtGroup(
             contactName: contactName,
             debts: contactDebts,
@@ -615,7 +717,7 @@ class _DebtCategoryViewState extends State<_DebtCategoryView>
 
   Widget _buildCategoryEmptyState() {
     final isDebt = widget.type == DebtType.debt;
-    
+
     return Center(
       child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
@@ -683,19 +785,22 @@ class _ContactDebtGroupState extends State<_ContactDebtGroup> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    
+
     // Calcular totales para este contacto
-    final totalAmount = widget.debts.fold<double>(0, (sum, d) => sum + d.initialAmount);
-    final totalPaid = widget.debts.fold<double>(0, (sum, d) => sum + d.paidAmount);
+    final totalAmount =
+        widget.debts.fold<double>(0, (sum, d) => sum + d.initialAmount);
+    final totalPaid =
+        widget.debts.fold<double>(0, (sum, d) => sum + d.paidAmount);
     final totalRemaining = totalAmount - totalPaid;
-    
+
     final currencyFormat = NumberFormat.compactCurrency(
       locale: 'es_CO',
       symbol: '\$',
       decimalDigits: 0,
     );
 
-    final accentColor = widget.type == DebtType.debt ? Colors.red : Colors.green;
+    final accentColor =
+        widget.type == DebtType.debt ? Colors.red : Colors.green;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -762,7 +867,7 @@ class _ContactDebtGroupState extends State<_ContactDebtGroup> {
                     ),
                   ),
                   const SizedBox(width: 16),
-                  
+
                   // Información del contacto
                   Expanded(
                     child: Column(
@@ -782,7 +887,8 @@ class _ContactDebtGroupState extends State<_ContactDebtGroup> {
                             ),
                             const SizedBox(width: 8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
                               decoration: BoxDecoration(
                                 color: colorScheme.primaryContainer,
                                 borderRadius: BorderRadius.circular(10),
@@ -802,7 +908,9 @@ class _ContactDebtGroupState extends State<_ContactDebtGroup> {
                         Row(
                           children: [
                             Icon(
-                              widget.isHistory ? Iconsax.tick_circle : Iconsax.wallet_money,
+                              widget.isHistory
+                                  ? Iconsax.tick_circle
+                                  : Iconsax.wallet_money,
                               size: 14,
                               color: colorScheme.onSurfaceVariant,
                             ),
@@ -816,7 +924,9 @@ class _ContactDebtGroupState extends State<_ContactDebtGroup> {
                                 color: widget.isHistory
                                     ? colorScheme.onSurfaceVariant
                                     : accentColor,
-                                fontWeight: widget.isHistory ? FontWeight.normal : FontWeight.w600,
+                                fontWeight: widget.isHistory
+                                    ? FontWeight.normal
+                                    : FontWeight.w600,
                               ),
                             ),
                           ],
@@ -824,7 +934,7 @@ class _ContactDebtGroupState extends State<_ContactDebtGroup> {
                       ],
                     ),
                   ),
-                  
+
                   // Indicador de expansión
                   AnimatedRotation(
                     turns: _isExpanded ? 0.5 : 0,
@@ -838,7 +948,7 @@ class _ContactDebtGroupState extends State<_ContactDebtGroup> {
               ),
             ),
           ),
-          
+
           // Contenido expandible (lista de deudas)
           AnimatedCrossFade(
             firstChild: const SizedBox.shrink(),
@@ -852,12 +962,14 @@ class _ContactDebtGroupState extends State<_ContactDebtGroup> {
                     physics: const NeverScrollableScrollPhysics(),
                     padding: const EdgeInsets.all(16),
                     itemCount: widget.debts.length,
-                    separatorBuilder: (context, index) => const SizedBox(height: 12),
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       final debt = widget.debts[index];
                       return DebtCard(
                         debt: debt,
-                        onActionSelected: (action) => widget.onActionSelected(action, debt),
+                        onActionSelected: (action) =>
+                            widget.onActionSelected(action, debt),
                       );
                     },
                   ),
@@ -896,7 +1008,8 @@ class _StatColumn extends StatelessWidget {
     return Expanded(
       flex: isLarge ? 2 : 1,
       child: Column(
-        crossAxisAlignment: isLarge ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+        crossAxisAlignment:
+            isLarge ? CrossAxisAlignment.start : CrossAxisAlignment.center,
         children: [
           Text(
             label,

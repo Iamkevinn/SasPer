@@ -61,8 +61,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
   late Future<List<Budget>> _budgetsFuture;
   late Future<List<Category>> _categoriesFuture;
 
-  final int _currentStep = 0;
-
   @override
   void initState() {
     super.initState();

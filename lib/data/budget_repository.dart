@@ -103,6 +103,35 @@ class BudgetRepository {
     }
   }
 
+  
+  /// Obtiene y calcula el resumen total de todos los presupuestos activos.
+  ///
+  /// Devuelve un récord con el presupuesto total y el gasto total.
+  Future<(double totalBudget, double totalSpent)> getOverallBudgetSummary() async {
+    try {
+      // 1. Reutilizamos la función existente para obtener todos los presupuestos.
+      final List<Budget> activeBudgets = await _fetchBudgets();
+
+      // 2. Si no hay presupuestos, devolvemos cero para evitar errores.
+      if (activeBudgets.isEmpty) {
+        return (0.0, 0.0);
+      }
+
+      // 3. Usamos fold para sumarizar los valores de forma segura y eficiente.
+      final double totalBudget = activeBudgets.fold(0.0, (sum, budget) => sum + budget.amount);
+      // Asumimos que tu modelo `Budget` tiene una propiedad `spent` que viene del RPC.
+      final double totalSpent = activeBudgets.fold(0.0, (sum, budget) => sum + budget.spentAmount);
+      
+      developer.log('📊 [Repo] Resumen de presupuesto calculado: Total \$${totalBudget.toStringAsFixed(2)}, Gastado \$${totalSpent.toStringAsFixed(2)}', name: 'BudgetRepository');
+
+      return (totalBudget, totalSpent);
+    } catch (e) {
+      developer.log('🔥 [Repo] Error calculando el resumen del presupuesto: $e', name: 'BudgetRepository');
+      // Devolvemos cero en caso de error para que la UI no se rompa.
+      return (0.0, 0.0);
+    }
+  }
+
   /// Llama a un RPC para eliminar un presupuesto de forma segura.
   Future<void> deleteBudgetSafely(int budgetId) async {
     developer.log('🗑️ [Repo] Eliminando presupuesto con id $budgetId', name: 'BudgetRepository');

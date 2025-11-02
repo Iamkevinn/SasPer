@@ -6,7 +6,7 @@ import 'package:sasper/models/category_model.dart';
 enum GoalTimeframe {
   short,
   medium,
-  long;
+  long, custom;
 
   static GoalTimeframe fromString(String? timeframe) {
     switch (timeframe?.toLowerCase()) {
