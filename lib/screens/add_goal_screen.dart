@@ -12,7 +12,6 @@ import 'package:sasper/services/event_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:sasper/data/category_repository.dart';
 import 'package:sasper/models/category_model.dart';
 import 'package:sasper/models/goal_model.dart';
 import 'dart:developer' as developer;
@@ -30,7 +29,6 @@ class AddGoalScreen extends StatefulWidget {
 class _AddGoalScreenState extends State<AddGoalScreen>
     with TickerProviderStateMixin {
   final GoalRepository _goalRepository = GoalRepository.instance;
-  final CategoryRepository _categoryRepository = CategoryRepository.instance;
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _targetAmountController = TextEditingController(text: '0');
@@ -44,8 +42,6 @@ class _AddGoalScreenState extends State<AddGoalScreen>
   bool _isLoading = false;
   bool _isSuccess = false;
 
-  // ignore: unused_field
-  late Future<List<Category>> _categoriesFuture;
 
   // Animaciones
   late AnimationController _viabilityAnimationController;
@@ -56,7 +52,6 @@ class _AddGoalScreenState extends State<AddGoalScreen>
   @override
   void initState() {
     super.initState();
-    _categoriesFuture = _categoryRepository.getExpenseCategories();
     _confettiController =
         ConfettiController(duration: const Duration(seconds: 2));
 

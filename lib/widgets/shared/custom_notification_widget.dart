@@ -84,7 +84,6 @@ class _CustomNotificationWidgetState extends State<CustomNotificationWidget>
           foregroundColor: colorScheme.onErrorContainer,
         );
       case NotificationType.info:
-      // ignore: unreachable_switch_default
       default:
         return _NotificationStyle(
           icon: Iconsax.info_circle,

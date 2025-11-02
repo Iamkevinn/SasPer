@@ -278,11 +278,9 @@ class AnalysisRepository {
           'end_date': endDate
         }).catchError((_) => []),
         // NOVEDAD: Añadimos nuestra nueva función a la lista de llamadas en paralelo.
-        // ignore: invalid_return_type_for_catch_error
-        getMoodSpendingAnalysis().catchError((_) => []),
+        getMoodSpendingAnalysis().catchError((_) => const <MoodAnalysis>[]),
         // Ahora la lista tiene 9 elementos, con índices del 0 al 8.
-        // ignore: invalid_return_type_for_catch_error
-        getMoodSpendingByDayOfWeek().catchError((_) => []), // Índice 8
+        getMoodSpendingByDayOfWeek().catchError((_) => const <MoodByDayAnalysis>[]), // Índice 8
         client
             .rpc('get_average_monthly_spending')
             .catchError((_) => []), // Índice 9

@@ -41,8 +41,6 @@ class _AddRecurringTransactionScreenState
 
   // Animaciones
   late AnimationController _typeAnimationController;
-  // ignore: unused_field
-  late Animation<double> _typeAnimation;
 
   @override
   void initState() {
@@ -54,9 +52,6 @@ class _AddRecurringTransactionScreenState
     _typeAnimationController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
-    );
-    _typeAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _typeAnimationController, curve: Curves.easeInOut),
     );
 
     // Listener para recalcular impacto

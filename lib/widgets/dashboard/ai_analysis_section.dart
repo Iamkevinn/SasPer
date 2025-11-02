@@ -77,8 +77,6 @@ class _AiAnalysisSectionState extends State<AiAnalysisSection> {
       case AiAnalysisState.success:
         return _buildResultCard();
       case AiAnalysisState.initial:
-      // ignore: unreachable_switch_default
-      default:
         return _buildInitialPromptCard();
     }
   }

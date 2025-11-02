@@ -1,6 +1,6 @@
 // lib/screens/dashboard_screen.dart
 // VERSIÓN PREMIUM COMPLETA - Con IA en tiempo real, simulaciones y gamificación
-import 'package:sasper/services/widget_service.dart';
+//import 'package:sasper/services/widget_service.dart';
 import 'dart:async';
 import 'dart:developer' as developer;
 import 'dart:ui';
@@ -17,6 +17,7 @@ import 'package:sasper/models/challenge_model.dart';
 import 'package:sasper/models/dashboard_data_model.dart';
 import 'package:sasper/screens/budget_details_screen.dart';
 import 'package:sasper/screens/budgets_screen.dart';
+import 'package:sasper/services/widgets/widget_orchestrator.dart';
 import 'package:sasper/widgets/dashboard/active_challenges_widget.dart';
 import 'package:sasper/widgets/dashboard/category_spending_chart.dart';
 import 'package:skeletonizer/skeletonizer.dart';
@@ -68,7 +69,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             '✅ INTENTANDO ACTUALIZAR WIDGETS DESDE EL DASHBOARD (Stream Listener)',
             name: 'DashboardScreen');
         // Creamos una instancia y llamamos al método de actualización.
-        WidgetService().updateAllWidgetsFromDashboard(data, context);
+        WidgetOrchestrator().updateAllFromDashboard(data, context);
       }
     });
     _dashboardRepository.forceRefresh(silent: true);
