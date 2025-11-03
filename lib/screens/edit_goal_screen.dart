@@ -12,6 +12,7 @@ import 'package:sasper/data/goal_repository.dart';
 import 'package:sasper/data/category_repository.dart';
 import 'package:sasper/models/goal_model.dart';
 import 'package:sasper/models/category_model.dart';
+import 'package:sasper/screens/goal_notes_editor_screen.dart';
 import 'package:sasper/services/event_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
@@ -33,17 +34,17 @@ class _EditGoalScreenState extends State<EditGoalScreen>
   // Repositories
   final GoalRepository _goalRepository = GoalRepository.instance;
   final CategoryRepository _categoryRepository = CategoryRepository.instance;
-  final AnalysisRepository _analysisRepository = AnalysisRepository.instance; 
+  final AnalysisRepository _analysisRepository = AnalysisRepository.instance;
 
   // --- AÑADIR NUEVAS VARIABLES DE ESTADO PARA DATOS REALES ---
   double _realMonthlyIncome = 0.0;
   bool _isInitialDataLoading = true; // Renombramos para claridad
-  
+
   // Form
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
   late final TextEditingController _targetAmountController;
-  
+
   final List<_ConfettiParticle> _particles = [];
 
   // State
@@ -54,11 +55,11 @@ class _EditGoalScreenState extends State<EditGoalScreen>
   late GoalPriority _priority;
   String? _selectedCategoryId;
   List<Category>? _categories;
-  
+
   // Simulación IA
   Timer? _debounceTimer;
   FinancialProjection? _currentProjection;
-  
+
   // Animaciones
   late AnimationController _projectionController;
   late AnimationController _pulseController;
@@ -67,7 +68,7 @@ class _EditGoalScreenState extends State<EditGoalScreen>
   @override
   void initState() {
     super.initState();
-    
+    _loadNotes();
     // Inicializar valores
     _nameController = TextEditingController(text: widget.goal.name);
     _targetAmountController = TextEditingController(
@@ -83,25 +84,32 @@ class _EditGoalScreenState extends State<EditGoalScreen>
       duration: const Duration(milliseconds: 600),
       vsync: this,
     );
-    
+
     _pulseController = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
     )..repeat(reverse: true);
-    
+
     _confettiController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     );
 
     // Cargar datos y calcular proyección inicial
-    _loadCategories();
-    _calculateProjection();
-    
-    _loadInitialData(); 
+    //_loadCategories();
+    //calculateProjection();
+
+    _loadInitialData();
 
     // Listeners para recalcular en tiempo real
     _targetAmountController.addListener(_onFieldChanged);
+  }
+
+  /// Carga o recarga las notas de la meta actual y actualiza la interfaz.
+  void _loadNotes() {
+    setState(() {
+      // widget.goal.id es el ID de la meta que se está editando
+    });
   }
 
   Future<void> _loadInitialData() async {
@@ -112,10 +120,10 @@ class _EditGoalScreenState extends State<EditGoalScreen>
     ]);
 
     // 2. Una vez que tenemos los datos, calculamos la proyección inicial.
-    _calculateProjection(); 
+    _calculateProjection();
 
     // 3. Marcamos la carga como completa.
-    if(mounted) {
+    if (mounted) {
       setState(() {
         _isInitialDataLoading = false;
       });
@@ -137,9 +145,10 @@ class _EditGoalScreenState extends State<EditGoalScreen>
         );
         calculatedAverageIncome = totalIncome / monthlySummaries.length;
       }
-      
+
       // Guardamos el dato real en el estado
-      _realMonthlyIncome = calculatedAverageIncome > 0 ? calculatedAverageIncome : 1.0; 
+      _realMonthlyIncome =
+          calculatedAverageIncome > 0 ? calculatedAverageIncome : 1.0;
     }
   }
 
@@ -155,40 +164,44 @@ class _EditGoalScreenState extends State<EditGoalScreen>
   }
 
   void _createConfettiParticles() {
-  _particles.clear(); // Limpiamos las partículas anteriores
-  final random = math.Random();
-  final screenWidth = MediaQuery.of(context).size.width;
-  final colors = [
-    Colors.blue, Colors.pink, Colors.green, Colors.yellow, Colors.purple, Colors.orange
-  ];
+    _particles.clear(); // Limpiamos las partículas anteriores
+    final random = math.Random();
+    final screenWidth = MediaQuery.of(context).size.width;
+    final colors = [
+      Colors.blue,
+      Colors.pink,
+      Colors.green,
+      Colors.yellow,
+      Colors.purple,
+      Colors.orange
+    ];
 
-  // Creamos 100 partículas de confeti
-  for (int i = 0; i < 100; i++) {
-    _particles.add(
-      _ConfettiParticle(
-        // Posición inicial aleatoria en la parte superior de la pantalla
-        position: Offset(random.nextDouble() * screenWidth, 0),
-        // Velocidad inicial aleatoria hacia abajo y hacia los lados
-        velocity: Offset(
-          random.nextDouble() * 4 - 2, // -2 a +2 horizontalmente
-          random.nextDouble() * 4 + 2, // 2 a 6 verticalmente
+    // Creamos 100 partículas de confeti
+    for (int i = 0; i < 100; i++) {
+      _particles.add(
+        _ConfettiParticle(
+          // Posición inicial aleatoria en la parte superior de la pantalla
+          position: Offset(random.nextDouble() * screenWidth, 0),
+          // Velocidad inicial aleatoria hacia abajo y hacia los lados
+          velocity: Offset(
+            random.nextDouble() * 4 - 2, // -2 a +2 horizontalmente
+            random.nextDouble() * 4 + 2, // 2 a 6 verticalmente
+          ),
+          color: colors[random.nextInt(colors.length)],
+          size: random.nextDouble() * 8 + 4, // Tamaño de 4 a 12
+          rotation: random.nextDouble() * 2 * math.pi,
+          angularVelocity: random.nextDouble() * 0.2 - 0.1, // -0.1 a +0.1
         ),
-        color: colors[random.nextInt(colors.length)],
-        size: random.nextDouble() * 8 + 4, // Tamaño de 4 a 12
-        rotation: random.nextDouble() * 2 * math.pi,
-        angularVelocity: random.nextDouble() * 0.2 - 0.1, // -0.1 a +0.1
-      ),
-    );
+      );
+    }
   }
-}
 
   Future<void> _loadCategories() async {
     final categories = await _categoryRepository.getCategories();
     if (mounted) {
       setState(() {
-        _categories = categories
-            .where((c) => c.type == CategoryType.expense)
-            .toList();
+        _categories =
+            categories.where((c) => c.type == CategoryType.expense).toList();
       });
     }
   }
@@ -202,7 +215,8 @@ class _EditGoalScreenState extends State<EditGoalScreen>
 
   void _calculateProjection() {
     final amountText = _targetAmountController.text.replaceAll(',', '.');
-    final targetAmount = double.tryParse(amountText) ?? widget.goal.targetAmount;
+    final targetAmount =
+        double.tryParse(amountText) ?? widget.goal.targetAmount;
     final currentAmount = widget.goal.currentAmount;
     final remainingAmount = targetAmount - currentAmount;
 
@@ -235,7 +249,7 @@ class _EditGoalScreenState extends State<EditGoalScreen>
         );
       },
     );
-    
+
     if (picked != null && picked != _targetDate) {
       HapticFeedback.selectionClick();
       setState(() => _targetDate = picked);
@@ -245,7 +259,7 @@ class _EditGoalScreenState extends State<EditGoalScreen>
 
   Future<void> _showCategoryPicker() async {
     if (_categories == null) return;
-    
+
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -271,12 +285,12 @@ class _EditGoalScreenState extends State<EditGoalScreen>
         final newDate = DateTime.now().add(Duration(days: suggestion * 30));
         setState(() => _targetDate = newDate);
         break;
-        
+
       case RecommendationType.increaseContribution:
         // Mostrar modal con simulación
         _showRecommendationModal(type);
         return;
-        
+
       case RecommendationType.reduceTarget:
         final reduction = _currentProjection!.remainingAmount * 0.2;
         final newTarget = widget.goal.targetAmount - reduction;
@@ -286,7 +300,7 @@ class _EditGoalScreenState extends State<EditGoalScreen>
 
     _calculateProjection();
     HapticFeedback.mediumImpact();
-    
+
     NotificationHelper.show(
       message: 'Sugerencia aplicada. Revisa los cambios.',
       type: NotificationType.info,
@@ -356,13 +370,14 @@ class _EditGoalScreenState extends State<EditGoalScreen>
       if (mounted) {
         // Confetti animation
         _createConfettiParticles(); // 1. Creamos las partículas
-      _confettiController.forward(from: 0); // 2. Reiniciamos y lanzamos la animación
-        
+        _confettiController.forward(
+            from: 0); // 2. Reiniciamos y lanzamos la animación
+
         // Esperar animación
         await Future.delayed(const Duration(milliseconds: 800));
-        
+
         EventService.instance.fire(AppEvent.goalUpdated);
-        
+
         navigator.pop(true);
 
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -374,7 +389,7 @@ class _EditGoalScreenState extends State<EditGoalScreen>
       }
     } catch (e) {
       developer.log('Error al actualizar meta: $e', name: 'EditGoalScreen');
-      
+
       if (mounted) {
         NotificationHelper.show(
           message: 'Error: ${e.toString().replaceFirst("Exception: ", "")}',
@@ -396,7 +411,9 @@ class _EditGoalScreenState extends State<EditGoalScreen>
     if (_isInitialDataLoading) {
       return Scaffold(
         backgroundColor: colorScheme.surface,
-        appBar: AppBar(backgroundColor: colorScheme.surface), // AppBar para consistencia visual
+        appBar: AppBar(
+            backgroundColor:
+                colorScheme.surface), // AppBar para consistencia visual
         body: const Center(child: CircularProgressIndicator()),
       );
     }
@@ -439,11 +456,18 @@ class _EditGoalScreenState extends State<EditGoalScreen>
                         _buildAdvancedFields(colorScheme),
                       ],
                       if (_currentProjection != null &&
-                          _currentProjection!.status != ViabilityStatus.feasible) ...[
+                          _currentProjection!.status !=
+                              ViabilityStatus.feasible) ...[
                         const SizedBox(height: 24),
                         _buildRecommendations(colorScheme),
                       ],
+
+                      // --- AÑADE ESTAS LÍNEAS AQUÍ ---
+                      const SizedBox(height: 24),
+                      _buildNotesSection(),
                       const SizedBox(height: 32),
+                      // --- FIN ---
+
                       _buildActionButtons(colorScheme),
                       const SizedBox(height: 40),
                     ],
@@ -475,7 +499,66 @@ class _EditGoalScreenState extends State<EditGoalScreen>
       ),
     );
   }
-  
+
+  // --- WIDGET 1: La sección principal que contiene todo ---
+  Widget _buildNotesSection() {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Notas y Apuntes',
+            style: GoogleFonts.poppins(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Card(
+            elevation: 0,
+            color: colorScheme.surfaceContainer,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: colorScheme.outline.withOpacity(0.2)),
+            ),
+            child: ListTile(
+              leading:
+                  Icon(Iconsax.document_text_1, color: colorScheme.primary),
+              title: const Text('Abrir editor de notas'),
+              subtitle:
+                  const Text('Añade enlaces, ideas y apuntes importantes.'),
+              trailing: const Icon(Iconsax.arrow_right_3),
+              onTap: () async {
+                // Navegamos a la nueva pantalla del editor
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => GoalNotesEditorScreen(
+                      goal: widget.goal, // Pasamos la meta completa
+                    ),
+                  ),
+                );
+
+                // Opcional pero recomendado: Si el editor devuelve la meta actualizada,
+                // la podemos usar para refrescar el estado de esta pantalla si fuera necesario.
+                if (result is Goal && mounted) {
+                  // Aquí podrías, por ejemplo, actualizar el objeto 'goal' del estado si
+                  // necesitaras reflejar algún cambio inmediatamente en EditGoalScreen.
+                  // Por ahora, solo con navegar es suficiente.
+                  developer.log('Se ha vuelto del editor de notas.',
+                      name: 'EditGoalScreen');
+                }
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAppBar(ColorScheme colorScheme) {
     return SliverAppBar(
       floating: true,
@@ -560,7 +643,8 @@ class _EditGoalScreenState extends State<EditGoalScreen>
             ),
             child: TextFormField(
               controller: _targetAmountController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
               textAlign: TextAlign.center,
               style: GoogleFonts.poppins(
                 fontSize: 28,
@@ -594,7 +678,7 @@ class _EditGoalScreenState extends State<EditGoalScreen>
             ),
           ),
           const SizedBox(height: 20),
-          
+
           // Fecha Límite
           Text(
             'Fecha Límite',
@@ -670,7 +754,7 @@ class _EditGoalScreenState extends State<EditGoalScreen>
 
   Widget _buildProjectionCard(ColorScheme colorScheme) {
     final projection = _currentProjection!;
-    
+
     return FadeTransition(
       opacity: _projectionController,
       child: SlideTransition(
@@ -764,7 +848,7 @@ class _EditGoalScreenState extends State<EditGoalScreen>
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // Categoría
           InkWell(
             onTap: _showCategoryPicker,
@@ -772,7 +856,7 @@ class _EditGoalScreenState extends State<EditGoalScreen>
             child: Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                 color: colorScheme.surfaceContainer,
+                color: colorScheme.surfaceContainer,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: colorScheme.outline.withOpacity(0.2),
@@ -804,7 +888,7 @@ class _EditGoalScreenState extends State<EditGoalScreen>
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // Prioridad
           Text(
             'Prioridad',
@@ -820,7 +904,7 @@ class _EditGoalScreenState extends State<EditGoalScreen>
             onChanged: (value) => setState(() => _priority = value),
           ),
           const SizedBox(height: 16),
-          
+
           // Timeframe
           Text(
             'Plazo',
@@ -967,7 +1051,8 @@ class _EditGoalScreenState extends State<EditGoalScreen>
 
 enum ViabilityStatus {
   feasible('Realista', 'Va por buen camino', Colors.green, Iconsax.verify),
-  challenging('Desafiante', 'Requiere ahorro intenso', Colors.orange, Iconsax.warning_2),
+  challenging('Desafiante', 'Requiere ahorro intenso', Colors.orange,
+      Iconsax.warning_2),
   highRisk('Alto Riesgo', 'Compromete presupuesto', Colors.red, Iconsax.danger);
 
   final String title;
@@ -1012,7 +1097,7 @@ class FinancialProjection {
 
     final monthlyNeeded = remainingAmount / months;
     final percentage = (monthlyNeeded / userMonthlyIncome) * 100;
-    
+
     final status = _evaluateViability(percentage);
     final suggestedMonths = _calculateSuggestedMonths(
       remainingAmount,
@@ -1029,7 +1114,8 @@ class FinancialProjection {
     );
   }
 
-  static int _calculateMonthsRemaining(DateTime? targetDate, GoalTimeframe timeframe) {
+  static int _calculateMonthsRemaining(
+      DateTime? targetDate, GoalTimeframe timeframe) {
     if (targetDate == null) {
       // Usar timeframe por defecto
       switch (timeframe) {
@@ -1046,9 +1132,8 @@ class FinancialProjection {
 
     final now = DateTime.now();
     if (targetDate.isBefore(now)) return 0;
-    
-    return (targetDate.year - now.year) * 12 + 
-           (targetDate.month - now.month);
+
+    return (targetDate.year - now.year) * 12 + (targetDate.month - now.month);
   }
 
   static ViabilityStatus _evaluateViability(double percentage) {
@@ -1089,11 +1174,12 @@ class _HeroCardDelegate extends SliverPersistentHeaderDelegate {
   double get maxExtent => 220;
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final progress = goal.currentAmount / goal.targetAmount;
-    
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.all(24),
@@ -1140,7 +1226,9 @@ class _HeroCardDelegate extends SliverPersistentHeaderDelegate {
               const SizedBox(width: 16),
               Expanded(
                 child: Text(
-                  nameController.text.isEmpty ? 'Nueva Meta' : nameController.text,
+                  nameController.text.isEmpty
+                      ? 'Nueva Meta'
+                      : nameController.text,
                   style: GoogleFonts.poppins(
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
@@ -1385,9 +1473,7 @@ class _ModeButton extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected
-              ? colorScheme.primary
-              : Colors.transparent,
+          color: isSelected ? colorScheme.primary : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
@@ -1437,7 +1523,7 @@ class _PrioritySelector extends StatelessWidget {
       children: GoalPriority.values.map((priority) {
         final isSelected = priority == selected;
         final color = _getPriorityColor(priority);
-        
+
         return Expanded(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -1463,7 +1549,12 @@ class _PrioritySelector extends StatelessWidget {
                   style: GoogleFonts.poppins(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: isSelected ? color : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                    color: isSelected
+                        ? color
+                        : Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withOpacity(0.6),
                   ),
                 ),
               ),
@@ -1515,7 +1606,7 @@ class _TimeframeSelector extends StatelessWidget {
     return Row(
       children: GoalTimeframe.values.map((timeframe) {
         final isSelected = timeframe == selected;
-        
+
         return Expanded(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -1531,7 +1622,9 @@ class _TimeframeSelector extends StatelessWidget {
                       : Theme.of(context).colorScheme.surfaceContainer,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: isSelected ? Theme.of(context).colorScheme.primary : Colors.transparent,
+                    color: isSelected
+                        ? Theme.of(context).colorScheme.primary
+                        : Colors.transparent,
                     width: 2,
                   ),
                 ),
@@ -1543,7 +1636,10 @@ class _TimeframeSelector extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                     color: isSelected
                         ? Theme.of(context).colorScheme.primary
-                        : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                        : Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withOpacity(0.6),
                   ),
                 ),
               ),
@@ -1782,7 +1878,7 @@ class _RecommendationModal extends StatelessWidget {
     switch (type) {
       case RecommendationType.extendDeadline:
         //final newDate = DateTime.now().add(
-          //Duration(days: projection.suggestedMonths * 30),
+        //Duration(days: projection.suggestedMonths * 30),
         //);
         title = 'Extender Plazo';
         description = 'Aumentar el plazo reduce el aporte mensual necesario';
@@ -1791,23 +1887,28 @@ class _RecommendationModal extends StatelessWidget {
         beforeValue = '${projection.monthsRemaining} meses';
         afterValue = '${projection.suggestedMonths} meses';
         break;
-        
+
       case RecommendationType.increaseContribution:
         title = 'Aumentar Aporte';
-        description = 'Aportar más mensualmente te ayuda a cumplir tu meta más rápido';
+        description =
+            'Aportar más mensualmente te ayuda a cumplir tu meta más rápido';
         beforeLabel = 'Aporte actual';
         afterLabel = 'Aporte sugerido';
-        beforeValue = NumberFormat('#,##0', 'es').format(projection.monthlyNeeded);
-        afterValue = NumberFormat('#,##0', 'es').format(projection.monthlyNeeded * 1.5);
+        beforeValue =
+            NumberFormat('#,##0', 'es').format(projection.monthlyNeeded);
+        afterValue =
+            NumberFormat('#,##0', 'es').format(projection.monthlyNeeded * 1.5);
         break;
-        
+
       case RecommendationType.reduceTarget:
         final newAmount = currentGoal.targetAmount * 0.8;
         title = 'Reducir Objetivo';
-        description = 'Un objetivo menor es más alcanzable con tu presupuesto actual';
+        description =
+            'Un objetivo menor es más alcanzable con tu presupuesto actual';
         beforeLabel = 'Objetivo actual';
         afterLabel = 'Nuevo objetivo';
-        beforeValue = NumberFormat('#,##0', 'es').format(currentGoal.targetAmount);
+        beforeValue =
+            NumberFormat('#,##0', 'es').format(currentGoal.targetAmount);
         afterValue = NumberFormat('#,##0', 'es').format(newAmount);
         break;
     }
@@ -1972,18 +2073,20 @@ class _ConfirmUpdateModal extends StatelessWidget {
     final amountChanged = newAmount != goal.targetAmount;
     // Compara fechas de forma segura, manejando el caso de que la fecha original sea nula
     final dateChanged = newDate != null &&
-        (goal.targetDate == null || !newDate!.isAtSameMomentAs(goal.targetDate!));
+        (goal.targetDate == null ||
+            !newDate!.isAtSameMomentAs(goal.targetDate!));
     final hasChanges = nameChanged || amountChanged || dateChanged;
 
     // --- Formateadores para mostrar los datos de forma legible ---
-    final currencyFormat = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+    final currencyFormat =
+        NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
     final dateFormat = DateFormat.yMMMd('es_CO');
 
     // --- Widget a mostrar si NO hay cambios ---
     if (!hasChanges) {
       return _buildNoChangesDialog(context, colorScheme);
     }
-    
+
     // --- Widget principal si SÍ hay cambios ---
     return Dialog(
       backgroundColor: colorScheme.surface,
@@ -1992,7 +2095,8 @@ class _ConfirmUpdateModal extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-        child: SingleChildScrollView( // Para evitar overflow si el contenido es mucho
+        child: SingleChildScrollView(
+          // Para evitar overflow si el contenido es mucho
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2036,7 +2140,8 @@ class _ConfirmUpdateModal extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
                   color: colorScheme.surfaceContainer,
-                  border: Border.all(color: colorScheme.outline.withOpacity(0.1)),
+                  border:
+                      Border.all(color: colorScheme.outline.withOpacity(0.1)),
                 ),
                 child: Column(
                   children: [
@@ -2058,14 +2163,16 @@ class _ConfirmUpdateModal extends StatelessWidget {
                       _buildChangeRow(
                         context: context,
                         label: 'Fecha',
-                        oldValue: goal.targetDate != null ? dateFormat.format(goal.targetDate!) : 'N/A',
+                        oldValue: goal.targetDate != null
+                            ? dateFormat.format(goal.targetDate!)
+                            : 'N/A',
                         newValue: dateFormat.format(newDate!),
                         isDifferent: dateChanged,
                       ),
                   ],
                 ),
               ),
-              
+
               // --- Sección de Proyección de IA (si existe) ---
               if (projection != null) ...[
                 const SizedBox(height: 20),
@@ -2082,8 +2189,10 @@ class _ConfirmUpdateModal extends StatelessWidget {
                       onPressed: () => Navigator.of(context).pop(false),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        side: BorderSide(color: colorScheme.outline.withOpacity(0.5)),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        side: BorderSide(
+                            color: colorScheme.outline.withOpacity(0.5)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16)),
                       ),
                       child: Text(
                         'Cancelar',
@@ -2097,7 +2206,8 @@ class _ConfirmUpdateModal extends StatelessWidget {
                       onPressed: () => Navigator.of(context).pop(true),
                       style: FilledButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16)),
                       ),
                       child: Text(
                         'Confirmar',
@@ -2142,7 +2252,8 @@ class _ConfirmUpdateModal extends StatelessWidget {
               style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
             )
           else
-            Flexible( // Para evitar overflow si los textos son largos
+            Flexible(
+              // Para evitar overflow si los textos son largos
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -2161,7 +2272,8 @@ class _ConfirmUpdateModal extends StatelessWidget {
                       color: colorScheme.primary,
                     ),
                   ),
-                  Flexible( // El nuevo valor puede ser largo
+                  Flexible(
+                    // El nuevo valor puede ser largo
                     child: Text(
                       newValue,
                       style: GoogleFonts.poppins(
@@ -2180,7 +2292,8 @@ class _ConfirmUpdateModal extends StatelessWidget {
   }
 
   /// Widget que muestra la información de la proyección financiera.
-   Widget _buildProjectionInfo(BuildContext context, FinancialProjection projection, NumberFormat currencyFormat) {
+  Widget _buildProjectionInfo(BuildContext context,
+      FinancialProjection projection, NumberFormat currencyFormat) {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
@@ -2215,7 +2328,7 @@ class _ConfirmUpdateModal extends StatelessWidget {
             value: currencyFormat.format(projection.monthlyNeeded),
           ),
           const SizedBox(height: 8),
-           _buildProjectionDetailRow(
+          _buildProjectionDetailRow(
             context: context,
             icon: Iconsax.calendar_tick,
             label: 'Meses para lograrlo',
@@ -2259,12 +2372,12 @@ class _ConfirmUpdateModal extends StatelessWidget {
   /// Widget que se muestra cuando no se ha realizado ningún cambio.
   Widget _buildNoChangesDialog(BuildContext context, ColorScheme colorScheme) {
     return Dialog(
-       backgroundColor: colorScheme.surface,
+      backgroundColor: colorScheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(28),
       ),
       child: Padding(
-         padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2301,10 +2414,12 @@ class _ConfirmUpdateModal extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             FilledButton(
-              onPressed: () => Navigator.of(context).pop(), // Cierra el modal, no devuelve valor
+              onPressed: () => Navigator.of(context)
+                  .pop(), // Cierra el modal, no devuelve valor
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
               ),
               child: Text(
                 'Entendido',

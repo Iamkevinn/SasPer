@@ -159,13 +159,38 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
   void _onCategorySelected(Category category, List<Budget> budgets) {
     setState(() {
       _selectedCategory = category;
+
+      // --- CÓDIGO CORREGIDO ---
+      // En lugar de usar 'b.isActive', comprobamos manualmente si la fecha
+      // seleccionada por el usuario cae dentro del rango de fechas de un presupuesto.
       try {
         final foundBudget = budgets.firstWhere(
-          (b) => b.category == category.name && b.isActive,
+          (b) {
+            // Condición 1: La categoría debe coincidir.
+            final categoryMatches = b.category == category.name;
+
+            // Condición 2: La fecha de la transacción (_selectedDate) debe estar
+            // dentro del rango del presupuesto [startDate, endDate].
+            // Usamos !isBefore para incluir el mismo día de inicio.
+            // Usamos !isAfter para incluir el mismo día de fin.
+            final dateIsInRange = !_selectedDate.isBefore(b.startDate) &&
+                !_selectedDate.isAfter(b.endDate);
+
+            return categoryMatches && dateIsInRange;
+          },
         );
+        // Si se encuentra, asignamos su ID.
         _selectedBudgetId = foundBudget.id;
+        developer.log(
+            '✅ Presupuesto encontrado (ID: ${foundBudget.id}) para la categoría "${category.name}" en la fecha ${DateFormat.yMd().format(_selectedDate)}',
+            name: 'AddTransactionScreen');
       } catch (e) {
+        // Si firstWhere falla (no encuentra ningún presupuesto que cumpla las condiciones),
+        // nos aseguramos de que el ID del presupuesto sea nulo.
         _selectedBudgetId = null;
+        developer.log(
+            'ℹ️ No se encontró un presupuesto activo para la categoría "${category.name}" en la fecha ${DateFormat.yMd().format(_selectedDate)}',
+            name: 'AddTransactionScreen');
       }
     });
   }
@@ -580,24 +605,26 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                     value: account.id,
                     child: Row(
                       children: [
-                        Icon(Iconsax.wallet_3, size: 18),
+                        const Icon(Iconsax.wallet_3, size: 18),
                         const SizedBox(width: 12),
+                        // 1. El nombre de la cuenta se expande para usar todo el espacio posible
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(account.name),
-                              Text(
-                                currencyFormat.format(account.balance),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: account.balance < 0
-                                      ? Colors.red
-                                      : Colors.green,
-                                ),
-                              ),
-                            ],
+                          child: Text(
+                            account.name,
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        ),
+                        // 2. Un pequeño espacio para que no se peguen
+                        const SizedBox(width: 8),
+                        // 3. El saldo se alinea al final, sin expandirse
+                        Text(
+                          currencyFormat.format(account.balance),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: account.balance < 0
+                                ? Colors.red
+                                : Colors.green,
                           ),
                         ),
                       ],

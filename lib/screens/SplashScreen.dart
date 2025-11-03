@@ -110,7 +110,9 @@ class _SplashScreenState extends State<SplashScreen> {
       }
       
       // --- ETAPA 5: TAREAS SECUNDARIAS (NO BLOQUEANTES) ---
-      saveMaterialYouColors();
+      // Le decimos a Dart que inicie estas tareas pero no espere su resultado.
+      unawaited(saveMaterialYouColors());
+      unawaited(NotificationService.instance.initializeQuick());
       NotificationService.instance.initializeQuick();
 
     } catch (e, stackTrace) {

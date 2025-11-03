@@ -8,6 +8,7 @@ import 'package:sasper/screens/SplashScreen.dart';
 import 'package:provider/provider.dart';
 //import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:sasper/services/theme_provider.dart';
+import 'package:flutter_quill/flutter_quill.dart';
 import 'package:line_awesome_flutter/line_awesome_flutter.dart'; // ¡Asegúrate de importar el paquete!
 // =================================================================
 //                 SOLUCIÓN DEFINITIVA PARA TREE SHAKING
@@ -111,6 +112,7 @@ class MyApp extends StatelessWidget {
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
+            FlutterQuillLocalizations.delegate,
           ],
           supportedLocales: const [
             Locale('es', ''),

@@ -128,6 +128,7 @@ class GoalRepository {
             'timeframe': goal.timeframe.name,
             'priority': goal.priority.name,
             'category_id': goal.categoryId,
+            'notes_content': goal.notesContent,
           })
           .eq('id', goal.id);
       developer.log('✅ [Repo] Meta actualizada con éxito.', name: 'GoalRepository');

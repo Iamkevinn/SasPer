@@ -77,18 +77,23 @@ class _AuthGateState extends State<AuthGate> {
       print("✅ Usuario autenticado. Orquestando inicialización de servicios tardíos...");
     }
     try {
-      await Future.wait([
+       NotificationService.instance.initializeLate().catchError((error) {
+        if (kDebugMode) {
+          print("🔥 Error esperado de Firebase (API bloqueada), continuando sin notificaciones: $error");
+        }
+      });
+      //await Future.wait([
         // [CAMBIO CLAVE] Aquí es el lugar perfecto para llamar a `initializeLate`.
         // Este método pide los permisos de notificación y obtiene el token FCM,
         // tareas que deben ocurrir DESPUÉS de que el usuario haya iniciado sesión.
-        NotificationService.instance.initializeLate(),
+        //NotificationService.instance.initializeLate(),
         
         // (Opcional) Si en el futuro necesitas refrescar todas las notificaciones
         // programadas al iniciar sesión, este sería un buen lugar para hacerlo.
         // NotificationService.instance.refreshAllSchedules(),
         
         // Ejemplo: AnalyticsService.instance.identifyUser(session.user.id),
-      ]);
+      //]);
       if (kDebugMode) {
         print("✅ Todos los servicios de usuario inicializados exitosamente.");
       }

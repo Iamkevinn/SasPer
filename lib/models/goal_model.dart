@@ -70,7 +70,8 @@ class Goal extends Equatable {
   final GoalPriority priority;
   final String? categoryId;
   final Category? category; // Para almacenar el objeto completo de la categoría
-  
+  final dynamic notesContent;
+
   const Goal({
     required this.id,
     required this.userId,
@@ -85,6 +86,7 @@ class Goal extends Equatable {
     required this.priority,
     this.categoryId,
     this.category,
+    this.notesContent,
   });
 
   /// Crea una instancia "vacía" de Goal.
@@ -126,6 +128,7 @@ class Goal extends Equatable {
         categoryId: map['category_id'] as String?,
         // Si la consulta de Supabase incluye la categoría, la parseamos aquí.
         category: map['categories'] != null ? Category.fromMap(map['categories']) : null,
+        notesContent: map['notes_content'],
       );
     } catch (e) {
       throw FormatException('Error al parsear Goal: $e', map);
@@ -147,6 +150,7 @@ class Goal extends Equatable {
     GoalPriority? priority,
     String? categoryId,
     Category? category,
+    dynamic notesContent,
   }) {
     return Goal(
       id: id ?? this.id,
@@ -162,6 +166,7 @@ class Goal extends Equatable {
       priority: priority ?? this.priority,
       categoryId: categoryId ?? this.categoryId,
       category: category ?? this.category,
+      notesContent: notesContent ?? this.notesContent
     );
   }
 
@@ -188,5 +193,6 @@ class Goal extends Equatable {
         priority,
         categoryId,
         category,
+        notesContent,
       ];
 }

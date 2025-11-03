@@ -91,6 +91,8 @@ dependencies:
   
   flutter_riverpod: ^3.0.0
   crypto: ^3.0.6
+  url_launcher: ^6.3.2
+  flutter_quill: ^11.5.0
   
 # Dependencias que solo se usan durante el desarrollo.
 dev_dependencies:

@@ -323,8 +323,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                   ? const AlwaysStoppedAnimation(1.0)
                   : _breatheAnimation,
               onAiTap: () => _navigateToAiAnalysisScreenTwo(),
-              minExtent: 120,
-              maxExtent: 160,
+              minExtent: 135,
+              maxExtent: 165,
               highContrast: _highContrast,
             ),
           ),
@@ -342,16 +342,19 @@ class _DashboardScreenState extends State<DashboardScreen>
                       ]),
           ),
           SliverToBoxAdapter(
-            child: _LiveRecommendationsFeed(
-              data: data,
-              highContrast: _highContrast,
-            ).animate(
-                effects: _reduceMotion
-                    ? []
-                    : [
-                        const FadeEffect(delay: Duration(milliseconds: 250)),
-                        const SlideEffect(begin: Offset(0, 0.2)),
-                      ]),
+            child: Padding( // <--- WIDGET AÑADIDO
+              padding: const EdgeInsets.symmetric(vertical: 13.0), // <--- ESPACIADO
+              child: _LiveRecommendationsFeed(
+                data: data,
+                highContrast: _highContrast,
+              ).animate(
+                  effects: _reduceMotion
+                      ? []
+                      : [
+                          const FadeEffect(delay: Duration(milliseconds: 250)),
+                          const SlideEffect(begin: Offset(0, 0.2)),
+                        ]),
+            ),
           ),
           SliverToBoxAdapter(
             child: _QuickActions(
@@ -437,11 +440,21 @@ class _PremiumHeaderDelegate extends SliverPersistentHeaderDelegate {
     final colorScheme = theme.colorScheme;
     final progress = (maxExtent - shrinkOffset) / (maxExtent - minExtent);
 
+    // AÑADE ESTA LÍNEA PARA OBTENER LA ALTURA DEL STATUS BAR
+    final double statusBarHeight = MediaQuery.of(context).padding.top;
+
     return ClipRRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: Container(
-          padding: const EdgeInsets.fromLTRB(20, 48, 20, 12),
+          //padding: const EdgeInsets.fromLTRB(20, 48, 20, 12),
+          padding: EdgeInsets.only(
+            top: statusBarHeight +
+                4, // Suma la altura del status bar + un pequeño margen
+            left: 30,
+            right: 20,
+            bottom: 8, // Añade un padding inferior para consistencia
+          ),
           decoration: BoxDecoration(
             color: highContrast
                 ? Colors.black
@@ -451,99 +464,103 @@ class _PremiumHeaderDelegate extends SliverPersistentHeaderDelegate {
                     bottom: BorderSide(color: Colors.white, width: 2))
                 : null,
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Hola, ${data.fullName.split(' ').first} 👋',
-                      style: GoogleFonts.poppins(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                        color: highContrast
-                            ? Colors.white
-                            : colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Tu Central Financiera',
-                      style: GoogleFonts.poppins(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color:
-                            highContrast ? Colors.white : colorScheme.onSurface,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Row(
-                children: [
-                  AnimatedBuilder(
-                    animation: breatheAnimation,
-                    builder: (context, child) {
-                      return Transform.scale(
-                        scale: breatheAnimation.value,
-                        child: _FinancialHealthMeter(
-                          score: data.healthScore,
-                          progress: progress,
-                          highContrast: highContrast,
+          child: Center(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Hola, ${data.fullName.split(' ').first} 👋',
+                        style: GoogleFonts.poppins(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          color: highContrast
+                              ? Colors.white
+                              : colorScheme.onSurfaceVariant,
                         ),
-                      );
-                    },
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Tu Central Financiera',
+                        style: GoogleFonts.poppins(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: highContrast
+                              ? Colors.white
+                              : colorScheme.onSurface,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  AnimatedBuilder(
-                    animation: pulseAnimation,
-                    builder: (context, child) {
-                      return Transform.scale(
-                        scale: pulseAnimation.value,
-                        child: Tooltip(
-                          message:
-                              'Análisis IA - Explora tu situación financiera',
-                          child: IconButton(
-                            onPressed: onAiTap,
-                            icon: Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                  gradient: LinearGradient(colors: [
-                                    highContrast
-                                        ? Colors.white
-                                        : const Color(0xFF0D9488),
-                                    highContrast
-                                        ? Colors.grey.shade300
-                                        : const Color(0xFF0EA5A5)
-                                  ]),
-                                  borderRadius: BorderRadius.circular(16),
-                                  boxShadow: highContrast
-                                      ? []
-                                      : [
-                                          BoxShadow(
-                                            color: const Color(0xFF0D9488)
-                                                .withOpacity(0.4),
-                                            blurRadius: 12,
-                                            offset: const Offset(0, 4),
-                                          )
-                                        ]),
-                              child: Icon(
-                                Iconsax.magic_star,
-                                color:
-                                    highContrast ? Colors.black : Colors.white,
+                ),
+                Row(
+                  children: [
+                    AnimatedBuilder(
+                      animation: breatheAnimation,
+                      builder: (context, child) {
+                        return Transform.scale(
+                          scale: breatheAnimation.value,
+                          child: _FinancialHealthMeter(
+                            score: data.healthScore,
+                            progress: progress,
+                            highContrast: highContrast,
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 12),
+                    AnimatedBuilder(
+                      animation: pulseAnimation,
+                      builder: (context, child) {
+                        return Transform.scale(
+                          scale: pulseAnimation.value,
+                          child: Tooltip(
+                            message:
+                                'Análisis IA - Explora tu situación financiera',
+                            child: IconButton(
+                              onPressed: onAiTap,
+                              icon: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                    gradient: LinearGradient(colors: [
+                                      highContrast
+                                          ? Colors.white
+                                          : const Color(0xFF0D9488),
+                                      highContrast
+                                          ? Colors.grey.shade300
+                                          : const Color(0xFF0EA5A5)
+                                    ]),
+                                    borderRadius: BorderRadius.circular(16),
+                                    boxShadow: highContrast
+                                        ? []
+                                        : [
+                                            BoxShadow(
+                                              color: const Color(0xFF0D9488)
+                                                  .withOpacity(0.4),
+                                              blurRadius: 12,
+                                              offset: const Offset(0, 4),
+                                            )
+                                          ]),
+                                child: Icon(
+                                  Iconsax.magic_star,
+                                  color: highContrast
+                                      ? Colors.black
+                                      : Colors.white,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ],
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -583,7 +600,7 @@ class _BalanceHeroCard extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      margin: const EdgeInsets.fromLTRB(20, 0, 20, 14),
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
         gradient: highContrast
@@ -836,7 +853,7 @@ class _LiveRecommendationsFeedState extends State<_LiveRecommendationsFeed> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
           child: Row(
             children: [
               Icon(
@@ -859,7 +876,7 @@ class _LiveRecommendationsFeedState extends State<_LiveRecommendationsFeed> {
           ),
         ),
         SizedBox(
-          height: 100, // Aumentado para que quepa bien el contenido
+          height: 120, // Aumentado para que quepa bien el contenido
           child: PageView.builder(
             scrollDirection: Axis.horizontal,
             //padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -1171,7 +1188,7 @@ class _QuickActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0), 
       child: Row(
         children: [
           _QuickActionButton(
@@ -1279,7 +1296,7 @@ class _BudgetsCarousel extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
