@@ -1,6 +1,6 @@
-<!-- res/drawable/widget_background.xml -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
-    <solid android:color="@android:color/transparent" /> <!-- será sobreescrito dinámicamente -->
-    <corners android:radius="24dp"/>
+    <!-- Pide el color de contenedor secundario del tema Material You del usuario -->
+    <solid android:color="?attr/colorSecondaryContainer" />
+    <corners android:radius="28dp"/> <!-- Un radio más grande se ve más "Expressive" -->
 </shape>

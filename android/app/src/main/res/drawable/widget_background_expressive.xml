@@ -1,0 +1,18 @@
+<!-- android/app/src/main/res/drawable/widget_background_expressive.xml -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+  <!--
+    Este pathData usa Curvas de Bézier Cúbicas (C) para crear un efecto de ola.
+    Cada comando 'C' dibuja un segmento que va desde un valle (lado hundido)
+    hasta una cresta (esquina redondeada que sobresale).
+    El resultado es una forma de eneágono festoneado, sólida y sin recortes.
+  -->
+  <path
+      android:fillColor="?attr/colorSecondaryContainer"
+      android:pathData="M 54,4 C 69.4,4 75.6,13.8 84.4,21.2 C 93.2,28.6 104,33.4 104,54 C 104,74.6 93.2,79.4 84.4,86.8 C 75.6,94.2 69.4,104 54,104 C 38.6,104 32.4,94.2 23.6,86.8 C 14.8,79.4 4,74.6 4,54 C 4,33.4 14.8,28.6 23.6,21.2 C 32.4,13.8 38.6,4 54,4 Z" />
+
+</vector>

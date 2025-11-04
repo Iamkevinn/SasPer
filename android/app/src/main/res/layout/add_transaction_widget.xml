@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_container"
+    android:layout_width="match_parent"   
+    android:layout_height="match_parent" 
+    android:theme="@style/Theme.AppWidget.Expressive"
+    android:background="@drawable/widget_background_expressive"
+    android:gravity="center"
+    android:orientation="horizontal">
+
+    <ImageButton
+        android:id="@+id/add_widget_button"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:src="@drawable/ic_shortcut_add"
+        android:tint="?attr/colorOnSecondaryContainer"
+        android:contentDescription="Añadir nueva transacción" />
+</LinearLayout>

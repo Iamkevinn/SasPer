@@ -4,13 +4,18 @@
     <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:windowBackground">@drawable/launch_background</item>
     </style>
-    <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
-        <item name="android:windowBackground">?android:colorBackground</item>
-    </style>
+    <style name="NormalTheme" parent="Theme.Material3.DayNight.NoActionBar">
+    <item name="android:windowBackground">?android:colorBackground</item>
+</style>
     <style name="AppTheme" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="android:forceDarkAllowed">true</item>
         <item name="android:windowEnableSplitTouch">true</item>
     </style>
+    
+    <!-- [NUEVO] Tema específico para el widget con colores dinámicos -->
+<style name="Theme.AppWidget.Expressive" parent="Theme.Material3.DynamicColors.DayNight">
+    <!-- 'DynamicColors' es la clave que extrae los colores del wallpaper -->
+</style>
 
     <!-- ===== CAMBIO: TEMA BASE PARA WIDGETS ===== -->
     <style name="Theme.AppWidget.Base" parent="Theme.Material3.Light.NoActionBar">

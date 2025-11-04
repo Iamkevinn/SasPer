@@ -6,37 +6,19 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:sasper/config/app_config.dart';
 import 'package:sasper/screens/SplashScreen.dart';
 import 'package:provider/provider.dart';
-//import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:sasper/services/theme_provider.dart';
-import 'package:flutter_quill/flutter_quill.dart';
-import 'package:line_awesome_flutter/line_awesome_flutter.dart'; // ¡Asegúrate de importar el paquete!
-// =================================================================
-//                 SOLUCIÓN DEFINITIVA PARA TREE SHAKING
-//
-// Esta lista estática y sin usar se coloca aquí para asegurar que el compilador
-// de Flutter vea estas referencias a iconos durante el análisis y los conserve
-// en la compilación final de la app.
-// =================================================================
-// final List<IconData> _usedIconsForTreeShaking = [
-//   // Iconos de Gastos
-//   LineAwesomeIcons.utensils,      // Comida
-//   LineAwesomeIcons.bus,           // Transporte
-//   LineAwesomeIcons.gamepad,       // Ocio
-//   LineAwesomeIcons.home,          // Hogar
-//   LineAwesomeIcons.shopping_cart, // Compras
-//   LineAwesomeIcons.plug,          // Servicios
-//   LineAwesomeIcons.heart,         // Salud
-//   LineAwesomeIcons.grip_horizontal, // Otro (Gasto)
-// 
-//   // Iconos de Ingresos
-//   LineAwesomeIcons.money_bill, // Sueldo
-//   LineAwesomeIcons.line_chart,      // Inversión
-//   LineAwesomeIcons.briefcase,       // Freelance
-//   LineAwesomeIcons.gift,            // Regalo
-//   // 'Otro' (Ingreso) usa grip_horizontal, que ya está incluido.
-// ];
+import 'package:line_awesome_flutter/line_awesome_flutter.dart';
+import 'package:quick_actions/quick_actions.dart';
+import 'package:sasper/screens/add_transaction_screen.dart';
+import 'dart:async'; // Necesario para StreamSubscription
 
-// La GlobalKey sigue siendo una buena práctica.
+// --- PAQUETE ACTUALIZADO PARA DEEP LINKS ---
+// Se reemplaza 'uni_links' por 'app_links' que es más moderno y compatible.
+import 'package:app_links/app_links.dart';
+
+// =================================================================
+//                 CONFIGURACIÓN GLOBAL
+// =================================================================
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
@@ -45,29 +27,14 @@ Future<void> main() async {
     print("--- CÓDIGOS PARA ICONOS DE GASTOS ---");
     print('El código para "Comida" (utensils) es: ${LineAwesomeIcons.utensils.codePoint}');
     print('El código para "Transporte" (bus) es: ${LineAwesomeIcons.bus.codePoint}');
-    print('El código para "Ocio" (gamepad) es: ${LineAwesomeIcons.gamepad.codePoint}');
-    print('El código para "Hogar" (home) es: ${LineAwesomeIcons.home.codePoint}');
-    print('El código para "Compras" (shopping_cart) es: ${LineAwesomeIcons.shopping_cart.codePoint}');
-    print('El código para "Servicios" (plug) es: ${LineAwesomeIcons.plug.codePoint}');
-    print('El código para "Salud" (heartbeat) es: ${LineAwesomeIcons.heartbeat.codePoint}');
-    print('El código para "Otro (Gasto)" (dot_circle) es: ${LineAwesomeIcons.dot_circle.codePoint}');
-    print('El código para "Sueldo" (money_bill_wave) es: ${LineAwesomeIcons.money_bill.codePoint}');
-    print('El código para "Inversión" (line_chart) es: ${LineAwesomeIcons.line_chart.codePoint}');
-    print('El código para "Freelance" (briefcase) es: ${LineAwesomeIcons.briefcase.codePoint}');
-    print('El código para "Regalo" (gift) es: ${LineAwesomeIcons.gift.codePoint}');
-    print('El código para "Otro (Ingreso)" (question_circle) es: ${LineAwesomeIcons.question_circle.codePoint}');
+    // ... (resto de tus prints)
   }
 
-  
-  // 1. Asegura que los bindings de Flutter estén listos.
   WidgetsFlutterBinding.ensureInitialized();
-  // 2. Inicializa la localización de fechas (es muy rápido).
   await initializeDateFormatting('es_CO', null);
-  // 3. ¡Ejecuta la app INMEDIATAMENTE!
-  //    Toda la carga pesada ahora está dentro de SplashScreen.
   AppConfig.checkKeys();
+
   runApp(
-    // Envolvemos la app con un ChangeNotifierProvider
     ChangeNotifierProvider(
       create: (_) => ThemeProvider(),
       child: const MyApp(),
@@ -75,12 +42,90 @@ Future<void> main() async {
   );
 }
 
-class MyApp extends StatelessWidget {
+// =================================================================
+//       WIDGET PRINCIPAL DE LA APP (CON LÓGICA DE WIDGETS Y SHORTCUTS)
+// =================================================================
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
   @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  // Para los Shortcuts (menú al presionar largo)
+  final QuickActions quickActions = const QuickActions();
+  
+  // Para el Widget de Pantalla de Inicio (usando app_links)
+  final _appLinks = AppLinks(); // Instancia del paquete
+  StreamSubscription<Uri>? _linkSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    
+    // Inicializa la lógica para los Shortcuts
+    _setupQuickActions();
+    _handleQuickActions();
+
+    // Inicializa la lógica para el Widget de Pantalla de Inicio
+    _initDeepLinks();
+  }
+
+  @override
+  void dispose() {
+    _linkSubscription?.cancel();
+    super.dispose();
+  }
+
+  /// Inicializa el manejo de deep links (clics desde el widget) de forma robusta.
+  Future<void> _initDeepLinks() async {
+    // Escucha los links que llegan mientras la app está abierta o en segundo plano.
+    // 'uriLinkStream' es la forma correcta y principal de recibir todos los links.
+    _linkSubscription = _appLinks.uriLinkStream.listen((uri) {
+      // Usamos 'mounted' para asegurarnos de que el widget todavía está en el árbol
+      // antes de intentar navegar.
+      if (mounted) {
+        _navigateToRouteFromUri(uri);
+      }
+    }, onError: (err) {
+      if (mounted) {
+        print('Error escuchando los links: $err');
+      }
+    });
+  }
+  
+  /// Navega a la pantalla correcta basándose en el URI del deep link.
+  void _navigateToRouteFromUri(Uri uri) {
+    print('Link recibido: $uri');
+    if (uri.scheme == 'sasper' && uri.host == 'sasper' && uri.path == '/add_transaction') {
+      navigatorKey.currentState?.pushNamed('/add_transaction');
+    }
+  }
+
+  /// Define y crea la lista de accesos directos (Shortcuts).
+  void _setupQuickActions() {
+    quickActions.setShortcutItems(<ShortcutItem>[
+      const ShortcutItem(
+        type: 'add_transaction',
+        localizedTitle: 'Nueva Transacción',
+        icon: 'ic_shortcut_add_adaptive',
+      )
+    ]);
+  }
+
+  /// Inicializa el "listener" para los clics en los Shortcuts.
+  void _handleQuickActions() {
+    quickActions.initialize((String shortcutType) {
+      if (shortcutType == 'add_transaction') {
+        navigatorKey.currentState?.pushNamed('/add_transaction');
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Consumimos el provider para obtener el themeMode
+    // Tu método build no necesita ningún cambio, se queda exactamente igual.
     final themeProvider = Provider.of<ThemeProvider>(context);
 
     return DynamicColorBuilder(
@@ -97,7 +142,7 @@ class MyApp extends StatelessWidget {
         }
 
         return MaterialApp(
-          themeMode: themeProvider.themeMode, 
+          themeMode: themeProvider.themeMode,
           title: 'Finanzas Personales IA',
           debugShowCheckedModeBanner: false,
           theme: ThemeData(
@@ -112,16 +157,16 @@ class MyApp extends StatelessWidget {
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
-            FlutterQuillLocalizations.delegate,
           ],
           supportedLocales: const [
             Locale('es', ''),
             Locale('en', ''),
           ],
           navigatorKey: navigatorKey, 
-          // --- CAMBIO CLAVE ---
-          // La pantalla de inicio de la app ahora es la pantalla de carga.
           home: const SplashScreen(),
+          routes: {
+            '/add_transaction': (context) => const AddTransactionScreen(),
+          },
         );
       },
     );
