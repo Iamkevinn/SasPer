@@ -15,6 +15,7 @@ import 'dart:async'; // Necesario para StreamSubscription
 // --- PAQUETE ACTUALIZADO PARA DEEP LINKS ---
 // Se reemplaza 'uni_links' por 'app_links' que es más moderno y compatible.
 import 'package:app_links/app_links.dart';
+import 'package:flutter_quill/flutter_quill.dart';
 
 // =================================================================
 //                 CONFIGURACIÓN GLOBAL
@@ -157,6 +158,7 @@ class _MyAppState extends State<MyApp> {
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
+            FlutterQuillLocalizations.delegate,
           ],
           supportedLocales: const [
             Locale('es', ''),

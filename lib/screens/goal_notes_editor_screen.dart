@@ -270,25 +270,30 @@ class _GoalNotesEditorScreenState extends State<GoalNotesEditorScreen> {
                         child: QuillSimpleToolbar(
                           controller: _controller,
                           config: const QuillSimpleToolbarConfig(
-                            // multiRowsDisplay: true, // Permitimos que se ajuste en varias líneas si es necesario
-                            multiRowsDisplay:
-                                false, // O mantenlo en false para ver si se ajusta bien en una
-                            showAlignmentButtons: true,
-                            showBoldButton: true,
-                            showItalicButton: true,
-                            showUnderLineButton: true,
-                            showStrikeThrough: true,
-                            showColorButton: true,
-                            showBackgroundColorButton: true,
-                            showListNumbers: true,
-                            showListBullets: true,
-                            showListCheck: true,
-                            showQuote: true,
-                            showIndent: true,
-                            showUndo: true,
-                            showRedo: true,
-                            showClearFormat: true,
-                          ),
+          multiRowsDisplay: false,
+          // DESHABILITAR los botones de alineación que causan el error
+          showAlignmentButtons: false, // ← ESTO ES CRÍTICO
+          showBoldButton: true,
+          showItalicButton: true,
+          showUnderLineButton: true,
+          showStrikeThrough: true,
+          showColorButton: true,
+          showBackgroundColorButton: true,
+          showListNumbers: true,
+          showListBullets: true,
+          showListCheck: true,
+          showQuote: true,
+          showIndent: true,
+          showUndo: true,
+          showRedo: true,
+          showClearFormat: true,
+          // También desactiva estos si siguen dando problemas:
+          showFontSize: false,
+          showFontFamily: false,
+          showCodeBlock: false,
+          showInlineCode: false,
+          showLink: false,
+        ),
                         ),
                       ),
                     )
