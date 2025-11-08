@@ -1,7 +1,7 @@
 // --- ESTE ES EL BLOQUE QUE FALTABA ---
 buildscript {
     // Define una versión de Kotlin moderna y consistente para todo el proyecto
-    val kotlinVersion by extra("1.8.20")
+    val kotlinVersion by extra("2.2.21")
     
     repositories {
         google()
@@ -9,9 +9,9 @@ buildscript {
     }
     dependencies {
         // Le decimos a Gradle cómo encontrar las herramientas para construir
-        classpath("com.android.tools.build:gradle:8.12.0")
+        classpath("com.android.tools.build:gradle:8.13.0")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
-        classpath("com.google.gms:google-services:4.4.3") // ¡La línea clave!
+        classpath("com.google.gms:google-services:4.4.4") // ¡La línea clave!
     }
 }
 // ------------------------------------
