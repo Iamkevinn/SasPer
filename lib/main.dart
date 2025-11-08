@@ -91,14 +91,18 @@ class _MyAppState extends State<MyApp> {
       }
     }, onError: (err) {
       if (mounted) {
-        print('Error escuchando los links: $err');
+        if (kDebugMode) {
+          print('Error escuchando los links: $err');
+        }
       }
     });
   }
   
   /// Navega a la pantalla correcta basándose en el URI del deep link.
   void _navigateToRouteFromUri(Uri uri) {
-    print('Link recibido: $uri');
+    if (kDebugMode) {
+      print('Link recibido: $uri');
+    }
     if (uri.scheme == 'sasper' && uri.host == 'sasper' && uri.path == '/add_transaction') {
       navigatorKey.currentState?.pushNamed('/add_transaction');
     }
