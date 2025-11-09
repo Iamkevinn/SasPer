@@ -1,7 +1,7 @@
 // lib/widgets/dashboard/ai_analysis_section.dart
 
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:sasper/services/ai_analysis_service.dart';
 

@@ -19,20 +19,20 @@ class AppIcons {
   // Usar 'static final' es suficiente para que el compilador los detecte.
   static final List<IconData> usedIcons = [
     // --- Iconos de Gastos ---
-    LineAwesomeIcons.utensils,        // 'Comida', 61668
-    LineAwesomeIcons.bus,             // 'Transporte', 59675
-    LineAwesomeIcons.gamepad,         // 'Ocio', 59823
-    LineAwesomeIcons.home,            // 'Hogar', 60339
-    LineAwesomeIcons.shopping_cart,   // 'Compras', 61014
-    LineAwesomeIcons.file_invoice,    // 'Servicios', 61386
-    LineAwesomeIcons.heartbeat,       // 'Salud', 60318
+    LineAwesomeIcons.utensils_solid,        // 'Comida', 61668
+    LineAwesomeIcons.bus_solid,             // 'Transporte', 59675
+    LineAwesomeIcons.gamepad_solid,         // 'Ocio', 59823
+    LineAwesomeIcons.home_solid,            // 'Hogar', 60339
+    LineAwesomeIcons.shopping_cart_solid,   // 'Compras', 61014
+    LineAwesomeIcons.file_invoice_solid,    // 'Servicios', 61386
+    LineAwesomeIcons.heartbeat_solid,       // 'Salud', 60318
     LineAwesomeIcons.question_circle, // 'Otro' (expense), 59895
 
     // --- Iconos de Ingresos ---
-    LineAwesomeIcons.wallet,          // 'Sueldo', 60628
-    LineAwesomeIcons.line_chart,      // 'Inversión', 59892 (CORREGIDO: de chart_line a line_chart)
-    LineAwesomeIcons.briefcase,       // 'Freelance', 59833
-    LineAwesomeIcons.gift,            // 'Regalo', 60249
-    LineAwesomeIcons.dollar_sign,     // 'Otro' (income), 60201
+    LineAwesomeIcons.wallet_solid,          // 'Sueldo', 60628
+    LineAwesomeIcons.chart_line_solid,      // 'Inversión', 59892 (CORREGIDO: de chart_line a line_chart)
+    LineAwesomeIcons.briefcase_solid,       // 'Freelance', 59833
+    LineAwesomeIcons.gift_solid,            // 'Regalo', 60249
+    LineAwesomeIcons.dollar_sign_solid,     // 'Otro' (income), 60201
   ];
 }

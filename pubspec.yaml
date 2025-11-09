@@ -23,7 +23,7 @@ dependencies:
   percent_indicator: ^4.2.3 # O la última versión disponible
   # Iconos de estilo iOS
   cupertino_icons: ^1.0.8
-  line_awesome_flutter: ^2.0.0 # Actualizado
+  line_awesome_flutter: ^3.0.1 # Actualizado
 
   # Base de datos y backend
   supabase_flutter: ^2.8.0 # Actualizado
@@ -32,10 +32,10 @@ dependencies:
   intl: ^0.20.1 # Actualizado
   http: ^1.2.2 # Actualizado
   app_links: ^6.4.0 # Actualizado
-  permission_handler: ^11.4.0 # Actualizado
+  permission_handler: ^12.0.1 # Actualizado
 
   #Passwords
-  flutter_dotenv: ^5.2.1 # Actualizado
+  flutter_dotenv: ^6.0.0 # Actualizado
   
   # UI y Gráficos
   fl_chart: ^1.0.0 # Actualizado
@@ -51,7 +51,7 @@ dependencies:
   flutter_animate: ^4.5.2 # Actualizado
   lottie: ^3.2.0 # Actualizado
   skeletonizer: ^2.1.0+1 # Actualizado
-  confetti: ^0.7.0 
+  confetti: ^0.8.0 
   animations: ^2.0.11
   quick_actions: ^1.1.0
   
@@ -65,25 +65,26 @@ dependencies:
   home_widget: ^0.8.0 # Actualizado
   
   # Para mostrar texto con formato (Markdown)
-  flutter_markdown: ^0.7.4 # Actualizado
+  #flutter_markdown: ^0.7.4 # Actualizado
+  flutter_markdown_plus: ^1.0.5
   
   # Dependencias para Notificaciones Push
-  firebase_core: ^3.8.0 # Actualizado
-  firebase_messaging: ^15.1.6 # Actualizado
-  connectivity_plus: ^6.1.0 # Actualizado
+  firebase_core: ^4.2.1 # Actualizado
+  firebase_messaging: ^16.0.4 # Actualizado
+  connectivity_plus: ^7.0.0 # Actualizado
   equatable: ^2.0.7 # Actualizado
   provider: ^6.1.5 # Actualizado
   shared_preferences: ^2.5.3 # Actualizado
   flutter_local_notifications: ^19.4.0 # Actualizado
   timezone: ^0.10.0
-  flutter_timezone: ^3.0.1 # Actualizado
+  flutter_timezone: ^5.0.1 # Actualizado
 
   # Seguridad 
-  local_auth: 2.3.0 
+  local_auth: ^3.0.0 
 
   # Imagenes generadas
   screenshot: ^3.0.0  # Para capturar widgets como imágenes
-  share_plus: ^10.1.4   # Para abrir el diálogo de compartir nativo
+  share_plus: ^12.0.1   # Para abrir el diálogo de compartir nativo
   image_picker: ^1.2.0
   
   # Geolocalización

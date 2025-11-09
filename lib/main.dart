@@ -26,8 +26,8 @@ Future<void> main() async {
   
   if (kDebugMode) {
     print("--- CÓDIGOS PARA ICONOS DE GASTOS ---");
-    print('El código para "Comida" (utensils) es: ${LineAwesomeIcons.utensils.codePoint}');
-    print('El código para "Transporte" (bus) es: ${LineAwesomeIcons.bus.codePoint}');
+    print('El código para "Comida" (utensils) es: ${LineAwesomeIcons.utensils_solid.codePoint}');
+    print('El código para "Transporte" (bus) es: ${LineAwesomeIcons.bus_alt_solid.codePoint}');
     // ... (resto de tus prints)
   }
 
