@@ -1,47 +1,60 @@
 // lib/screens/SplashScreen.dart
-
 // ignore_for_file: file_names
 
 import 'dart:async';
+import 'dart:developer' as developer;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:dynamic_color/dynamic_color.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:developer' as developer; // NOVEDAD: Importamos developer para logs
+import 'package:sasper/home_widget_callback_handler.dart' as hw;
 
-// --- Dependencias de Configuración y Servicios ---
+// --- Configuración & Servicios ---
 import 'package:sasper/config/app_config.dart';
 import 'package:sasper/config/global_state.dart';
 import 'package:sasper/firebase_options.dart';
 import 'package:sasper/services/notification_service.dart';
-import 'package:sasper/services/widget_service.dart';
 
-// --- Repositorios CRÍTICOS (solo los que se inicializan tempranamente) ---
+// --- Rutas de Widgets ---
+import 'package:sasper/services/widget_service.dart' as widget_service;
+import 'package:sasper/services/manifestation_widget_service.dart';
+import 'package:sasper/services/affirmation_widget_service.dart';
+
+// --- Repositorios ---
 import 'package:sasper/data/dashboard_repository.dart';
+
+// --- Navegación ---
 import 'package:sasper/screens/auth_gate.dart';
 
-// Función auxiliar para guardar colores de Material You.
+// ====================================================================
+//                  GUARDAR PALETA MATERIAL YOU
+// ====================================================================
+
 Future<void> saveMaterialYouColors() async {
-    try {
-        final corePalette = await DynamicColorPlugin.getCorePalette();
-        if (corePalette != null) {
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setInt('m3_primary', corePalette.primary.get(100));
-            await prefs.setInt('m3_surface', corePalette.neutral.get(100));
-            await prefs.setInt('m3_onSurface', corePalette.neutralVariant.get(0));
-            if (kDebugMode) {
-              print("🎨 Colores de Material You guardados en SharedPreferences.");
-            }
-        }
-    } catch(e) {
-        debugPrint("⚠️ No se pudieron obtener los colores de Material You (probablemente no es Android 12+).");
+  try {
+    final palette = await DynamicColorPlugin.getCorePalette();
+    if (palette == null) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('m3_primary', palette.primary.get(100));
+    await prefs.setInt('m3_surface', palette.neutral.get(100));
+    await prefs.setInt('m3_onSurface', palette.neutralVariant.get(0));
+
+    if (kDebugMode) {
+      print("🎨 Colores Material You guardados.");
     }
+  } catch (_) {}
 }
+
+// ====================================================================
+//                  SPLASH SCREEN
+// ====================================================================
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -57,23 +70,20 @@ class _SplashScreenState extends State<SplashScreen> {
     _initializeAppAndNavigate();
   }
 
-  /// Orquesta la secuencia de inicialización optimizada de la aplicación.
   Future<void> _initializeAppAndNavigate() async {
     try {
-      // --- NOVEDAD: ETAPA 0 - PERSISTENCIA DE CLAVES PARA SERVICIOS DE FONDO ---
-      // Guardamos las claves críticas en SharedPreferences para que los Isolates (widgets, notificaciones)
-      // puedan acceder a ellas sin depender del .env, que no es accesible en segundo plano.
-      if (AppConfig.supabaseUrl.isNotEmpty && AppConfig.supabaseAnonKey.isNotEmpty) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('supabase_url', AppConfig.supabaseUrl);
-        await prefs.setString('supabase_api_key', AppConfig.supabaseAnonKey);
-        developer.log('✅ Claves de Supabase guardadas en SharedPreferences para uso en segundo plano.', name: 'SplashScreen');
-      } else {
-        // Lanzamos un error si las claves no están en AppConfig. Esto detendrá la app
-        // y te mostrará el problema claramente en lugar de fallar silenciosamente.
-        throw Exception("Las claves de Supabase no están definidas en AppConfig.");
-      }
-      // --- ETAPA 1: INICIALIZACIONES CRÍTICAS EN PARALELO ---
+      // ------------------------------------------------------------
+      // 🔐 1. Guardar claves para el callback de widgets
+      // ------------------------------------------------------------
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('supabase_url', AppConfig.supabaseUrl);
+      await prefs.setString('supabase_api_key', AppConfig.supabaseAnonKey);
+
+      developer.log("🔑 Claves Supabase guardadas.", name: "SplashInit");
+
+      // ------------------------------------------------------------
+      // ⚙️ 2. Inicializaciones críticas (en paralelo)
+      // ------------------------------------------------------------
       await Future.wait([
         Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform),
         Supabase.initialize(
@@ -83,46 +93,52 @@ class _SplashScreenState extends State<SplashScreen> {
         initializeDateFormatting('es_CO', null),
       ]);
 
-      // --- ETAPA 2: INYECCIÓN DE DEPENDENCIAS ESENCIALES ---
-      final supabaseClient = Supabase.instance.client;
-      final firebaseMessaging = FirebaseMessaging.instance;
-      
-      DashboardRepository.instance.initialize(supabaseClient);
-      
+      GlobalState.supabaseInitialized = true;
+
+      // ------------------------------------------------------------
+      // 📦 3. Inyectar dependencias
+      // ------------------------------------------------------------
+      final supabase = Supabase.instance.client;
+      final messaging = FirebaseMessaging.instance;
+
+      DashboardRepository.instance.initialize(supabase);
+
       NotificationService.instance.initializeDependencies(
-        supabaseClient: supabaseClient,
-        firebaseMessaging: firebaseMessaging,
+        supabaseClient: supabase,
+        firebaseMessaging: messaging,
       );
 
-      // --- ETAPA 3: REGISTRO DE CALLBACKS DE SEGUNDO PLANO ---
-      GlobalState.supabaseInitialized = true;
-      HomeWidget.registerBackgroundCallback(backgroundCallback);
-      
-      // [CAMBIO CLAVE] Se usa el nombre público de la función importada desde notification_service.dart
+      // ------------------------------------------------------------
+      // 🔄 4. Registrar callbacks de segundo plano
+      // ------------------------------------------------------------
+      HomeWidget.registerBackgroundCallback(hw.homeWidgetBackgroundCallback);
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-      // --- ETAPA 4: NAVEGACIÓN INMEDIATA ---
+      developer.log("🔄 Callbacks de widgets y FCM registrados.",
+          name: "SplashInit");
+
+      // ------------------------------------------------------------
+      // 🌈 5. Navegación inmediata
+      // ------------------------------------------------------------
       if (mounted) {
         Navigator.of(context).pushReplacement(
-          // 2. Cambia el destino de la navegación
-          MaterialPageRoute(builder: (context) => const AuthGate()), 
+          MaterialPageRoute(builder: (_) => const AuthGate()),
         );
       }
-      
-      // --- ETAPA 5: TAREAS SECUNDARIAS (NO BLOQUEANTES) ---
-      // Le decimos a Dart que inicie estas tareas pero no espere su resultado.
+
+      // ------------------------------------------------------------
+      // 🚀 6. Tareas en segundo plano
+      // ------------------------------------------------------------
       unawaited(saveMaterialYouColors());
       unawaited(NotificationService.instance.initializeQuick());
-      NotificationService.instance.initializeQuick();
+    } catch (e, st) {
+      debugPrint("🔥 ERROR CRÍTICO EN SPLASH: $e\n$st");
 
-    } catch (e, stackTrace) {
-      debugPrint("🔥🔥🔥 ERROR CRÍTICO DURANTE LA INICIALIZACIÓN: $e\n$stackTrace");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al inicializar la app: $e'),
+            content: Text("No se pudo inicializar la app: $e"),
             backgroundColor: Colors.red,
-            duration: const Duration(seconds: 10),
           ),
         );
       }
@@ -141,7 +157,7 @@ class _SplashScreenState extends State<SplashScreen> {
             Text(
               'Configurando tu espacio financiero...',
               style: TextStyle(fontSize: 16),
-            ),
+            )
           ],
         ),
       ),

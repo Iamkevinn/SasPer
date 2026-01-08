@@ -1,22 +1,214 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- 
+    Widget Loading State - Material You 3 Expressive
+    - Estado de carga elegante y minimalista
+    - Adaptable a modo claro/oscuro automáticamente
+    - Animación de progreso con colores dinámicos
+    - Shimmer effect opcional para mejor UX
+-->
+<FrameLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:gravity="center"
-    android:background="#1C1C1E"
-    android:orientation="horizontal"
-    android:padding="16dp">
+    android:background="@drawable/widget_background_m3"
+    android:theme="@style/Theme.AppWidget">
 
-    <ProgressBar
-        android:layout_width="24dp"
-        android:layout_height="24dp"
-        android:indeterminateTint="#FFFFFF"
-        android:layout_marginEnd="8dp"/>
+    <!-- ============================================== -->
+    <!-- OPCIÓN 1: Loading con texto (Simple)         -->
+    <!-- ============================================== -->
+    <LinearLayout
+        android:id="@+id/loading_with_text"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="20dp"
+        android:visibility="visible">
+        
+        <!-- Progress indicator circular -->
+        <ProgressBar
+            android:id="@+id/loading_progress"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:indeterminate="true"
+            android:indeterminateTint="?attr/colorPrimary"
+            android:indeterminateTintMode="src_in" />
+        
+        <!-- Texto de carga -->
+        <TextView
+            android:id="@+id/loading_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/loading_data"
+            android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+            android:textColor="?attr/colorOnSurface"
+            android:fontFamily="sans-serif"
+            android:layout_marginTop="12dp"
+            android:alpha="0.87" />
+        
+        <!-- Subtexto opcional (ej: "Sincronizando datos") -->
+        <TextView
+            android:id="@+id/loading_subtext"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/sync_in_progress"
+            android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:fontFamily="sans-serif"
+            android:layout_marginTop="4dp"
+            android:alpha="0.7"
+            android:visibility="gone" />
+    </LinearLayout>
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Cargando..."
-        android:textColor="#FFFFFF"
-        android:textSize="14sp" />
-</LinearLayout>
+    <!-- ============================================== -->
+    <!-- OPCIÓN 2: Loading compacto (Solo spinner)    -->
+    <!-- Para widgets pequeños                        -->
+    <!-- ============================================== -->
+    <LinearLayout
+        android:id="@+id/loading_compact"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:padding="16dp"
+        android:visibility="gone">
+        
+        <!-- Spinner pequeño -->
+        <ProgressBar
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:indeterminate="true"
+            android:indeterminateTint="?attr/colorPrimary"
+            android:indeterminateTintMode="src_in"
+            android:layout_marginEnd="8dp" />
+        
+        <!-- Texto inline -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/loading_data"
+            android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+            android:textColor="?attr/colorOnSurface"
+            android:fontFamily="sans-serif"
+            android:alpha="0.87" />
+    </LinearLayout>
+
+    <!-- ============================================== -->
+    <!-- OPCIÓN 3: Shimmer effect (Más elaborado)     -->
+    <!-- Placeholder animado tipo skeleton            -->
+    <!-- ============================================== -->
+    <LinearLayout
+        android:id="@+id/loading_shimmer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="20dp"
+        android:visibility="gone">
+        
+        <!-- Shimmer header -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="16dp">
+            
+            <!-- Circle placeholder -->
+            <ImageView
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:contentDescription="@null"
+                android:background="@drawable/shimmer_circle"
+                android:layout_marginEnd="12dp" />
+            
+            <!-- Text placeholders -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                
+                <ImageView
+                    android:layout_width="120dp"
+                    android:layout_height="16dp"
+                    android:contentDescription="@null"
+                    android:background="@drawable/shimmer_rectangle"
+                    android:layout_marginBottom="6dp" />
+                
+                <ImageView
+                    android:layout_width="80dp"
+                    android:layout_height="12dp"
+                    android:contentDescription="@null"
+                    android:background="@drawable/shimmer_rectangle" />
+            </LinearLayout>
+        </LinearLayout>
+        
+        <!-- Shimmer content lines -->
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_height="12dp"
+            android:contentDescription="@null"
+            android:background="@drawable/shimmer_rectangle"
+            android:layout_marginBottom="8dp" />
+        
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_height="12dp"
+            android:contentDescription="@null"
+            android:background="@drawable/shimmer_rectangle"
+            android:layout_marginBottom="8dp" />
+        
+        <ImageView
+            android:layout_width="160dp"
+            android:layout_height="12dp"
+            android:contentDescription="@null"
+            android:background="@drawable/shimmer_rectangle" />
+    </LinearLayout>
+
+    <!-- ============================================== -->
+    <!-- OPCIÓN 4: Loading con animación de pulso     -->
+    <!-- Para indicar actividad sin texto             -->
+    <!-- ============================================== -->
+    <LinearLayout
+        android:id="@+id/loading_pulse"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:visibility="gone">
+        
+        <!-- Círculos pulsantes -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center">
+            
+            <ImageView
+                android:id="@+id/pulse_dot_1"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:contentDescription="@null"
+                android:background="@drawable/pulse_dot"
+                android:backgroundTint="?attr/colorPrimary"
+                android:layout_marginEnd="8dp" />
+            
+            <ImageView
+                android:id="@+id/pulse_dot_2"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:contentDescription="@null"
+                android:background="@drawable/pulse_dot"
+                android:backgroundTint="?attr/colorSecondary"
+                android:layout_marginEnd="8dp" />
+            
+            <ImageView
+                android:id="@+id/pulse_dot_3"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:contentDescription="@null"
+                android:background="@drawable/pulse_dot"
+                android:backgroundTint="?attr/colorTertiary" />
+        </LinearLayout>
+    </LinearLayout>
+
+</FrameLayout>

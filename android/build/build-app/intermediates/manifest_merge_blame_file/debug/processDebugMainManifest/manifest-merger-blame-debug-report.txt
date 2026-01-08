@@ -76,7 +76,7 @@
 45-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:10:9-43
 46        android:label="sasper"
 46-->C:\Proyectos\SasPer\android\app\src\main\AndroidManifest.xml:8:9-31
-47        android:theme="@style/AppTheme" >
+47        android:theme="@style/LaunchTheme" >
 47-->C:\Proyectos\SasPer\android\app\src\debug\AndroidManifest.xml:7:9-40
 48
 49        <!-- … otras entradas … -->

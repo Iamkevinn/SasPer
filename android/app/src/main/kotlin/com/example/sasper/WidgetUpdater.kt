@@ -21,20 +21,6 @@ import java.text.NumberFormat
 import java.util.Locale
 import com.google.gson.annotations.SerializedName
 
-// --- MODELOS DE DATOS DE KOTLIN (Añadidos aquí) ---
-// Estos deben coincidir con los campos del JSON que envías desde Dart.
-data class WidgetBudget(
-    @SerializedName("category_name") val category: String,
-    // Asegúrate de que tu JSON de Dart incluya 'progress'
-    val progress: Double 
-)
-
-data class WidgetTransaction(
-    val description: String?, // Hacemos los strings nullable por seguridad
-    val category: String?,    // <-- CORRECCIÓN: De 'categoryName' a 'category'
-    val amount: Double,
-    val type: String
-)
 
 
 
@@ -207,35 +193,54 @@ object WidgetUpdater {
 
     // --- FUNCIONES AUXILIARES (HELPERS) ---
     private fun populateBudget(context: Context, views: RemoteViews, budget: WidgetBudget, index: Int) {
-        val titleId = context.resources.getIdentifier("budget_item_${index}_title", "id", context.packageName)
-        val percentageId = context.resources.getIdentifier("budget_item_${index}_percentage", "id", context.packageName)
-        val progressId = context.resources.getIdentifier("budget_item_${index}_progress", "id", context.packageName)
-        val containerId = context.resources.getIdentifier("budget_item_${index}", "id", context.packageName)
-
-        views.setTextViewText(titleId, budget.category)
-        val percentage = (budget.progress * 100).toInt()
-        views.setTextViewText(percentageId, "$percentage%")
-        views.setProgressBar(progressId, 100, percentage, false)
+        // Obtenemos el ID del contenedor del <include>
+        val containerId = context.resources.getIdentifier("budget_item_$index", "id", context.packageName)
+        
+        // Hacemos visible todo el bloque del item
         views.setViewVisibility(containerId, View.VISIBLE)
+        
+        // [CORRECCIÓN] Creamos una RemoteViews específica para ESTE 'include'.
+        val budgetItemViews = RemoteViews(context.packageName, R.layout.widget_large_budget_item)
+        
+        // Ahora, modificamos las vistas DENTRO de este bloque aislado.
+        budgetItemViews.setTextViewText(R.id.budget_item_title, budget.category)
+        val percentage = (budget.progress * 100).toInt()
+        budgetItemViews.setTextViewText(R.id.budget_item_percentage, "$percentage%")
+        
+        // OJO: Tu layout usa ImageView para la barra. Esto es visual, la lógica principal es el texto.
+        // Podríamos añadir lógica para cambiar el ancho aquí, pero por ahora lo dejamos simple.
+
+        // Finalmente, añadimos estas vistas modificadas al contenedor del layout principal.
+        views.removeAllViews(containerId) // Limpiamos el contenido por defecto
+        views.addView(containerId, budgetItemViews) // Añadimos la vista con los datos reales
     }
 
     private fun populateTransaction(context: Context, views: RemoteViews, transaction: WidgetTransaction, index: Int) {
-        val titleId = context.resources.getIdentifier("transaction_item_${index}_title", "id", context.packageName)
-        val categoryId = context.resources.getIdentifier("transaction_item_${index}_category", "id", context.packageName)
-        val amountId = context.resources.getIdentifier("transaction_item_${index}_amount", "id", context.packageName)
-        val containerId = context.resources.getIdentifier("transaction_item_${index}", "id", context.packageName)
+        // Obtenemos el ID del contenedor del <include>
+        val containerId = context.resources.getIdentifier("transaction_item_$index", "id", context.packageName)
 
-        val format = NumberFormat.getCurrencyInstance(Locale("es", "CO"))
-        format.maximumFractionDigits = 0
-        
-        // CORRECCIÓN: Usamos transaction.category y proveemos un valor por defecto si es nulo
-        views.setTextViewText(titleId, transaction.description ?: "Sin descripción")
-        views.setTextViewText(categoryId, transaction.category ?: "Sin categoría")
-        views.setTextViewText(amountId, format.format(transaction.amount))
-
-        val color = if (transaction.type == "Gasto") Color.parseColor("#E57373") else Color.parseColor("#81C784")
-        views.setTextColor(amountId, color)
-        
+        // Hacemos visible todo el bloque del item
         views.setViewVisibility(containerId, View.VISIBLE)
+        
+        // [CORRECCIÓN] Creamos una RemoteViews específica para ESTE 'include'.
+        val transactionItemViews = RemoteViews(context.packageName, R.layout.widget_large_transaction_item)
+
+        val format = NumberFormat.getCurrencyInstance(Locale("es", "CO")).apply {
+            maximumFractionDigits = 0
+        }
+        
+        // Modificamos las vistas DENTRO de este bloque aislado.
+        transactionItemViews.setTextViewText(R.id.transaction_item_title, transaction.description ?: "Sin descripción")
+        transactionItemViews.setTextViewText(R.id.transaction_item_category, transaction.category ?: "Sin categoría")
+        transactionItemViews.setTextViewText(R.id.transaction_item_amount, format.format(transaction.amount))
+
+        val color = if (transaction.type.equals("Gasto", ignoreCase = true)) Color.parseColor("#E57373") else Color.parseColor("#81C784")
+        transactionItemViews.setTextColor(R.id.transaction_item_amount, color)
+        
+        // Añadimos estas vistas modificadas al contenedor del layout principal.
+        views.removeAllViews(containerId) // Limpiamos el contenido por defecto
+        views.addView(containerId, transactionItemViews) // Añadimos la vista con los datos reales
     }
+
+    
 }

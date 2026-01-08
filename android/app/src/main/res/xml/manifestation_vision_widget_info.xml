@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ========================================= -->
+<!-- Widget Info - Configuración del Widget -->
+<!-- Ubicar en: res/xml/ -->
+<!-- ========================================= -->
+<appwidget-provider 
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="250dp"
+    android:minHeight="120dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="3600000"
+    android:initialLayout="@layout/manifestation_vision_widget"
+    android:previewImage="@drawable/widget_preview"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    android:description="@string/widget_description"
+    android:initialKeyguardLayout="@layout/manifestation_vision_widget">
+</appwidget-provider>
+
+<!-- ========================================= -->
+<!-- strings.xml - Agregar estas cadenas -->
+<!-- ========================================= -->
+<!--
+<resources>
+    <string name="widget_description">Visualiza y manifiesta tus deseos diariamente</string>
+    <string name="manifestation_image_description">Imagen de tu manifestación</string>
+    <string name="manifestation_icon">Icono de manifestación</string>
+    <string name="next_manifestation">Siguiente manifestación</string>
+    <string name="previous_manifestation">Anterior manifestación</string>
+    <string name="open_app">Abrir aplicación</string>
+</resources>
+-->

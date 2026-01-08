@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 🌟 LAYOUT DEL WIDGET "FOCUS DE AFIRMACIÓN" -->
+<!-- Widget centrado en tipografía y afirmaciones sin imágenes -->
+
+<FrameLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="0dp">
+
+    <!-- ===== CONTENEDOR PRINCIPAL ===== -->
+    <LinearLayout
+        android:id="@+id/widget_background"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:background="@drawable/affirmation_widget_background"
+        android:padding="16dp"
+        android:clipToOutline="true">
+
+        <!-- ===== HEADER: Tipo de afirmación + Contador ===== -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingBottom="12dp">
+
+            <!-- Tipo de afirmación (ej: "🙏 Gratitud") -->
+            <TextView
+                android:id="@+id/affirmation_type_label"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="🙏 Gratitud"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:alpha="0.9" />
+
+            <!-- Contador de manifestaciones -->
+            <TextView
+                android:id="@+id/manifestation_counter"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="1 de 5"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp"
+                android:background="@drawable/counter_badge_affirmation"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp"
+                android:alpha="0.85" />
+        </LinearLayout>
+
+        <!-- ===== ÁREA CENTRAL: TEXTO DE AFIRMACIÓN (INTERACTIVA) ===== -->
+        <FrameLayout
+            android:id="@+id/affirmation_text_container"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp">
+
+            <!-- Texto principal de afirmación -->
+            <TextView
+                android:id="@+id/affirmation_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="Estoy tan feliz y agradecido/a por mi nuevo celular"
+                android:textColor="#FFFFFF"
+                android:textSize="20sp"
+                android:textStyle="italic"
+                android:gravity="center"
+                android:lineSpacingMultiplier="1.3"
+                android:fontFamily="serif"
+                android:shadowColor="#40000000"
+                android:shadowDx="0"
+                android:shadowDy="2"
+                android:shadowRadius="4" />
+
+            <!-- Overlay de animación de enfoque -->
+            <ImageView
+                android:id="@+id/focus_animation_overlay"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/focus_glow_effect"
+                android:visibility="gone"
+                android:alpha="0.6" />
+        </FrameLayout>
+
+        <!-- ===== FOOTER: Estadísticas + Controles ===== -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingTop="12dp">
+
+            <!-- Estadística semanal -->
+            <TextView
+                android:id="@+id/weekly_focus_count"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:text="Esta semana: 3 veces"
+                android:textColor="#FFFFFF"
+                android:textSize="10sp"
+                android:alpha="0.7"
+                android:paddingBottom="8dp" />
+
+            <!-- Barra de controles -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:paddingTop="4dp">
+
+                <!-- Botón: Anterior -->
+                <ImageButton
+                    android:id="@+id/btn_previous"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:src="@drawable/ic_chevron_left"
+                    android:background="@drawable/button_ripple_affirmation"
+                    android:contentDescription="Manifestación anterior"
+                    android:scaleType="centerInside"
+                    android:tint="#FFFFFF"
+                    android:alpha="0.8" />
+
+                <!-- Botón: Rotar afirmación (central) -->
+                <FrameLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="12dp"
+                    android:layout_marginEnd="12dp">
+
+                    <ImageButton
+                        android:id="@+id/btn_rotate_affirmation"
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:src="@drawable/ic_rotate_affirmation"
+                        android:background="@drawable/button_rotate_affirmation"
+                        android:contentDescription="Cambiar enfoque de afirmación"
+                        android:scaleType="center"
+                        android:tint="#FFFFFF" />
+                </FrameLayout>
+
+                <!-- Botón: Siguiente -->
+                <ImageButton
+                    android:id="@+id/btn_next"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:src="@drawable/ic_chevron_right"
+                    android:background="@drawable/button_ripple_affirmation"
+                    android:contentDescription="Siguiente manifestación"
+                    android:scaleType="centerInside"
+                    android:tint="#FFFFFF"
+                    android:alpha="0.8"
+                    android:layout_marginEnd="4dp" />
+
+                <!-- Botón: Abrir app -->
+                <ImageButton
+                    android:id="@+id/btn_open_app"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:src="@drawable/ic_open_app"
+                    android:background="@drawable/button_ripple_affirmation"
+                    android:contentDescription="Abrir aplicación"
+                    android:scaleType="centerInside"
+                    android:tint="#FFFFFF"
+                    android:alpha="0.8" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

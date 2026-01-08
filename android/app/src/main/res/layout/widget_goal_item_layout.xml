@@ -1,33 +1,120 @@
-<!-- android/app/src/main/res/layout/widget_goal_item_layout.xml -->
+<?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/goal_item_container"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:paddingVertical="8dp">
+    android:padding="16dp"
+    android:background="@drawable/widget_goal_item_background"
+    android:clickable="true"
+    android:focusable="true"
+    android:theme="@style/Theme.AppWidget"> <!-- [CORRECCIÓN] Tema añadido -->
 
-    <TextView
-        android:id="@+id/goal_name"
-        android:layout_width="wrap_content"
+    <!-- HEADER -->
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Nombre de la Meta"
-        android:textAppearance="?android:attr/textAppearanceSmall"
-        android:textColor="?android:attr/textColorPrimary"/>
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
 
+        <FrameLayout
+            android:id="@+id/goal_icon_container"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/widget_goal_icon_background">
+
+            <ImageView
+                android:id="@+id/goal_icon"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_goal_default"
+                android:tint="?attr/colorPrimary"
+                android:contentDescription="@null"
+                tools:src="@drawable/ic_savings" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="12dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/goal_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/goal_name_placeholder"
+                android:textColor="?attr/colorOnSurface"
+                android:fontFamily="sans-serif-medium"
+                android:textSize="16sp"
+                android:maxLines="1"
+                android:ellipsize="end"
+                tools:text="Viaje a Europa" />
+
+            <TextView
+                android:id="@+id/goal_status_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:fontFamily="sans-serif"
+                android:textSize="12sp"
+                android:alpha="0.7"
+                tools:text="Meta para diciembre" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/goal_percentage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:textColor="?attr/colorPrimary"
+            android:fontFamily="sans-serif-black"
+            android:textSize="22sp"
+            tools:text="60%" />
+    </LinearLayout>
+
+    <!-- PROGRESS BAR -->
     <ProgressBar
         android:id="@+id/goal_progress_bar"
         style="?android:attr/progressBarStyleHorizontal"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
+        android:layout_height="8dp"
+        android:layout_marginTop="12dp"
         android:max="100"
-        android:progress="60" />
+        android:progress="60"
+        android:progressDrawable="@drawable/widget_goal_progress_bar"
+        tools:progress="60" />
 
-    <TextView
-        android:id="@+id/goal_progress_text"
+    <!-- FOOTER -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="end"
-        android:text="\$6,000 / \$10,000"
-        android:textAppearance="?android:attr/textAppearanceSmall"
-        android:textColor="?android:attr/textColorSecondary" />
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/goal_current_amount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="?attr/colorOnSurface"
+            android:fontFamily="sans-serif-medium"
+            android:textSize="14sp"
+            tools:text="$6.000.000" />
+        
+        <TextView
+            android:id="@+id/goal_target_amount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:fontFamily="sans-serif"
+            android:textSize="12sp"
+            android:alpha="0.7"
+            tools:text="de $10.000.000" />
+    </LinearLayout>
 </LinearLayout>

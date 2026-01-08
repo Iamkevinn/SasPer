@@ -1,49 +1,313 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- 
+    Widget Mediano - Balance y Gráfico de Gastos
+    Material You 3 Expressive
+    - Muestra saldo actual con cambio del día
+    - Gráfico de gastos de la semana/mes
+    - Acciones rápidas de ingreso/gasto
+    - Indicadores visuales de tendencia
+-->
+<LinearLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_medium_container"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="?attr/colorSurface"
-    android:padding="16dp"
+    android:background="@drawable/widget_background_m3"
+    android:padding="20dp"
     android:theme="@style/Theme.AppWidget"
-    >
+    android:clipToPadding="false">
 
+    <!-- ============================================== -->
+    <!-- HEADER: Título y controles                    -->
+    <!-- ============================================== -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:orientation="horizontal">
-        <TextView
-            android:id="@+id/widget_medium_title"
-            style="@style/Widget.Text.Title"
+        android:layout_marginBottom="16dp">
+        
+        <!-- Sección de título -->
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Saldo Total" />
-        <ImageButton
-            android:id="@+id/widget_medium_add_button"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="@drawable/widget_button_background"
-            android:backgroundTint="?attr/colorPrimary"
-            android:src="@drawable/ic_add"
-            android:tint="?attr/colorOnPrimary"
-            android:importantForAccessibility="no" />
+            android:orientation="vertical">
+            
+            <!-- Título principal -->
+            <TextView
+                android:id="@+id/widget_medium_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/widget_title_balance"
+                android:textAppearance="@style/Widget.Text.TitleMedium"
+                android:textColor="?attr/colorOnSurface"
+                android:fontFamily="sans-serif_medium" />
+            
+            <!-- Período del gráfico -->
+            <TextView
+                android:id="@+id/widget_medium_period"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/period_this_month"
+                android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:fontFamily="sans-serif"
+                android:layout_marginTop="2dp"
+                android:alpha="0.8" />
+        </LinearLayout>
+        
+        <!-- Botones de acción -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            
+            <!-- Botón: Añadir transacción -->
+            <ImageButton
+                android:id="@+id/widget_medium_add_button"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@android:drawable/ic_input_add"
+                android:background="@drawable/widget_action_button_medium"
+                android:tint="?attr/colorOnSecondaryContainer"
+                android:contentDescription="@string/add_transaction_description"
+                android:scaleType="center"
+                android:padding="8dp" />
+            
+            <!-- Botón: Actualizar -->
+            <ImageButton
+                android:id="@+id/widget_medium_refresh_button"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@android:drawable/ic_menu_rotate"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:tint="?attr/colorOnSurfaceVariant"
+                android:contentDescription="@string/refresh_button_description"
+                android:scaleType="center"
+                android:padding="8dp"
+                android:layout_marginStart="4dp" />
+        </LinearLayout>
     </LinearLayout>
-    <TextView
-        android:id="@+id/widget_medium_balance"
-        style="@style/Widget.Text.Balance"
-        android:layout_width="wrap_content"
+
+    <!-- ============================================== -->
+    <!-- BALANCE SECTION: Saldo y cambio              -->
+    <!-- ============================================== -->
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:text="0,00" />
-    <ImageView
-        android:id="@+id/widget_medium_chart"
+        android:orientation="vertical"
+        android:layout_marginBottom="16dp">
+        
+        <!-- Saldo principal -->
+        <TextView
+            android:id="@+id/widget_medium_balance"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="$0.00"
+            android:textAppearance="@style/Widget.Text.Balance"
+            android:textColor="?attr/colorOnSurface"
+            android:fontFamily="sans-serif-black"
+            android:letterSpacing="-0.02" />
+        
+        <!-- Cambio del día/período -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="4dp">
+            
+            <!-- Indicador de tendencia (flecha) -->
+            <ImageView
+                android:id="@+id/widget_medium_trend_icon"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:src="@android:drawable/arrow_up_float"
+                android:tint="?attr/colorTertiary"
+                android:contentDescription="@string/content_description_trend_up"
+                android:visibility="visible" />
+            
+            <!-- Texto del cambio -->
+            <TextView
+                android:id="@+id/widget_medium_change"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/change_placeholder"
+                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                android:textColor="?attr/colorTertiary"
+                android:fontFamily="sans-serif_medium"
+                android:layout_marginStart="4dp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- ============================================== -->
+    <!-- RESUMEN RÁPIDO: Ingresos y Gastos            -->
+    <!-- ============================================== -->
+    <LinearLayout
+        android:id="@+id/widget_medium_summary"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="12dp"
+        android:visibility="visible">
+        
+        <!-- Card de Ingresos -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:background="@drawable/summary_card_background"
+            android:padding="10dp"
+            android:layout_marginEnd="6dp">
+            
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/income_short"
+                android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:fontFamily="sans-serif"
+                android:alpha="0.8" />
+            
+            <TextView
+                android:id="@+id/widget_medium_income"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="$0"
+                android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
+                android:textColor="?attr/colorTertiary"
+                android:fontFamily="sans-serif_medium"
+                android:layout_marginTop="2dp" />
+        </LinearLayout>
+        
+        <!-- Card de Gastos -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:background="@drawable/summary_card_background"
+            android:padding="10dp"
+            android:layout_marginStart="6dp">
+            
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/expense_short"
+                android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:fontFamily="sans-serif"
+                android:alpha="0.8" />
+            
+            <TextView
+                android:id="@+id/widget_medium_expenses"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="$0"
+                android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
+                android:textColor="?attr/colorError"
+                android:fontFamily="sans-serif_medium"
+                android:layout_marginTop="2dp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- ============================================== -->
+    <!-- GRÁFICO: Visualización de gastos              -->
+    <!-- ============================================== -->
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
+        android:background="@drawable/chart_container_background">
+        
+        <!-- Gráfico principal -->
+        <ImageView
+            android:id="@+id/widget_medium_chart"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitXY"
+            android:contentDescription="@string/content_description_chart"
+            android:padding="8dp" />
+        
+        <!-- Placeholder cuando no hay datos -->
+        <LinearLayout
+            android:id="@+id/widget_medium_chart_placeholder"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="16dp"
+            android:visibility="gone">
+            
+            <ImageView
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@android:drawable/ic_menu_gallery"
+                android:tint="?attr/colorOutlineVariant"
+                android:alpha="0.4"
+                android:contentDescription="@string/empty_state" />
+            
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/empty_state"
+                android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:fontFamily="sans-serif"
+                android:layout_marginTop="8dp"
+                android:alpha="0.6"
+                android:textAlignment="center" />
+        </LinearLayout>
+        
+        <!-- Overlay de categoría dominante (opcional) -->
+        <LinearLayout
+            android:id="@+id/widget_medium_chart_overlay"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|start"
+            android:orientation="horizontal"
+            android:background="@drawable/chart_overlay_badge"
+            android:padding="6dp"
+            android:layout_margin="12dp"
+            android:gravity="center_vertical"
+            android:visibility="gone">
+            
+            <ImageView
+                android:id="@+id/widget_medium_category_indicator"
+                android:layout_width="8dp"
+                android:layout_height="8dp"
+                android:contentDescription="@null"
+                android:background="@drawable/category_indicator_circle"
+                android:backgroundTint="?attr/colorPrimary"
+                android:layout_marginEnd="6dp" />
+            
+            <TextView
+                android:id="@+id/widget_medium_dominant_category"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Alimentación"
+                android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                android:textColor="?attr/colorOnSurface"
+                android:fontFamily="sans-serif_medium" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- ============================================== -->
+    <!-- FOOTER: Última actualización                  -->
+    <!-- ============================================== -->
+    <TextView
+        android:id="@+id/widget_medium_last_update"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/last_update_now"
+        android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:fontFamily="sans-serif"
+        android:gravity="center"
         android:layout_marginTop="8dp"
-        android:scaleType="centerCrop"
-        android:src="@android:color/transparent" />
+        android:alpha="0.6" />
+
 </LinearLayout>

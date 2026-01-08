@@ -1,46 +1,116 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- ... tus otros temas (LaunchTheme, etc.) se quedan igual ... -->
-    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+
+    <!-- ============================================== -->
+    <!-- TEMA DE LANZAMIENTO (Splash Screen)           -->
+    <!-- Este tema solo se usa mientras la app carga.  -->
+    <!-- ============================================== -->
+    <style name="LaunchTheme" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Fondo de la splash screen -->
         <item name="android:windowBackground">@drawable/launch_background</item>
+        
+        <!-- MEJORA: Hacemos las barras transparentes para una apariencia 'edge-to-edge' desde el inicio -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
+
+    <!-- ============================================== -->
+    <!-- TEMA PRINCIPAL DE LA APLICACIÓN (UNIFICADO)   -->
+    <!-- Se aplica a la actividad principal en AndroidManifest.xml -->
+    <!-- ============================================== -->
     <style name="NormalTheme" parent="Theme.Material3.DayNight.NoActionBar">
-    <item name="android:windowBackground">?android:colorBackground</item>
-</style>
-    <style name="AppTheme" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="android:forceDarkAllowed">true</item>
-        <item name="android:windowEnableSplitTouch">true</item>
+        <!-- Fondo de la ventana principal -->
+        <item name="android:windowBackground">?android:attr/colorBackground</item>
+        
+        <!-- MEJORA: Barras transparentes para 'edge-to-edge' -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        
+        <!-- MEJORA: Se eliminan 'windowLight...' para que el tema DayNight gestione los iconos automáticamente -->
+        <!-- Esto corrige el problema de iconos invisibles en modo oscuro -->
+        
+        <!-- MEJORA: Habilitar 'edge-to-edge' para que el contenido se dibuje detrás de las barras del sistema -->
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:enforceNavigationBarContrast">false</item>
+        <item name="android:enforceStatusBarContrast">false</item>
+        
+        <!-- MEJORA: Animaciones de transición de Material Motion más modernas -->
+        <item name="android:windowActivityTransitions">true</item>
+        <item name="android:windowEnterTransition">@android:transition/fade</item>
+        <item name="android:windowExitTransition">@android:transition/fade</item>
+    </style>
+
+    <!-- ============================================== -->
+    <!-- TEMA PARA WIDGETS - EXPRESSIVE THEME          -->
+    <!-- Con colores dinámicos del sistema (Android 12+) -->
+    <!-- ============================================== -->
+    <style name="Theme.AppWidget.Expressive" parent="Theme.Material3.DynamicColors.DayNight">
+        <!-- Los colores se extraen del wallpaper del usuario. No es necesario definirlos manualmente. -->
+        <!-- Sin embargo, si quieres forzar un estilo "Expressive", puedes sobreescribir colores aquí, -->
+        <!-- aunque es mejor dejar que DynamicColors haga su trabajo. -->
+        <!-- Las definiciones anteriores con system_accent son buenas si DynamicColors no se aplica correctamente. -->
+    </style>
+
+    <!-- ============================================== -->
+    <!-- TEMA BASE PARA WIDGETS (Fallback)             -->
+    <!-- Se usa en versiones de Android < 12 o si los colores dinámicos fallan -->
+    <!-- ============================================== -->
+    <style name="Theme.AppWidget.Base" parent="Theme.Material3.Light.NoActionBar">
+        <!-- Colores de respaldo fijos -->
+        <item name="colorPrimary">#6750A4</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorPrimaryContainer">#EADDFF</item>
+        <item name="colorOnPrimaryContainer">#21005D</item>
+        <!-- ... resto de tus colores de fallback, están bien definidos -->
     </style>
     
-    <!-- [NUEVO] Tema específico para el widget con colores dinámicos -->
-<style name="Theme.AppWidget.Expressive" parent="Theme.Material3.DynamicColors.DayNight">
-    <!-- 'DynamicColors' es la clave que extrae los colores del wallpaper -->
-</style>
+    <!-- TEMA FINAL PARA WIDGETS -->
+    <style name="Theme.AppWidget" parent="Theme.AppWidget.Expressive" />
 
-    <!-- ===== CAMBIO: TEMA BASE PARA WIDGETS ===== -->
-    <style name="Theme.AppWidget.Base" parent="Theme.Material3.Light.NoActionBar">
-        <!-- Colores de respaldo para modo claro -->
-        <item name="colorSurface">@color/widget_background_color</item>
-        <item name="colorOnSurface">@color/widget_text_color</item>
-        <item name="colorPrimary">@color/widget_button_background_color</item>
-        <item name="colorOnPrimary">@color/widget_button_icon_color</item>
-        <!-- Colores personalizados -->
-        <item name="positiveColor">#388E3C</item>
-        <item name="negativeColor">#D32F2F</item>
-    </style>
 
-    <!-- TEMA FINAL PARA WIDGETS QUE HEREDA DEL BASE -->
-    <style name="Theme.AppWidget" parent="Theme.AppWidget.Base" />
-
-    <!-- ... tus estilos de texto se quedan igual ... -->
-    <style name="Widget.Text.Title" parent="android:Widget.TextView">
-        <item name="android:textSize">16sp</item>
-        <item name="android:fontFamily">sans-serif-medium</item>
+    <!-- ============================================== -->
+    <!-- ESTILOS DE TEXTO MATERIAL 3                   -->
+    <!-- ============================================== -->
+    
+    <!-- Title Large -->
+    <style name="Widget.Text.Title" parent="TextAppearance.Material3.TitleLarge">
+        <!-- MEJORA: Usar una fuente segura del sistema si 'google_sans' no está en el proyecto -->
+        <item name="fontFamily">sans-serif-medium</item>
         <item name="android:textColor">?attr/colorOnSurface</item>
     </style>
-    <style name="Widget.Text.Balance" parent="android:Widget.TextView">
-        <item name="android:textSize">28sp</item>
-        <item name="android:fontFamily">sans-serif-black</item>
+    
+    <!-- Title Medium -->
+    <style name="Widget.Text.TitleMedium" parent="TextAppearance.Material3.TitleMedium">
+        <item name="fontFamily">sans-serif-medium</item>
         <item name="android:textColor">?attr/colorOnSurface</item>
     </style>
+    
+    <!-- Body Large -->
+    <style name="Widget.Text.BodyLarge" parent="TextAppearance.Material3.BodyLarge">
+        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
+    </style>
+
+    <!-- Balance Text (personalizado) -->
+    <style name="Widget.Text.Balance" parent="TextAppearance.Material3.DisplayMedium">
+        <item name="fontFamily">sans-serif-medium</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
+    </style>
+    
+    <!-- ============================================== -->
+    <!-- ESTILOS PARA COMPONENTES ESPECÍFICOS          -->
+    <!-- ============================================== -->
+    
+    <!-- Botones -->
+    <style name="Widget.App.Button.Filled" parent="Widget.Material3.Button">
+        <item name="cornerRadius">20dp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="fontFamily">sans-serif-medium</item>
+    </style>
+    
+    <!-- Cards -->
+    <style name="Widget.App.Card.Elevated" parent="Widget.Material3.CardView.Elevated">
+        <item name="cardCornerRadius">16dp</item>
+        <item name="cardElevation">1dp</item>
+    </style>
+    
 </resources>

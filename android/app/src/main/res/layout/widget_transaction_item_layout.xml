@@ -1,51 +1,255 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 
+    Item de Transacción - Material You 3 Expressive
+    - Diseño limpio con iconos de categoría
+    - Diferenciación visual entre ingresos y gastos
+    - Información contextual clara
+    - Estados interactivos
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/transaction_item_container"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:paddingVertical="6dp">
+    android:gravity="center_vertical"
+    android:paddingHorizontal="4dp"
+    android:paddingVertical="10dp"
+    android:background="@drawable/widget_transaction_item_background"
+    android:clickable="true"
+    android:focusable="true">
 
-    <!-- Contenedor para Título y Categoría -->
+    <!-- ============================================== -->
+    <!-- ICONO DE CATEGORÍA -->
+    <!-- ============================================== -->
+    <FrameLayout
+        android:id="@+id/transaction_icon_container"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginEnd="12dp"
+        android:background="@drawable/widget_transaction_icon_background">
+
+        <ImageView
+            android:id="@+id/widget_item_transaction_icon"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_category_food"
+            android:tint="?attr/colorPrimary"
+            android:contentDescription="@null"
+            tools:src="@drawable/ic_category_food" />
+
+    </FrameLayout>
+
+    <!-- ============================================== -->
+    <!-- INFORMACIÓN DE LA TRANSACCIÓN -->
+    <!-- ============================================== -->
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:paddingEnd="12dp"
+        tools:ignore="RtlSymmetry">
 
         <!-- Título de la transacción -->
         <TextView
             android:id="@+id/widget_item_transaction_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Supermercado"
-            android:textColor="?android:attr/textColorPrimary"
+            android:text="@string/transaction_title_placeholder"
+            android:textColor="?attr/colorOnSurface"
+            android:fontFamily="sans-serif_medium"
             android:textSize="14sp"
+            android:letterSpacing="0.01"
             android:maxLines="1"
-            android:ellipsize="end"/>
+            android:ellipsize="end"
+            tools:text="Supermercado Central" />
 
-        <!-- NUEVO: TextView para la Categoría -->
-        <TextView
-            android:id="@+id/widget_item_transaction_category"
+        <!-- Contenedor de categoría y fecha -->
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Comida"
-            android:textColor="?android:attr/textColorSecondary"
-            android:textSize="12sp"
+            android:layout_marginTop="2dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <!-- Categoría -->
+            <TextView
+                android:id="@+id/widget_item_transaction_category"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/transaction_category_placeholder"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:fontFamily="sans-serif"
+                android:textSize="12sp"
+                android:alpha="0.8"
+                android:letterSpacing="0.02"
+                android:maxLines="1"
+                android:ellipsize="end"
+                tools:text="Alimentación" />
+
+            <!-- Separador -->
+            <FrameLayout
+                android:id="@+id/category_time_separator"
+                android:layout_width="3dp"
+                android:layout_height="3dp"
+                android:layout_marginHorizontal="6dp"
+                android:background="@drawable/widget_dot_separator"
+                android:visibility="visible" />
+
+            <!-- Hora o fecha -->
+            <TextView
+                android:id="@+id/widget_item_transaction_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/transaction_time_placeholder"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:fontFamily="sans-serif"
+                android:textSize="11sp"
+                android:alpha="0.6"
+                android:letterSpacing="0.02"
+                android:visibility="visible"
+                tools:text="14:30" />
+
+        </LinearLayout>
+
+        <!-- Nota o descripción adicional (opcional) -->
+        <TextView
+            android:id="@+id/widget_item_transaction_note"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="@string/transaction_note_placeholder"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:fontFamily="sans-serif"
+            android:textSize="11sp"
+            android:alpha="0.7"
+            android:letterSpacing="0.01"
             android:maxLines="1"
-            android:ellipsize="end"/>
+            android:ellipsize="end"
+            android:visibility="gone"
+            tools:visibility="visible"
+            tools:text="Compras semanales" />
 
     </LinearLayout>
 
-    <!-- Monto de la transacción (sin cambios) -->
-    <TextView
-        android:id="@+id/widget_item_transaction_amount"
+    <!-- ============================================== -->
+    <!-- MONTO Y TIPO DE TRANSACCIÓN -->
+    <!-- ============================================== -->
+    <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="-50.25"
+        android:orientation="vertical"
+        android:gravity="end">
+
+        <!-- Monto principal -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <!-- Indicador de tipo (+ o -) -->
+            <TextView
+                android:id="@+id/widget_item_transaction_type_indicator"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="−"
+                android:textColor="?attr/colorError"
+                android:fontFamily="sans-serif_medium"
+                android:textSize="16sp"
+                android:letterSpacing="0"
+                tools:text="−" />
+
+            <!-- Monto -->
+            <TextView
+                android:id="@+id/widget_item_transaction_amount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="2dp"
+                android:text="@string/currency_format"
+                android:textColor="?attr/colorError"
+                android:fontFamily="sans-serif_display_bold"
+                android:textSize="16sp"
+                android:letterSpacing="-0.01"
+                tools:text="$50.250" />
+
+        </LinearLayout>
+
+        <!-- Etiqueta o badge (opcional) -->
+        <FrameLayout
+            android:id="@+id/transaction_badge_container"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <TextView
+                android:id="@+id/transaction_badge_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/transaction_pending"
+                android:background="@drawable/widget_transaction_badge"
+                android:textColor="?attr/colorOnTertiaryContainer"
+                android:fontFamily="sans-serif_medium"
+                android:textSize="9sp"
+                android:paddingHorizontal="6dp"
+                android:paddingVertical="2dp"
+                android:letterSpacing="0.04"
+                tools:text="PENDIENTE" />
+
+        </FrameLayout>
+
+        <!-- Método de pago (opcional) -->
+        <LinearLayout
+            android:id="@+id/payment_method_container"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <ImageView
+                android:id="@+id/payment_method_icon"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:src="@drawable/ic_credit_card"
+                android:tint="?attr/colorOnSurfaceVariant"
+                android:alpha="0.5"
+                android:contentDescription="@null" />
+
+            <TextView
+                android:id="@+id/payment_method_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="3dp"
+                android:text="@string/payment_method_card"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:fontFamily="sans-serif"
+                android:textSize="10sp"
+                android:alpha="0.6"
+                android:letterSpacing="0.03"
+                tools:text="Visa ••1234" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- ============================================== -->
+    <!-- INDICADOR DE ESTADO (lado derecho) -->
+    <!-- ============================================== -->
+    <FrameLayout
+        android:id="@+id/transaction_status_indicator"
+        android:layout_width="4dp"
+        android:layout_height="match_parent"
         android:layout_marginStart="8dp"
-        android:textColor="?android:attr/textColorSecondary"
-        android:textSize="14sp"
-        android:textStyle="bold" />
+        android:background="@drawable/widget_transaction_status_indicator"
+        android:backgroundTint="?attr/colorError"
+        android:visibility="gone"
+        tools:visibility="visible" />
 
 </LinearLayout>

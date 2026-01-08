@@ -127,7 +127,7 @@ class RecurringRepository {
       final newTransactionData = {
         'user_id': client.auth.currentUser!.id,
         'description': description,
-        'amount': amount.abs(),
+        'amount': amount,
         'type': type,
         'category': category,
         'account_id': accountId,

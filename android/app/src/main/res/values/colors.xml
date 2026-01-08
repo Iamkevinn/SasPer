@@ -7,4 +7,11 @@
     <color name="widget_button_icon_color">#FFFFFF</color>
     <color name="widget_positive_color">#388E3C</color> <!-- Verde -->
     <color name="widget_negative_color">#D32F2F</color> <!-- Rojo -->
+        <!-- Payment Urgency Colors -->
+    <color name="payment_overdue">#B00020</color>
+    <color name="payment_urgent">#D32F2F</color>
+    <color name="payment_warning">#F57C00</color>
+    <color name="payment_normal">#1976D2</color>
+    <color name="payment_safe">#388E3C</color>
+	<color name="ic_launcher_background">#2a2a2a</color>
 </resources>

@@ -1,10 +1,328 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Puedes añadir más strings aquí en el futuro -->
+
+    <!-- ============================================== -->
+    <!-- DESCRIPCIONES DE WIDGETS                      -->
+    <!-- ============================================== -->
     <string name="widget_medium_description">Muestra tu saldo y un gráfico de gastos.</string>
     <string name="widget_large_description">Un resumen completo de tus finanzas.</string>
     <string name="goals_widget_description">Muestra el progreso de tus metas</string>
     <string name="financial_health_widget_description">Un vistazo rápido a tu salud financiera.</string>
     <string name="monthly_comparison_widget_description">Compara tus gastos con el mes anterior.</string>
     <string name="widget_next_payment_description">Muestra tu próximo pago pendiente.</string>
+
+    <!-- ============================================== -->
+    <!-- WIDGET: SALUD FINANCIERA                      -->
+    <!-- ============================================== -->
+
+    <!-- Títulos y encabezados -->
+    <string name="widget_title_financial_health">Salud Financiera</string>
+    <string name="widget_subtitle_financial_health">Resumen mensual</string>
+
+    <!-- Iconos y accesibilidad -->
+    <string name="widget_icon_description">Icono de salud financiera</string>
+    <string name="refresh_button_description">Actualizar datos</string>
+    <string name="settings_button_description">Configuración del widget</string>
+
+    <!-- Insights - Labels -->
+    <string name="spending_rate_label">Ritmo de gasto</string>
+    <string name="savings_rate_label">Tasa de ahorro</string>
+    <string name="budget_usage_label">Uso del presupuesto</string>
+    <string name="debt_ratio_label">Relación deuda/ingreso</string>
+    <string name="emergency_fund_label">Fondo de emergencia</string>
+
+    <!-- Insights - Estados de datos -->
+    <string name="loading_data">Cargando…</string>
+    <string name="no_data_available">Sin datos</string>
+    <string name="data_error">Error al cargar</string>
+    <string name="calculating">Calculando…</string>
+
+    <!-- Insights - Valores con formato -->
+    <string name="spending_rate_value">%1$s/día</string>
+    <string name="savings_rate_value">%1$s%%</string>
+    <string name="budget_usage_value">%1$d%% usado</string>
+    <string name="debt_ratio_value">%1$.1f%%</string>
+    <string name="days_covered_value">%1$d días cubiertos</string>
+
+    <!-- Mensajes de estado -->
+    <string name="status_healthy">Saludable</string>
+    <string name="status_warning">Precaución</string>
+    <string name="status_critical">Atención</string>
+    <string name="status_excellent">Excelente</string>
+
+    <!-- Footer - Última actualización -->
+    <string name="last_update_now">Actualizado ahora</string>
+    <string name="last_update_minutes">Actualizado hace %1$d min</string>
+    <string name="last_update_hours">Actualizado hace %1$d h</string>
+    <string name="last_update_days">Actualizado hace %1$d días</string>
+    <string name="last_update_placeholder">Última actualización: %s</string>
+
+    <!-- Acciones del widget -->
+    <string name="view_details">Ver detalles</string>
+    <string name="view_all">Ver todo</string>
+    <string name="open_app">Abrir app</string>
+    <string name="configure_widget">Configurar</string>
+
+    <!-- ============================================== -->
+    <!-- WIDGET: METAS FINANCIERAS                     -->
+    <!-- ============================================== -->
+
+    <string name="widget_title_goals">Mis Metas</string>
+    <string name="goal_progress_label">Progreso: %1$d%%</string>
+    <string name="goal_amount_remaining">Faltan %1$s</string>
+    <string name="goal_on_track">En camino</string>
+    <string name="goal_behind">Retrasada</string>
+    <string name="no_active_goals">No hay metas activas</string>
+    <string name="add_goal">Agregar meta</string>
+
+    <string name="affirmation_widget_description">Enfócate en tus metas con afirmaciones poderosas</string>
+
+    <!-- ============================================== -->
+    <!-- WIDGET: COMPARACIÓN MENSUAL                   -->
+    <!-- ============================================== -->
+
+    <string name="widget_title_monthly_comparison">Este mes vs anterior</string>
+    <string name="comparison_more_spending">+%1$s más gastado</string>
+    <string name="comparison_less_spending">−%1$s menos gastado</string>
+    <string name="comparison_more_income">+%1$s más ingresado</string>
+    <string name="comparison_less_income">−%1$s menos ingresado</string>
+    <string name="comparison_equal">Sin cambios</string>
+
+    <!-- ============================================== -->
+    <!-- WIDGET: PRÓXIMO PAGO (Next Payment)           -->
+    <!-- ============================================== -->
+    <!-- Título principal del widget -->
+    <string name="widget_title_next_payment">Próximo Pago</string>
+
+    <!-- Estados de vencimiento -->
+    <string name="payment_due_today">Vence hoy</string>
+    <string name="payment_due_tomorrow">Vence mañana</string>
+    <string name="payment_due_in_days">Vence en %1$d días</string>
+    <string name="payment_overdue">Vencido hace %1$d días</string>
+    <string name="days_until_payment_singular">Vence en %d día</string>
+    <string name="payment_overdue_singular">Vencido hace %d día</string>
+
+    <!-- Acciones y estado vacío -->
+    <string name="mark_as_paid">Marcar como pagado</string>
+    <string name="snooze_payment_description">Posponer recordatorio</string>
+    <string name="view_payment_details">Ver detalles</string>
+    <string name="no_pending_payments_title">¡Todo al día!</string>
+    <string name="no_pending_payments_message">No tienes pagos pendientes</string>
+    <string name="all_paid_up">Estás al día 👍</string>
+
+    <!-- Info del pago -->
+    <string name="payment_icon_description">Icono de pago</string>
+    <string name="payment_urgent">URGENTE</string>
+    <string name="payment_soon">PRONTO</string>
+    <string name="payment_today">HOY</string>
+    <string name="payment_concept_placeholder">Concepto del pago</string>
+    <string name="payment_category_placeholder">Categoría</string>
+    <string name="payment_date_placeholder">Fecha de vencimiento</string>
+    <string name="to_pay_label">a pagar</string>
+
+    <!-- ============================================== -->
+    <!-- WIDGET: SALDO Y GRÁFICO (Home Widget)          -->
+    <!-- ============================================== -->
+
+    <string name="widget_title_balance">Balance</string>
+    <string name="current_balance_label">Saldo actual</string>
+    <string name="total_income_label">Ingresos totales</string>
+    <string name="total_expenses_label">Gastos totales</string>
+    <string name="balance_positive">+%1$s</string>
+    <string name="balance_negative">−%1$s</string>
+    <string name="widget_icon_balance">Icono de balance</string>
+    <string name="loading_balance">Cargando…</string>
+    <string name="change_placeholder">+$0.00 hoy</string>
+    <string name="add_transaction_description">Añadir transacción</string>
+    <string name="income_short">Ingresos</string>
+    <string name="expense_short">Gastos</string>
+
+    <!-- ============================================== -->
+    <!-- WIDGET: PRÓXIMOS PAGOS (Upcoming Payments)     -->
+    <!-- ============================================== -->
+
+    <string name="widget_title_upcoming_payments">Próximos Pagos</string>
+    <string name="payments_widget_icon_description">Icono de pagos programados</string>
+    <string name="payments_count_placeholder">%d pagos pendientes</string>
+    <string name="payments_count_singular">%d pago pendiente</string>
+    <string name="filter_payments_description">Filtrar pagos</string>
+    <string name="total_to_pay_label">Total a pagar</string>
+    <string name="urgent_payments_label">Pagos urgentes</string>
+    <string name="no_upcoming_payments_title">¡Todo al día!</string>
+    <string name="no_upcoming_payments_message">No tienes pagos pendientes próximamente</string>
+    <string name="payments_info_message">Tienes %d pagos esta semana</string>
+    <string name="payments_urgent_warning">¡Atención! Hay pagos urgentes</string>
+    <string name="payments_all_clear">Todo en orden con tus pagos</string>
+    <string name="view_calendar_description">Ver calendario de pagos</string>
+    <string name="filter_all">Todos</string>
+    <string name="filter_urgent">Urgentes</string>
+    <string name="filter_this_week">Esta semana</string>
+    <string name="filter_this_month">Este mes</string>
+
+
+    <!-- ============================================== -->
+    <!-- COMPONENTES (Items)                           -->
+    <!-- ============================================== -->
+
+    <!-- Budget Item -->
+    <string name="percentage_placeholder">0%</string>
+    <string name="spent_amount_placeholder">$0 gastados</string>
+    <string name="budget_total_placeholder">de $0</string>
+    <string name="budget_exceeded">Excedido</string>
+    <string name="budget_warning">Advertencia</string>
+    <string name="budget_on_track">En ruta</string>
+    <string name="days_remaining_placeholder">Quedan %d días</string>
+    <string name="budget_item_description">Item de presupuesto para %s</string>
+
+    <!-- Goal Item -->
+    <string name="goal_name_placeholder">Mi Meta</string>
+    <string name="goal_deadline_placeholder">Meta para %s</string>
+    <string name="goal_target_format">de %s</string>
+    <string name="goal_remaining_amount">Faltan %s para completar</string>
+    <string name="goal_almost_there">¡Casi!</string>
+    <string name="goal_completed">¡Completada!</string>
+    <string name="goal_behind_schedule">Necesita impulso</string>
+    <string name="add_to_goal_description">Agregar fondos a la meta</string>
+    <string name="view_goal_details">Ver detalles de la meta</string>
+    <string name="goal_days_remaining">%d días restantes</string>
+    <string name="goal_months_remaining">%d meses restantes</string>
+
+    <!-- Transaction Item -->
+    <string name="transaction_title_placeholder">Transacción</string>
+    <string name="transaction_category_placeholder">Categoría</string>
+    <string name="transaction_time_placeholder">Ahora</string>
+    <string name="transaction_note_placeholder">Nota</string>
+    <string name="transaction_pending">PENDIENTE</string>
+    <string name="transaction_recurring">RECURRENTE</string>
+    <string name="transaction_split">DIVIDIDA</string>
+    <string name="transaction_refund">REEMBOLSO</string>
+
+    <!-- Upcoming Payment Item -->
+    <string name="beneficiary_placeholder">Beneficiario</string>
+    <string name="payment_type_bill">Factura</string>
+    <string name="payment_type_subscription">Suscripción</string>
+    <string name="payment_type_loan">Préstamo</string>
+    <string name="payment_type_credit_card">Tarjeta de crédito</string>
+    <string name="in_days">en %d días</string>
+    <string name="in_days_singular">en %d día</string>
+    <string name="tomorrow_label">mañana</string>
+    <string name="today_label">hoy</string>
+    <string name="overdue_label">vencido</string>
+    <string name="quick_pay">Pago rápido</string>
+    <string name="set_reminder">Recordar</string>
+
+    <!-- ============================================== -->
+    <!-- CATEGORÍAS, MÉTODOS Y FORMATOS                -->
+    <!-- ============================================== -->
+
+    <!-- Categorías de gastos -->
+    <string name="category_food">Alimentación</string>
+    <string name="category_transport">Transporte</string>
+    <string name="category_entertainment">Entretenimiento</string>
+    <string name="category_bills">Servicios</string>
+    <string name="category_shopping">Compras</string>
+    <string name="category_health">Salud</string>
+    <string name="category_education">Educación</string>
+    <string name="category_other">Otros</string>
+
+    <!-- Métodos de pago -->
+    <string name="payment_method_card">Tarjeta</string>
+    <string name="payment_method_cash">Efectivo</string>
+    <string name="payment_method_transfer">Transferencia</string>
+    <string name="payment_method_other">Otro</string>
+
+    <!-- Formato de Moneda y Números -->
+    <string name="currency_format">$%1$s</string>
+    <string name="currency_format_negative">−$%1$s</string>
+    <string name="percentage_format">%1$s%%</string>
+    <string name="number_thousands">%1$sk</string>
+    <string name="number_millions">%1$sM</string>
+
+    <!-- ============================================== -->
+    <!-- ESTADOS GLOBALES, ERRORES Y NOTIFICACIONES    -->
+    <!-- ============================================== -->
+
+    <string name="error_network">Sin conexión</string>
+    <string name="error_loading">Error al cargar</string>
+    <string name="error_permission">Permiso requerido</string>
+    <string name="retry">Reintentar</string>
+    <string name="empty_state">No hay datos para mostrar</string>
+    <string name="sync_in_progress">Sincronizando…</string>
+
+    <string name="notification_widget_updated">Widget actualizado</string>
+    <string name="notification_goal_reached">¡Meta alcanzada!</string>
+    <string name="notification_payment_due">Pago próximo a vencer</string>
+    <string name="notification_budget_exceeded">Presupuesto excedido</string>
+
+    <!-- ============================================== -->
+    <!-- CONFIGURACIÓN DE WIDGETS                      -->
+    <!-- ============================================== -->
+
+    <string name="config_title">Configurar widget</string>
+    <string name="config_choose_account">Elegir cuenta</string>
+    <string name="config_choose_period">Elegir período</string>
+    <string name="config_show_balance">Mostrar saldo</string>
+    <string name="config_show_graph">Mostrar gráfico</string>
+    <string name="config_auto_update">Actualización automática</string>
+    <string name="config_theme">Tema del widget</string>
+    <string name="config_theme_system">Sistema</string>
+    <string name="config_theme_light">Claro</string>
+    <string name="config_theme_dark">Oscuro</string>
+
+    <!-- Períodos de tiempo -->
+    <string name="period_today">Hoy</string>
+    <string name="period_this_week">Esta semana</string>
+    <string name="period_this_month">Este mes</string>
+    <string name="period_this_year">Este año</string>
+    <string name="period_last_7_days">Últimos 7 días</string>
+    <string name="period_last_30_days">Últimos 30 días</string>
+    <string name="period_custom">Personalizado</string>
+
+    <!-- ============================================== -->
+    <!-- ACCESIBILIDAD ADICIONAL                       -->
+    <!-- ============================================== -->
+
+    <string name="content_description_chart">Gráfico de gastos</string>
+    <string name="content_description_trend_up">Tendencia al alza</string>
+    <string name="content_description_trend_down">Tendencia a la baja</string>
+    <string name="content_description_trend_stable">Tendencia estable</string>
+    <string name="content_description_health_good">Estado financiero bueno</string>
+    <string name="content_description_health_warning">Estado financiero requiere atención</string>
+    <string name="content_description_health_critical">Estado financiero crítico</string>
+
+    <string name="days_until_payment">Vence en %d días</string>
+
+    <!-- ============================================== -->
+    <!-- STRINGS FALTANTES PARA GOALS WIDGET           -->
+    <!-- ============================================== -->
+    
+    <!-- Goals Widget Header -->
+    <string name="goals_widget_icon_description">Icono de metas financieras</string>
+    <string name="goals_active_count">%d metas activas</string>
+    <string name="add_new_goal_description">Agregar nueva meta</string>
+    
+    <!-- Goals Summary -->
+    <string name="total_saved_label">Total ahorrado</string>
+    <string name="avg_progress_label">Progreso promedio</string>
+    
+    <!-- Goals Empty State -->
+    <string name="no_active_goals_title">Sin metas activas</string>
+    <string name="no_active_goals_message">Comienza a alcanzar tus sueños creando tu primera meta</string>
+    <string name="create_first_goal">Crear mi primera meta</string>
+    
+    <!-- Goals Footer -->
+    <string name="goals_motivational_message">¡Vas por buen camino! Sigue así.</string>
+    
+        <!-- 🔽 Añade esta línea si no está -->
+    <string name="widget_manifestation_description">Tu widget de manifestaciones</string>
+
+    <!-- 🔽 Puedes añadir también los otros strings si no existen aún -->
+    <string name="widget_image_desc">Imagen de la manifestación</string>
+
+    <string name="widget_description">Visualiza y manifiesta tus deseos diariamente</string>
+    <string name="manifestation_image_description">Imagen de tu manifestación</string>
+    <string name="manifestation_icon">Icono de manifestación</string>
+    <string name="next_manifestation">Siguiente manifestación</string>
+    <string name="previous_manifestation">Anterior manifestación</string>
+
 </resources>

@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 🌟 LAYOUT DEL WIDGET "VISION FOCUS" -->
+<!-- Diseño moderno con glassmorphism para manifestación diaria -->
+
+<FrameLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="0dp">
+
+    <!-- ===== CONTENEDOR PRINCIPAL CON BORDES REDONDEADOS ===== -->
+    <LinearLayout
+        android:id="@+id/widget_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:background="@drawable/widget_background"
+        android:clipToOutline="true">
+
+        <!-- ===== IMAGEN DE FONDO CON OVERLAY ===== -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <!-- Imagen de la manifestación -->
+            <ImageView
+                android:id="@+id/manifestation_image"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:contentDescription="@string/manifestation_image_description"
+                android:src="@drawable/placeholder_manifestation" />
+
+            <!-- Overlay degradado para legibilidad -->
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/gradient_overlay" />
+
+            <!-- Efecto de visualización (aparece al presionar ✨) -->
+            <FrameLayout
+                android:id="@+id/visualization_effect"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone"
+                android:background="@drawable/visualization_ripple"
+                android:alpha="0.7" />
+
+            <!-- ===== HEADER: Icono + Contador ===== -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="12dp"
+                android:gravity="center_vertical">
+
+                <!-- Icono de estrella -->
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@drawable/ic_sparkle"
+                    android:tint="#FFD700"
+                    android:contentDescription="@string/manifestation_icon" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Mi Manifestación"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:shadowColor="#000000"
+                    android:shadowRadius="4" />
+
+                <!-- Contador (ej: "1 de 5") -->
+                <TextView
+                    android:id="@+id/manifestation_counter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="1 de 5"
+                    android:textColor="#FFFFFF"
+                    android:textSize="11sp"
+                    android:background="@drawable/counter_badge"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp"
+                    android:shadowColor="#000000"
+                    android:shadowRadius="4" />
+            </LinearLayout>
+
+            <!-- ===== CONTENIDO: Título + Descripción ===== -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <!-- Título de la manifestación -->
+                <TextView
+                    android:id="@+id/manifestation_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Casa en la playa"
+                    android:textColor="#FFFFFF"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    android:maxLines="2"
+                    android:ellipsize="end"
+                    android:shadowColor="#000000"
+                    android:shadowDx="0"
+                    android:shadowDy="2"
+                    android:shadowRadius="6" />
+
+                <!-- Descripción (opcional) -->
+                <TextView
+                    android:id="@+id/manifestation_description"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Un lugar para descansar y disfrutar"
+                    android:textColor="#F0F0F0"
+                    android:textSize="13sp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:layout_marginTop="4dp"
+                    android:shadowColor="#000000"
+                    android:shadowRadius="4"
+                    android:visibility="visible" />
+            </LinearLayout>
+        </FrameLayout>
+
+        <!-- ===== BARRA DE ACCIONES ===== -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:orientation="horizontal"
+            android:background="@drawable/actions_bar_background"
+            android:gravity="center"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp">
+
+            <!-- Botón: Anterior (opcional) -->
+            <ImageButton
+                android:id="@+id/btn_previous"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@drawable/ic_chevron_left"
+                android:background="@drawable/button_ripple"
+                android:contentDescription="@string/previous_manifestation"
+                android:scaleType="centerInside"
+                android:tint="#FFFFFF" />
+
+            <!-- Botón: Visualizar (acción principal) -->
+            <FrameLayout
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp">
+
+                <Button
+                    android:id="@+id/btn_visualize"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:text="✨ Manifestar"
+                    android:textColor="#000000"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:background="@drawable/button_primary"
+                    android:elevation="4dp" />
+            </FrameLayout>
+
+            <!-- Botón: Siguiente -->
+            <ImageButton
+                android:id="@+id/btn_next"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@drawable/ic_chevron_right"
+                android:background="@drawable/button_ripple"
+                android:contentDescription="@string/next_manifestation"
+                android:scaleType="centerInside"
+                android:tint="#FFFFFF"
+                android:layout_marginEnd="4dp" />
+
+            <!-- Botón: Abrir app -->
+            <ImageButton
+                android:id="@+id/btn_open_app"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@drawable/ic_open_app"
+                android:background="@drawable/button_ripple"
+                android:contentDescription="@string/open_app"
+                android:scaleType="centerInside"
+                android:tint="#FFFFFF" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

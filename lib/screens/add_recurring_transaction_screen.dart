@@ -48,6 +48,22 @@ class _AddRecurringTransactionScreenState
     _accountsFuture = _accountRepository.getAccounts();
     _startDate = DateTime.now();
 
+    // ==================== INICIO DE LA CORRECCIÓN ====================
+    // Añadimos un listener al Future para inicializar la cuenta seleccionada
+    // cuando los datos estén listos.
+    _accountsFuture.then((accounts) {
+      // Es una buena práctica verificar si el widget sigue "montado"
+      // antes de llamar a setState en un callback asíncrono.
+      if (mounted && accounts.isNotEmpty) {
+        setState(() {
+          // Asignamos la primera cuenta de la lista como la seleccionada por defecto.
+          _selectedAccountId = accounts.first.id;
+          _selectedAccount = accounts.first;
+        });
+      }
+    });
+    // ===================== FIN DE LA CORRECCIÓN ======================
+
     // Animación del selector de tipo
     _typeAnimationController = AnimationController(
       duration: const Duration(milliseconds: 300),

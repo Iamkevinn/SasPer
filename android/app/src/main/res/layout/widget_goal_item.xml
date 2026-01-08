@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+    Item de Meta Individual - Material You 3 Expressive
+    - Card elevado con bordes redondeados
+    - Barra de progreso visual prominente
+    - Información jerárquica clara
+    - Acciones rápidas integradas
+-->
+<LinearLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/goal_item_background"
+    android:padding="16dp"
+    android:layout_marginBottom="8dp"
+    android:clickable="true"
+    android:focusable="true">
+
+    <!-- ============================================== -->
+    <!-- HEADER: Nombre y estado de la meta            -->
+    <!-- ============================================== -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="12dp">
+        
+        <!-- Icono de categoría de la meta -->
+        <ImageView
+            android:id="@+id/goal_icon"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@android:drawable/ic_menu_save"
+            android:tint="?attr/colorPrimary"
+            android:contentDescription="@string/widget_icon_description"
+            android:layout_marginEnd="12dp" />
+        
+        <!-- Nombre y deadline -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+            
+            <!-- Nombre de la meta -->
+            <TextView
+                android:id="@+id/goal_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/goal_name_placeholder"
+                android:textAppearance="@style/TextAppearance.Material3.TitleSmall"
+                android:textColor="?attr/colorOnSurface"
+                android:fontFamily="sans-serif_medium"
+                android:maxLines="1"
+                android:ellipsize="end" />
+            
+            <!-- Fecha límite -->
+            <TextView
+                android:id="@+id/goal_deadline"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/goal_deadline_placeholder"
+                android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:fontFamily="sans-serif"
+                android:layout_marginTop="2dp"
+                android:alpha="0.8" />
+        </LinearLayout>
+        
+        <!-- Badge de estado -->
+        <TextView
+            android:id="@+id/goal_status_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/goal_on_track"
+            android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+            android:textColor="?attr/colorOnSecondaryContainer"
+            android:fontFamily="sans-serif_medium"
+            android:background="@drawable/status_badge_background"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp" />
+    </LinearLayout>
+
+    <!-- ============================================== -->
+    <!-- PROGRESO: Barra y porcentaje                  -->
+    <!-- ============================================== -->
+    
+    <!-- Porcentaje de progreso -->
+    <TextView
+        android:id="@+id/goal_progress_percentage"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/goal_progress_label"
+        android:textAppearance="@style/TextAppearance.Material3.HeadlineSmall"
+        android:textColor="?attr/colorPrimary"
+        android:fontFamily="sans-serif_display"
+        android:layout_marginBottom="8dp"
+        android:letterSpacing="-0.02" />
+    
+    <!-- Barra de progreso con track personalizado -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="12dp"
+        android:layout_marginBottom="12dp">
+        
+        <!-- Track de fondo -->
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="@null"
+            android:background="@drawable/progress_track_background" />
+        
+        <!-- Progreso real -->
+        <ImageView
+            android:id="@+id/goal_progress_indicator"
+            android:layout_width="0dp"
+            android:contentDescription="@null"
+            android:layout_height="match_parent"
+            android:background="@drawable/progress_fill_background" />
+    </FrameLayout>
+
+    <!-- ============================================== -->
+    <!-- AMOUNTS: Actual y objetivo                    -->
+    <!-- ============================================== -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="12dp">
+        
+        <!-- Monto actual -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+            
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Actual"
+                android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:fontFamily="sans-serif"
+                android:alpha="0.7" />
+            
+            <TextView
+                android:id="@+id/goal_current_amount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/currency_format"
+                android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
+                android:textColor="?attr/colorOnSurface"
+                android:fontFamily="sans-serif_medium"
+                android:layout_marginTop="2dp" />
+        </LinearLayout>
+        
+        <!-- Monto objetivo -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="end">
+            
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Objetivo"
+                android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:fontFamily="sans-serif"
+                android:alpha="0.7" />
+            
+            <TextView
+                android:id="@+id/goal_target_amount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/goal_target_format"
+                android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
+                android:textColor="?attr/colorOnSurface"
+                android:fontFamily="sans-serif_medium"
+                android:layout_marginTop="2dp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- ============================================== -->
+    <!-- FOOTER: Información adicional y acción        -->
+    <!-- ============================================== -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+        
+        <!-- Monto restante -->
+        <TextView
+            android:id="@+id/goal_remaining_text"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/goal_remaining_amount"
+            android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:fontFamily="sans-serif"
+            android:alpha="0.8"
+            android:maxLines="1"
+            android:ellipsize="end" />
+        
+        <!-- Botón de acción rápida -->
+        <ImageButton
+            android:id="@+id/add_to_goal_button"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="@android:drawable/ic_input_add"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/add_to_goal_description"
+            android:tint="?attr/colorPrimary"
+            android:scaleType="center"
+            android:padding="6dp" />
+    </LinearLayout>
+
+</LinearLayout>

@@ -1,42 +1,123 @@
-<!-- android/app/src/main/res/layout/widget_upcoming_payment_item.xml -->
+<?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/upcoming_payment_item_container"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
-    android:padding="8dp"
-    android:gravity="center_vertical">
+    android:gravity="center_vertical"
+    android:paddingHorizontal="6dp"
+    android:paddingVertical="10dp"
+    android:background="@drawable/widget_upcoming_payment_background"
+    android:theme="@style/Theme.AppWidget"> <!-- [CORRECCIÓN] Tema añadido -->
 
-    <!-- Podrías usar un ImageView para el ícono si lo pasas -->
+    <!-- [CORRECCIÓN] Reemplazado <FrameLayout> por <FrameLayout> -->
+    <FrameLayout
+        android:id="@+id/urgency_indicator_bar"
+        android:layout_width="4dp"
+        android:layout_height="match_parent"
+        android:layout_marginEnd="12dp"
+        android:background="@drawable/widget_urgency_indicator"
+        tools:backgroundTint="#F57C00" />
+
+    <FrameLayout
+        android:id="@+id/payment_icon_container"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_marginEnd="12dp"
+        android:background="@drawable/widget_upcoming_payment_icon_bg">
+
+        <ImageView
+            android:id="@+id/payment_icon"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_payment"
+            android:tint="?attr/colorOnErrorContainer"
+            android:contentDescription="@null"
+            tools:src="@drawable/ic_payment" />
+    </FrameLayout>
 
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:paddingEnd="12dp"
+        tools:ignore="RtlSymmetry">
 
         <TextView
             android:id="@+id/tv_concept"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Concepto del Pago"
-            android:textColor="?android:attr/textColorPrimary"
+            android:text="@string/payment_concept_placeholder"
+            android:textColor="?attr/colorOnSurface"
+            android:fontFamily="sans-serif-medium"
+            android:textSize="14sp"
             android:maxLines="1"
-            android:ellipsize="end"/>
+            android:ellipsize="end"
+            tools:text="Tarjeta de Crédito" />
 
-        <TextView
-            android:id="@+id/tv_due_date"
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="dd/MM/yyyy"
-            android:textColor="?android:attr/textColorSecondary"
-            android:textSize="12sp"/>
+            android:layout_marginTop="3dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <ImageView
+                android:layout_width="11dp"
+                android:layout_height="11dp"
+                android:src="@drawable/ic_calendar_small"
+                android:tint="?attr/colorOnSurfaceVariant"
+                android:alpha="0.7"
+                android:contentDescription="@null" />
+
+            <TextView
+                android:id="@+id/tv_due_date"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="5dp"
+                android:text="@string/payment_date_placeholder"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:fontFamily="sans-serif"
+                android:textSize="12sp"
+                android:alpha="0.8"
+                tools:text="15 nov" />
+
+            <!-- [CORRECCIÓN] Reemplazado <FrameLayout> por <FrameLayout> -->
+            <FrameLayout
+                android:layout_width="2dp"
+                android:layout_height="2dp"
+                android:layout_marginHorizontal="6dp"
+                android:background="@drawable/widget_dot_separator" />
+
+            <TextView
+                android:id="@+id/tv_days_remaining"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/days_until_payment"
+                android:textColor="?attr/colorError"
+                android:fontFamily="sans-serif-medium"
+                android:textSize="11sp"
+                tools:text="en 3 días" />
+        </LinearLayout>
     </LinearLayout>
 
-    <TextView
-        android:id="@+id/tv_amount"
+    <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="€0.00"
-        android:textColor="@android:color/holo_red_light"
-        android:textStyle="bold"/>
+        android:orientation="vertical"
+        android:gravity="end">
+
+        <TextView
+            android:id="@+id/tv_amount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/currency_format"
+            android:textColor="?attr/colorError"
+            android:fontFamily="sans-serif-black"
+            android:textSize="17sp"
+            tools:text="$850K" />
+    </LinearLayout>
 </LinearLayout>

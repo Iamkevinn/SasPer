@@ -1,3 +1,4 @@
+import 'dart:developer' as developer;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:dynamic_color/dynamic_color.dart';
@@ -10,12 +11,15 @@ import 'package:sasper/services/theme_provider.dart';
 import 'package:line_awesome_flutter/line_awesome_flutter.dart';
 import 'package:quick_actions/quick_actions.dart';
 import 'package:sasper/screens/add_transaction_screen.dart';
-import 'dart:async'; // Necesario para StreamSubscription
-
-// --- PAQUETE ACTUALIZADO PARA DEEP LINKS ---
-// Se reemplaza 'uni_links' por 'app_links' que es más moderno y compatible.
+import 'dart:async';
+import 'package:timezone/data/latest_all.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:app_links/app_links.dart';
 import 'package:flutter_quill/flutter_quill.dart';
+
+// 🌟 NUEVO: Import para el widget de manifestaciones
+import 'package:sasper/services/manifestation_widget_service.dart';
 
 // =================================================================
 //                 CONFIGURACIÓN GLOBAL
@@ -23,17 +27,28 @@ import 'package:flutter_quill/flutter_quill.dart';
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
-  
   if (kDebugMode) {
     print("--- CÓDIGOS PARA ICONOS DE GASTOS ---");
-    print('El código para "Comida" (utensils) es: ${LineAwesomeIcons.utensils_solid.codePoint}');
-    print('El código para "Transporte" (bus) es: ${LineAwesomeIcons.bus_alt_solid.codePoint}');
-    // ... (resto de tus prints)
+    print(
+        'El código para "Comida" (utensils) es: ${LineAwesomeIcons.utensils_solid.codePoint}');
+    print(
+        'El código para "Transporte" (bus) es: ${LineAwesomeIcons.bus_alt_solid.codePoint}');
   }
 
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('es_CO', null);
   AppConfig.checkKeys();
+
+  try {
+    tz.initializeTimeZones();
+    final TimezoneInfo timeZoneInfo = await FlutterTimezone.getLocalTimezone();
+    final String timeZoneName = timeZoneInfo.identifier;
+    tz.setLocalLocation(tz.getLocation(timeZoneName));
+    developer.log('✅ Timezone inicializado globalmente: $timeZoneName',
+        name: 'Main');
+  } catch (e) {
+    developer.log('🔥 Error al inicializar timezone: $e', name: 'Main');
+  }
 
   runApp(
     ChangeNotifierProvider(
@@ -44,7 +59,7 @@ Future<void> main() async {
 }
 
 // =================================================================
-//       WIDGET PRINCIPAL DE LA APP (CON LÓGICA DE WIDGETS Y SHORTCUTS)
+//       WIDGET PRINCIPAL DE LA APP
 // =================================================================
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
@@ -54,83 +69,152 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  // Para los Shortcuts (menú al presionar largo)
   final QuickActions quickActions = const QuickActions();
-  
-  // Para el Widget de Pantalla de Inicio (usando app_links)
-  final _appLinks = AppLinks(); // Instancia del paquete
-  StreamSubscription<Uri>? _linkSubscription;
+  //final _appLinks = AppLinks();
+  //StreamSubscription<Uri>? _linkSubscription;
 
   @override
   void initState() {
     super.initState();
-    
-    // Inicializa la lógica para los Shortcuts
     _setupQuickActions();
     _handleQuickActions();
-
-    // Inicializa la lógica para el Widget de Pantalla de Inicio
-    _initDeepLinks();
+    //_initDeepLinks();
   }
 
   @override
   void dispose() {
-    _linkSubscription?.cancel();
+    //_linkSubscription?.cancel();
     super.dispose();
   }
 
-  /// Inicializa el manejo de deep links (clics desde el widget) de forma robusta.
-  Future<void> _initDeepLinks() async {
-    // Escucha los links que llegan mientras la app está abierta o en segundo plano.
-    // 'uriLinkStream' es la forma correcta y principal de recibir todos los links.
-    _linkSubscription = _appLinks.uriLinkStream.listen((uri) {
-      // Usamos 'mounted' para asegurarnos de que el widget todavía está en el árbol
-      // antes de intentar navegar.
-      if (mounted) {
-        _navigateToRouteFromUri(uri);
-      }
-    }, onError: (err) {
-      if (mounted) {
-        if (kDebugMode) {
-          print('Error escuchando los links: $err');
-        }
-      }
-    });
-  }
-  
-  /// Navega a la pantalla correcta basándose en el URI del deep link.
-  void _navigateToRouteFromUri(Uri uri) {
-    if (kDebugMode) {
-      print('Link recibido: $uri');
-    }
-    if (uri.scheme == 'sasper' && uri.host == 'sasper' && uri.path == '/add_transaction') {
-      navigatorKey.currentState?.pushNamed('/add_transaction');
-    }
-  }
+  /// Inicializa el manejo de deep links (clics desde widgets y otros)
+  //Future<void> _initDeepLinks() async {
+  //  _linkSubscription = _appLinks.uriLinkStream.listen((uri) {
+  //    if (mounted) {
+  //      _navigateToRouteFromUri(uri);
+  //    }
+  //  }, onError: (err) {
+  //    if (mounted && kDebugMode) {
+  //      print('Error escuchando los links: $err');
+  //    }
+  //  });
+  //}
 
-  /// Define y crea la lista de accesos directos (Shortcuts).
+  /// Navega a la pantalla correcta basándose en el URI del deep link
+  //void _navigateToRouteFromUri(Uri uri) {
+  //  if (kDebugMode) {
+  //    print('🔗 Link recibido: $uri');
+  //  }
+//
+  //  // Deep link para agregar transacción
+  //  if (uri.scheme == 'sasper' &&
+  //      uri.host == 'sasper' &&
+  //      uri.path == '/add_transaction') {
+  //    navigatorKey.currentState?.pushNamed('/add_transaction');
+  //    return;
+  //  }
+//
+  //  // 🌟 NUEVO: Deep link para interacciones del widget de manifestaciones
+  //  if (uri.scheme == 'sasper' && uri.host == 'manifestation') {
+  //    _handleManifestationWidgetAction(uri);
+  //    return;
+  //  }
+  //}
+
+  /// 🌟 NUEVO: Maneja las acciones del widget de manifestaciones
+  //void _handleManifestationWidgetAction(Uri uri) {
+  //  final action = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : '';
+//
+  //  if (kDebugMode) {
+  //    print('🌟 Acción de widget de manifestación: $action');
+  //  }
+//
+  //  switch (action) {
+  //    case 'open_app':
+  //      // El usuario abrió la app desde el widget
+  //      // Podrías navegar directamente a la pantalla de manifestaciones
+  //      navigatorKey.currentState?.pushNamed('/manifestations');
+  //      break;
+//
+  //    case 'next':
+  //    case 'previous':
+  //    case 'visualize':
+  //      // Estas acciones se manejan en el background callback
+  //      // pero si la app está abierta, mostramos feedback
+  //      if (action == 'visualize') {
+  //        _showVisualizationFeedback();
+  //      }
+  //      break;
+//
+  //    default:
+  //      if (kDebugMode) {
+  //        print('❓ Acción desconocida: $action');
+  //      }
+  //  }
+  //}
+
+  /// 🌟 NUEVO: Muestra feedback cuando el usuario "manifiesta"
+  //void _showVisualizationFeedback() {
+  //  final context = navigatorKey.currentContext;
+  //  if (context == null) return;
+//
+  //  ScaffoldMessenger.of(context).showSnackBar(
+  //    SnackBar(
+  //      content: Row(
+  //        children: const [
+  //          Icon(Icons.auto_awesome, color: Colors.amber),
+  //          SizedBox(width: 12),
+  //          Expanded(
+  //            child: Text(
+  //              '✨ ¡Manifestación visualizada!',
+  //              style: TextStyle(fontWeight: FontWeight.w600),
+  //            ),
+  //          ),
+  //        ],
+  //      ),
+  //      backgroundColor: Colors.deepPurple.shade700,
+  //      behavior: SnackBarBehavior.floating,
+  //      shape: RoundedRectangleBorder(
+  //        borderRadius: BorderRadius.circular(12),
+  //      ),
+  //      duration: const Duration(seconds: 2),
+  //    ),
+  //  );
+  //}
+
+  /// Define los accesos directos (Shortcuts)
   void _setupQuickActions() {
     quickActions.setShortcutItems(<ShortcutItem>[
       const ShortcutItem(
         type: 'add_transaction',
         localizedTitle: 'Nueva Transacción',
         icon: 'ic_shortcut_add_adaptive',
-      )
+      ),
+      // 🌟 NUEVO: Shortcut para ver manifestaciones
+      const ShortcutItem(
+        type: 'view_manifestations',
+        localizedTitle: 'Mis Manifestaciones',
+        icon: 'ic_shortcut_manifestation_adaptive',
+      ),
     ]);
   }
 
-  /// Inicializa el "listener" para los clics en los Shortcuts.
+  /// Maneja los clics en los Shortcuts
   void _handleQuickActions() {
     quickActions.initialize((String shortcutType) {
-      if (shortcutType == 'add_transaction') {
-        navigatorKey.currentState?.pushNamed('/add_transaction');
+      switch (shortcutType) {
+        case 'add_transaction':
+          navigatorKey.currentState?.pushNamed('/add_transaction');
+          break;
+        case 'view_manifestations':
+          navigatorKey.currentState?.pushNamed('/manifestations');
+          break;
       }
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // Tu método build no necesita ningún cambio, se queda exactamente igual.
     final themeProvider = Provider.of<ThemeProvider>(context);
 
     return DynamicColorBuilder(
@@ -143,7 +227,8 @@ class _MyAppState extends State<MyApp> {
           darkColorScheme = darkDynamic.harmonized();
         } else {
           lightColorScheme = ColorScheme.fromSeed(seedColor: Colors.blueAccent);
-          darkColorScheme = ColorScheme.fromSeed(seedColor: Colors.blueAccent, brightness: Brightness.dark);
+          darkColorScheme = ColorScheme.fromSeed(
+              seedColor: Colors.blueAccent, brightness: Brightness.dark);
         }
 
         return MaterialApp(
@@ -168,10 +253,12 @@ class _MyAppState extends State<MyApp> {
             Locale('es', ''),
             Locale('en', ''),
           ],
-          navigatorKey: navigatorKey, 
+          navigatorKey: navigatorKey,
           home: const SplashScreen(),
           routes: {
             '/add_transaction': (context) => const AddTransactionScreen(),
+            // 🌟 NUEVO: Ruta para manifestaciones (debes crearla o ajustarla)
+            // '/manifestations': (context) => const ManifestationsScreen(),
           },
         );
       },

@@ -4,9 +4,9 @@
 
     <!-- Permisos necesarios -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-        <!-- Permisos de Ubicación -->
+    <!-- Permisos de Ubicación -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <application
@@ -30,15 +30,15 @@
                 android:resource="@style/NormalTheme" />
 
             <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="sasper" android:host="add_transaction"/>
+                <data android:scheme="sasper" android:host="add_transaction" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
@@ -47,28 +47,29 @@
                 <data android:scheme="sasper" android:host="login-callback" />
             </intent-filter>
             <intent-filter>
-        <action android:name="android.intent.action.VIEW" />
-        <category android:name="android.intent.category.DEFAULT" />
-        <category android:name="android.intent.category.BROWSABLE" />
-        <!-- Define el esquema y host de tu deep link -->
-        <data
-            android:scheme="sasper"
-            android:host="sasper" />
-    </intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <!-- Define el esquema y host de tu deep link -->
+                <data
+                    android:scheme="sasper"
+                    android:host="sasper" />
+            </intent-filter>
         </activity>
-        
+
         <!-- AÑADE ESTE BLOQUE PARA REGISTRAR EL WIDGET -->
-    <receiver
-    android:name="com.example.sasper.AddTransactionWidgetProvider"
-    android:exported="false"
-    android:label="Añadir Transacción"> <!-- Añadimos una etiqueta para que se vea bien en la lista de widgets -->
-    <intent-filter>
-        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-    </intent-filter>
-    <meta-data
-        android:name="android.appwidget.provider"
-        android:resource="@xml/add_transaction_widget_info" />
-</receiver>
+        <receiver
+            android:name="com.example.sasper.AddTransactionWidgetProvider"
+            android:exported="false"
+            android:label="Añadir Transacción"> <!-- Añadimos una etiqueta para que se vea bien en la
+            lista de widgets -->
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/add_transaction_widget_info" />
+        </receiver>
 
         <!-- home_widget -->
         <receiver
@@ -81,7 +82,7 @@
         <service
             android:name="es.antonborri.home_widget.HomeWidgetBackgroundService"
             android:permission="android.permission.BIND_JOB_SERVICE"
-            android:exported="true"/>
+            android:exported="true" />
 
         <!-- =============================================================== -->
         <!-- App Widgets - Declaraciones de cada proveedor de widget -->
@@ -115,6 +116,35 @@
         </receiver>
 
         <receiver
+            android:name=".ManifestationWidgetProvider"
+            android:exported="true"
+            android:enabled="true"
+            android:label="Manifestación">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/manifestation_widget_info" />
+        </receiver>
+        
+        <receiver
+            android:name=".ManifestationVisionWidget"
+            android:label="Manifestaciones"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.sasper.ACTION_NEXT_MANIFESTATION" />
+                <action android:name="com.sasper.ACTION_PREVIOUS_MANIFESTATION" />
+                <action android:name="com.sasper.ACTION_VISUALIZE" />
+                <action android:name="com.sasper.ACTION_OPEN_APP" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/manifestation_vision_widget_info" />
+        </receiver>
+
+        <receiver
             android:name=".SasPerLargeWidgetProvider"
             android:exported="true"
             tools:replace="android:exported"
@@ -126,7 +156,7 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_large_info" />
         </receiver>
-        
+
         <receiver
             android:name=".GoalsWidgetProvider"
             android:exported="true"
@@ -150,7 +180,7 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/financial_health_widget_info" />
         </receiver>
-        
+
         <receiver
             android:name=".UpcomingPaymentsWidgetProvider"
             android:exported="true"
@@ -175,8 +205,25 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/monthly_comparison_widget_info" />
         </receiver>
-        
-         <!-- [NUEVO] Declaración para el widget de Próximo Pago -->
+
+        <receiver
+            android:name=".AffirmationFocusWidget"
+            android:label="Afirma tu futuro"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.sasper.ACTION_NEXT_AFFIRMATION" />
+                <action android:name="com.sasper.ACTION_PREVIOUS_AFFIRMATION" />
+                <action android:name="com.sasper.ACTION_ROTATE_AFFIRMATION" />
+                <action android:name="com.sasper.ACTION_FOCUS_MOMENT" />
+                <action android:name="com.sasper.ACTION_OPEN_APP_AFFIRMATION" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/affirmation_focus_widget_info" />
+        </receiver>
+
+        <!-- [NUEVO] Declaración para el widget de Próximo Pago -->
         <receiver
             android:name=".NextPaymentWidgetProvider"
             android:exported="true"
@@ -188,8 +235,10 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/next_payment_widget_info" />
         </receiver>
+
+
         <!-- =============================================================== -->
-        
+
         <service
             android:name=".GoalsWidgetService"
             android:permission="android.permission.BIND_REMOTEVIEWS"
@@ -218,26 +267,27 @@
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED"/>
-                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
         <receiver
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
-            android:exported="false"/>
+            android:exported="false" />
 
     </application>
 
     <queries>
         <intent>
-            <action android:name="android.intent.action.PROCESS_TEXT"/>
-            <data android:mimeType="text/plain"/>
+            <action android:name="android.intent.action.PROCESS_TEXT" />
+            <data android:mimeType="text/plain" />
         </intent>
     </queries>
 
-    <!--Seguridad al entrar a la app-->
+    <!--Seguridad
+    al entrar a la app-->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
-    
+
     <!-- Permiso para leer los contactos -->
-    <uses-permission android:name="android.permission.READ_CONTACTS"/>
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
 </manifest>

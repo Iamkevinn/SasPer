@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:developer' as developer;
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
+import 'package:sasper/models/manifestation_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sasper/models/dashboard_data_model.dart';
 
@@ -91,6 +92,7 @@ class DashboardRepository {
     });
   }
 
+  
   /// Carga los datos frescos del dashboard desde la base de datos.
   Future<void> forceRefresh({bool silent = true}) async {
     if (_isFetching) {
@@ -203,6 +205,20 @@ class DashboardRepository {
       _isFetching = false;
     }
   }
+
+  Future<List<Manifestation>> getManifestations({required String userId}) async {
+    final dashboardData = await fetchDataForWidget(userId: userId);
+    if (dashboardData == null) return [];
+
+    // Convertimos los items a Manifestation
+    final manifestations = (dashboardData.expenseSummaryForWidget as List)
+        .map((item) => Manifestation.fromMap(item as Map<String, dynamic>))
+        .toList();
+
+    return manifestations;
+    }
+
+
 
   /// Obtiene los datos del dashboard una sola vez. Ideal para tareas de fondo como widgets.
   Future<DashboardData?> fetchDataForWidget({required String userId}) async {

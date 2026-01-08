@@ -1,46 +1,273 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- 
+    Widget Principal de Balance - Material You 3 Expressive
+    - Diseño optimizado para lectura rápida
+    - Botón de acción destacado
+    - Colores dinámicos del sistema
+    - Animaciones y estados visuales
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/widget_root_linear_layout"
+    android:theme="@style/Theme.AppWidget.Expressive"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?attr/colorSurface"
-    android:padding="16dp"
-    android:theme="@style/Theme.AppWidget"
-    >
+    android:background="@drawable/widget_background">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <!-- ============================================== -->
+        <!-- HEADER: Título e icono del widget -->
+        <!-- ============================================== -->
         <LinearLayout
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingBottom="8dp">
+
+            <!-- Icono del widget -->
+            <ImageView
+                android:id="@+id/widget_icon"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_wallet"
+                android:tint="?attr/colorPrimary"
+                android:alpha="0.9"
+                android:contentDescription="@string/widget_icon_balance" />
+
+            <!-- Título del widget -->
             <TextView
                 android:id="@+id/widget_title"
-                style="@style/Widget.Text.Title"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:text="Saldo Total" />
-            <TextView
-                android:id="@+id/widget_balance"
-                style="@style/Widget.Text.Balance"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="$0.00" />
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="@string/widget_title_balance"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:fontFamily="sans-serif"
+                android:textSize="13sp"
+                android:letterSpacing="0.03"
+                android:alpha="0.87" />
+
+            <!-- Badge de estado (opcional) -->
+            <ImageView
+                android:id="@+id/widget_status_indicator"
+                android:layout_width="8dp"
+                android:layout_height="8dp"
+                android:background="@drawable/widget_status_badge"
+                android:backgroundTint="?attr/colorPrimary"
+                android:visibility="gone"
+                android:contentDescription="@null"
+                tools:visibility="visible" />
+
         </LinearLayout>
-        <ImageButton
-            android:id="@+id/widget_button"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginStart="16dp"
-            android:background="@drawable/widget_button_background"
-            android:backgroundTint="?attr/colorPrimary"
-            android:src="@drawable/ic_add"
-            android:tint="?attr/colorOnPrimary"
-            android:contentDescription="Añadir Transacción"/>
+
+        <!-- ============================================== -->
+        <!-- CONTENIDO PRINCIPAL: Balance -->
+        <!-- ============================================== -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <!-- Contenedor de balance y detalle -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:paddingEnd="16dp"
+                tools:ignore="RtlSymmetry">
+
+                <!-- Balance principal -->
+                <TextView
+                    android:id="@+id/widget_balance"
+                    style="@style/Widget.Text.Balance"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/loading_balance"
+                    android:textColor="?attr/colorOnSurface"
+                    android:fontFamily="sans-serif-black"
+                    android:textSize="36sp"
+                    android:letterSpacing="-0.02"
+                    android:lineSpacingExtra="0dp"
+                    android:includeFontPadding="false" />
+
+                <!-- Indicador de cambio (opcional) -->
+                <LinearLayout
+                    android:id="@+id/widget_change_container"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:visibility="visible">
+
+                    <!-- Flecha de tendencia -->
+                    <ImageView
+                        android:id="@+id/widget_trend_icon"
+                        android:layout_width="12dp"
+                        android:layout_height="12dp"
+                        android:src="@drawable/ic_trending_up"
+                        android:tint="?attr/colorPrimary"
+                        android:contentDescription="@null" />
+
+                    <!-- Texto de cambio -->
+                    <TextView
+                        android:id="@+id/widget_change_text"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:text="@string/change_placeholder"
+                        android:textColor="?attr/colorPrimary"
+                        android:fontFamily="sans-serif_medium"
+                        android:textSize="12sp"
+                        android:letterSpacing="0.01" />
+
+                </LinearLayout>
+
+                <!-- Subtítulo o período -->
+                <TextView
+                    android:id="@+id/widget_subtitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/current_balance_label"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:fontFamily="sans-serif"
+                    android:textSize="11sp"
+                    android:alpha="0.6"
+                    android:letterSpacing="0.04" />
+
+            </LinearLayout>
+
+            <!-- Botón de acción principal -->
+            <FrameLayout
+                android:id="@+id/widget_button_container"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:background="@drawable/widget_fab_background"
+                android:clickable="true"
+                android:focusable="true">
+
+                <ImageView
+                    android:id="@+id/widget_button"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_add"
+                    android:tint="?attr/colorOnPrimaryContainer"
+                    android:contentDescription="@string/add_transaction_description" />
+
+            </FrameLayout>
+
+        </LinearLayout>
+
+        <!-- ============================================== -->
+        <!-- FOOTER: Acciones secundarias o info -->
+        <!-- ============================================== -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <!-- Botón de vista rápida de ingresos -->
+            <LinearLayout
+                android:id="@+id/widget_income_button"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:paddingVertical="8dp"
+                android:paddingHorizontal="12dp"
+                android:background="@drawable/widget_chip_background"
+                android:clickable="true"
+                android:focusable="true">
+
+                <ImageView
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:src="@drawable/ic_arrow_down"
+                    android:tint="?attr/colorSecondary"
+                    android:contentDescription="@null" />
+
+                <TextView
+                    android:id="@+id/widget_income_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:text="@string/income_short"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:fontFamily="sans-serif-medium"
+                    android:textSize="11sp"
+                    android:letterSpacing="0.02" />
+            </LinearLayout>
+
+            <!-- [CORRECCIÓN] Se eliminó el <Space> y se añadió un margen aquí -->
+            <!-- Botón de vista rápida de gastos -->
+            <LinearLayout
+                android:id="@+id/widget_expense_button"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:layout_marginStart="8dp"
+                android:paddingVertical="8dp"
+                android:paddingHorizontal="12dp"
+                android:background="@drawable/widget_chip_background"
+                android:clickable="true"
+                android:focusable="true">
+
+                <ImageView
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:src="@drawable/ic_arrow_up"
+                    android:tint="?attr/colorTertiary"
+                    android:contentDescription="@null" />
+
+                <TextView
+                    android:id="@+id/widget_expense_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:text="@string/expense_short"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:fontFamily="sans-serif-medium"
+                    android:textSize="11sp"
+                    android:letterSpacing="0.02" />
+            </LinearLayout>
+        </LinearLayout>
+
     </LinearLayout>
-</RelativeLayout>
+
+    <!-- ============================================== -->
+    <!-- ESTADO DE CARGA (Overlay) -->
+    <!-- ============================================== -->
+    <FrameLayout
+        android:id="@+id/widget_loading_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#99000000"
+        android:visibility="gone"
+        tools:visibility="visible">
+
+        <ProgressBar
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_gravity="center"
+            android:indeterminateTint="?attr/colorPrimary" />
+
+    </FrameLayout>
+
+</FrameLayout>

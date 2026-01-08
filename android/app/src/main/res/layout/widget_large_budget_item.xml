@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+    Item de Presupuesto - Material You 3 Expressive
+    - Card con información de gasto vs límite
+    - Barra de progreso visual con estados de color
+    - Diseño compacto pero informativo
+-->
+<LinearLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:id="@+id/budget_item_container"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/budget_item_card_background"
+    android:padding="14dp"
+    android:clickable="true"
+    android:focusable="true">
+
+    <!-- ============================================== -->
+    <!-- HEADER: Categoría y porcentaje                -->
+    <!-- ============================================== -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="10dp">
+        
+        <!-- Icono de categoría -->
+        <ImageView
+            android:id="@+id/budget_item_icon"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:src="@android:drawable/ic_menu_compass"
+            android:tint="?attr/colorPrimary"
+            android:contentDescription="@string/budget_item_description"
+            android:layout_marginEnd="10dp" />
+        
+        <!-- Nombre de la categoría -->
+        <TextView
+            android:id="@+id/budget_item_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/category_food"
+            android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+            android:textColor="?attr/colorOnSurface"
+            android:fontFamily="sans-serif_medium"
+            android:ellipsize="end"
+            android:maxLines="1" />
+        
+        <!-- Porcentaje usado -->
+        <TextView
+            android:id="@+id/budget_item_percentage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/percentage_placeholder"
+            android:textAppearance="@style/TextAppearance.Material3.TitleSmall"
+            android:textColor="?attr/colorOnSurface"
+            android:fontFamily="sans-serif_display"
+            android:letterSpacing="-0.01" />
+    </LinearLayout>
+
+    <!-- ============================================== -->
+    <!-- BARRA DE PROGRESO                             -->
+    <!-- ============================================== -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="10dp"
+        android:layout_marginBottom="10dp">
+        
+        <!-- Track de fondo -->
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="@null"
+            android:background="@drawable/budget_progress_track" />
+        
+        <!-- Indicador de progreso -->
+        <ImageView
+            android:id="@+id/budget_item_progress_indicator"
+            android:layout_width="0dp"
+            android:contentDescription="@null"
+            android:layout_height="match_parent"
+            android:background="@drawable/budget_progress_fill" />
+        
+        <!-- Marca de advertencia (80% del presupuesto) -->
+        <ImageView
+            android:layout_width="1dp"
+            android:layout_height="match_parent"
+            android:layout_marginStart="24dp"
+            android:contentDescription="@null"
+            android:background="?attr/colorOutlineVariant"
+            android:alpha="0.4" />
+    </FrameLayout>
+
+    <!-- ============================================== -->
+    <!-- FOOTER: Montos y estado                       -->
+    <!-- ============================================== -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+        
+        <!-- Monto gastado y total -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="horizontal">
+            
+            <TextView
+                android:id="@+id/budget_item_spent"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/spent_amount_placeholder"
+                android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                android:textColor="?attr/colorOnSurface"
+                android:fontFamily="sans-serif_medium" />
+            
+            <TextView
+                android:id="@+id/budget_item_total"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/budget_total_placeholder"
+                android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:fontFamily="sans-serif"
+                android:layout_marginStart="4dp"
+                android:alpha="0.8" />
+        </LinearLayout>
+        
+        <!-- Badge de estado -->
+        <TextView
+            android:id="@+id/budget_item_status_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/budget_on_track"
+            android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+            android:textColor="?attr/colorOnSecondaryContainer"
+            android:fontFamily="sans-serif_medium"
+            android:background="@drawable/budget_status_badge"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="3dp"
+            android:paddingBottom="3dp"
+            android:visibility="visible" />
+    </LinearLayout>
+
+    <!-- Días restantes (opcional) -->
+    <TextView
+        android:id="@+id/budget_item_days_remaining"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/days_remaining_placeholder"
+        android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:fontFamily="sans-serif"
+        android:layout_marginTop="6dp"
+        android:alpha="0.7"
+        android:visibility="gone" />
+
+</LinearLayout>

@@ -1,6 +1,7 @@
 // lib/screens/main_screen.dart
 
 import 'dart:async';
+import 'dart:ui';
 import 'package:app_links/app_links.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -171,7 +172,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
         children: _widgetOptions,
       ),
       extendBody: true,
-      bottomNavigationBar: _buildModernBottomNavBar(),
+      bottomNavigationBar: _buildBubbleBottomNavBar(),
       floatingActionButton: _buildModernFAB(),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
@@ -255,45 +256,80 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     });
   }
 
-  Widget _buildModernBottomNavBar() {
+  Widget _buildBubbleBottomNavBar() {
     final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     
-    return Container(
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.shadow.withOpacity(0.1),
-            blurRadius: 20,
-            offset: const Offset(0, -5),
-          ),
-        ],
-      ),
+    return Padding(
+      padding: const EdgeInsets.only(left: 16, right: 16, bottom: 20),
       child: ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        child: BottomAppBar(
-          height: 80,
-          elevation: 0,
-          color: colorScheme.surfaceContainerLow,
-          shape: const CircularNotchedRectangle(),
-          notchMargin: 8.0,
-          padding: const EdgeInsets.only(bottom: 8, top: 4),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: <Widget>[
-              _buildNavItemModern(index: 0),
-              _buildNavItemModern(index: 1),
-              const SizedBox(width: 56), // Espacio para el FAB (ajustado al nuevo tamaño)
-              _buildNavItemModern(index: 2),
-              _buildNavItemModern(index: 3),
-            ],
+        borderRadius: BorderRadius.circular(36),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            height: 72,
+            decoration: BoxDecoration(
+              color: isDark 
+                  ? colorScheme.surfaceContainerHigh.withOpacity(0.7)
+                  : colorScheme.surface.withOpacity(0.7),
+              borderRadius: BorderRadius.circular(36),
+              boxShadow: [
+                BoxShadow(
+                  color: colorScheme.shadow.withOpacity(0.15),
+                  blurRadius: 30,
+                  offset: const Offset(0, 10),
+                  spreadRadius: 0,
+                ),
+                BoxShadow(
+                  color: isDark 
+                      ? Colors.black.withOpacity(0.3)
+                      : Colors.black.withOpacity(0.05),
+                  blurRadius: 15,
+                  offset: const Offset(0, 5),
+                  spreadRadius: -5,
+                ),
+              ],
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withOpacity(0.15)
+                    : Colors.white.withOpacity(0.6),
+                width: 1.5,
+              ),
+              gradient: isDark
+                  ? LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.white.withOpacity(0.1),
+                        Colors.white.withOpacity(0.05),
+                      ],
+                    )
+                  : LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.white.withOpacity(0.8),
+                        Colors.white.withOpacity(0.4),
+                      ],
+                    ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: <Widget>[
+                _buildNavItemBubble(index: 0),
+                _buildNavItemBubble(index: 1),
+                const SizedBox(width: 56), // Espacio para el FAB
+                _buildNavItemBubble(index: 2),
+                _buildNavItemBubble(index: 3),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildNavItemModern({required int index}) {
+  Widget _buildNavItemBubble({required int index}) {
     final item = _navItems[index];
     final isSelected = _selectedIndex == index;
     final colorScheme = Theme.of(context).colorScheme;
@@ -301,11 +337,11 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     return Expanded(
       child: InkWell(
         onTap: () => _onItemTapped(index),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(24),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeInOutCubic,
-          padding: const EdgeInsets.only(top: 8, bottom: 4),
+          padding: const EdgeInsets.symmetric(vertical: 12),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
@@ -360,7 +396,6 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                 ),
                 child: Text(item.label),
               ),
-              const SizedBox(height: 4), // Espacio extra inferior
             ],
           ),
         ),

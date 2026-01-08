@@ -13,6 +13,7 @@ import 'package:home_widget/home_widget.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sasper/data/debt_repository.dart';
+import 'package:sasper/data/manifestation_repository.dart';
 import 'package:sasper/data/recurring_repository.dart';
 import 'package:sasper/models/analysis_models.dart';
 import 'package:sasper/models/dashboard_data_model.dart';
@@ -22,6 +23,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 // NOVEDAD: Importamos SharedPreferences para leer las claves en segundo plano.
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sasper/data/analysis_repository.dart'; // <-- AÑADIR ESTA IMPORTACIÓN
+import 'package:sasper/models/manifestation_model.dart';
 
 // --- Constante de Logging ---
 const String _logName = 'WidgetService';
@@ -29,48 +31,77 @@ const String _logName = 'WidgetService';
 /// Callback de nivel superior para la actualización periódica en segundo plano.
 /// Este es el punto de entrada para TODAS las actualizaciones de widgets que se
 /// ejecutan cuando la app está cerrada.
-@pragma('vm:entry-point')
-Future<void> backgroundCallback(Uri? uri) async {
-  developer.log('🚀 [BACKGROUND] Callback de HomeWidget iniciado.',
-      name: _logName);
-
-  // 1. Leer las claves guardadas desde SharedPreferences.
-  final prefs = await SharedPreferences.getInstance();
-  final supabaseUrl = prefs.getString('supabase_url');
-  final supabaseApiKey = prefs.getString('supabase_api_key');
-
-  if (supabaseUrl == null || supabaseApiKey == null) {
+// =====> AÑADE ESTA NUEVA FUNCIÓN <=====
+  Future<void> handleWidgetAction(String action) async {
+    // La inicialización de Supabase ya la hace el router central,
+    // así que podemos llamar directamente a los métodos de actualización.
     developer.log(
-        '🔥 [BACKGROUND] ERROR: No se encontraron las claves de Supabase en SharedPreferences. Abortando actualización.',
+        '🚀 [BACKGROUND-ROUTED] Acción recibida para widget financiero: $action',
         name: _logName);
-    return; // No podemos continuar sin las claves.
+        
+    try {
+      // Aquí replicamos lo que hacía la antigua `backgroundCallback`.
+      // Si el propósito del callback era actualizar todo, hacemos eso.
+      // Si era para acciones específicas, las pondríamos en un switch.
+      // Basado en tu código, parece que una actualización general es lo correcto.
+      
+      // Asumimos que la acción principal es refrescar todos los datos
+      if (action == 'refresh' || action == 'updateAll') { // O cualquier acción que uses
+          await WidgetService.updateFinancialHealthWidget();
+          await WidgetService.updateMonthlyComparisonWidget();
+          await WidgetService.updateGoalsWidget();
+          await WidgetService.updateUpcomingPaymentsWidget();
+          await WidgetService.updateNextPaymentWidget();
+          developer.log(
+              '✅ [BACKGROUND-ROUTED] Todas las actualizaciones financieras completadas.',
+              name: _logName);
+      } else {
+           developer.log(
+              '❓ [BACKGROUND-ROUTED] Acción "$action" no manejada para widgets financieros.',
+              name: _logName);
+      }
+      
+    } catch (e) {
+      developer.log(
+          '🔥 [BACKGROUND-ROUTED] ERROR FATAL durante la actualización: $e',
+          name: _logName);
+    }
   }
 
-  try {
-    // 2. Inicializar una instancia de Supabase DENTRO de este Isolate de fondo.
-    // Usamos `Supabase.initialize` para configurar el singleton para este hilo.
-    // Esto es SEGURO y NECESARIO.
-    await Supabase.initialize(url: supabaseUrl, anonKey: supabaseApiKey);
-    developer.log(
-        '✅ [BACKGROUND] Supabase inicializado correctamente en segundo plano.',
-        name: _logName);
+Future<void> saveManifestationsToWidget(
+    List<Manifestation> manifestations) async {
+  if (manifestations.isEmpty) return;
 
-    // 3. Ahora que Supabase está listo, llamamos a nuestros métodos de actualización.
-    // Estos métodos ahora pueden usar `Supabase.instance.client` de forma segura.
-    await WidgetService.updateFinancialHealthWidget();
-    await WidgetService.updateMonthlyComparisonWidget();
-    await WidgetService.updateGoalsWidget();
-    await WidgetService.updateUpcomingPaymentsWidget();
-    await WidgetService.updateNextPaymentWidget();
+  // 1. Convertimos la lista completa a un JSON que Kotlin pueda entender.
+  //    Esto es CRUCIAL para que los botones "siguiente/anterior" funcionen.
+  final List<Map<String, String?>> widgetDataList = manifestations.map((m) {
+    return {
+      'title': m.title,
+      'description': m.description ?? "", // Incluimos la descripción
+      'image_url': m.imageUrl,
+    };
+  }).toList();
+  final String jsonStringList = jsonEncode(widgetDataList);
 
-    developer.log(
-        '✅ [BACKGROUND] Todas las tareas de actualización de widgets han sido llamadas.',
-        name: _logName);
-  } catch (e) {
-    developer.log(
-        '🔥 [BACKGROUND] ERROR FATAL durante la actualización de widgets en segundo plano: $e',
-        name: _logName);
-  }
+  // 2. Guardamos la lista completa. La clave 'manifestations_list' coincide con KEY_LIST en Kotlin.
+  await HomeWidget.saveWidgetData<String>(
+      'manifestations_list', jsonStringList);
+
+  // 3. Guardamos los datos del primer elemento para la vista inicial.
+  final Manifestation firstManifestation = manifestations.first;
+  await HomeWidget.saveWidgetData<String>('manifestation_index', '0');
+  await HomeWidget.saveWidgetData<String>(
+      'manifestation_title', firstManifestation.title);
+  // AÑADIDO: Guardamos la descripción del primer elemento.
+  await HomeWidget.saveWidgetData<String>(
+      'manifestation_description', firstManifestation.description ?? "");
+  await HomeWidget.saveWidgetData<String>(
+      'manifestation_image_path', firstManifestation.imageUrl ?? "");
+
+  // 4. Actualizamos el widget.
+  await HomeWidget.updateWidget(
+    androidName: 'ManifestationWidgetProvider',
+  );
 }
 
 /// Clase de servicio que encapsula toda la lógica para los widgets de la pantalla de inicio.
@@ -89,32 +120,50 @@ class WidgetService {
   /// en un Isolate secundario.
   static const String _goalsWidgetName = 'GoalsWidgetProvider';
 
-   // ---> CREA ESTA NUEVA FUNCIÓN <---
+  // ---> CREA ESTA NUEVA FUNCIÓN <---
   /// Orquesta la actualización de TODOS los widgets desde el hilo principal.
   /// Llama a los métodos individuales que actualizan cada tipo de widget.
-  Future<void> updateAllWidgetsFromDashboard(DashboardData data, BuildContext context) async {
+  Future<void> updateAllWidgetsFromDashboard(
+      DashboardData data, BuildContext context) async {
+        // Verificar timestamps antes de actualizar
+    final lastUpdate = await HomeWidget.getWidgetData<int>(
+      'last_update_timestamp',
+      defaultValue: 0,
+    );
+    
+    if (lastUpdate != null && 
+        DateTime.now().millisecondsSinceEpoch - lastUpdate < 5000) {
+      developer.log('⏱️ Actualización demasiado reciente, saltando...');
+      return;
+    }
     // 1. Llama a la función que ya tenías para los widgets principales.
     await updateAllWidgets(data, context);
 
     // 2. Llama explícitamente a las funciones de actualización para los otros widgets.
     //    Estas funciones ya están diseñadas para funcionar en segundo plano,
     //    por lo que también funcionarán perfectamente aquí.
-    developer.log('🚀 [UI_THREAD] Disparando actualizaciones para widgets secundarios...', name: _logName);
-    await WidgetService.updateFinancialHealthWidget();
-    await WidgetService.updateMonthlyComparisonWidget();
-    await WidgetService.updateGoalsWidget();
-    await WidgetService.updateUpcomingPaymentsWidget();
-    await WidgetService.updateNextPaymentWidget();
-    developer.log('✅ [UI_THREAD] Todas las actualizaciones de widgets han sido llamadas.', name: _logName);
+    developer.log(
+        '🚀 [UI_THREAD] Disparando actualizaciones para widgets secundarios...',
+        name: _logName);
+    await Future.wait([
+      WidgetService.updateFinancialHealthWidget(),
+      WidgetService.updateMonthlyComparisonWidget(),
+      WidgetService.updateGoalsWidget(),
+      WidgetService.updateUpcomingPaymentsWidget(),
+      WidgetService.updateNextPaymentWidget(),
+    ]);
+
+    developer.log(
+        '✅ [UI_THREAD] Todas las actualizaciones de widgets han sido llamadas.',
+        name: _logName);
   }
-  
+
   Future<void> updateAllWidgets(
       DashboardData data, BuildContext context) async {
     developer.log(
         '🚀 [UI_THREAD] Iniciando actualización completa de todos los widgets.',
         name: _logName);
 
-    // --> AÑADE ESTAS LÍNEAS DE VERIFICACIÓN <--
     developer.log(
         '📊 Datos recibidos: Balance=${data.totalBalance}, Presupuestos=${data.featuredBudgets.length}, Transacciones=${data.recentTransactions.length}',
         name: _logName);
@@ -125,36 +174,54 @@ class WidgetService {
           NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0)
               .format(data.totalBalance);
 
-      // 2. Serializar datos complejos a JSON.
-      final budgetsJson =
-          jsonEncode(data.featuredBudgets.map((b) => b.toJson()).toList());
-      final transactionsJson = jsonEncode(
-          data.recentTransactions.take(3).map((tx) => tx.toJson()).toList());
+      // ====================================================================
+      // 2. [CORRECCIÓN DEFINITIVA] Serializar datos complejos a JSON.
+      // ====================================================================
+      final budgetsJson = jsonEncode(data.featuredBudgets
+          .map((b) => {
+                // La clave 'category_name' es la que espera Kotlin.
+                // El valor viene de 'b.category' según tu modelo.
+                'category_name': b.category,
+                'progress': b.progress,
+              })
+          .toList());
 
-      // 3. Crear y guardar la imagen del gráfico (operación de UI/CPU).
+      final transactionsJson = jsonEncode(data.recentTransactions
+          .take(3)
+          .map((tx) => {
+                'description': tx.description,
+                // 'tx.category' ya es un String, lo pasamos directamente.
+                'category': tx.category,
+                'amount': tx.amount,
+                // 'tx.type' ya es un String, lo pasamos directamente.
+                'type': tx.type,
+              })
+          .toList());
+
+      // Logs para verificar el JSON que estamos generando
+      developer.log('SAVING BUDGETS JSON -> $budgetsJson',
+          name: 'WidgetService-SAVE');
+      developer.log('SAVING TRANSACTIONS JSON -> $transactionsJson',
+          name: 'WidgetService-SAVE');
+      // ====================================================================
+
+      // 3. Crear y guardar la imagen del gráfico (tu código existente).
       String? finalChartPath;
       if (data.expenseSummaryForWidget.isNotEmpty) {
-        developer.log('📊 [UI_THREAD] Creando imagen del gráfico...',
-            name: _logName);
+        // ... tu código para generar el gráfico se mantiene igual ...
         final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
         final chartBytes = await _createChartImageFromData(
             data.expenseSummaryForWidget,
             isDarkMode: isDarkMode);
-
         if (chartBytes != null) {
           final dir = await getApplicationSupportDirectory();
-          final file = File('${dir.path}/widget_chart.png');
+          final file = File('${dir.path}/widget_dashboard_chart.png');
           await file.writeAsBytes(chartBytes);
           finalChartPath = file.path;
-          developer.log(
-              '✅ [UI_THREAD] Imagen del gráfico guardada en: $finalChartPath',
-              name: _logName);
         }
       }
 
       // 4. Persistir todos los datos usando HomeWidget.
-      // Estas llamadas son asíncronas pero rápidas (escriben en SharedPreferences).
       await HomeWidget.saveWidgetData<String>(
           'total_balance', formattedBalance);
       await HomeWidget.saveWidgetData<String>(
@@ -164,17 +231,93 @@ class WidgetService {
       await HomeWidget.saveWidgetData<String>(
           'recent_transactions_json', transactionsJson);
 
-      // 5. Notificar a los widgets nativos que sus datos han cambiado y deben redibujarse.
+      // 5. Notificar a los widgets nativos.
       await HomeWidget.updateWidget(name: 'SasPerMediumWidgetProvider');
       await HomeWidget.updateWidget(name: 'SasPerLargeWidgetProvider');
-      // Asegúrate de incluir aquí los nombres de todos tus providers.
-      // await HomeWidget.updateWidget(name: 'SasPerSmallWidgetProvider');
 
       developer.log('✅ [UI_THREAD] Actualización de widgets completada.',
           name: _logName);
     } catch (e, st) {
       developer.log('🔥🔥🔥 [UI_THREAD] ERROR FATAL al actualizar widgets: $e',
           name: _logName, error: e, stackTrace: st);
+    }
+  }
+
+  //============================================================================
+// [NUEVO] SECCIÓN DE WIDGET DE MANIFESTACIÓN
+//============================================================================
+
+  /// Actualiza el widget de manifestación con los datos de una manifestación específica.
+  /// Esta función debe ser llamada desde la UI cuando el usuario selecciona qué manifestar.
+  /// // Este método guarda la lista de IDs y el índice inicial (0)
+  /// 
+  
+  static Future<void> setManifestationForWidget(
+      Manifestation manifestation) async {
+    developer.log(
+        '🚀 [UI_THREAD] Fijando manifestación "${manifestation.title}" para el widget.',
+        name: _logName);
+    try {
+      String? finalImagePath;
+
+      // 1. Si la imagen es una URL remota, la descargamos localmente.
+      // 1. Verificamos si existe una imagen primero
+      if (manifestation.imageUrl != null &&
+          manifestation.imageUrl!.isNotEmpty) {
+        final imageUrl = manifestation.imageUrl!.trim();
+
+        if (imageUrl.startsWith('http')) {
+          // Imagen remota: descargar
+          final httpClient = HttpClient();
+          final request = await httpClient.getUrl(Uri.parse(imageUrl));
+          final response = await request.close();
+          if (response.statusCode == 200) {
+            final bytes = await consolidateHttpClientResponseBytes(response);
+            final dir = await getApplicationSupportDirectory();
+            final file = File('${dir.path}/manifestation_image.png');
+            await file.writeAsBytes(bytes);
+            finalImagePath = file.path;
+          } else {
+            developer.log(
+                '⚠️ No se pudo descargar la imagen. Código: ${response.statusCode}',
+                name: _logName);
+          }
+        } else {
+          // Imagen local
+          finalImagePath = imageUrl;
+        }
+      } else {
+        // No hay imagen
+        developer.log('ℹ️ La manifestación no tiene imagen asociada.',
+            name: _logName);
+        finalImagePath = null;
+      }
+
+      // 3. Guardar los datos del widget con las claves CORRECTAS.
+      await HomeWidget.saveWidgetData<String>(
+          'simple_manifest_title', manifestation.title); // <-- CORREGIDO
+      await HomeWidget.saveWidgetData<String>(
+          'simple_manifest_description', manifestation.description ?? ""); // <-- CORREGIDO
+      await HomeWidget.saveWidgetData<String>(
+          'simple_manifest_image_url', finalImagePath ?? ""); // <-- CORREGIDO
+      await HomeWidget.saveWidgetData<String>(
+          'manifestation_id', manifestation.id);
+
+      // 4. Notificar al widget nativo (asegúrate que el nombre coincida en Kotlin)
+      var result = await HomeWidget.updateWidget(
+        name: 'ManifestationWidgetProvider',
+        androidName: 'ManifestationWidgetProvider',
+      );
+
+      developer.log(
+          '✅ [UI_THREAD] Widget de manifestación actualizado ($result).',
+          name: _logName);
+    } catch (e, st) {
+      developer.log(
+          '🔥 [UI_THREAD] Error al actualizar el widget de manifestación: $e',
+          name: _logName,
+          error: e,
+          stackTrace: st);
     }
   }
 
@@ -285,28 +428,31 @@ class WidgetService {
         '🔄 [WidgetService] Iniciando actualización del widget de metas...',
         name: 'WidgetService');
     try {
-      // 1. Usa la instancia Singleton
       final goalRepo = GoalRepository.instance;
-
-      // 2. Llama al nuevo método que devuelve un Future
       final goals = await goalRepo.getActiveGoals();
 
+      // [CORRECCIÓN] Mapeamos TODOS los campos necesarios para el widget.
       final goalsListForWidget = goals
           .map((goal) => {
+                'id': goal.id, // Esencial para los clicks
                 'name': goal.name,
                 'current_amount': goal.currentAmount,
                 'target_amount': goal.targetAmount,
+                'deadline': goal.targetDate
+                    ?.toIso8601String(), // Enviamos en formato estándar
+                'icon_type': goal
+                    .category, // Asumiendo que el ícono depende de la categoría
               })
           .toList();
 
-      // Guardar los datos para que el widget nativo los lea
-      await HomeWidget.saveWidgetData<String>(
-          'goals_list', json.encode(goalsListForWidget));
+      final jsonString = json.encode(goalsListForWidget);
+      developer.log('SAVING GOALS DATA -> $jsonString',
+          name: 'WidgetService-SAVE');
 
-      // Notificar al widget que se actualice
+      await HomeWidget.saveWidgetData<String>('goals_list', jsonString);
       await HomeWidget.updateWidget(
-        name: _goalsWidgetName,
-        androidName: _goalsWidgetName,
+        name: 'GoalsWidgetProvider', // Asegúrate de que el nombre es correcto
+        androidName: 'GoalsWidgetProvider',
       );
       developer.log(
           '✅ [WidgetService] Widget de metas actualizado con ${goals.length} metas.',
@@ -618,3 +764,4 @@ class WidgetService {
     }
   }
 }
+

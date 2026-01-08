@@ -117,6 +117,7 @@ flutter:
     - assets/icons/
     - assets/animations/
     - .env
+    - assets/Images/LaCondicionHumana.jpg
 
   # Shaders para efectos visuales (como el ruido en la navbar).
   shaders:

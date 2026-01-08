@@ -120,11 +120,11 @@ class NotificationService {
     developer.log('🚀 [NotificationService] Starting QUICK initialize()',
         name: 'NotificationService');
 
-    tz.initializeTimeZones();
-    final tzName = await FlutterTimezone.getLocalTimezone();
+    //tz.initializeTimeZones();
+    //final tzName = await FlutterTimezone.getLocalTimezone();
 // Solución: Llama a .toString() en el objeto TimezoneInfo para obtener el nombre como String
-    tz.setLocalLocation(tz.getLocation(tzName.toString()));
-    developer.log('   Timezone set: $tzName', name: 'NotificationService');
+    //tz.setLocalLocation(tz.getLocation(tzName.toString()));
+    //developer.log('   Timezone set: $tzName', name: 'NotificationService');
 
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosInit = DarwinInitializationSettings();

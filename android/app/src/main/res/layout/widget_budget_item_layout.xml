@@ -1,22 +1,219 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 
+    Item de Presupuesto - Material You 3 Expressive
+    - Diseño limpio con jerarquía visual
+    - Indicadores de progreso coloridos
+    - Iconos y valores claramente visibles
+    - Estados de alerta visual (normal, warning, exceeded)
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/budget_item_container"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:paddingVertical="6dp">
-    <TextView
-        android:id="@+id/widget_item_budget_title"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="🍔 Comida"
-        android:textColor="?android:attr/textColorPrimary"
-        android:textSize="14sp" />
-    <ProgressBar
-        android:id="@+id/widget_item_budget_progress"
-        style="?android:attr/progressBarStyleHorizontal"
+    android:paddingHorizontal="4dp"
+    android:paddingVertical="8dp"
+    android:background="@drawable/widget_budget_item_background"
+    android:clickable="true"
+    android:focusable="true">
+
+    <!-- ============================================== -->
+    <!-- HEADER: Título y valores -->
+    <!-- ============================================== -->
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="6dp"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingBottom="6dp">
+
+        <!-- Contenedor de icono -->
+        <FrameLayout
+            android:id="@+id/budget_icon_container"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="@drawable/widget_budget_icon_background">
+
+            <!-- Icono de categoría -->
+            <ImageView
+                android:id="@+id/budget_item_icon"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_category_food"
+                android:tint="?attr/colorPrimary"
+                android:contentDescription="@null"
+                tools:src="@drawable/ic_category_food" />
+
+        </FrameLayout>
+
+        <!-- Título de la categoría -->
+        <TextView
+            android:id="@+id/widget_item_budget_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="12dp"
+            android:text="@string/category_food"
+            android:textColor="?attr/colorOnSurface"
+            android:fontFamily="sans-serif_medium"
+            android:textSize="14sp"
+            android:letterSpacing="0.01"
+            android:maxLines="1"
+            android:ellipsize="end"
+            tools:text="Alimentación" />
+
+        <!-- Porcentaje usado -->
+        <TextView
+            android:id="@+id/budget_item_percentage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="@string/percentage_placeholder"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:fontFamily="sans-serif_medium"
+            android:textSize="13sp"
+            android:letterSpacing="0"
+            tools:text="75%" />
+
+    </LinearLayout>
+
+    <!-- ============================================== -->
+    <!-- PROGRESS BAR: Barra de progreso personalizada -->
+    <!-- ============================================== -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <!-- Barra de progreso -->
+        <ProgressBar
+            android:id="@+id/widget_item_budget_progress"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="8dp"
+            android:progress="75"
+            android:max="100"
+            android:progressDrawable="@drawable/widget_progress_bar_m3"
+            android:progressTint="?attr/colorPrimary"
+            android:progressBackgroundTint="?attr/colorSurfaceContainerHighest"
+            tools:progress="75" />
+
+        <!-- Indicador de límite (opcional, para mostrar meta) -->
+        <ImageView
+            android:id="@+id/budget_limit_indicator"
+            android:layout_width="2dp"
+            android:layout_height="12dp"
+            android:layout_gravity="start|center_vertical"
+            android:layout_marginStart="0dp"
+            android:background="?attr/colorOnSurfaceVariant"
+            android:alpha="0.5"
+            android:visibility="gone"
+            tools:visibility="visible"
+            android:contentDescription="@null"
+            tools:layout_marginStart="180dp" />
+
+    </FrameLayout>
+
+    <!-- ============================================== -->
+    <!-- FOOTER: Valores gastados y totales -->
+    <!-- ============================================== -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <!-- Valor gastado -->
+        <TextView
+            android:id="@+id/budget_item_spent"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/spent_amount_placeholder"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:fontFamily="sans-serif"
+            android:textSize="11sp"
+            android:letterSpacing="0.02"
+            android:alpha="0.87"
+            tools:text="$450.000 gastados" />
+
+        <!-- Valor total del presupuesto -->
+        <TextView
+            android:id="@+id/budget_item_total"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/budget_total_placeholder"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:fontFamily="sans-serif"
+            android:textSize="11sp"
+            android:letterSpacing="0.02"
+            android:alpha="0.6"
+            tools:text="de $600.000" />
+
+        <!-- Badge de estado (excedido/advertencia) -->
+        <FrameLayout
+            android:id="@+id/budget_status_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <TextView
+                android:id="@+id/budget_status_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/budget_exceeded"
+                android:textColor="?attr/colorOnErrorContainer"
+                android:background="@drawable/widget_budget_badge_background"
+                android:backgroundTint="?attr/colorErrorContainer"
+                android:fontFamily="sans-serif_medium"
+                android:textSize="10sp"
+                android:paddingHorizontal="6dp"
+                android:paddingVertical="2dp"
+                android:letterSpacing="0.03"
+                tools:text="Excedido" />
+
+        </FrameLayout>
+
+    </LinearLayout>
+
+    <!-- ============================================== -->
+    <!-- REMAINING DAYS INDICATOR (opcional) -->
+    <!-- ============================================== -->
+    <LinearLayout
+        android:id="@+id/budget_remaining_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
-        android:progress="75"
-        android:progressDrawable="@drawable/widget_progress_bar" />
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:visibility="gone"
+        tools:visibility="visible">
+
+        <ImageView
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:src="@drawable/ic_calendar"
+            android:tint="?attr/colorOnSurfaceVariant"
+            android:alpha="0.5"
+            android:contentDescription="@null" />
+
+        <TextView
+            android:id="@+id/budget_remaining_days"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:text="@string/days_remaining_placeholder"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:fontFamily="sans-serif"
+            android:textSize="10sp"
+            android:alpha="0.6"
+            android:letterSpacing="0.03"
+            tools:text="Quedan 12 días" />
+
+    </LinearLayout>
+
 </LinearLayout>

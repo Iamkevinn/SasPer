@@ -44,7 +44,7 @@
         android:extractNativeLibs="true"
         android:icon="@mipmap/ic_launcher"
         android:label="sasper"
-        android:theme="@style/AppTheme" >
+        android:theme="@style/LaunchTheme" >
 
         <!-- … otras entradas … -->
 

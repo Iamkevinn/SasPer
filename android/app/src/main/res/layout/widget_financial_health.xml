@@ -1,65 +1,215 @@
-<!-- android/app/src/main/res/layout/widget_financial_health.xml -->
+<?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/widget_root_container"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    xmlns:tools="http://schemas.android.com/tools"
+    android:background="@drawable/widget_background"
     android:orientation="vertical"
-    android:padding="16dp"
-    android:background="@drawable/widget_background_m3">
+    android:padding="20dp"
+    android:theme="@style/Theme.AppWidget"
+    android:clipToPadding="false">
 
-    <TextView
-        android:id="@+id/widget_title"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Salud Financiera"
-        android:textAppearance="?android:attr/textAppearanceMedium"
-        android:textColor="?android:attr/textColorPrimary"
-        android:textStyle="bold" />
-
+    <!-- HEADER -->
     <LinearLayout
+        android:id="@+id/widget_header"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingBottom="4dp">
+
+        <ImageView
+            android:id="@+id/widget_icon"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_finance_health"
+            android:tint="?attr/colorPrimary"
+            android:contentDescription="@string/widget_icon_description" />
+
+        <TextView
+            android:id="@+id/widget_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="12dp"
+            android:text="@string/widget_title_financial_health"
+            android:textColor="?attr/colorOnSurface"
+            android:fontFamily="sans-serif-medium"
+            android:textSize="18sp" />
+
+        <ImageButton
+            android:id="@+id/widget_refresh_button"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_refresh"
+            android:tint="?attr/colorOnSurfaceVariant"
+            android:alpha="0.7"
+            android:contentDescription="@string/refresh_button_description"
+            android:background="?android:attr/selectableItemBackgroundBorderless" />
+    </LinearLayout>
+
+    <!-- Divisor -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
         android:layout_marginTop="12dp"
+        android:layout_marginBottom="16dp"
+        android:background="?attr/colorOutlineVariant"
+        android:alpha="0.5" />
+
+    <!-- CONTENIDO -->
+
+    <!-- Insight 1: Ritmo de gasto -->
+    <LinearLayout
+        android:id="@+id/insight_1_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:orientation="horizontal">
+        android:paddingVertical="10dp"
+        android:background="@drawable/widget_item_background"
+        android:clickable="true"
+        android:focusable="true">
 
-        <ImageView
-            android:layout_width="18dp"
-            android:layout_height="18dp"
-            android:src="@drawable/ic_add"
-            android:alpha="0.7"
-            tools:ignore="ContentDescription" />
+        <FrameLayout
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginEnd="12dp"
+            android:background="@drawable/widget_icon_background">
 
-        <TextView
-            android:id="@+id/insight_1_text"
-            android:layout_width="wrap_content"
+            <ImageView
+                android:id="@+id/insight_1_icon"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_trending_up"
+                android:tint="?attr/colorPrimary"
+                android:contentDescription="@null" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="Ritmo de gasto: --"
-            android:textColor="?android:attr/textColorSecondary"/>
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/insight_1_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/spending_rate_label"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:fontFamily="sans-serif"
+                android:textSize="12sp"
+                android:alpha="0.87" />
+
+            <TextView
+                android:id="@+id/insight_1_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="@string/loading_data"
+                android:textColor="?attr/colorOnSurface"
+                android:fontFamily="sans-serif-medium"
+                android:textSize="15sp" />
+        </LinearLayout>
     </LinearLayout>
 
+    <!-- Insight 2: Tasa de ahorro -->
+    <LinearLayout
+        android:id="@+id/insight_2_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingVertical="10dp"
+        android:background="@drawable/widget_item_background"
+        android:clickable="true"
+        android:focusable="true"
+        android:layout_marginTop="12dp"> <!-- [CORRECCIÓN] Reemplazado <Space> con layout_marginTop -->
+
+        <FrameLayout
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginEnd="12dp"
+            android:background="@drawable/widget_icon_background">
+
+            <ImageView
+                android:id="@+id/insight_2_icon"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_savings"
+                android:tint="?attr/colorSecondary"
+                android:contentDescription="@null" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/insight_2_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/savings_rate_label"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:fontFamily="sans-serif"
+                android:textSize="12sp"
+                android:alpha="0.87" />
+
+            <TextView
+                android:id="@+id/insight_2_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="@string/loading_data"
+                android:textColor="?attr/colorOnSurface"
+                android:fontFamily="sans-serif-medium"
+                android:textSize="15sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- [CORRECCIÓN] Usamos un View para tomar el espacio restante -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"/>
+    
+    <!-- FOOTER -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
-
-        <ImageView
-            android:layout_width="18dp"
-            android:layout_height="18dp"
-            android:src="@drawable/ic_add"
-            android:alpha="0.7"
-            tools:ignore="ContentDescription" />
+        android:layout_marginTop="16dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
 
         <TextView
-            android:id="@+id/insight_2_text"
+            android:id="@+id/widget_last_update"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/last_update_placeholder"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:fontFamily="sans-serif"
+            android:textSize="11sp"
+            android:alpha="0.6" />
+
+        <TextView
+            android:id="@+id/widget_action_button"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="Tasa de ahorro: --"
-            android:textColor="?android:attr/textColorSecondary"/>
+            android:text="@string/view_details"
+            android:textColor="?attr/colorPrimary"
+            android:fontFamily="sans-serif-medium"
+            android:textSize="12sp"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="6dp"
+            android:background="@drawable/widget_button_background"
+            android:clickable="true"
+            android:focusable="true" />
     </LinearLayout>
-
 </LinearLayout>

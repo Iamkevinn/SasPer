@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Barra de progreso con gradiente animado -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    
+    <!-- Background -->
+    <item android:id="@android:id/background">
+        <shape android:shape="rectangle">
+            <corners android:radius="5dp" />
+            <solid android:color="?attr/colorSurfaceContainerHighest" />
+        </shape>
+    </item>
+    
+    <!-- Progress con gradiente -->
+    <item android:id="@android:id/progress">
+        <clip>
+            <shape android:shape="rectangle">
+                <corners android:radius="5dp" />
+                <gradient
+                    android:angle="0"
+                    android:startColor="?attr/colorPrimary"
+                    android:centerColor="?attr/colorSecondary"
+                    android:endColor="?attr/colorTertiary"
+                    android:type="linear" />
+            </shape>
+        </clip>
+    </item>
+    
+</layer-list>

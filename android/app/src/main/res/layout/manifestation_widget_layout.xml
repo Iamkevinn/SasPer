@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/manifestation_widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/rounded_widget_background"> <!-- Usamos un fondo con bordes redondeados -->
+
+    <!-- La imagen que ocupará todo el fondo -->
+    <ImageView
+        android:id="@+id/widget_manifestation_image"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:contentDescription="Imagen de la manifestación" />
+
+    <!-- Un gradiente que se superpone para oscurecer la parte inferior y hacer el texto legible -->
+    <ImageView
+        android:id="@+id/widget_gradient_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:src="@drawable/gradient_for_text_widget"
+        android:scaleType="fitXY"
+        android:contentDescription="Gradiente de overlay" />
+
+    <!-- Un contenedor para el título y la descripción en la parte inferior -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_gravity="bottom"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="16dp"
+        android:paddingTop="16dp">
+
+        <!-- El TextView para el Título -->
+        <TextView
+            android:id="@+id/widget_manifestation_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@android:color/white"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:maxLines="2"
+            android:ellipsize="end" />
+
+        <!-- EL NUEVO TextView para la Descripción -->
+        <TextView
+            android:id="@+id/widget_manifestation_description"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#E0E0E0"
+            android:textSize="14sp"
+            android:maxLines="3"
+            android:ellipsize="end"
+            android:layout_marginTop="4dp" />
+
+    </LinearLayout>
+
+    <!-- Botones de navegación (estos no cambian de lógica, solo se reposicionan) -->
+    <ImageButton
+        android:id="@+id/widget_prev_button"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_gravity="start|center_vertical"
+        android:layout_marginStart="8dp"
+        android:background="@drawable/button_circle"
+        android:src="@android:drawable/ic_media_previous"
+        android:contentDescription="Anterior"
+        android:tint="@android:color/white" />
+
+    <ImageButton
+        android:id="@+id/widget_next_button"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_gravity="end|center_vertical"
+        android:layout_marginEnd="8dp"
+        android:background="@drawable/button_circle"
+        android:src="@android:drawable/ic_media_next"
+        android:contentDescription="Siguiente"
+        android:tint="@android:color/white" />
+
+</FrameLayout>

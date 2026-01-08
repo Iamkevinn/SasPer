@@ -1,13 +1,68 @@
 <?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="rectangle">
+<!-- 
+    Background para Widgets con Material You 3 Expressive
+    - Superficie elevada con sombra sutil
+    - Adaptable a modo claro/oscuro
+    - Esquinas redondeadas según sistema
+    - Borde opcional para mayor contraste
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    
+    <!-- CAPA 1: Sombra suave (elevación) -->
+    <item
+        android:bottom="2dp"
+        android:left="1dp"
+        android:right="1dp"
+        android:top="1dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="@android:dimen/system_app_widget_background_radius" />
+            <solid android:color="#08000000" />
+        </shape>
+    </item>
+    
+    <!-- CAPA 2: Background principal con gradiente sutil -->
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="@android:dimen/system_app_widget_background_radius" />
+            
+            <!-- Gradiente sutil para dar profundidad (modo claro) -->
+            <gradient
+                android:angle="135"
+                android:centerColor="?attr/colorSurfaceContainer"
+                android:endColor="?attr/colorSurfaceContainerLow"
+                android:startColor="?attr/colorSurfaceContainerHigh"
+                android:type="linear" />
+        </shape>
+    </item>
+    
+    <!-- CAPA 3: Borde sutil para mejor definición -->
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="@android:dimen/system_app_widget_background_radius" />
+            <stroke
+                android:width="0.5dp"
+                android:color="?attr/colorOutlineVariant" />
+        </shape>
+    </item>
+    
+    <!-- CAPA 4: Overlay de brillo en la parte superior (efecto glassmorphism) -->
+    <item
+        android:bottom="16dp"
+        android:left="8dp"
+        android:right="8dp"
+        android:top="8dp">
+        <shape android:shape="rectangle">
+            <corners
+                android:bottomLeftRadius="0dp"
+                android:bottomRightRadius="0dp"
+                android:topLeftRadius="16dp"
+                android:topRightRadius="16dp" />
+            <gradient
+                android:angle="90"
+                android:endColor="#00FFFFFF"
+                android:startColor="#08FFFFFF"
+                android:type="linear" />
+        </shape>
+    </item>
 
-    <!-- Usamos un recurso de dimensión explícito para las esquinas.
-         Esto es más seguro que un atributo de tema en un drawable. -->
-    <corners android:radius="@android:dimen/system_app_widget_background_radius" />
-
-    <!-- Usamos un color explícito del sistema para el fondo.
-         Esto se adaptará al modo claro/oscuro automáticamente. -->
-    <solid android:color="@android:color/system_accent1_50" />
-
-</shape>
+</layer-list>

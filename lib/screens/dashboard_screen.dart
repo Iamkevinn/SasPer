@@ -27,6 +27,7 @@ import 'package:sasper/screens/goals_screen.dart';
 import 'package:sasper/screens/can_i_afford_it_screen.dart';
 import 'package:sasper/screens/ia_screen.dart';
 import 'package:sasper/screens/transactions_screen.dart';
+import 'package:sasper/screens/manifestations_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -139,6 +140,9 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   void _navigateToGoalsScreen() => Navigator.of(context)
       .push(MaterialPageRoute(builder: (context) => const GoalsScreen()));
+
+  void _navigateToManifestationsScreen() => Navigator.of(context)
+      .push(MaterialPageRoute(builder: (context) => const ManifestationsScreen()));
 
   Future<void> _checkAndShowCelebrations(DashboardData data) async {
     if (_hasShownCelebration) return;
@@ -361,6 +365,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               onSimulateTap: _navigateToCanIAffordIt,
               onAddTap: _navigateToTransactionsScreen,
               onGoalsTap: _navigateToGoalsScreen,
+              onManifestationsTap: _navigateToManifestationsScreen, 
             ).animate(
                 effects: _reduceMotion
                     ? []
@@ -1178,11 +1183,13 @@ class _QuickActions extends StatelessWidget {
   final VoidCallback onSimulateTap;
   final VoidCallback onAddTap;
   final VoidCallback onGoalsTap;
+  final VoidCallback onManifestationsTap;
 
   const _QuickActions({
     required this.onSimulateTap,
     required this.onAddTap,
     required this.onGoalsTap,
+    required this.onManifestationsTap,
   });
 
   @override
@@ -1199,6 +1206,9 @@ class _QuickActions extends StatelessWidget {
           const SizedBox(width: 12),
           _QuickActionButton(
               icon: Iconsax.flag, label: 'Metas', onTap: onGoalsTap),
+          const SizedBox(width: 12),
+          _QuickActionButton(
+              icon: Iconsax.magicpen, label: 'Manifestar', onTap: onManifestationsTap),
         ],
       ),
     );

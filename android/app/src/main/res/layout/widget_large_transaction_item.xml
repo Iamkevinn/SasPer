@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+    Item de Transacción - Material You 3 Expressive
+    - Diseño limpio y escaneable
+    - Icono de categoría coloreable
+    - Monto destacado con color según tipo
+    - Información secundaria sutil
+-->
+<LinearLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/transaction_item_container"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:background="@drawable/transaction_item_background"
+    android:padding="12dp"
+    android:clickable="true"
+    android:focusable="true"
+    android:minHeight="64dp">
+
+    <!-- ============================================== -->
+    <!-- ICONO DE CATEGORÍA                            -->
+    <!-- ============================================== -->
+    <FrameLayout
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:layout_marginEnd="12dp">
+        
+        <!-- Background del icono -->
+        <ImageView
+            android:id="@+id/transaction_item_icon_background"
+            android:layout_width="match_parent"
+            android:contentDescription="@null"
+            android:layout_height="match_parent"
+            android:background="@drawable/transaction_icon_circle"
+            android:backgroundTint="?attr/colorPrimaryContainer" />
+        
+        <!-- Icono -->
+        <ImageView
+            android:id="@+id/transaction_item_icon"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_gravity="center"
+            android:src="@android:drawable/ic_menu_compass"
+            android:tint="?attr/colorOnPrimaryContainer"
+            android:contentDescription="@string/category_food" />
+    </FrameLayout>
+
+    <!-- ============================================== -->
+    <!-- INFORMACIÓN PRINCIPAL                         -->
+    <!-- ============================================== -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+        
+        <!-- Título/Descripción de la transacción -->
+        <TextView
+            android:id="@+id/transaction_item_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Supermercado"
+            android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
+            android:textColor="?attr/colorOnSurface"
+            android:fontFamily="sans-serif"
+            android:ellipsize="end"
+            android:maxLines="1" />
+        
+        <!-- Categoría y fecha -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="2dp">
+            
+            <!-- Categoría -->
+            <TextView
+                android:id="@+id/transaction_item_category"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/category_food"
+                android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:fontFamily="sans-serif"
+                android:alpha="0.8" />
+            
+            <!-- Separador -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" • "
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:alpha="0.5" />
+            
+            <!-- Fecha/Hora -->
+            <TextView
+                android:id="@+id/transaction_item_date"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Hace 2h"
+                android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:fontFamily="sans-serif"
+                android:alpha="0.8" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- ============================================== -->
+    <!-- MONTO                                         -->
+    <!-- ============================================== -->
+    <TextView
+        android:id="@+id/transaction_item_amount"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/currency_format"
+        android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+        android:textColor="?attr/colorError"
+        android:fontFamily="sans-serif_medium"
+        android:layout_marginStart="12dp"
+        android:letterSpacing="-0.01" />
+
+</LinearLayout>

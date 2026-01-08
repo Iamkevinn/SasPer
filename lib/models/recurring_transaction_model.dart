@@ -80,7 +80,7 @@ class RecurringTransaction extends Equatable {
   Map<String, dynamic> toJson() {
     return {
       'description': description,
-      'amount': amount.abs(),
+      'amount': amount,
       'type': type,
       'category': category,
       'account_id': accountId,

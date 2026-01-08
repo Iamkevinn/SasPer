@@ -15,6 +15,8 @@ import 'package:sasper/screens/add_goal_screen.dart';
 import 'package:sasper/widgets/goals/contribute_to_goal_dialog.dart';
 import 'package:sasper/screens/edit_goal_screen.dart';
 import 'package:sasper/main.dart';
+// --- 1. AÑADIR IMPORTACIÓN DE LA PANTALLA DE NOTAS ---
+import 'package:sasper/screens/goal_notes_editor_screen.dart';
 
 class GoalsScreen extends StatefulWidget {
   const GoalsScreen({super.key});
@@ -63,6 +65,13 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
     if (result == true) _repository.refreshData();
   }
 
+  // --- 2. CREAR NUEVA FUNCIÓN DE NAVEGACIÓN PARA NOTAS ---
+  void _navigateToNotes(Goal goal) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => GoalNotesEditorScreen(goal: goal)),
+    );
+  }
+  
   Future<void> _handleDeleteGoal(Goal goal) async {
     final confirmed = await showDialog<bool>(
       context: navigatorKey.currentContext!,
@@ -181,11 +190,9 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
             final activeGoals = _filterGoals(allGoals.where((g) => g.status == GoalStatus.active).toList(), _activeFilters);
             final completedGoals = _filterGoals(allGoals.where((g) => g.status != GoalStatus.active).toList(), _completedFilters);
 
-            // --- INICIO DE LA CORRECCIÓN ESTRUCTURAL ---
             return TabBarView(
               controller: _tabController,
               children: [
-                // Cada hijo del TabBarView es ahora un CustomScrollView que recibe una lista de slivers.
                 RefreshIndicator(
                   onRefresh: _handleRefresh,
                   child: CustomScrollView(
@@ -212,21 +219,18 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
                 ),
               ],
             );
-            // --- FIN DE LA CORRECCIÓN ESTRUCTURAL ---
           },
         ),
       ),
     );
   }
 
-  // --- NUEVO MÉTODO HELPER QUE GENERA LOS SLIVERS PARA CADA TAB ---
   List<Widget> _buildSliversForTab({
     required BuildContext context,
     required List<Goal> goals,
     required _GoalFilters filters,
     required bool isCompletedTab,
   }) {
-    // Si la lista está vacía (después de filtrar), devolvemos un único sliver que llena la pantalla.
     if (goals.isEmpty) {
       return [
         SliverFillRemaining(
@@ -235,7 +239,6 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
       ];
     }
     
-    // Si la lista NO está vacía, devolvemos la lista de slivers normal.
     return [
       if (_showFilters)
         SliverToBoxAdapter(
@@ -261,6 +264,8 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
                 isCompleted: isCompletedTab,
                 onEdit: isCompletedTab ? null : () => _navigateToEditGoal(goal),
                 onDelete: isCompletedTab ? null : () => _handleDeleteGoal(goal),
+                // --- 4. CONECTAR LA FUNCIÓN AL WIDGET DE LA TARJETA ---
+                onNotesTap: isCompletedTab ? null : () => _navigateToNotes(goal),
                 onContributeSuccess: _handleRefresh,
               )
                   .animate()
@@ -274,7 +279,6 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
     ];
   }
 
-  // El método para construir el estado vacío ahora recibe los filtros
   Widget _buildEmptyFilterState(BuildContext context, _GoalFilters filters) {
     return Center(
       child: Padding(
@@ -304,7 +308,6 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
     );
   }
 
-  // --- El resto de tus widgets (_filterGoals, _buildSkeletonLoader, etc.) permanecen iguales ---
   List<Goal> _filterGoals(List<Goal> goals, _GoalFilters filters) {
     if (filters.timeframe == null && filters.priority == null) return goals;
     return goals.where((goal) {
@@ -365,10 +368,6 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
   }
 }
 
-
-// ============================================================================
-// CLASE AUXILIAR PARA FILTROS
-// ============================================================================
 class _GoalFilters {
   GoalTimeframe? timeframe;
   GoalPriority? priority;
@@ -381,14 +380,6 @@ class _GoalFilters {
   }
 }
 
-// ============================================================================
-// (SE ELIMINÓ EL WIDGET _GoalsTab PORQUE SU LÓGICA SE MOVIÓ A _buildSliversForTab)
-// ============================================================================
-
-
-// ============================================================================
-// ESTADÍSTICAS RÁPIDAS
-// ============================================================================
 class _QuickStats extends StatelessWidget {
   final List<Goal> goals;
 
@@ -396,7 +387,6 @@ class _QuickStats extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    //final totalTarget = goals.fold<double>(0, (sum, g) => sum + g.targetAmount);
     final totalSaved = goals.fold<double>(0, (sum, g) => sum + g.currentAmount);
     final avgProgress = goals.isNotEmpty ? goals.fold<double>(0, (sum, g) => sum + g.progress) / goals.length : 0;
 
@@ -517,9 +507,6 @@ class _StatItem extends StatelessWidget {
   }
 }
 
-// ============================================================================
-// SECCIÓN DE FILTROS (MEJORADA)
-// ============================================================================
 class _FilterSection extends StatelessWidget {
   final _GoalFilters filters;
   final VoidCallback onChanged;
@@ -640,14 +627,12 @@ class _FilterSection extends StatelessWidget {
   }
 }
 
-// ============================================================================
-// TARJETA DE META (REDISEÑADA)
-// ============================================================================
 class _GoalCard extends StatelessWidget {
   final Goal goal;
   final bool isCompleted;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  final VoidCallback? onNotesTap; // --- 3.A. AÑADIR NUEVO CALLBACK
   final VoidCallback onContributeSuccess;
 
   const _GoalCard({
@@ -655,6 +640,7 @@ class _GoalCard extends StatelessWidget {
     required this.isCompleted,
     this.onEdit,
     this.onDelete,
+    this.onNotesTap, // --- 3.B. AÑADIR AL CONSTRUCTOR
     required this.onContributeSuccess,
   });
 
@@ -789,9 +775,11 @@ class _GoalCard extends StatelessWidget {
           ),
         ),
         if (!isCompleted && onEdit != null && onDelete != null)
+          // --- 3.C. MODIFICAR EL MENÚ POP-UP ---
           PopupMenuButton<String>(
             onSelected: (value) {
               if (value == 'edit') onEdit?.call();
+              if (value == 'notes') onNotesTap?.call(); // Llamar a la nueva función
               if (value == 'delete') onDelete?.call();
             },
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -799,6 +787,11 @@ class _GoalCard extends StatelessWidget {
               const PopupMenuItem(
                 value: 'edit',
                 child: Row(children: [Icon(Iconsax.edit, size: 20), SizedBox(width: 12), Text('Editar')]),
+              ),
+              // Añadir la nueva opción de "Notas"
+              const PopupMenuItem(
+                value: 'notes',
+                child: Row(children: [Icon(Iconsax.document_text_1, size: 20), SizedBox(width: 12), Text('Notas')]),
               ),
               const PopupMenuItem(
                 value: 'delete',
@@ -970,9 +963,6 @@ class _GoalCard extends StatelessWidget {
   }
 }
 
-// ============================================================================
-// CHIP DE INFORMACIÓN (REDISEÑADO)
-// ============================================================================
 class _InfoChip extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -998,9 +988,6 @@ class _InfoChip extends StatelessWidget {
   }
 }
 
-// ============================================================================
-// HELPERS (CENTRALIZADOS)
-// ============================================================================
 class GoalHelpers {
   static String getPriorityText(GoalPriority priority) {
     switch (priority) {
