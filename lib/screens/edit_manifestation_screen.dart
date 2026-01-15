@@ -11,8 +11,7 @@ import 'package:sasper/models/manifestation_model.dart';
 class EditManifestationScreen extends StatefulWidget {
   final Manifestation manifestation;
 
-  const EditManifestationScreen({Key? key, required this.manifestation})
-      : super(key: key);
+  const EditManifestationScreen({super.key, required this.manifestation});
 
   @override
   State<EditManifestationScreen> createState() =>

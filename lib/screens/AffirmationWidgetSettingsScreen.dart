@@ -4,7 +4,7 @@ import 'package:sasper/services/affirmation_widget_service.dart';
 
 /// 🎨 Pantalla de configuración del widget de afirmaciones
 class AffirmationWidgetSettingsScreen extends StatefulWidget {
-  const AffirmationWidgetSettingsScreen({Key? key}) : super(key: key);
+  const AffirmationWidgetSettingsScreen({super.key});
 
   @override
   State<AffirmationWidgetSettingsScreen> createState() =>
@@ -463,7 +463,7 @@ class _AffirmationWidgetSettingsScreenState
               ),
             ),
           );
-        }).toList(),
+        }),
       ],
     );
   }

@@ -8,7 +8,7 @@ import 'dart:math' as math;
 import 'package:sasper/services/manifestation_widget_service.dart';
 
 class ManifestationsScreen extends StatefulWidget {
-  const ManifestationsScreen({Key? key}) : super(key: key);
+  const ManifestationsScreen({super.key});
 
   @override
   _ManifestationsScreenState createState() => _ManifestationsScreenState();
@@ -533,12 +533,12 @@ class _ManifestationCard extends StatelessWidget {
   final bool isDark;
 
   const _ManifestationCard({
-    Key? key,
+    super.key,
     required this.manifestation,
     required this.onEdit,
     required this.onDelete,
     required this.isDark,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

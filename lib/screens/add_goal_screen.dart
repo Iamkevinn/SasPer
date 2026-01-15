@@ -208,13 +208,27 @@ class _AddGoalScreenState extends State<AddGoalScreen>
     setState(() => _isLoading = true);
 
     try {
+       // --- CORRECCIÓN 1: Calcular el Timeframe Automáticamente ---
+      // El usuario elige fecha, nosotros determinamos si es Corto, Medio o Largo.
+      GoalTimeframe calculatedTimeframe;
+      final months = _monthsRemaining;
+
+      if (months <= 12) {
+        calculatedTimeframe = GoalTimeframe.short; // Menos de 1 año
+      } else if (months <= 36) {
+        calculatedTimeframe = GoalTimeframe.medium; // 1 a 3 años
+      } else {
+        calculatedTimeframe = GoalTimeframe.long; // Más de 3 años
+      }
+
       await _goalRepository.addGoal(
         name: _nameController.text.trim(),
         targetAmount: _targetAmount,
         targetDate: _targetDate,
         priority: _priority,
         categoryId: _selectedCategory?.id,
-        timeframe: GoalTimeframe.custom,
+        // Envíamos el calculado, NUNCA 'custom' si la BD no lo soporta
+        timeframe: calculatedTimeframe, 
       );
 
       if (mounted) {

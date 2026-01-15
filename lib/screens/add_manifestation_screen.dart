@@ -10,7 +10,7 @@ import 'package:path/path.dart' as path;
 import '../data/manifestation_repository.dart';
 
 class AddManifestationScreen extends StatefulWidget {
-  const AddManifestationScreen({Key? key}) : super(key: key);
+  const AddManifestationScreen({super.key});
 
   @override
   State<AddManifestationScreen> createState() => _AddManifestationScreenState();

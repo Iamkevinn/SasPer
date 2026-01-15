@@ -96,16 +96,24 @@ class GoalRepository {
   }) async {
     try {
       final userId = client.auth.currentUser!.id;
+      // --- CORRECCIÓN 2: Formato de Fecha Seguro ---
+      // toIso8601String() manda "2026-01-01T15:30:00". 
+      // Para una columna DATE, es mejor mandar "2026-01-01".
+      String? dateString;
+      if (targetDate != null) {
+        dateString = targetDate.toIso8601String().split('T')[0];
+      }
+
       await client.from('goals').insert({
         'user_id': userId,
         'name': name,
         'target_amount': targetAmount,
         'current_amount': 0,
         'status': 'active',
-        'target_date': targetDate?.toIso8601String(),
+        'target_date': dateString, // Usamos la fecha limpia
         'icon_name': iconName,
-        'timeframe': timeframe.name, // 'short', 'medium', 'long'
-        'priority': priority.name,   // 'low', 'medium', 'high'
+        'timeframe': timeframe.name, // Ahora enviará 'short', 'medium' o 'long'
+        'priority': priority.name,
         'category_id': categoryId,
       });
       developer.log('✅ [Repo] Meta "$name" añadida con éxito.', name: 'GoalRepository');

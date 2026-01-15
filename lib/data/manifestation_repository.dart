@@ -25,9 +25,6 @@ class ManifestationRepository {
         .eq('user_id', userId)
         .order('created_at', ascending: false);
 
-    // A veces supabase devuelve PostgrestResponse; pero en la mayoría de setups es List
-    if (response == null) return [];
-
     return (response as List).map((item) => Manifestation.fromMap(item)).toList();
   } catch (e, st) {
     print('Error en getManifestations(): $e\n$st');

@@ -15,11 +15,9 @@ import 'dart:async';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
-import 'package:app_links/app_links.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 
 // 🌟 NUEVO: Import para el widget de manifestaciones
-import 'package:sasper/services/manifestation_widget_service.dart';
 
 // =================================================================
 //                 CONFIGURACIÓN GLOBAL

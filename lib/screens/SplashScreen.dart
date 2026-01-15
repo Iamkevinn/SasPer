@@ -22,9 +22,6 @@ import 'package:sasper/firebase_options.dart';
 import 'package:sasper/services/notification_service.dart';
 
 // --- Rutas de Widgets ---
-import 'package:sasper/services/widget_service.dart' as widget_service;
-import 'package:sasper/services/manifestation_widget_service.dart';
-import 'package:sasper/services/affirmation_widget_service.dart';
 
 // --- Repositorios ---
 import 'package:sasper/data/dashboard_repository.dart';

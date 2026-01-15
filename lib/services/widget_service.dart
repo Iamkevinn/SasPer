@@ -13,7 +13,6 @@ import 'package:home_widget/home_widget.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sasper/data/debt_repository.dart';
-import 'package:sasper/data/manifestation_repository.dart';
 import 'package:sasper/data/recurring_repository.dart';
 import 'package:sasper/models/analysis_models.dart';
 import 'package:sasper/models/dashboard_data_model.dart';
@@ -21,7 +20,6 @@ import 'package:sasper/models/upcoming_payment_model.dart';
 import 'package:sasper/data/goal_repository.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 // NOVEDAD: Importamos SharedPreferences para leer las claves en segundo plano.
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sasper/data/analysis_repository.dart'; // <-- AÑADIR ESTA IMPORTACIÓN
 import 'package:sasper/models/manifestation_model.dart';
 

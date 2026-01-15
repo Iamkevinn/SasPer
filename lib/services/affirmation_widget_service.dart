@@ -286,9 +286,13 @@ class AffirmationWidgetService {
     String? widgetId,
   }) async {
     if (manifestationIndex < 0 ||
-        manifestationIndex >= manifestations.length) return;
+        manifestationIndex >= manifestations.length) {
+      return;
+    }
     if (affirmationTypeIndex < 0 ||
-        affirmationTypeIndex >= affirmationTemplates.length) return;
+        affirmationTypeIndex >= affirmationTemplates.length) {
+      return;
+    }
 
     final manifestation = manifestations[manifestationIndex];
     final template = affirmationTemplates[affirmationTypeIndex];
