@@ -13,488 +13,314 @@ class IconPickerScreen extends StatefulWidget {
   State<IconPickerScreen> createState() => _IconPickerScreenState();
 }
 
-class _IconPickerScreenState extends State<IconPickerScreen> 
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-  final _searchController = TextEditingController();
-  
+class _IconPickerScreenState extends State<IconPickerScreen> {
   String _searchQuery = '';
-  IconData? _selectedIcon;
-
-  // Mapas de iconos categorizados
-  final Map<String, List<MapEntry<String, IconData>>> _categorizedIcons = {
+  String _selectedCategory = 'Todos';
+  
+  // OPTIMIZACIÓN: Lista limitada de iconos más comunes
+  static const Map<String, List<Map<String, dynamic>>> _iconsByCategory = {
     'Finanzas': [
-      MapEntry('Dinero', Icons.attach_money),
-      MapEntry('Tarjeta', Icons.credit_card),
-      MapEntry('Billetera', Icons.account_balance_wallet),
-      MapEntry('Banco', Icons.account_balance),
-      MapEntry('Ahorro', Icons.savings),
-      MapEntry('Pago', Icons.payment),
-      MapEntry('Gráfica', Icons.show_chart),
-      MapEntry('Tendencia', Icons.trending_up),
-      MapEntry('Inversión', Icons.monetization_on),
-      MapEntry('Monedas', Iconsax.dollar_circle),
-      MapEntry('Tarjeta2', Iconsax.card),
-      MapEntry('Billetera2', Iconsax.wallet),
-      MapEntry('Gráfica2', Iconsax.chart),
-      MapEntry('Tendencia2', Iconsax.trend_up),
+      {'icon': Iconsax.wallet, 'name': 'Billetera'},
+      {'icon': Iconsax.money, 'name': 'Dinero'},
+      {'icon': Iconsax.card, 'name': 'Tarjeta'},
+      {'icon': Iconsax.bank, 'name': 'Banco'},
+      {'icon': Iconsax.chart, 'name': 'Gráfico'},
+      {'icon': Iconsax.coin, 'name': 'Moneda'},
+      {'icon': Iconsax.dollar_circle, 'name': 'Dólar'},
+      {'icon': Iconsax.receipt, 'name': 'Recibo'},
+      {'icon': Iconsax.empty_wallet, 'name': 'Cartera vacía'},
+      {'icon': Iconsax.strongbox, 'name': 'Caja fuerte'},
     ],
     'Comida': [
-      MapEntry('Restaurante', Icons.restaurant),
-      MapEntry('Café', Icons.local_cafe),
-      MapEntry('Pizza', Icons.local_pizza),
-      MapEntry('Comida Rápida', Icons.fastfood),
-      MapEntry('Bar', Icons.local_bar),
-      MapEntry('Postre', Icons.cake),
-      MapEntry('Café2', Iconsax.coffee),
+      {'icon': Iconsax.coffee, 'name': 'Café'},
+      {'icon': Icons.restaurant, 'name': 'Restaurante'},
+      {'icon': Icons.local_pizza, 'name': 'Pizza'},
+      {'icon': Icons.local_cafe, 'name': 'Cafetería'},
+      {'icon': Icons.fastfood, 'name': 'Comida rápida'},
+      {'icon': Icons.dinner_dining, 'name': 'Cena'},
+      {'icon': Icons.lunch_dining, 'name': 'Almuerzo'},
+      {'icon': Icons.breakfast_dining, 'name': 'Desayuno'},
+      {'icon': Icons.icecream, 'name': 'Helado'},
+      {'icon': Icons.cake, 'name': 'Postre'},
     ],
     'Transporte': [
-      MapEntry('Carro', Icons.directions_car),
-      MapEntry('Bus', Icons.directions_bus),
-      MapEntry('Tren', Icons.train),
-      MapEntry('Avión', Icons.flight),
-      MapEntry('Bici', Icons.directions_bike),
-      MapEntry('Moto', Icons.two_wheeler),
-      MapEntry('Taxi', Icons.local_taxi),
-      MapEntry('Metro', Icons.subway),
-      MapEntry('Carro2', Iconsax.car),
-      MapEntry('Gas', Iconsax.gas_station),
-    ],
-    'Hogar': [
-      MapEntry('Casa', Icons.home),
-      MapEntry('Cama', Icons.bed),
-      MapEntry('Baño', Icons.bathtub),
-      MapEntry('Cocina', Icons.kitchen),
-      MapEntry('Sofá', Icons.weekend),
-      MapEntry('Luz', Icons.lightbulb),
-      MapEntry('Wifi', Icons.wifi),
-      MapEntry('Herramientas', Icons.build),
-      MapEntry('Casa2', Iconsax.house),
-      MapEntry('Lámpara', Iconsax.lamp),
+      {'icon': Iconsax.car, 'name': 'Auto'},
+      {'icon': Iconsax.bus, 'name': 'Bus'},
+      {'icon': Icons.directions_subway, 'name': 'Metro'},
+      {'icon': Icons.directions_bike, 'name': 'Bicicleta'},
+      {'icon': Icons.local_taxi, 'name': 'Taxi'},
+      {'icon': Icons.flight, 'name': 'Avión'},
+      {'icon': Icons.directions_walk, 'name': 'Caminar'},
+      {'icon': Icons.train, 'name': 'Tren'},
+      {'icon': Icons.motorcycle, 'name': 'Moto'},
+      {'icon': Icons.local_shipping, 'name': 'Camión'},
     ],
     'Compras': [
-      MapEntry('Carrito', Icons.shopping_cart),
-      MapEntry('Bolsa', Icons.shopping_bag),
-      MapEntry('Tienda', Icons.store),
-      MapEntry('Moda', Icons.checkroom),
-      MapEntry('Etiqueta', Icons.local_offer),
-      MapEntry('Carrito2', Iconsax.shopping_cart),
-      MapEntry('Bolsa2', Iconsax.bag),
-      MapEntry('Tienda2', Iconsax.shop),
-    ],
-    'Salud': [
-      MapEntry('Hospital', Icons.local_hospital),
-      MapEntry('Farmacia', Icons.local_pharmacy),
-      MapEntry('Corazón', Icons.favorite),
-      MapEntry('Fitness', Icons.fitness_center),
-      MapEntry('Médico', Icons.medical_services),
-      MapEntry('Salud2', Iconsax.health),
-      MapEntry('Corazón2', Iconsax.heart),
-    ],
-    'Educación': [
-      MapEntry('Escuela', Icons.school),
-      MapEntry('Libro', Icons.menu_book),
-      MapEntry('Graduación', Icons.school),
-      MapEntry('Mochila', Icons.backpack),
-      MapEntry('Lápiz', Icons.edit),
-      MapEntry('Libro2', Iconsax.book),
-      MapEntry('Educación', Iconsax.teacher),
+      {'icon': Iconsax.shopping_cart, 'name': 'Carrito'},
+      {'icon': Iconsax.bag, 'name': 'Bolsa'},
+      {'icon': Icons.shopping_bag, 'name': 'Compras'},
+      {'icon': Icons.store, 'name': 'Tienda'},
+      {'icon': Icons.local_mall, 'name': 'Centro comercial'},
+      {'icon': Icons.checkroom, 'name': 'Ropa'},
+      {'icon': Icons.watch, 'name': 'Accesorios'},
+      {'icon': Iconsax.gift, 'name': 'Regalo'},
+      {'icon': Icons.local_grocery_store, 'name': 'Supermercado'},
+      {'icon': Icons.local_pharmacy, 'name': 'Farmacia'},
     ],
     'Entretenimiento': [
-      MapEntry('Película', Icons.movie),
-      MapEntry('Música', Icons.music_note),
-      MapEntry('Juego', Icons.sports_esports),
-      MapEntry('TV', Icons.tv),
-      MapEntry('Cámara', Icons.camera_alt),
-      MapEntry('Deporte', Icons.sports_soccer),
-      MapEntry('Juego2', Iconsax.game),
-      MapEntry('Música2', Iconsax.music),
+      {'icon': Iconsax.game, 'name': 'Juegos'},
+      {'icon': Icons.movie, 'name': 'Cine'},
+      {'icon': Icons.sports_esports, 'name': 'Videojuegos'},
+      {'icon': Icons.music_note, 'name': 'Música'},
+      {'icon': Icons.theater_comedy, 'name': 'Teatro'},
+      {'icon': Icons.sports_soccer, 'name': 'Deportes'},
+      {'icon': Icons.headphones, 'name': 'Auriculares'},
+      {'icon': Icons.tv, 'name': 'TV'},
+      {'icon': Icons.casino, 'name': 'Casino'},
+      {'icon': Icons.celebration, 'name': 'Fiesta'},
     ],
-    'Servicios': [
-      MapEntry('Teléfono', Icons.phone),
-      MapEntry('Internet', Icons.language),
-      MapEntry('Correo', Icons.email),
-      MapEntry('Nube', Icons.cloud),
-      MapEntry('Seguridad', Icons.security),
-      MapEntry('Limpieza', Icons.cleaning_services),
-      MapEntry('Móvil', Iconsax.mobile),
-      MapEntry('Global', Iconsax.global),
+    'Hogar': [
+      {'icon': Iconsax.home, 'name': 'Casa'},
+      {'icon': Icons.bed, 'name': 'Dormitorio'},
+      {'icon': Icons.chair, 'name': 'Muebles'},
+      {'icon': Icons.kitchen, 'name': 'Cocina'},
+      {'icon': Icons.bathtub, 'name': 'Baño'},
+      {'icon': Icons.weekend, 'name': 'Sofá'},
+      {'icon': Icons.lightbulb, 'name': 'Luz'},
+      {'icon': Icons.water_drop, 'name': 'Agua'},
+      {'icon': Icons.build, 'name': 'Herramientas'},
+      {'icon': Icons.cleaning_services, 'name': 'Limpieza'},
     ],
-    'Trabajo': [
-      MapEntry('Trabajo', Icons.work),
-      MapEntry('Maleta', Icons.business_center),
-      MapEntry('Computadora', Icons.computer),
-      MapEntry('Escritorio', Icons.desk),
-      MapEntry('Calendario', Icons.calendar_today),
-      MapEntry('Reloj', Icons.access_time),
-      MapEntry('Briefcase', Iconsax.briefcase),
-      MapEntry('Código', Iconsax.code),
+    'Salud': [
+      {'icon': Iconsax.health, 'name': 'Salud'},
+      {'icon': Icons.medical_services, 'name': 'Medicina'},
+      {'icon': Icons.fitness_center, 'name': 'Gimnasio'},
+      {'icon': Icons.favorite, 'name': 'Corazón'},
+      {'icon': Icons.healing, 'name': 'Cura'},
+      {'icon': Icons.spa, 'name': 'Spa'},
+      {'icon': Icons.psychology, 'name': 'Mental'},
+      {'icon': Icons.self_improvement, 'name': 'Meditación'},
+      {'icon': Icons.local_hospital, 'name': 'Hospital'},
+      {'icon': Icons.medication, 'name': 'Medicamentos'},
+    ],
+    'Educación': [
+      {'icon': Iconsax.book, 'name': 'Libro'},
+      {'icon': Icons.school, 'name': 'Escuela'},
+      {'icon': Icons.menu_book, 'name': 'Lectura'},
+      {'icon': Icons.science, 'name': 'Ciencia'},
+      {'icon': Icons.calculate, 'name': 'Matemáticas'},
+      {'icon': Icons.language, 'name': 'Idiomas'},
+      {'icon': Icons.draw, 'name': 'Arte'},
+      {'icon': Icons.computer, 'name': 'Computación'},
+      {'icon': Icons.library_books, 'name': 'Biblioteca'},
+      {'icon': Icons.backpack, 'name': 'Mochila'},
+    ],
+    'Tecnología': [
+      {'icon': Iconsax.mobile, 'name': 'Móvil'},
+      {'icon': Icons.laptop, 'name': 'Laptop'},
+      {'icon': Icons.tablet, 'name': 'Tablet'},
+      {'icon': Icons.watch, 'name': 'Reloj'},
+      {'icon': Icons.headset, 'name': 'Auriculares'},
+      {'icon': Icons.camera, 'name': 'Cámara'},
+      {'icon': Icons.wifi, 'name': 'Internet'},
+      {'icon': Icons.bluetooth, 'name': 'Bluetooth'},
+      {'icon': Icons.devices, 'name': 'Dispositivos'},
+      {'icon': Icons.print, 'name': 'Impresora'},
     ],
     'Otros': [
-      MapEntry('Regalo', Icons.card_giftcard),
-      MapEntry('Mascota', Icons.pets),
-      MapEntry('Planta', Icons.local_florist),
-      MapEntry('Bebé', Icons.child_care),
-      MapEntry('Viaje', Icons.luggage),
-      MapEntry('Evento', Icons.event),
-      MapEntry('Regalo2', Iconsax.gift),
-      MapEntry('Mascota2', Iconsax.pet),
-      MapEntry('Estrella', Iconsax.star),
-      MapEntry('Categoría', Iconsax.category),
+      {'icon': Iconsax.category, 'name': 'Categoría'},
+      {'icon': Icons.star, 'name': 'Estrella'},
+      {'icon': Icons.pets, 'name': 'Mascotas'},
+      {'icon': Icons.child_care, 'name': 'Niños'},
+      {'icon': Icons.elderly, 'name': 'Adultos'},
+      {'icon': Icons.diamond, 'name': 'Premium'},
+      {'icon': Icons.eco, 'name': 'Ecología'},
+      {'icon': Icons.question_mark, 'name': 'Otro'},
+      {'icon': Icons.more_horiz, 'name': 'Más'},
+      {'icon': Icons.all_inclusive, 'name': 'Todo'},
     ],
   };
 
-  @override
-  void initState() {
-    super.initState();
-    _selectedIcon = widget.currentIcon;
-    _tabController = TabController(
-      length: _categorizedIcons.length,
-      vsync: this,
-    );
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  List<MapEntry<String, IconData>> _getFilteredIcons(String category) {
-    final icons = _categorizedIcons[category] ?? [];
-    if (_searchQuery.isEmpty) return icons;
-
-    return icons.where((entry) {
-      return entry.key.toLowerCase().contains(_searchQuery.toLowerCase());
-    }).toList();
-  }
-
-  List<MapEntry<String, IconData>> _getAllFilteredIcons() {
-    if (_searchQuery.isEmpty) return [];
+  List<Map<String, dynamic>> get _filteredIcons {
+    List<Map<String, dynamic>> icons = [];
     
-    final allIcons = <MapEntry<String, IconData>>[];
-    _categorizedIcons.values.forEach((icons) {
-      allIcons.addAll(icons);
-    });
-
-    return allIcons.where((entry) {
-      return entry.key.toLowerCase().contains(_searchQuery.toLowerCase());
-    }).toList();
+    // Filtrar por categoría
+    if (_selectedCategory == 'Todos') {
+      _iconsByCategory.values.forEach((categoryIcons) {
+        icons.addAll(categoryIcons);
+      });
+    } else {
+      icons = _iconsByCategory[_selectedCategory] ?? [];
+    }
+    
+    // Filtrar por búsqueda
+    if (_searchQuery.isNotEmpty) {
+      icons = icons.where((iconData) {
+        return iconData['name']
+            .toString()
+            .toLowerCase()
+            .contains(_searchQuery.toLowerCase());
+      }).toList();
+    }
+    
+    return icons;
   }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
+    
     return Scaffold(
       backgroundColor: colorScheme.surface,
-      body: CustomScrollView(
-        slivers: [
-          // App Bar
-          SliverAppBar(
-            expandedHeight: 140,
-            floating: false,
-            pinned: true,
-            elevation: 0,
-            backgroundColor: colorScheme.surface,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () => Navigator.pop(context),
-            ),
-            actions: [
-              if (_selectedIcon != null)
-                TextButton.icon(
-                  onPressed: () => Navigator.pop(context, _selectedIcon),
-                  icon: const Icon(Icons.check_circle),
-                  label: Text(
-                    'Seleccionar',
-                    style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-                  ),
-                ),
-            ],
-            flexibleSpace: FlexibleSpaceBar(
-              title: Text(
-                'Elegir Icono',
-                style: GoogleFonts.poppins(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              titlePadding: const EdgeInsets.only(left: 56, bottom: 16),
-            ),
+      appBar: AppBar(
+        backgroundColor: colorScheme.surface,
+        elevation: 0,
+        title: Text(
+          'Seleccionar Icono',
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.bold,
           ),
-
-          // Barra de búsqueda
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'Buscar icono...',
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() => _searchQuery = '');
-                          },
-                        )
-                      : null,
-                  filled: true,
-                  fillColor: colorScheme.surfaceContainerHighest,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-                onChanged: (value) {
-                  setState(() => _searchQuery = value);
-                },
-              ),
-            ),
-          ),
-
-          // Icono seleccionado preview
-          if (_selectedIcon != null)
-            SliverToBoxAdapter(
-              child: Container(
-                margin: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      colorScheme.primary.withOpacity(0.1),
-                      colorScheme.primary.withOpacity(0.05),
-                    ],
-                  ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Iconsax.arrow_left),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: Column(
+        children: [
+          // Buscador
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: TextField(
+              onChanged: (value) => setState(() => _searchQuery = value),
+              decoration: InputDecoration(
+                hintText: 'Buscar icono...',
+                prefixIcon: const Icon(Iconsax.search_normal),
+                filled: true,
+                fillColor: colorScheme.surfaceContainerHighest,
+                border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: colorScheme.primary.withOpacity(0.3),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: colorScheme.primary.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        _selectedIcon,
-                        size: 32,
-                        color: colorScheme.primary,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Icono Seleccionado',
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Presiona "Seleccionar" para confirmar',
-                            style: GoogleFonts.poppins(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.primary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                  borderSide: BorderSide.none,
                 ),
               ),
+              style: GoogleFonts.poppins(),
             ),
+          ),
 
-          // Resultados de búsqueda o tabs
-          if (_searchQuery.isNotEmpty)
-            _buildSearchResults()
-          else
-            ...[
-              // Tabs
-              SliverPersistentHeader(
-                pinned: true,
-                delegate: _SliverAppBarDelegate(
-                  TabBar(
-                    controller: _tabController,
-                    isScrollable: true,
-                    tabAlignment: TabAlignment.start,
-                    indicator: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      color: colorScheme.primary,
+          // Categorías (scroll horizontal)
+          SizedBox(
+            height: 50,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              children: [
+                _buildCategoryChip('Todos', colorScheme),
+                ..._iconsByCategory.keys.map(
+                  (category) => _buildCategoryChip(category, colorScheme),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          // Grid de iconos - OPTIMIZADO con GridView.builder
+          Expanded(
+            child: _filteredIcons.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Iconsax.search_normal,
+                          size: 64,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No se encontraron iconos',
+                          style: GoogleFonts.poppins(
+                            fontSize: 16,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
                     ),
-                    labelColor: colorScheme.onPrimary,
-                    unselectedLabelColor: colorScheme.onSurfaceVariant,
-                    labelStyle: GoogleFonts.poppins(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
+                  )
+                : GridView.builder(
+                    padding: const EdgeInsets.all(16),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 4,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 1,
                     ),
-                    tabs: _categorizedIcons.keys.map((category) {
-                      return Tab(text: category);
-                    }).toList(),
+                    // CRÍTICO: Solo construye los iconos visibles
+                    itemCount: _filteredIcons.length,
+                    itemBuilder: (context, index) {
+                      final iconData = _filteredIcons[index];
+                      final isSelected = widget.currentIcon?.codePoint == 
+                                        iconData['icon'].codePoint;
+                      
+                      return _buildIconButton(
+                        iconData['icon'],
+                        iconData['name'],
+                        isSelected,
+                        colorScheme,
+                      );
+                    },
                   ),
-                ),
-              ),
-
-              // Grid de iconos
-              SliverFillRemaining(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: _categorizedIcons.keys.map((category) {
-                    final icons = _getFilteredIcons(category);
-                    return _buildIconGrid(icons);
-                  }).toList(),
-                ),
-              ),
-            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildSearchResults() {
-    final results = _getAllFilteredIcons();
-
-    if (results.isEmpty) {
-      return SliverFillRemaining(
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.search_off,
-                size: 80,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.2),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Sin resultados para: "$_searchQuery"',
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Intenta con otra palabra',
-                style: GoogleFonts.inter(
-                  fontSize: 14,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
+  Widget _buildCategoryChip(String category, ColorScheme colorScheme) {
+    final isSelected = _selectedCategory == category;
+    
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: FilterChip(
+        label: Text(
+          category,
+          style: GoogleFonts.poppins(
+            fontSize: 14,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+            color: isSelected ? Colors.white : colorScheme.onSurface,
           ),
         ),
-      );
-    }
-
-    return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${results.length} resultados',
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 16),
-            _buildIconGrid(results),
-          ],
+        selected: isSelected,
+        onSelected: (selected) {
+          setState(() => _selectedCategory = category);
+        },
+        backgroundColor: colorScheme.surfaceContainerHighest,
+        selectedColor: colorScheme.primary,
+        checkmarkColor: Colors.white,
+        side: BorderSide(
+          color: isSelected ? colorScheme.primary : colorScheme.outline,
         ),
       ),
     );
   }
 
-  Widget _buildIconGrid(List<MapEntry<String, IconData>> icons) {
-    if (icons.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(40),
-          child: Text(
-            'No hay iconos en esta categoría',
-            style: GoogleFonts.inter(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ),
-      );
-    }
-
-    return GridView.builder(
-      padding: const EdgeInsets.all(20),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 4,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-      ),
-      itemCount: icons.length,
-      itemBuilder: (context, index) {
-        final entry = icons[index];
-        final isSelected = _selectedIcon?.codePoint == entry.value.codePoint &&
-                          _selectedIcon?.fontFamily == entry.value.fontFamily;
-
-        return _IconTile(
-          icon: entry.value,
-          label: entry.key,
-          isSelected: isSelected,
-          onTap: () {
-            setState(() {
-              _selectedIcon = entry.value;
-            });
-          },
-        );
-      },
-    );
-  }
-}
-
-// Widget de icono individual
-class _IconTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _IconTile({
-    required this.icon,
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
+  Widget _buildIconButton(
+    IconData icon,
+    String name,
+    bool isSelected,
+    ColorScheme colorScheme,
+  ) {
     return Material(
       color: isSelected
-          ? colorScheme.primary.withOpacity(0.15)
+          ? colorScheme.primaryContainer
           : colorScheme.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(16),
       child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        onTap: () => Navigator.pop(context, icon),
+        borderRadius: BorderRadius.circular(16),
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: isSelected
                   ? colorScheme.primary
@@ -507,55 +333,26 @@ class _IconTile extends StatelessWidget {
             children: [
               Icon(
                 icon,
-                size: 28,
+                size: 32,
                 color: isSelected
                     ? colorScheme.primary
                     : colorScheme.onSurface,
               ),
               const SizedBox(height: 4),
               Text(
-                label,
+                name,
+                style: GoogleFonts.inter(
+                  fontSize: 10,
+                  color: colorScheme.onSurfaceVariant,
+                ),
                 textAlign: TextAlign.center,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.inter(
-                  fontSize: 10,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                  color: isSelected
-                      ? colorScheme.primary
-                      : colorScheme.onSurfaceVariant,
-                ),
               ),
             ],
           ),
         ),
       ),
     );
-  }
-}
-
-// Delegate para el header sticky
-class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
-  final TabBar _tabBar;
-
-  _SliverAppBarDelegate(this._tabBar);
-
-  @override
-  double get minExtent => _tabBar.preferredSize.height;
-  @override
-  double get maxExtent => _tabBar.preferredSize.height;
-
-  @override
-  Widget build(
-      BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Container(
-      color: Theme.of(context).colorScheme.surface,
-      child: _tabBar,
-    );
-  }
-
-  @override
-  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
-    return false;
   }
 }

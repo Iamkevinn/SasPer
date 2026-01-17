@@ -77,18 +77,35 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen>
   Future<void> _pickIcon() async {
     if (!mounted) return;
 
-    final IconData? selected = await Navigator.push<IconData>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => IconPickerScreen(currentIcon: _selectedIcon),
-      ),
-    );
+    // CRÍTICO: Esperar a que el frame actual termine antes de navegar
+    await Future.delayed(const Duration(milliseconds: 100));
+    
+    if (!mounted) return;
 
-    if (selected != null && mounted) {
-      setState(() {
-        _selectedIcon = selected;
-        _hasChanges = true;
-      });
+    try {
+      final IconData? selected = await Navigator.push<IconData>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => IconPickerScreen(currentIcon: _selectedIcon),
+          // Agregado: configuración para mejor manejo de memoria
+          maintainState: false,
+        ),
+      );
+
+      if (selected != null && mounted) {
+        setState(() {
+          _selectedIcon = selected;
+          _hasChanges = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error al seleccionar icono: $e');
+      if (mounted) {
+        NotificationHelper.show(
+          message: 'Error al seleccionar icono',
+          type: NotificationType.error,
+        );
+      }
     }
   }
 
@@ -185,7 +202,6 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen>
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
