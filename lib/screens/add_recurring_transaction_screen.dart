@@ -25,7 +25,7 @@ class _AddRecurringTransactionScreenState
     with SingleTickerProviderStateMixin {
   final RecurringRepository _repository = RecurringRepository.instance;
   final AccountRepository _accountRepository = AccountRepository.instance;
-
+  TimeOfDay _notificationTime = const TimeOfDay(hour: 9, minute: 0); // Por defecto 9:00 AM
   final _formKey = GlobalKey<FormState>();
   final _descriptionController = TextEditingController();
   final _amountController = TextEditingController();
@@ -96,6 +96,25 @@ class _AddRecurringTransactionScreenState
     }
   }
 
+  // 2. NUEVO MÉTODO PARA SELECCIONAR HORA
+  Future<void> _selectTime(BuildContext context) async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: _notificationTime,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            dialogBackgroundColor: Theme.of(context).colorScheme.surface,
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null && picked != _notificationTime) {
+      setState(() => _notificationTime = picked);
+    }
+  }
+
   double get _monthlyAmount {
     final amount = double.tryParse(_amountController.text.replaceAll(',', '.')) ?? 0;
     switch (_frequency) {
@@ -137,6 +156,15 @@ class _AddRecurringTransactionScreenState
     setState(() => _isLoading = true);
 
     try {
+      // 3. COMBINAR FECHA Y HORA ANTES DE GUARDAR
+      // Creamos un DateTime que tenga la fecha de _startDate y la hora de _notificationTime
+      final DateTime startDateTimeWithTime = DateTime(
+        _startDate.year,
+        _startDate.month,
+        _startDate.day,
+        _notificationTime.hour,
+        _notificationTime.minute,
+      );
       final newTransaction = await _repository.addRecurringTransaction(
         description: _descriptionController.text.trim(),
         amount: double.parse(_amountController.text.replaceAll(',', '.')),
@@ -145,7 +173,7 @@ class _AddRecurringTransactionScreenState
         accountId: _selectedAccountId!,
         frequency: _frequency,
         interval: 1,
-        startDate: _startDate,
+        startDate: startDateTimeWithTime,
       );
 
       await NotificationService.instance
@@ -310,6 +338,14 @@ class _AddRecurringTransactionScreenState
                   _StartDateAnimatedTile(
                     startDate: _startDate,
                     onTap: () => _selectDate(context),
+                    accentColor: accentColor,
+                  ),
+
+                  const SizedBox(height: 20),
+                   // 4. NUEVO WIDGET: SELECTOR DE HORA
+                  _NotificationTimeTile(
+                    time: _notificationTime,
+                    onTap: () => _selectTime(context),
                     accentColor: accentColor,
                   ),
 
@@ -1312,6 +1348,100 @@ class _PremiumSaveButton extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+// 5. NUEVO WIDGET AL FINAL DEL ARCHIVO (O DONDE TENGAS LOS WIDGETS)
+class _NotificationTimeTile extends StatelessWidget {
+  final TimeOfDay time;
+  final VoidCallback onTap;
+  final Color accentColor;
+
+  const _NotificationTimeTile({
+    required this.time,
+    required this.onTap,
+    required this.accentColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Formato de hora amigable (ej: 9:00 AM)
+    final localizations = MaterialLocalizations.of(context);
+    final formattedTime = localizations.formatTimeOfDay(time);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            'Hora del recordatorio',
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: accentColor,
+            ),
+          ),
+        ),
+        Material(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: accentColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(Iconsax.clock, color: accentColor),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Se notificará a las',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          formattedTime,
+                          style: GoogleFonts.poppins(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Iconsax.edit,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    size: 20,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

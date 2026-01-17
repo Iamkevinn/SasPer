@@ -72,9 +72,6 @@ class RecurringRepository {
     return _supabase!;
   }
 
-  // Se elimina el método `initialize()` público.
-  // void initialize(SupabaseClient supabaseClient) { ... } // <-- ELIMINADO
-
   // --- MÉTODOS PÚBLICOS DEL REPOSITORIO ---
 
   /// Devuelve un stream de todas las transacciones recurrentes.
@@ -101,7 +98,7 @@ class RecurringRepository {
       return list;
     } catch (e) {
       developer.log('🔥 [Repo] Error obteniendo transacciones recurrentes: $e', name: 'RecurringRepository');
-      return []; // Devolver lista vacía en caso de error.
+      return [];
     }
   }
 
@@ -112,6 +109,7 @@ class RecurringRepository {
   }
 
   /// Añade una nueva transacción recurrente y la devuelve.
+  /// ⚠️ VERSIÓN CORREGIDA: Guarda la fecha CON OFFSET de zona horaria
   Future<RecurringTransaction> addRecurringTransaction({
     required String description,
     required double amount,
@@ -124,6 +122,41 @@ class RecurringRepository {
     DateTime? endDate,
   }) async {
     try {
+      // 🔥 SOLUCIÓN: Usar formato ISO 8601 COMPLETO con offset de zona horaria
+      // Esto le dice a PostgreSQL EXPLÍCITAMENTE en qué zona horaria está la fecha
+      // Formato: "YYYY-MM-DDTHH:MM:SS-05:00" (para Colombia UTC-5)
+      
+      // Calcular el offset en horas (Colombia = -5)
+      final offsetMinutes = startDate.timeZoneOffset.inMinutes;
+      final offsetHours = (offsetMinutes / 60).floor();
+      final offsetMins = offsetMinutes.abs() % 60;
+      final offsetSign = offsetMinutes >= 0 ? '+' : '-';
+      final offsetStr = '$offsetSign${offsetHours.abs().toString().padLeft(2, '0')}:${offsetMins.toString().padLeft(2, '0')}';
+      
+      final String startDateStr = 
+          '${startDate.year.toString().padLeft(4, '0')}-'
+          '${startDate.month.toString().padLeft(2, '0')}-'
+          '${startDate.day.toString().padLeft(2, '0')}T'
+          '${startDate.hour.toString().padLeft(2, '0')}:'
+          '${startDate.minute.toString().padLeft(2, '0')}:'
+          '${startDate.second.toString().padLeft(2, '0')}'
+          '$offsetStr';
+
+      final String? endDateStr = endDate != null
+          ? '${endDate.year.toString().padLeft(4, '0')}-'
+            '${endDate.month.toString().padLeft(2, '0')}-'
+            '${endDate.day.toString().padLeft(2, '0')}T'
+            '${endDate.hour.toString().padLeft(2, '0')}:'
+            '${endDate.minute.toString().padLeft(2, '0')}:'
+            '${endDate.second.toString().padLeft(2, '0')}'
+            '$offsetStr'
+          : null;
+
+      developer.log(
+        '💾 [Repo] Guardando con fecha Y OFFSET: $startDateStr',
+        name: 'RecurringRepository',
+      );
+
       final newTransactionData = {
         'user_id': client.auth.currentUser!.id,
         'description': description,
@@ -133,9 +166,9 @@ class RecurringRepository {
         'account_id': accountId,
         'frequency': frequency,
         'interval': interval,
-        'start_date': startDate.toIso8601String(),
-        'next_due_date': startDate.toIso8601String(),
-        'end_date': endDate?.toIso8601String(),
+        'start_date': startDateStr,
+        'next_due_date': startDateStr,
+        'end_date': endDateStr,
       };
 
       final response = await client
@@ -144,9 +177,17 @@ class RecurringRepository {
           .select()
           .single();
 
+      developer.log(
+        '✅ [Repo] Guardado exitoso. Fecha en BD: ${response['next_due_date']}',
+        name: 'RecurringRepository',
+      );
+
       return RecurringTransaction.fromMap(response);
-    } catch (e) {
-      developer.log('🔥 Error añadiendo transacción recurrente: $e', name: 'RecurringRepository');
+    } catch (e, stackTrace) {
+      developer.log(
+        '🔥 Error añadiendo transacción recurrente: $e\n$stackTrace',
+        name: 'RecurringRepository',
+      );
       throw Exception('No se pudo crear el gasto fijo.');
     }
   }
@@ -212,7 +253,7 @@ class RecurringRepository {
   Future<void> _fetchAndPushData() async {
     developer.log('🔄 [Repo] Obteniendo transacciones recurrentes...', name: 'RecurringRepository');
     try {
-      final transactions = await getAll(); // Reutilizamos el método `getAll`
+      final transactions = await getAll();
       if (!_streamController.isClosed) {
         _streamController.add(transactions);
         developer.log('✅ [Repo] ${transactions.length} elementos recurrentes enviados al stream.', name: 'RecurringRepository');
