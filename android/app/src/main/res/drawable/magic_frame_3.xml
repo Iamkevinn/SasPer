@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Halo grande transparente -->
+    <item android:gravity="center">
+        <shape android:shape="oval">
+            <gradient android:type="radial" android:gradientRadius="150dp"
+                android:startColor="#40FFD700" android:endColor="#00000000"/>
+            <size android:width="300dp" android:height="300dp"/>
+        </shape>
+    </item>
+    <!-- Partículas lejanas (círculos pequeños dispersos) -->
+    <item android:top="20dp" android:left="40dp"><shape android:shape="oval"><solid android:color="#FFFFFF"/><size android:width="8dp" android:height="8dp"/></shape></item>
+    <item android:bottom="30dp" android:right="50dp"><shape android:shape="oval"><solid android:color="#FFD700"/><size android:width="10dp" android:height="10dp"/></shape></item>
+    <item android:top="50dp" android:right="30dp"><shape android:shape="oval"><solid android:color="#FFFFFF"/><size android:width="6dp" android:height="6dp"/></shape></item>
+    <item android:bottom="40dp" android:left="20dp"><shape android:shape="oval"><solid android:color="#FFD700"/><size android:width="9dp" android:height="9dp"/></shape></item>
+</layer-list>

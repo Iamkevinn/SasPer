@@ -1,13 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- 🌟 LAYOUT DEL WIDGET "VISION FOCUS" -->
 <!-- Diseño moderno con glassmorphism para manifestación diaria -->
-
 <FrameLayout 
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:padding="0dp">
-
+    
     <!-- ===== CONTENEDOR PRINCIPAL CON BORDES REDONDEADOS ===== -->
     <LinearLayout
         android:id="@+id/widget_container"
@@ -15,14 +14,14 @@
         android:layout_height="match_parent"
         android:orientation="vertical"
         android:background="@drawable/widget_background"
-        android:clipToOutline="true">
-
+        android:clipToOutline="false">
+        
         <!-- ===== IMAGEN DE FONDO CON OVERLAY ===== -->
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1">
-
+            
             <!-- Imagen de la manifestación -->
             <ImageView
                 android:id="@+id/manifestation_image"
@@ -31,22 +30,57 @@
                 android:scaleType="centerCrop"
                 android:contentDescription="@string/manifestation_image_description"
                 android:src="@drawable/placeholder_manifestation" />
-
+            
             <!-- Overlay degradado para legibilidad -->
             <ImageView
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:background="@drawable/gradient_overlay" />
-
-            <!-- Efecto de visualización (aparece al presionar ✨) -->
-            <FrameLayout
+            
+            <!-- 🆕 Efecto de visualización (aparece al presionar ✨) -->
+           <FrameLayout
                 android:id="@+id/visualization_effect"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
+                android:background="#90FFD700"
                 android:visibility="gone"
-                android:background="@drawable/visualization_ripple"
-                android:alpha="0.7" />
+                android:clickable="true"
+                android:focusable="true">
+                
+                <!-- #90FFD700 es Oro con transparencia (aprox 56%) -->
+                <!-- clickable=true evita que se pulse lo de abajo mientras se muestra -->
 
+                <!-- Contenedor centralizado para el mensaje -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="¡Sigue Manifestando!"
+                        android:textColor="#FFFFFF"
+                        android:textSize="26sp"
+                        android:textStyle="bold"
+                        android:gravity="center"
+                        android:shadowColor="#40000000"
+                        android:shadowDx="0"
+                        android:shadowDy="4"
+                        android:shadowRadius="8"
+                        android:textAllCaps="true" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="✨"
+                        android:textSize="40sp"
+                        android:layout_marginTop="8dp"/>
+                </LinearLayout>
+            </FrameLayout>
             <!-- ===== HEADER: Icono + Contador ===== -->
             <LinearLayout
                 android:layout_width="match_parent"
@@ -54,7 +88,7 @@
                 android:orientation="horizontal"
                 android:padding="12dp"
                 android:gravity="center_vertical">
-
+                
                 <!-- Icono de estrella -->
                 <ImageView
                     android:layout_width="24dp"
@@ -62,7 +96,7 @@
                     android:src="@drawable/ic_sparkle"
                     android:tint="#FFD700"
                     android:contentDescription="@string/manifestation_icon" />
-
+                
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
@@ -75,7 +109,7 @@
                     android:paddingEnd="8dp"
                     android:shadowColor="#000000"
                     android:shadowRadius="4" />
-
+                
                 <!-- Contador (ej: "1 de 5") -->
                 <TextView
                     android:id="@+id/manifestation_counter"
@@ -92,7 +126,7 @@
                     android:shadowColor="#000000"
                     android:shadowRadius="4" />
             </LinearLayout>
-
+            
             <!-- ===== CONTENIDO: Título + Descripción ===== -->
             <LinearLayout
                 android:layout_width="match_parent"
@@ -100,7 +134,7 @@
                 android:layout_gravity="bottom"
                 android:orientation="vertical"
                 android:padding="16dp">
-
+                
                 <!-- Título de la manifestación -->
                 <TextView
                     android:id="@+id/manifestation_title"
@@ -116,7 +150,7 @@
                     android:shadowDx="0"
                     android:shadowDy="2"
                     android:shadowRadius="6" />
-
+                
                 <!-- Descripción (opcional) -->
                 <TextView
                     android:id="@+id/manifestation_description"
@@ -131,9 +165,28 @@
                     android:shadowColor="#000000"
                     android:shadowRadius="4"
                     android:visibility="visible" />
+                
+                <!-- 🆕 Contador diario de manifestaciones -->
+                <TextView
+                    android:id="@+id/daily_manifestation_count"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="✨ Has manifestado 3 veces hoy"
+                    android:textColor="#FFD700"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:layout_marginTop="8dp"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:paddingTop="6dp"
+                    android:paddingBottom="6dp"
+                    android:background="@drawable/daily_count_badge"
+                    android:shadowColor="#000000"
+                    android:shadowRadius="4"
+                    android:visibility="gone" />
             </LinearLayout>
         </FrameLayout>
-
+        
         <!-- ===== BARRA DE ACCIONES ===== -->
         <LinearLayout
             android:layout_width="match_parent"
@@ -143,7 +196,7 @@
             android:gravity="center"
             android:paddingStart="8dp"
             android:paddingEnd="8dp">
-
+            
             <!-- Botón: Anterior (opcional) -->
             <ImageButton
                 android:id="@+id/btn_previous"
@@ -154,7 +207,7 @@
                 android:contentDescription="@string/previous_manifestation"
                 android:scaleType="centerInside"
                 android:tint="#FFFFFF" />
-
+            
             <!-- Botón: Visualizar (acción principal) -->
             <FrameLayout
                 android:layout_width="0dp"
@@ -162,8 +215,8 @@
                 android:layout_weight="1"
                 android:layout_marginStart="8dp"
                 android:layout_marginEnd="8dp">
-
-                <Button
+                
+                <TextView
                     android:id="@+id/btn_visualize"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
@@ -172,9 +225,10 @@
                     android:textSize="14sp"
                     android:textStyle="bold"
                     android:background="@drawable/button_primary"
-                    android:elevation="4dp" />
+                    android:gravity="center" 
+                    android:clickable="true" />
             </FrameLayout>
-
+            
             <!-- Botón: Siguiente -->
             <ImageButton
                 android:id="@+id/btn_next"
@@ -186,7 +240,7 @@
                 android:scaleType="centerInside"
                 android:tint="#FFFFFF"
                 android:layout_marginEnd="4dp" />
-
+            
             <!-- Botón: Abrir app -->
             <ImageButton
                 android:id="@+id/btn_open_app"

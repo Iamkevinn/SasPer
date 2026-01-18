@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Capa 1: Resplandor central intenso -->
+    <item>
+        <shape android:shape="oval">
+            <gradient
+                android:type="radial"
+                android:gradientRadius="70%p"
+                android:centerX="0.5"
+                android:centerY="0.5"
+                android:startColor="#90FFD700"
+                android:centerColor="#40FFA500"
+                android:endColor="#00000000" />
+        </shape>
+    </item>
+
+    <!-- Capa 2: Un anillo sutil alrededor -->
+    <item android:top="20dp" android:bottom="20dp" android:left="20dp" android:right="20dp">
+        <shape android:shape="oval">
+            <stroke android:width="2dp" android:color="#30FFFFFF" android:dashWidth="4dp" android:dashGap="4dp"/>
+        </shape>
+    </item>
+    
+    <!-- Capa 3: "Partículas" estáticas (simuladas con shapes pequeños) -->
+    <!-- Arriba Izquierda -->
+    <item android:width="8dp" android:height="8dp" android:gravity="top|left" android:top="40dp" android:left="60dp">
+        <shape android:shape="oval"><solid android:color="#FFFFFF"/></shape>
+    </item>
+    <!-- Abajo Derecha -->
+    <item android:width="6dp" android:height="6dp" android:gravity="bottom|right" android:bottom="50dp" android:right="50dp">
+        <shape android:shape="oval"><solid android:color="#FFD700"/></shape>
+    </item>
+    <!-- Arriba Derecha -->
+    <item android:width="10dp" android:height="10dp" android:gravity="top|right" android:top="60dp" android:right="40dp">
+        <shape android:shape="oval"><solid android:color="#FFFFFF"/></shape>
+    </item>
+     <!-- Centro Abajo -->
+    <item android:width="5dp" android:height="5dp" android:gravity="bottom|center_horizontal" android:bottom="30dp">
+        <shape android:shape="oval"><solid android:color="#FFD700"/></shape>
+    </item>
+</layer-list>

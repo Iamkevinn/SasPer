@@ -3,6 +3,7 @@ import 'package:sasper/data/manifestation_repository.dart';
 import 'package:sasper/models/manifestation_model.dart';
 import 'package:sasper/screens/add_manifestation_screen.dart';
 import 'package:sasper/screens/edit_manifestation_screen.dart';
+import 'package:sasper/screens/ManifestationVisionWidgetDebug.dart';
 import 'package:sasper/services/widget_service.dart';
 import 'dart:math' as math;
 import 'package:sasper/services/manifestation_widget_service.dart';
@@ -20,6 +21,9 @@ class _ManifestationsScreenState extends State<ManifestationsScreen>
   late Future<List<Manifestation>> _manifestationsFuture;
   late AnimationController _sparkleController;
   late AnimationController _fabController;
+  
+  // 🆕 Variable para mostrar/ocultar el panel de debug
+  bool _showDebugPanel = false;
 
   @override
   void initState() {
@@ -171,6 +175,79 @@ class _ManifestationsScreenState extends State<ManifestationsScreen>
     }
   }
 
+  // 🆕 Mostrar panel de debug en modal
+  void _showDebugModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) {
+          return Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(20),
+              ),
+            ),
+            child: Column(
+              children: [
+                // Handle del modal
+                Container(
+                  margin: const EdgeInsets.symmetric(vertical: 12),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade400,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                // Título
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.bug_report,
+                        color: Colors.amber.shade700,
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'Panel de Debug',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(),
+                // Contenido del debug
+                Expanded(
+                  child: SingleChildScrollView(
+                    controller: scrollController,
+                    child: const ManifestationWidgetDebug(
+                      widgetId: null, // null = global, o usa '0' para el primer widget
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -207,6 +284,17 @@ class _ManifestationsScreenState extends State<ManifestationsScreen>
             ),
           ],
         ),
+        // 🆕 Botón de debug en el AppBar
+        actions: [
+          IconButton(
+            icon: Icon(
+              Icons.bug_report,
+              color: isDark ? Colors.amber.shade300 : Colors.white,
+            ),
+            tooltip: 'Panel de Debug del Widget',
+            onPressed: _showDebugModal,
+          ),
+        ],
         flexibleSpace: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -251,6 +339,13 @@ class _ManifestationsScreenState extends State<ManifestationsScreen>
                     textAlign: TextAlign.center,
                   ),
                 ),
+                
+                // 🆕 Panel de debug expandible (opcional, como alternativa al modal)
+                if (_showDebugPanel)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    child: ManifestationWidgetDebug(widgetId: null),
+                  ),
                 
                 // Lista de manifestaciones
                 Expanded(
@@ -498,26 +593,11 @@ class _AnimatedBackground extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        // Usamos una decoración de imagen
         image: DecorationImage(
-          // Le decimos dónde encontrar la imagen
           image: const AssetImage('assets/Images/LaCondicionHumana.jpg'),
-          
-          // Esto es MUY importante: asegura que la imagen cubra toda la pantalla
-          // sin deformarse, recortando lo que sobre.
           fit: BoxFit.cover,
-
-          // --- LA MAGIA OCURRE AQUÍ ---
-          // Aplicamos un filtro de color para que la imagen se integre.
-          // Fusiona un color semi-transparente con la imagen.
           colorFilter: ColorFilter.mode(
-            // Usamos un color negro muy oscuro y semi-transparente.
-            // Puedes jugar con la opacidad (el valor después de 'x') 
-            // 0x99 -> Más transparente, 0xCC -> Más oscuro
             Colors.black.withOpacity(isDark ? 0.8 : 0.5),
-
-            // El BlendMode le dice CÓMO fusionar el color y la imagen.
-            // BlendMode.darken es una buena opción para empezar.
             BlendMode.darken,
           ),
         ),

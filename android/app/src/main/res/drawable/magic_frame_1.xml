@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Centro pequeño -->
+    <item android:gravity="center">
+        <shape android:shape="oval">
+            <size android:width="20dp" android:height="20dp"/>
+            <solid android:color="#FFFFD700"/> <!-- Dorado brillante -->
+            <corners android:radius="100dp"/>
+        </shape>
+    </item>
+</layer-list>

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Efecto de partículas mágicas ✨ -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Círculo dorado brillante -->
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="#80FFD700" />
+            <size android:width="100dp" android:height="100dp" />
+        </shape>
+    </item>
+    
+    <!-- Múltiples círculos pequeños simulando partículas -->
+    <item android:top="20dp" android:left="30dp">
+        <shape android:shape="oval">
+            <solid android:color="#CCFFD700" />
+            <size android:width="15dp" android:height="15dp" />
+        </shape>
+    </item>
+    
+    <item android:top="50dp" android:left="80dp">
+        <shape android:shape="oval">
+            <solid android:color="#99FFFFFF" />
+            <size android:width="12dp" android:height="12dp" />
+        </shape>
+    </item>
+    
+    <item android:top="100dp" android:left="50dp">
+        <shape android:shape="oval">
+            <solid android:color="#CCFFD700" />
+            <size android:width="18dp" android:height="18dp" />
+        </shape>
+    </item>
+    
+    <item android:top="70dp" android:left="120dp">
+        <shape android:shape="oval">
+            <solid android:color="#99FFFFFF" />
+            <size android:width="10dp" android:height="10dp" />
+        </shape>
+    </item>
+</layer-list>

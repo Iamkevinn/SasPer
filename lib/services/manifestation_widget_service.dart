@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:sasper/models/manifestation_model.dart';
 import 'package:sasper/data/manifestation_repository.dart';
+import 'package:intl/intl.dart';
 
 /// Permite crear claves separadas por widgetId
 String _keyFor(String baseKey, String? widgetId) {
@@ -23,6 +24,16 @@ class ManifestationWidgetService {
   static const String keyCurrentImageUrl = 'vision_current_image_url';
   static const String keyLastUpdateDate = 'vision_last_update_date';
   static const String keyAutoRotate = 'vision_auto_rotate_daily';
+  
+  // 🆕 Claves para el contador diario y animación
+  static const String keyDailyCountPrefix = 'vision_daily_count_';
+  static const String keyLastCountDate = 'vision_last_count_date';
+  static const String keyTriggerAnimation = 'vision_trigger_animation';
+
+  // 🆕 Obtener la fecha actual en formato "yyyy-MM-dd"
+  static String _getCurrentDate() {
+    return DateFormat('yyyy-MM-dd').format(DateTime.now());
+  }
 
   // ===============================================================
   //                INICIALIZACIÓN PRINCIPAL DEL WIDGET
@@ -94,7 +105,7 @@ class ManifestationWidgetService {
 
     await _showManifestationAtIndex(list, nextIndex, widgetId: widgetId);
     
-    // 🔥 CAMBIO CRÍTICO: Solo actualizar el widget específico
+    // Actualizar el widget específico
     await _updateWidget(specificWidgetId: widgetId);
   }
 
@@ -107,23 +118,83 @@ class ManifestationWidgetService {
 
     await _showManifestationAtIndex(list, previous, widgetId: widgetId);
     
-    // 🔥 CAMBIO CRÍTICO: Solo actualizar el widget específico
+    // Actualizar el widget específico
     await _updateWidget(specificWidgetId: widgetId);
   }
 
+  // 🆕 ✨ FUNCIÓN ACTUALIZADA PARA MANEJAR LA VISUALIZACIÓN/MANIFESTACIÓN
   static Future<void> recordManifestationVisualization({String? widgetId}) async {
-    // Opcional: Puedes mantener un registro si quieres usarlo para estadísticas en el futuro.
-    final currentIndex = await _getCurrentIndex(widgetId: widgetId);
-    final key = 'last_visualization_${currentIndex}_${widgetId ?? "global"}';
-    await HomeWidget.saveWidgetData<String>(key, DateTime.now().toIso8601String());
+    try {
+      final currentIndex = await _getCurrentIndex(widgetId: widgetId);
+      final currentDate = _getCurrentDate();
+      
+      // 🔑 Construir clave única para manifestación + fecha + widget
+      final countKey = _keyFor('${keyDailyCountPrefix}${currentIndex}_$currentDate', widgetId);
+      
+      // Obtener contador actual
+      final currentCount = await HomeWidget.getWidgetData<int>(countKey, defaultValue: 0) ?? 0;
+      final newCount = currentCount + 1;
+      
+      // 💾 Guardar nuevo contador
+      await HomeWidget.saveWidgetData<int>(countKey, newCount);
+      
+      // 💾 Guardar fecha actual
+      await HomeWidget.saveWidgetData<String>(
+        _keyFor(keyLastCountDate, widgetId),
+        currentDate,
+      );
+      
+      // 🎨 Activar animación
+      await HomeWidget.saveWidgetData<bool>(
+        _keyFor(keyTriggerAnimation, widgetId),
+        true,
+      );
+      
+      developer.log(
+        '✨ Manifestación registrada: $newCount veces hoy (widgetId: $widgetId, index: $currentIndex)',
+        name: 'ManifestationWidget',
+      );
+      
+      // 🔄 Actualizar widget para mostrar contador y animación
+      await _updateWidget(specificWidgetId: widgetId);
+      
+    } catch (e) {
+      developer.log(
+        '❌ Error al registrar visualización: $e',
+        name: 'ManifestationWidget',
+      );
+    }
+  }
 
-    developer.log(
-      '👁️ Visualización registrada para widget $widgetId (SIN actualización de UI para evitar parpadeo)',
-      name: 'ManifestationWidget',
-    );
-    // NO HAY LLAMADAS A HomeWidget.saveWidgetData para animaciones.
-    // NO HAY LLAMADAS A _updateWidget().
-    // Esto elimina el parpadeo por completo.
+  // 🆕 Obtener el contador diario actual para una manifestación
+  static Future<int> getDailyCount({required String? widgetId}) async {
+    try {
+      final currentIndex = await _getCurrentIndex(widgetId: widgetId);
+      final currentDate = _getCurrentDate();
+      final countKey = _keyFor('${keyDailyCountPrefix}${currentIndex}_$currentDate', widgetId);
+      
+      final count = await HomeWidget.getWidgetData<int>(countKey, defaultValue: 0) ?? 0;
+      return count;
+    } catch (e) {
+      developer.log('❌ Error obteniendo contador diario: $e', name: 'ManifestationWidget');
+      return 0;
+    }
+  }
+
+  // 🆕 Resetear contador diario (útil para testing o ajustes manuales)
+  static Future<void> resetDailyCount({required String? widgetId}) async {
+    try {
+      final currentIndex = await _getCurrentIndex(widgetId: widgetId);
+      final currentDate = _getCurrentDate();
+      final countKey = _keyFor('${keyDailyCountPrefix}${currentIndex}_$currentDate', widgetId);
+      
+      await HomeWidget.saveWidgetData<int>(countKey, 0);
+      await _updateWidget(specificWidgetId: widgetId);
+      
+      developer.log('🔄 Contador diario reseteado', name: 'ManifestationWidget');
+    } catch (e) {
+      developer.log('❌ Error reseteando contador: $e', name: 'ManifestationWidget');
+    }
   }
 
   // ===============================================================
@@ -227,10 +298,8 @@ class ManifestationWidgetService {
     await _updateWidget(specificWidgetId: widgetId);
   }
 
-  // 🔥 CORRECCIÓN DEFINITIVA: Sistema de marcado temporal
   static Future<void> _updateWidget({String? specificWidgetId}) async {
     try {
-
       await HomeWidget.updateWidget(
         androidName: _widgetName,
         iOSName: _widgetName,
@@ -250,7 +319,6 @@ class ManifestationWidgetService {
         name: 'ManifestationWidget');
 
     switch (action) {
-      // 🔥 ESTA ES LA LÍNEA QUE FALTA 🔥
       case 'initialize':
         await initializeWidget(widgetId: widgetId);
         break;
@@ -274,7 +342,7 @@ class ManifestationWidgetService {
 }
 
 // ===============================================================
-//             ESTADÍSTICAS EXTRAS (Opcional)
+//             ESTADÍSTICAS EXTRAS (Mejoradas)
 // ===============================================================
 extension ManifestationStats on ManifestationWidgetService {
   static Future<int> getVisualizationCount(String manifestationId) async {
@@ -292,5 +360,48 @@ extension ManifestationStats on ManifestationWidgetService {
       'visualization_count_$manifestationId',
       current + 1,
     );
+  }
+  
+  // 🆕 Obtener estadísticas de manifestaciones por día
+  static Future<Map<String, int>> getManifestationHistory({
+    required String? widgetId,
+    int daysBack = 7,
+  }) async {
+    final Map<String, int> history = {};
+    final now = DateTime.now();
+    
+    for (int i = 0; i < daysBack; i++) {
+      final date = now.subtract(Duration(days: i));
+      final dateStr = DateFormat('yyyy-MM-dd').format(date);
+      
+      // Obtener índice actual (o podrías iterar por todos)
+      final currentIndex = await ManifestationWidgetService._getCurrentIndex(widgetId: widgetId);
+      final countKey = _keyFor('${ManifestationWidgetService.keyDailyCountPrefix}${currentIndex}_$dateStr', widgetId);
+      
+      final count = await HomeWidget.getWidgetData<int>(countKey, defaultValue: 0) ?? 0;
+      history[dateStr] = count;
+    }
+    
+    return history;
+  }
+  
+  // 🆕 Obtener total de manifestaciones realizadas
+  static Future<int> getTotalManifestations({required String? widgetId}) async {
+    int total = 0;
+    final now = DateTime.now();
+    
+    // Revisar últimos 30 días
+    for (int i = 0; i < 30; i++) {
+      final date = now.subtract(Duration(days: i));
+      final dateStr = DateFormat('yyyy-MM-dd').format(date);
+      
+      final currentIndex = await ManifestationWidgetService._getCurrentIndex(widgetId: widgetId);
+      final countKey = _keyFor('${ManifestationWidgetService.keyDailyCountPrefix}${currentIndex}_$dateStr', widgetId);
+      
+      final count = await HomeWidget.getWidgetData<int>(countKey, defaultValue: 0) ?? 0;
+      total += count;
+    }
+    
+    return total;
   }
 }
