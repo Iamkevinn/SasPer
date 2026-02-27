@@ -251,6 +251,17 @@
                 android:contentDescription="@string/open_app"
                 android:scaleType="centerInside"
                 android:tint="#FFFFFF" />
+
+            <!-- Botón: Refrescar datos del widget -->
+            <ImageButton
+                android:id="@+id/btn_refresh"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@android:drawable/ic_popup_sync"
+                android:background="@drawable/button_ripple"
+                android:contentDescription="@string/refresh"
+                android:scaleType="centerInside"
+                android:tint="#FFFFFF" />
         </LinearLayout>
     </LinearLayout>
 </FrameLayout>

@@ -57,11 +57,11 @@
 
     </LinearLayout>
 
-    <!-- Botones de navegación (estos no cambian de lógica, solo se reposicionan) -->
+    <!-- Botones de navegación (izquierda / derecha) -->
     <ImageButton
         android:id="@+id/widget_prev_button"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
         android:layout_gravity="start|center_vertical"
         android:layout_marginStart="8dp"
         android:background="@drawable/button_circle"
@@ -71,13 +71,25 @@
 
     <ImageButton
         android:id="@+id/widget_next_button"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
         android:layout_gravity="end|center_vertical"
         android:layout_marginEnd="8dp"
         android:background="@drawable/button_circle"
         android:src="@android:drawable/ic_media_next"
         android:contentDescription="Siguiente"
+        android:tint="@android:color/white" />
+
+    <!-- Botón para forzar actualización completa desde el widget -->
+    <ImageButton
+        android:id="@+id/widget_refresh_button"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:layout_gravity="top|end"
+        android:layout_margin="8dp"
+        android:background="@drawable/button_circle"
+        android:src="@android:drawable/ic_popup_sync"
+        android:contentDescription="Actualizar manifestaciones"
         android:tint="@android:color/white" />
 
 </FrameLayout>

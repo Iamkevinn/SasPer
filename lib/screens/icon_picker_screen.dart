@@ -146,9 +146,9 @@ class _IconPickerScreenState extends State<IconPickerScreen> {
     
     // Filtrar por categoría
     if (_selectedCategory == 'Todos') {
-      _iconsByCategory.values.forEach((categoryIcons) {
+      for (var categoryIcons in _iconsByCategory.values) {
         icons.addAll(categoryIcons);
-      });
+      }
     } else {
       icons = _iconsByCategory[_selectedCategory] ?? [];
     }

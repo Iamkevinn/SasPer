@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:developer' as developer;
+import 'package:flutter/foundation.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:sasper/models/manifestation_model.dart';
 import 'package:sasper/data/manifestation_repository.dart';
@@ -98,7 +99,9 @@ class AffirmationWidgetService {
 
       await saveManifestationsToWidget(manifestations, widgetId: widgetId);
     } catch (e) {
-      print('⚠️ Error inicializando widget de afirmaciones: $e');
+      if (kDebugMode) {
+        print('⚠️ Error inicializando widget de afirmaciones: $e');
+      }
       await _setEmptyState(widgetId: widgetId);
     }
   }
@@ -408,7 +411,9 @@ class AffirmationWidgetService {
         );
       }).toList();
     } catch (e) {
-      print('Error al recuperar manifestaciones: $e');
+      if (kDebugMode) {
+        print('Error al recuperar manifestaciones: $e');
+      }
       return [];
     }
   }
@@ -433,7 +438,9 @@ class AffirmationWidgetService {
 
       await HomeWidget.updateWidget(androidName: _widgetName, iOSName: _widgetName);
     } catch (e) {
-      print('Error al actualizar widget: $e');
+      if (kDebugMode) {
+        print('Error al actualizar widget: $e');
+      }
     }
   }
 

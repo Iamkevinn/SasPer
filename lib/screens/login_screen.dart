@@ -378,7 +378,6 @@ class _LoginScreenState extends State<LoginScreen>
             alignment: Alignment.centerRight,
             child: TextButton(
               onPressed: _isLoading ? null : () {
-                // TODO: Implementar recuperación de contraseña
                 NotificationHelper.show(
                   message: 'Función disponible próximamente',
                   type: NotificationType.info,

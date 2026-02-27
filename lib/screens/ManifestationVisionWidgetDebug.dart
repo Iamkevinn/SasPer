@@ -1,3 +1,6 @@
+// ignore_for_file: file_names
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:sasper/services/manifestation_widget_service.dart';
 
@@ -6,9 +9,9 @@ class ManifestationWidgetDebug extends StatefulWidget {
   final String? widgetId;
   
   const ManifestationWidgetDebug({
-    Key? key,
+    super.key,
     this.widgetId,
-  }) : super(key: key);
+  });
 
   @override
   State<ManifestationWidgetDebug> createState() => _ManifestationWidgetDebugState();
@@ -50,7 +53,9 @@ class _ManifestationWidgetDebugState extends State<ManifestationWidgetDebug> {
         _loading = false;
       });
     } catch (e) {
-      print('Error cargando estadísticas: $e');
+      if (kDebugMode) {
+        print('Error cargando estadísticas: $e');
+      }
       setState(() => _loading = false);
     }
   }
@@ -60,7 +65,10 @@ class _ManifestationWidgetDebugState extends State<ManifestationWidgetDebug> {
       widgetId: widget.widgetId,
     );
     await _loadStats();
-    
+
+    // CAMBIO AQUÍ: Quita "context." y deja solo "!mounted"
+    if (!mounted) return; 
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('✨ ¡Manifestación realizada!'),
@@ -76,6 +84,9 @@ class _ManifestationWidgetDebugState extends State<ManifestationWidgetDebug> {
     );
     await _loadStats();
     
+    // AGREGA ESTA LÍNEA AQUÍ:
+    if (!mounted) return; 
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('🔄 Contador reseteado'),
@@ -167,7 +178,7 @@ class _ManifestationWidgetDebugState extends State<ManifestationWidgetDebug> {
                         ],
                       ),
                     );
-                  }).toList(),
+                  }),
                   
                   const SizedBox(height: 16),
                   const Divider(),

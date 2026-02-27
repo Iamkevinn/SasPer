@@ -4,16 +4,14 @@ import 'dart:developer' as developer;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:home_widget/home_widget.dart';
-import 'package:sasper/services/affirmation_widget_service.dart';
-import 'package:sasper/services/simple_manifestation_widget_service.dart'; // 🔥 AGREGADO
 import 'package:supabase_flutter/supabase_flutter.dart';
 // Screens
 import 'loading_screen.dart';
 import 'login_screen.dart';
 import 'biometric_gate.dart';
 // Services
+
 import 'package:sasper/services/notification_service.dart';
-import 'package:sasper/services/manifestation_widget_service.dart';
 import 'package:sasper/services/widget_service.dart' as widget_service; // 🔥 AÑADIDO
 
 /// 🔐 Widget "guardián" que gestiona el estado de autenticación
@@ -26,7 +24,6 @@ class AuthGate extends StatefulWidget {
 }
 
 class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
-  Future<void>? _initializationFuture;
   StreamSubscription<Uri?>? _widgetClickSubscription;
 
   // Timeouts para prevenir bloqueos
@@ -227,7 +224,6 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
           );
         } else {
           // Usuario no autenticado: resetear estado
-          _initializationFuture = null;
           return const LoginScreen();
         }
       },
@@ -306,31 +302,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _initializeAffirmationWidget() async {
-    try {
-      await AffirmationWidgetService.initializeWidget().timeout(
-        _servicesTimeout,
-        onTimeout: () {
-          developer.log(
-            '⚠️ Timeout al inicializar widget de afirmaciones',
-            name: 'AuthGate',
-          );
-          throw TimeoutException('Affirmation widget timeout');
-        },
-      );
-      developer.log(
-        '✅ Widget de afirmaciones inicializado',
-        name: 'AuthGate',
-      );
-    } catch (e, stackTrace) {
-      developer.log(
-        '⚠️ Error al inicializar widget de afirmaciones: $e',
-        name: 'AuthGate',
-        error: e,
-        stackTrace: stackTrace,
-      );
-    }
-  }
+  
 
   /// 🔔 Inicializa el servicio de notificaciones
   Future<void> _initializeNotifications() async {
@@ -351,89 +323,8 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   }
 
   /// 🌟 Inicializa el widget de manifestaciones
-  Future<void> _initializeManifestationWidget() async {
-    try {
-      await ManifestationWidgetService.initializeWidget().timeout(
-        _servicesTimeout,
-        onTimeout: () {
-          developer.log(
-            '⚠️ Timeout al inicializar widget de manifestaciones',
-            name: 'AuthGate',
-          );
-          throw TimeoutException('Widget initialization timeout');
-        },
-      );
-      developer.log(
-        '✅ Widget de manifestaciones inicializado',
-        name: 'AuthGate',
-      );
-    } catch (e, stackTrace) {
-      developer.log(
-        '⚠️ Error al inicializar widget: $e',
-        name: 'AuthGate',
-        error: e,
-        stackTrace: stackTrace,
-      );
-      // Intentar establecer un estado por defecto
-      try {
-        await _setDefaultWidgetState();
-      } catch (defaultError) {
-        developer.log(
-          '⚠️ Error al establecer estado por defecto: $defaultError',
-          name: 'AuthGate',
-        );
-      }
-    }
-  }
-
+  
   /// 🌟 Inicializa el widget simple de manifestaciones
-  Future<void> _initializeSimpleManifestationWidget() async {
-    try {
-      await SimpleManifestationWidgetService.initializeWidget().timeout(
-        _servicesTimeout,
-        onTimeout: () {
-          developer.log(
-            '⚠️ Timeout al inicializar widget simple de manifestaciones',
-            name: 'AuthGate',
-          );
-          throw TimeoutException('Simple Manifestation widget timeout');
-        },
-      );
-      developer.log(
-        '✅ Widget simple de manifestaciones inicializado',
-        name: 'AuthGate',
-      );
-    } catch (e, stackTrace) {
-      developer.log(
-        '⚠️ Error al inicializar widget simple: $e',
-        name: 'AuthGate',
-        error: e,
-        stackTrace: stackTrace,
-      );
-    }
-  }
 
   /// 📝 Establece un estado por defecto para el widget
-  Future<void> _setDefaultWidgetState() async {
-    await HomeWidget.saveWidgetData<String>(
-      'vision_current_title',
-      'Comienza a Manifestar',
-    );
-    await HomeWidget.saveWidgetData<String>(
-      'vision_current_description',
-      'Crea tu primera manifestación en la app',
-    );
-    await HomeWidget.saveWidgetData<String>('vision_current_image_url', '');
-    await HomeWidget.saveWidgetData<int>(
-        'vision_current_manifestation_index', 0);
-    await HomeWidget.saveWidgetData<int>('vision_manifestations_total_count', 0);
-    await HomeWidget.updateWidget(
-      androidName: 'ManifestationVisionWidget',
-      iOSName: 'ManifestationVisionWidget',
-    );
-    developer.log(
-      'ℹ️ Widget configurado con estado por defecto',
-      name: 'AuthGate',
-    );
-  }
 }

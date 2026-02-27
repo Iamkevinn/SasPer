@@ -12,7 +12,7 @@ class ManifestationsScreen extends StatefulWidget {
   const ManifestationsScreen({super.key});
 
   @override
-  _ManifestationsScreenState createState() => _ManifestationsScreenState();
+  State<ManifestationsScreen> createState() => _ManifestationsScreenState();
 }
 
 class _ManifestationsScreenState extends State<ManifestationsScreen>
@@ -23,7 +23,7 @@ class _ManifestationsScreenState extends State<ManifestationsScreen>
   late AnimationController _fabController;
   
   // 🆕 Variable para mostrar/ocultar el panel de debug
-  bool _showDebugPanel = false;
+  final bool _showDebugPanel = false;
 
   @override
   void initState() {
@@ -613,7 +613,6 @@ class _ManifestationCard extends StatelessWidget {
   final bool isDark;
 
   const _ManifestationCard({
-    super.key,
     required this.manifestation,
     required this.onEdit,
     required this.onDelete,

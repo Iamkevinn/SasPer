@@ -324,5 +324,6 @@
     <string name="manifestation_icon">Icono de manifestación</string>
     <string name="next_manifestation">Siguiente manifestación</string>
     <string name="previous_manifestation">Anterior manifestación</string>
+    <string name="refresh">Actualizar</string>
 
 </resources>

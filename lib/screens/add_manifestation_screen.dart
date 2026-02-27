@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'dart:math' as math;
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:home_widget/home_widget.dart';
@@ -8,6 +7,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import '../data/manifestation_repository.dart';
+import 'package:sasper/services/simple_manifestation_widget_service.dart';
+import 'package:sasper/services/manifestation_widget_service.dart';
+import 'package:sasper/services/affirmation_widget_service.dart';
 
 class AddManifestationScreen extends StatefulWidget {
   const AddManifestationScreen({super.key});
@@ -205,9 +207,23 @@ class _AddManifestationScreenState extends State<AddManifestationScreen>
         imageFile: _selectedImage!,
       );
 
-      // Actualizar widget
+      // Actualizar datos base desde Supabase
       final allManifestations =
           await _manifestationRepository.getManifestations();
+
+      // Sincronizar widgets de manifestaciones y afirmaciones con la nueva lista
+      await SimpleManifestationWidgetService.saveManifestationsToWidget(
+        allManifestations,
+        widgetId: null,
+      );
+      await ManifestationWidgetService.saveManifestationsToWidget(
+        allManifestations,
+        widgetId: null,
+      );
+      await AffirmationWidgetService.saveManifestationsToWidget(
+        allManifestations,
+        widgetId: null,
+      );
 
       if (allManifestations.isNotEmpty) {
         final idsString = allManifestations.map((m) => m.id).join(',');

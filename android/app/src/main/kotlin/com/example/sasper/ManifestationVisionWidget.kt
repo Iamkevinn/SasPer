@@ -254,6 +254,11 @@ class ManifestationVisionWidget : AppWidgetProvider() {
             Uri.parse("app://manifestation_widget/open_app?widgetId=$appWidgetId")
         )
         views.setOnClickPendingIntent(R.id.btn_open_app, openAppIntent)
+
+        // Botón de refresco manual: fuerza a Dart a recargar manifestaciones
+        val refreshUri = Uri.parse("app://manifestation_widget/refresh?widgetId=$appWidgetId")
+        val refreshIntent = HomeWidgetBackgroundIntent.getBroadcast(context, refreshUri)
+        views.setOnClickPendingIntent(R.id.btn_refresh, refreshIntent)
     }
 
     private fun loadImageIntoWidget(

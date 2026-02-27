@@ -37,7 +37,6 @@ class _EditRecurringTransactionScreenState extends State<EditRecurringTransactio
   late String _type;
   late String _frequency;
   String? _selectedAccountId;
-  Account? _selectedAccount;
   
   late DateTime _nextDueDate;
   late TimeOfDay _notificationTime;
@@ -247,7 +246,6 @@ class _EditRecurringTransactionScreenState extends State<EditRecurringTransactio
                 if (_selectedAccountId != null && 
                     !accounts.any((acc) => acc.id == _selectedAccountId)) {
                   _selectedAccountId = accounts.isNotEmpty ? accounts.first.id : null;
-                  _selectedAccount = accounts.firstOrNull;
                 }
 
                 return Form(
@@ -315,7 +313,6 @@ class _EditRecurringTransactionScreenState extends State<EditRecurringTransactio
                           onChanged: (accountId) {
                             setState(() {
                               _selectedAccountId = accountId;
-                              _selectedAccount = accounts.firstWhere((a) => a.id == accountId);
                               _hasChanges = true;
                             });
                           },

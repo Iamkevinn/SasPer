@@ -1,3 +1,5 @@
+// ignore_for_file: file_names
+
 import 'package:flutter/material.dart';
 import 'package:sasper/models/manifestation_model.dart';
 import 'package:sasper/services/manifestation_widget_service.dart';

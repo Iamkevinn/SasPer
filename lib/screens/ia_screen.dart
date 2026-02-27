@@ -1486,7 +1486,6 @@ class _RecommendationDetailSheet extends StatelessWidget {
                       onPressed: () {
                         HapticFeedback.heavyImpact();
                         Navigator.pop(context);
-                        // TODO: Implement activation
                       },
                       style: FilledButton.styleFrom(
                         backgroundColor: recommendation.color,

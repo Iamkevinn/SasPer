@@ -116,7 +116,6 @@ class WidgetService {
   /// Esta función debe ser llamada desde el hilo principal de la UI, ya que
   /// contiene operaciones de renderizado (`dart:ui`) que no pueden ejecutarse
   /// en un Isolate secundario.
-  static const String _goalsWidgetName = 'GoalsWidgetProvider';
 
   // ---> CREA ESTA NUEVA FUNCIÓN <---
   /// Orquesta la actualización de TODOS los widgets desde el hilo principal.
@@ -134,6 +133,9 @@ class WidgetService {
       developer.log('⏱️ Actualización demasiado reciente, saltando...');
       return;
     }
+
+    if (!context.mounted) return; 
+
     // 1. Llama a la función que ya tenías para los widgets principales.
     await updateAllWidgets(data, context);
 

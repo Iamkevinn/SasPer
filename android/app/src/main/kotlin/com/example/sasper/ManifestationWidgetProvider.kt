@@ -128,6 +128,11 @@ class ManifestationWidgetProvider : AppWidgetProvider() {
         val visualizeUri = Uri.parse("app://$host/visualize?widgetId=$appWidgetId")
         val visualizeIntent = HomeWidgetBackgroundIntent.getBroadcast(context, visualizeUri)
         views.setOnClickPendingIntent(R.id.widget_manifestation_image, visualizeIntent) // Reemplaza con el ID de tu imagen
+
+        // Botón de refresco manual: vuelve a pedir datos a Dart
+        val refreshUri = Uri.parse("app://$host/refresh?widgetId=$appWidgetId")
+        val refreshIntent = HomeWidgetBackgroundIntent.getBroadcast(context, refreshUri)
+        views.setOnClickPendingIntent(R.id.widget_refresh_button, refreshIntent)
     }
 
     // 4. AGREGAMOS UN HELPER PARA CARGAR IMÁGENES (COPIADO DE TU OTRO WIDGET)

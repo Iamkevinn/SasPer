@@ -176,5 +176,10 @@ class AffirmationFocusWidget : AppWidgetProvider() {
             Uri.parse("app://affirmation_widget/open_app?widgetId=$appWidgetId")
         )
         views.setOnClickPendingIntent(R.id.btn_open_app, openAppIntent)
+
+        // Botón de refresco manual: vuelve a pedir todas las manifestaciones a Dart
+        val refreshUri = Uri.parse("app://affirmation_widget/refresh?widgetId=$appWidgetId")
+        val refreshIntent = HomeWidgetBackgroundIntent.getBroadcast(context, refreshUri)
+        views.setOnClickPendingIntent(R.id.btn_refresh, refreshIntent)
     }
 }

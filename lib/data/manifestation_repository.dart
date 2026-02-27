@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart'; // Asegúrate de importar 'package:path/path.dart'
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
@@ -14,7 +15,9 @@ class ManifestationRepository {
     final currentUser = _supabase.auth.currentUser;
     if (currentUser == null) {
       // No hay usuario autenticado en este momento
-      print('ManifestationRepository: currentUser is null — returning empty list');
+      if (kDebugMode) {
+        print('ManifestationRepository: currentUser is null — returning empty list');
+      }
       return [];
     }
     final userId = currentUser.id;
@@ -27,7 +30,9 @@ class ManifestationRepository {
 
     return (response as List).map((item) => Manifestation.fromMap(item)).toList();
   } catch (e, st) {
-    print('Error en getManifestations(): $e\n$st');
+    if (kDebugMode) {
+      print('Error en getManifestations(): $e\n$st');
+    }
     return [];
   }
 }
@@ -97,7 +102,9 @@ class ManifestationRepository {
           await _supabase.storage.from('manifestation_images').remove(['$userId/$oldImagePath']);
         } catch (e) {
           // Loggear el error pero continuar, es posible que el archivo ya no existiera
-          print('Error al borrar imagen antigua: $e');
+          if (kDebugMode) {
+            print('Error al borrar imagen antigua: $e');
+          }
         }
       }
 
@@ -138,7 +145,9 @@ class ManifestationRepository {
     } catch (e) {
       // Es importante loggear el error, pero no detener el proceso.
       // Si la imagen no existe, aún queremos borrar el registro de la DB.
-      print('No se pudo borrar la imagen del storage (puede que ya no exista): $e');
+      if (kDebugMode) {
+        print('No se pudo borrar la imagen del storage (puede que ya no exista): $e');
+      }
     }
 
     // 2. Borrar el registro de la tabla 'manifestations'

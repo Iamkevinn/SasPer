@@ -129,7 +129,7 @@ class ManifestationWidgetService {
       final currentDate = _getCurrentDate();
       
       // 🔑 Construir clave única para manifestación + fecha + widget
-      final countKey = _keyFor('${keyDailyCountPrefix}${currentIndex}_$currentDate', widgetId);
+      final countKey = _keyFor('$keyDailyCountPrefix${currentIndex}_$currentDate', widgetId);
       
       // Obtener contador actual
       final currentCount = await HomeWidget.getWidgetData<int>(countKey, defaultValue: 0) ?? 0;
@@ -171,7 +171,7 @@ class ManifestationWidgetService {
     try {
       final currentIndex = await _getCurrentIndex(widgetId: widgetId);
       final currentDate = _getCurrentDate();
-      final countKey = _keyFor('${keyDailyCountPrefix}${currentIndex}_$currentDate', widgetId);
+      final countKey = _keyFor('$keyDailyCountPrefix${currentIndex}_$currentDate', widgetId);
       
       final count = await HomeWidget.getWidgetData<int>(countKey, defaultValue: 0) ?? 0;
       return count;
@@ -186,7 +186,7 @@ class ManifestationWidgetService {
     try {
       final currentIndex = await _getCurrentIndex(widgetId: widgetId);
       final currentDate = _getCurrentDate();
-      final countKey = _keyFor('${keyDailyCountPrefix}${currentIndex}_$currentDate', widgetId);
+      final countKey = _keyFor('$keyDailyCountPrefix${currentIndex}_$currentDate', widgetId);
       
       await HomeWidget.saveWidgetData<int>(countKey, 0);
       await _updateWidget(specificWidgetId: widgetId);

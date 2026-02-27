@@ -16,6 +16,7 @@ import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:flutter_quill/flutter_quill.dart';
+import 'package:sasper/theme/design_system.dart';
 
 // 🌟 NUEVO: Import para el widget de manifestaciones
 
@@ -233,14 +234,8 @@ class _MyAppState extends State<MyApp> {
           themeMode: themeProvider.themeMode,
           title: 'Finanzas Personales IA',
           debugShowCheckedModeBanner: false,
-          theme: ThemeData(
-            colorScheme: lightColorScheme,
-            useMaterial3: true,
-          ),
-          darkTheme: ThemeData(
-            colorScheme: darkColorScheme,
-            useMaterial3: true,
-          ),
+          theme: buildLightTheme(lightColorScheme),
+          darkTheme: buildDarkTheme(darkColorScheme),
           localizationsDelegates: const [
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,
