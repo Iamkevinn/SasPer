@@ -1,15 +1,24 @@
 // lib/screens/dashboard_screen.dart
-// VERSIÓN PREMIUM COMPLETA - Con IA en tiempo real, simulaciones y gamificación
-//import 'package:sasper/services/widget_service.dart';
+// ─────────────────────────────────────────────────────────────────────────────
+// SASPER — Dashboard Premium, diseño Apple-first
+// Jerarquía: identidad → balance → aspiraciones → control → análisis
+// ─────────────────────────────────────────────────────────────────────────────
+
 import 'dart:async';
 import 'dart:developer' as developer;
+import 'dart:math' as math;
 import 'dart:ui';
-import 'package:flutter_animate/flutter_animate.dart';
-import 'package:intl/intl.dart';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:intl/intl.dart';
 import 'package:lottie/lottie.dart';
+import 'package:skeletonizer/skeletonizer.dart';
+
 import 'package:sasper/data/challenge_repository.dart';
 import 'package:sasper/data/dashboard_repository.dart';
 import 'package:sasper/models/budget_models.dart';
@@ -17,1431 +26,990 @@ import 'package:sasper/models/challenge_model.dart';
 import 'package:sasper/models/dashboard_data_model.dart';
 import 'package:sasper/screens/budget_details_screen.dart';
 import 'package:sasper/screens/budgets_screen.dart';
+import 'package:sasper/screens/can_i_afford_it_screen.dart';
+import 'package:sasper/screens/goals_screen.dart';
+import 'package:sasper/screens/ia_screen.dart';
+import 'package:sasper/screens/manifestations_screen.dart';
+import 'package:sasper/screens/transactions_screen.dart';
 import 'package:sasper/services/widgets/widget_orchestrator.dart';
 import 'package:sasper/widgets/dashboard/active_challenges_widget.dart';
 import 'package:sasper/widgets/dashboard/category_spending_chart.dart';
-import 'package:skeletonizer/skeletonizer.dart';
 
-// Pantallas
-import 'package:sasper/screens/goals_screen.dart';
-import 'package:sasper/screens/can_i_afford_it_screen.dart';
-import 'package:sasper/screens/ia_screen.dart';
-import 'package:sasper/screens/transactions_screen.dart';
-import 'package:sasper/screens/manifestations_screen.dart';
+// ── Tokens de diseño ─────────────────────────────────────────────────────────
+class _D {
+  // Colores semánticos — se adaptan al tema del sistema
+  static const teal    = Color(0xFF00C896);   // acento principal
+  static const tealDim = Color(0xFF00C896);
+  static const gold    = Color(0xFFFFCC00);   // metas / manifestaciones
+  static const rose    = Color(0xFFFF6B6B);   // alertas
+
+  // Espaciado
+  static const h  = 20.0;   // horizontal gutter
+  static const r  = 24.0;   // radio base de tarjetas
+  static const r2 = 16.0;   // radio secundario
+
+  // Tipografía — DM Sans para UI, Playfair para números grandes
+  static TextStyle display(double size, {Color? color}) => GoogleFonts.playfairDisplay(
+    fontSize: size, fontWeight: FontWeight.w700,
+    color: color, letterSpacing: -1.0, height: 1.0,
+  );
+  static TextStyle label(double size, {FontWeight w = FontWeight.w500, Color? color}) =>
+      GoogleFonts.dmSans(fontSize: size, fontWeight: w, color: color);
+  static TextStyle caption(double size, {Color? color}) =>
+      GoogleFonts.dmSans(fontSize: size, fontWeight: FontWeight.w400, color: color, letterSpacing: 0.1);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ROOT SCREEN
+// ─────────────────────────────────────────────────────────────────────────────
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
-
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
 class _DashboardScreenState extends State<DashboardScreen>
     with TickerProviderStateMixin {
-  final DashboardRepository _dashboardRepository = DashboardRepository.instance;
+  final _repo = DashboardRepository.instance;
 
-  late final Stream<DashboardData> _dashboardDataStream;
+  // Initialized at field level — safe before initState completes.
+  late final Stream<DashboardData> _stream =
+      _repo.getDashboardDataStream();
+
+  StreamSubscription? _sub;
   bool _hasShownCelebration = false;
-
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
-
-  late AnimationController _breatheController;
-  late Animation<double> _breatheAnimation;
-
-  // Control de accesibilidad
   bool _reduceMotion = false;
-  bool _highContrast = false;
-  StreamSubscription? _dataSubscription;
+
+  // Nullable until initState — avoids LateInitializationError.
+  // Access via _breathe getter which asserts non-null.
+  AnimationController? _breatheCtrl;
+  AnimationController get _breathe => _breatheCtrl!;
+
+  // Fallback used only if build() fires before initState (hot-reload edge case).
+  // A zero-duration stopped controller — no vsync needed, never ticks.
+  static final _breatheFallback = AnimationController(
+    vsync: const _NoVsync(),
+    duration: Duration.zero,
+  );
 
   @override
   void initState() {
     super.initState();
-    developer.log(
-        "✅ [DashboardV3] initState: Configurando streams y carga inicial...",
-        name: "Dashboard");
 
-    _dashboardDataStream = _dashboardRepository.getDashboardDataStream();
-    // Escuchamos el stream para actualizar los widgets cuando lleguen nuevos datos.
-    _dataSubscription = _dashboardDataStream.listen((data) {
-      // Nos aseguramos de que no esté en estado de carga y de que el contexto esté disponible.
+    _sub = _stream.listen((data) {
       if (!data.isLoading && mounted) {
-        developer.log(
-            '✅ INTENTANDO ACTUALIZAR WIDGETS DESDE EL DASHBOARD (Stream Listener)',
-            name: 'DashboardScreen');
-        // Creamos una instancia y llamamos al método de actualización.
         WidgetOrchestrator().updateAllFromDashboard(data, context);
       }
     });
-    _dashboardRepository.forceRefresh(silent: true);
+    _repo.forceRefresh(silent: true);
 
-    // Animación de pulso para botón IA
-    _pulseController = AnimationController(
-      duration: const Duration(seconds: 2),
-      vsync: this,
+    // vsync (this) is available here — safe to create controller.
+    _breatheCtrl = AnimationController(
+      vsync: this, duration: const Duration(seconds: 4),
     )..repeat(reverse: true);
 
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.08).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
-
-    // Animación de respiración para health meter
-    _breatheController = AnimationController(
-      duration: const Duration(seconds: 3),
-      vsync: this,
-    )..repeat(reverse: true);
-
-    _breatheAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
-      CurvedAnimation(parent: _breatheController, curve: Curves.easeInOut),
-    );
-
-    // Detectar preferencias de accesibilidad
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        setState(() {
-          _reduceMotion = MediaQuery.of(context).disableAnimations;
-        });
-      }
+      if (mounted) setState(() => _reduceMotion = MediaQuery.of(context).disableAnimations);
     });
   }
 
   @override
   void dispose() {
-    _pulseController.dispose();
-    _dataSubscription?.cancel();
-    _breatheController.dispose();
+    _breatheCtrl?.dispose();
+    _sub?.cancel();
     super.dispose();
   }
 
-  Future<void> _handleRefresh() async {
-    await _dashboardRepository.forceRefresh(silent: false);
-  }
+  Future<void> _refresh() => _repo.forceRefresh(silent: false);
 
-  void _navigateToAiAnalysisScreen(DashboardData data) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => _AiAnalysisFullScreen(dashboardData: data),
-      ),
-    );
-  }
+  void _go(Widget screen) =>
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
 
-  void _navigateToAiAnalysisScreenTwo() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-          builder: (context) => const AiFinancialAnalysisScreen()),
-    );
-  }
-
-  void _navigateToCanIAffordIt() => Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => const CanIAffordItScreen()));
-
-  void _navigateToTransactionsScreen() => Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => const TransactionsScreen()));
-
-  void _navigateToGoalsScreen() => Navigator.of(context)
-      .push(MaterialPageRoute(builder: (context) => const GoalsScreen()));
-
-  void _navigateToManifestationsScreen() => Navigator.of(context)
-      .push(MaterialPageRoute(builder: (context) => const ManifestationsScreen()));
-
-  Future<void> _checkAndShowCelebrations(DashboardData data) async {
+  Future<void> _checkCelebrations(DashboardData data) async {
     if (_hasShownCelebration) return;
     _hasShownCelebration = true;
-
     try {
-      final newlyCompleted =
-          await ChallengeRepository.instance.checkUserChallengesStatus();
-
-      if (newlyCompleted.isEmpty || !mounted) {
-        return;
-      }
-
-      for (var userChallenge in newlyCompleted) {
-        await Future.delayed(const Duration(milliseconds: 500));
+      final done = await ChallengeRepository.instance.checkUserChallengesStatus();
+      for (final c in done) {
+        await Future.delayed(500.ms);
         if (mounted) {
           showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (context) => _buildCelebrationDialog(userChallenge),
+            context: context, barrierDismissible: false,
+            builder: (_) => _CelebrationDialog(challenge: c, reduceMotion: _reduceMotion),
           );
         }
       }
     } catch (e) {
-      developer.log("🔥 Error al chequear retos para celebración: $e",
-          name: "Dashboard");
+      developer.log('🔥 celebration error: $e', name: 'Dashboard');
     }
-  }
-
-  Widget _buildCelebrationDialog(UserChallenge userChallenge) {
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (!_reduceMotion)
-              SizedBox(
-                width: 200,
-                height: 150,
-                child: Lottie.asset(
-                  'assets/animations/confetti_celebration.json',
-                  repeat: false,
-                ),
-              ),
-            Text(
-              '¡Reto Completado!',
-              style: GoogleFonts.poppins(
-                  fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              userChallenge.challengeDetails.title,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Chip(
-              avatar: const Icon(Iconsax.star_1, size: 18),
-              label: Text('+${userChallenge.challengeDetails.rewardXp} XP',
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
-              backgroundColor: Colors.amber.withOpacity(0.3),
-              side: BorderSide.none,
-            ),
-            const SizedBox(height: 24),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(),
-              style: FilledButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 50)),
-              child: const Text('¡Genial!'),
-            )
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _toggleAccessibilityMode(String mode) {
-    setState(() {
-      if (mode == 'contrast') {
-        _highContrast = !_highContrast;
-      } else if (mode == 'motion') {
-        _reduceMotion = !_reduceMotion;
-      }
-    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
-        top: false,
-        bottom: false,
+        top: false, bottom: false,
         child: StreamBuilder<DashboardData>(
-          stream: _dashboardDataStream,
-          builder: (context, snapshot) {
-            final isLoading = !snapshot.hasData || snapshot.data!.isLoading;
-            final data = isLoading ? DashboardData.empty() : snapshot.data!;
-
-            if (!isLoading && !_hasShownCelebration) {
+          stream: _stream,
+          builder: (context, snap) {
+            final loading = !snap.hasData || snap.data!.isLoading;
+            final data = loading ? DashboardData.empty() : snap.data!;
+            if (!loading && !_hasShownCelebration) {
               WidgetsBinding.instance
-                  .addPostFrameCallback((_) => _checkAndShowCelebrations(data));
+                  .addPostFrameCallback((_) => _checkCelebrations(data));
             }
-
             return Skeletonizer(
-              enabled: isLoading,
-              child: _buildDashboardContent(data),
+              enabled: loading,
+              child: RefreshIndicator(
+                onRefresh: _refresh,
+                color: _D.teal,
+                child: _DashboardBody(
+                  data: data,
+                  breathe: _breatheCtrl ?? _breatheFallback,
+                  reduceMotion: _reduceMotion,
+                  onAiTap: () => _go(const AiFinancialAnalysisScreen()),
+                  onSimulateTap: () => _go(_AiAnalysisFullScreen(dashboardData: data)),
+                  onAddTap: () => _go(const TransactionsScreen()),
+                  onGoalsTap: () => _go(const GoalsScreen()),
+                  onManifestTap: () => _go(const ManifestationsScreen()),
+                  onAffordTap: () => _go(const CanIAffordItScreen()),
+                ),
+              ),
             );
           },
         ),
       ),
-      floatingActionButton: _buildAccessibilityFab(),
     );
   }
+}
 
-  Widget _buildAccessibilityFab() {
-    return FloatingActionButton.small(
-      onPressed: () => _showAccessibilityMenu(),
-      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-      child: const Icon(Iconsax.setting_2, size: 20),
+// ─────────────────────────────────────────────────────────────────────────────
+// DASHBOARD BODY — CustomScrollView orquestado
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _DashboardBody extends StatelessWidget {
+  final DashboardData data;
+  final AnimationController breathe;
+  final bool reduceMotion;
+  final VoidCallback onAiTap, onSimulateTap, onAddTap,
+      onGoalsTap, onManifestTap, onAffordTap;
+
+  const _DashboardBody({
+    required this.data,
+    required this.breathe,
+    required this.reduceMotion,
+    required this.onAiTap,
+    required this.onSimulateTap,
+    required this.onAddTap,
+    required this.onGoalsTap,
+    required this.onManifestTap,
+    required this.onAffordTap,
+  });
+
+  Widget _sliver(Widget w, {int delayMs = 0}) => SliverToBoxAdapter(
+    child: reduceMotion ? w : w.animate().fadeIn(
+      delay: Duration(milliseconds: delayMs),
+      duration: const Duration(milliseconds: 500),
+    ).slideY(begin: 0.04, curve: Curves.easeOutCubic),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomScrollView(
+      physics: const BouncingScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics()),
+      slivers: [
+        // ── 1. Header compacto con saludo + balance ─────────────────
+        SliverPersistentHeader(
+          pinned: true,
+          delegate: _CompactHeaderDelegate(
+            data: data,
+            breathe: breathe,
+            onAiTap: onAiTap,
+          ),
+        ),
+
+        // ── 2. Sección de Aspiraciones (Metas + Manifestaciones) ────
+        _sliver(
+          _AspirationsSection(
+            onGoalsTap: onGoalsTap,
+            onManifestTap: onManifestTap,
+          ),
+          delayMs: 80,
+        ),
+
+        // ── 3. Acciones rápidas ─────────────────────────────────────
+        _sliver(
+          _QuickBar(
+            onAddTap: onAddTap,
+            onSimulateTap: onSimulateTap,
+            onAffordTap: onAffordTap,
+          ),
+          delayMs: 140,
+        ),
+
+        // ── 4. Presupuestos ─────────────────────────────────────────
+        _sliver(_BudgetsSection(budgets: data.featuredBudgets), delayMs: 200),
+
+        // ── 5. Retos activos ────────────────────────────────────────
+        _sliver(
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: _D.h),
+            child: const ActiveChallengesWidget(),
+          ),
+          delayMs: 260,
+        ),
+
+        // ── 6. Distribución de gastos ───────────────────────────────
+        _sliver(
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: _D.h),
+            child: CategorySpendingChart(spendingData: data.categorySpendingSummary),
+          ),
+          delayMs: 320,
+        ),
+
+        // ── Espacio inferior para nav bar ───────────────────────────
+        const SliverToBoxAdapter(child: SizedBox(height: 110)),
+      ],
     );
   }
+}
 
-  void _showAccessibilityMenu() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPACT HEADER — Hero compacto con saludo, balance y salud financiera
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _CompactHeaderDelegate extends SliverPersistentHeaderDelegate {
+  final DashboardData data;
+  final AnimationController breathe;
+  final VoidCallback onAiTap;
+
+  _CompactHeaderDelegate({
+    required this.data,
+    required this.breathe,
+    required this.onAiTap,
+  });
+
+  @override double get minExtent => 100;
+  @override double get maxExtent => 155;
+
+  @override
+  bool shouldRebuild(covariant _CompactHeaderDelegate old) =>
+      data != old.data || onAiTap != old.onAiTap;
+
+  @override
+  Widget build(BuildContext ctx, double shrinkOffset, bool overlaps) {
+    final t = (shrinkOffset / (maxExtent - minExtent)).clamp(0.0, 1.0);
+    final statusH = MediaQuery.of(ctx).padding.top;
+    final theme = Theme.of(ctx);
+    final isDark = theme.brightness == Brightness.dark;
+    final fmt = NumberFormat.compactCurrency(locale: 'es_CO', symbol: '\$');
+    final onSurface = theme.colorScheme.onSurface;
+
+    // Colores adaptativos
+    final surfaceBg = isDark
+        ? theme.scaffoldBackgroundColor.withOpacity(0.92)
+        : theme.scaffoldBackgroundColor.withOpacity(0.94);
+
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          color: surfaceBg,
+          padding: EdgeInsets.only(
+            top: statusH + 8,
+            left: _D.h + 4,
+            right: _D.h,
+            bottom: 12,
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Fila superior: saludo + IA button
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Saludo — se desvanece al hacer scroll
+                        AnimatedOpacity(
+                          opacity: (1 - t * 2).clamp(0.0, 1.0),
+                          duration: const Duration(milliseconds: 80),
+                          child: Text(
+                            _greeting(data.fullName),
+                            style: _D.caption(13,
+                                color: onSurface.withOpacity(0.55)),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        // Balance — se comprime al hacer scroll
+                        AnimatedBuilder(
+                          animation: breathe,
+                          builder: (_, __) => Text(
+                            fmt.format(data.totalBalance),
+                            style: _D.display(
+                              lerpDouble(38, 24, t)!,
+                              color: onSurface,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // IA Pill button
+                  _AiButton(onTap: onAiTap, breathe: breathe),
+                ],
+              ),
+
+              const SizedBox(height: 10),
+
+              // Barra de subtítulos: proyección + salud
+              AnimatedOpacity(
+                opacity: (1 - t * 1.5).clamp(0.0, 1.0),
+                duration: const Duration(milliseconds: 80),
+                child: Row(
+                  children: [
+                    Icon(Iconsax.trend_up, size: 13,
+                        color: _D.teal.withOpacity(0.9)),
+                    const SizedBox(width: 5),
+                    Text(
+                      'Proyección: ${fmt.format(data.monthlyProjection)}',
+                      style: _D.caption(12,
+                          color: onSurface.withOpacity(0.5)),
+                    ),
+                    const Spacer(),
+                    _HealthPill(score: data.healthScore),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Ajustes de Accesibilidad',
-              style: GoogleFonts.poppins(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+    );
+  }
+
+  String _greeting(String fullName) {
+    final hour = DateTime.now().hour;
+    final first = fullName.split(' ').first;
+    if (hour < 12) return 'Buenos días, $first 🌤';
+    if (hour < 18) return 'Buenas tardes, $first ☀️';
+    return 'Buenas noches, $first 🌙';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AI BUTTON — pill compacto con shimmer
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _AiButton extends StatefulWidget {
+  final VoidCallback onTap;
+  final AnimationController breathe;
+  const _AiButton({required this.onTap, required this.breathe});
+
+  @override
+  State<_AiButton> createState() => _AiButtonState();
+}
+
+class _AiButtonState extends State<_AiButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _press;
+
+  @override
+  void initState() {
+    super.initState();
+    _press = AnimationController(vsync: this,
+        duration: const Duration(milliseconds: 90));
+  }
+  @override
+  void dispose() { _press.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) { _press.forward(); HapticFeedback.lightImpact(); },
+      onTapUp:   (_) { _press.reverse(); widget.onTap(); },
+      onTapCancel: () => _press.reverse(),
+      child: AnimatedBuilder(
+        animation: Listenable.merge([_press, widget.breathe]),
+        builder: (_, __) {
+          final scale = lerpDouble(1.0, 0.93, _press.value)!;
+          final glow  = lerpDouble(8.0, 14.0, widget.breathe.value)!;
+          return Transform.scale(
+            scale: scale,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF00C896), Color(0xFF00A3FF)],
+                  begin: Alignment.topLeft, end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(50),
+                boxShadow: [
+                  BoxShadow(
+                    color: _D.teal.withOpacity(0.35),
+                    blurRadius: glow,
+                    spreadRadius: 0,
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Iconsax.magic_star, size: 15, color: Colors.white),
+                  const SizedBox(width: 6),
+                  Text('IA', style: _D.label(13,
+                      w: FontWeight.w700, color: Colors.white)),
+                ],
               ),
             ),
-            const SizedBox(height: 24),
-            SwitchListTile(
-              title: const Text('Alto contraste'),
-              subtitle: const Text('Mejora la legibilidad'),
-              value: _highContrast,
-              onChanged: (_) => _toggleAccessibilityMode('contrast'),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HEALTH PILL — compacto, en el header
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _HealthPill extends StatelessWidget {
+  final double score;
+  const _HealthPill({required this.score});
+
+  (Color, String) _status() {
+    if (score >= 80) return (const Color(0xFF30D158), 'Excelente');
+    if (score >= 60) return (const Color(0xFF0A84FF), 'Bueno');
+    if (score >= 40) return (const Color(0xFFFF9F0A), 'Regular');
+    return (const Color(0xFFFF453A), 'Atención');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final (color, label) = _status();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.3), width: 0.5),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(width: 6, height: 6,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+          const SizedBox(width: 6),
+          Text('$label · ${score.toInt()}',
+              style: _D.label(11, w: FontWeight.w600, color: color)),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ASPIRACIONES — Metas + Manifestaciones (protagonistas visuales)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _AspirationsSection extends StatelessWidget {
+  final VoidCallback onGoalsTap, onManifestTap;
+  const _AspirationsSection({required this.onGoalsTap, required this.onManifestTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(_D.h, 8, _D.h, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Section label
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(
+              'TU FUTURO',
+              style: _D.label(10,
+                  w: FontWeight.w700,
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withOpacity(0.35)),
+            ).animate().fadeIn(delay: 100.ms),
+          ),
+
+          // Dos tarjetas lado a lado
+          Row(
+            children: [
+              Expanded(
+                child: _AspirationCard(
+                  icon: Iconsax.flag,
+                  label: 'Metas',
+                  sublabel: 'Define tus logros',
+                  gradient: [const Color(0xFF0A84FF), const Color(0xFF5AC8FA)],
+                  isDark: isDark,
+                  onTap: onGoalsTap,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _AspirationCard(
+                  icon: Iconsax.magicpen,
+                  label: 'Manifestar',
+                  sublabel: 'Visualiza tu abundancia',
+                  gradient: [const Color(0xFFFFCC00), const Color(0xFFFF9500)],
+                  isDark: isDark,
+                  onTap: onManifestTap,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AspirationCard extends StatefulWidget {
+  final IconData icon;
+  final String label, sublabel;
+  final List<Color> gradient;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _AspirationCard({
+    required this.icon, required this.label, required this.sublabel,
+    required this.gradient, required this.isDark, required this.onTap,
+  });
+
+  @override
+  State<_AspirationCard> createState() => _AspirationCardState();
+}
+
+class _AspirationCardState extends State<_AspirationCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this,
+        duration: const Duration(milliseconds: 100));
+    _scale = Tween(begin: 1.0, end: 0.96).animate(
+        CurvedAnimation(parent: _ctrl, curve: Curves.easeIn));
+  }
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) { _ctrl.forward(); HapticFeedback.selectionClick(); },
+      onTapUp:   (_) { _ctrl.reverse(); widget.onTap(); },
+      onTapCancel: () => _ctrl.reverse(),
+      child: ScaleTransition(
+        scale: _scale,
+        child: Container(
+          height: 108,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: widget.gradient,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-            SwitchListTile(
-              title: const Text('Reducir animaciones'),
-              subtitle: const Text('Minimiza efectos de movimiento'),
-              value: _reduceMotion,
-              onChanged: (_) => _toggleAccessibilityMode('motion'),
+            borderRadius: BorderRadius.circular(_D.r),
+            boxShadow: [
+              BoxShadow(
+                color: widget.gradient.first.withOpacity(0.28),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Stack(
+            children: [
+              // Círculo decorativo de fondo
+              Positioned(
+                right: -18, bottom: -18,
+                child: Container(
+                  width: 80, height: 80,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.12),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 12, top: -10,
+                child: Container(
+                  width: 44, height: 44,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.08),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+
+              // Contenido
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.22),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(widget.icon, size: 18, color: Colors.white),
+                    ),
+                    const Spacer(),
+                    Text(widget.label,
+                        style: _D.label(16,
+                            w: FontWeight.w700, color: Colors.white)),
+                    const SizedBox(height: 2),
+                    Text(widget.sublabel,
+                        style: _D.caption(11,
+                            color: Colors.white.withOpacity(0.75))),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// QUICK BAR — tres acciones horizontales compactas
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _QuickBar extends StatelessWidget {
+  final VoidCallback onAddTap, onSimulateTap, onAffordTap;
+  const _QuickBar({required this.onAddTap, required this.onSimulateTap,
+      required this.onAffordTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final surface = theme.colorScheme.surfaceContainer;
+    final onSurface = theme.colorScheme.onSurface;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(_D.h, 16, _D.h, 0),
+      child: Row(
+        children: [
+          _QuickChip(
+            icon: Iconsax.add_circle,
+            label: 'Agregar',
+            color: _D.teal,
+            surface: surface,
+            onSurface: onSurface,
+            onTap: onAddTap,
+          ),
+          const SizedBox(width: 10),
+          _QuickChip(
+            icon: Iconsax.calculator,
+            label: 'Simular',
+            color: const Color(0xFF5AC8FA),
+            surface: surface,
+            onSurface: onSurface,
+            onTap: onSimulateTap,
+          ),
+          const SizedBox(width: 10),
+          _QuickChip(
+            icon: Iconsax.wallet_3,
+            label: '¿Lo puedo?',
+            color: const Color(0xFFFF9500),
+            surface: surface,
+            onSurface: onSurface,
+            onTap: onAffordTap,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickChip extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final Color color, surface, onSurface;
+  final VoidCallback onTap;
+
+  const _QuickChip({
+    required this.icon, required this.label, required this.color,
+    required this.surface, required this.onSurface, required this.onTap,
+  });
+
+  @override
+  State<_QuickChip> createState() => _QuickChipState();
+}
+
+class _QuickChipState extends State<_QuickChip>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this,
+        duration: const Duration(milliseconds: 80));
+  }
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTapDown: (_) { _ctrl.forward(); HapticFeedback.selectionClick(); },
+        onTapUp:   (_) { _ctrl.reverse(); widget.onTap(); },
+        onTapCancel: () => _ctrl.reverse(),
+        child: AnimatedBuilder(
+          animation: _ctrl,
+          builder: (_, __) => Transform.scale(
+            scale: lerpDouble(1.0, 0.94, _ctrl.value)!,
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              decoration: BoxDecoration(
+                color: widget.surface,
+                borderRadius: BorderRadius.circular(_D.r),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(9),
+                    decoration: BoxDecoration(
+                      color: widget.color.withOpacity(0.13),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(widget.icon, size: 18, color: widget.color),
+                  ),
+                  const SizedBox(height: 7),
+                  Text(widget.label,
+                      style: _D.label(11,
+                          w: FontWeight.w600,
+                          color: widget.onSurface.withOpacity(0.8)),
+                      textAlign: TextAlign.center),
+                ],
+              ),
             ),
-            const SizedBox(height: 16),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BUDGETS SECTION
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _BudgetsSection extends StatelessWidget {
+  final List<Budget> budgets;
+  const _BudgetsSection({required this.budgets});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header de sección
+        Padding(
+          padding: const EdgeInsets.fromLTRB(_D.h, 24, _D.h, 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text('Presupuestos',
+                  style: _D.label(17, w: FontWeight.w700, color: onSurface)),
+              GestureDetector(
+                onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const BudgetsScreen())),
+                child: Text('Ver todos',
+                    style: _D.label(13,
+                        w: FontWeight.w600,
+                        color: _D.teal)),
+              ),
+            ],
+          ),
+        ),
+
+        if (budgets.isEmpty)
+          _EmptyBudgets()
+        else
+          SizedBox(
+            height: 148,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: _D.h),
+              itemCount: budgets.length,
+              itemBuilder: (ctx, i) => Padding(
+                padding: EdgeInsets.only(right: i < budgets.length - 1 ? 12 : 0),
+                child: _BudgetCard(budget: budgets[i]),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _EmptyBudgets extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: _D.h),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainer,
+          borderRadius: BorderRadius.circular(_D.r),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: _D.teal.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Iconsax.wallet_add, size: 20, color: _D.teal),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                'Crea tu primer presupuesto y toma el control.',
+                style: _D.caption(13,
+                    color: theme.colorScheme.onSurface.withOpacity(0.6)),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
-
-  Widget _buildDashboardContent(DashboardData data) {
-    return RefreshIndicator(
-      onRefresh: _handleRefresh,
-      child: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          SliverPersistentHeader(
-            pinned: true,
-            delegate: _PremiumHeaderDelegate(
-              data: data,
-              pulseAnimation: _reduceMotion
-                  ? const AlwaysStoppedAnimation(1.0)
-                  : _pulseAnimation,
-              breatheAnimation: _reduceMotion
-                  ? const AlwaysStoppedAnimation(1.0)
-                  : _breatheAnimation,
-              onAiTap: () => _navigateToAiAnalysisScreenTwo(),
-              minExtent: 135,
-              maxExtent: 165,
-              highContrast: _highContrast,
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: _BalanceHeroCard(
-              data: data,
-              onSimulateTap: () => _navigateToAiAnalysisScreen(data),
-              highContrast: _highContrast,
-            ).animate(
-                effects: _reduceMotion
-                    ? []
-                    : [
-                        const FadeEffect(delay: Duration(milliseconds: 200)),
-                        const SlideEffect(begin: Offset(0, 0.2)),
-                      ]),
-          ),
-          SliverToBoxAdapter(
-            child: Padding( // <--- WIDGET AÑADIDO
-              padding: const EdgeInsets.symmetric(vertical: 13.0), // <--- ESPACIADO
-              child: _LiveRecommendationsFeed(
-                data: data,
-                highContrast: _highContrast,
-              ).animate(
-                  effects: _reduceMotion
-                      ? []
-                      : [
-                          const FadeEffect(delay: Duration(milliseconds: 250)),
-                          const SlideEffect(begin: Offset(0, 0.2)),
-                        ]),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: _QuickActions(
-              onSimulateTap: _navigateToCanIAffordIt,
-              onAddTap: _navigateToTransactionsScreen,
-              onGoalsTap: _navigateToGoalsScreen,
-              onManifestationsTap: _navigateToManifestationsScreen, 
-            ).animate(
-                effects: _reduceMotion
-                    ? []
-                    : [
-                        const FadeEffect(delay: Duration(milliseconds: 300)),
-                        const SlideEffect(begin: Offset(0, 0.2)),
-                      ]),
-          ),
-          SliverToBoxAdapter(
-            child: _BudgetsCarousel(
-              budgets: data.featuredBudgets,
-              highContrast: _highContrast,
-            ).animate(
-                effects: _reduceMotion
-                    ? []
-                    : [
-                        const FadeEffect(delay: Duration(milliseconds: 400)),
-                        const SlideEffect(begin: Offset(0, 0.2)),
-                      ]),
-          ),
-          SliverToBoxAdapter(
-            child: const ActiveChallengesWidget().animate(
-                effects: _reduceMotion
-                    ? []
-                    : [
-                        const FadeEffect(delay: Duration(milliseconds: 500)),
-                        const SlideEffect(begin: Offset(0, 0.2)),
-                      ]),
-          ),
-          SliverToBoxAdapter(
-            child: CategorySpendingChart(
-              spendingData: data.categorySpendingSummary,
-            ).animate(
-                effects: _reduceMotion
-                    ? []
-                    : [
-                        const FadeEffect(delay: Duration(milliseconds: 600)),
-                        const SlideEffect(begin: Offset(0, 0.2)),
-                      ]),
-          ),
-          const SliverToBoxAdapter(child: SizedBox(height: 120)),
-        ],
-      ),
-    );
-  }
 }
 
-// ============================================================================
-// HEADER PREMIUM CON HEALTH METER
-// ============================================================================
-
-class _PremiumHeaderDelegate extends SliverPersistentHeaderDelegate {
-  final DashboardData data;
-  final Animation<double> pulseAnimation;
-  final Animation<double> breatheAnimation;
-  final VoidCallback onAiTap;
-  final bool highContrast;
-  @override
-  final double minExtent;
-  @override
-  final double maxExtent;
-
-  _PremiumHeaderDelegate({
-    required this.data,
-    required this.pulseAnimation,
-    required this.breatheAnimation,
-    required this.onAiTap,
-    required this.minExtent,
-    required this.maxExtent,
-    required this.highContrast,
-  });
-
-  @override
-  Widget build(
-      BuildContext context, double shrinkOffset, bool overlapsContent) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final progress = (maxExtent - shrinkOffset) / (maxExtent - minExtent);
-
-    // AÑADE ESTA LÍNEA PARA OBTENER LA ALTURA DEL STATUS BAR
-    final double statusBarHeight = MediaQuery.of(context).padding.top;
-
-    return ClipRRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          //padding: const EdgeInsets.fromLTRB(20, 48, 20, 12),
-          padding: EdgeInsets.only(
-            top: statusBarHeight +
-                4, // Suma la altura del status bar + un pequeño margen
-            left: 30,
-            right: 20,
-            bottom: 8, // Añade un padding inferior para consistencia
-          ),
-          decoration: BoxDecoration(
-            color: highContrast
-                ? Colors.black
-                : theme.scaffoldBackgroundColor.withOpacity(0.90),
-            border: highContrast
-                ? const Border(
-                    bottom: BorderSide(color: Colors.white, width: 2))
-                : null,
-          ),
-          child: Center(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'Hola, ${data.fullName.split(' ').first} 👋',
-                        style: GoogleFonts.poppins(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                          color: highContrast
-                              ? Colors.white
-                              : colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Tu Central Financiera',
-                        style: GoogleFonts.poppins(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: highContrast
-                              ? Colors.white
-                              : colorScheme.onSurface,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Row(
-                  children: [
-                    AnimatedBuilder(
-                      animation: breatheAnimation,
-                      builder: (context, child) {
-                        return Transform.scale(
-                          scale: breatheAnimation.value,
-                          child: _FinancialHealthMeter(
-                            score: data.healthScore,
-                            progress: progress,
-                            highContrast: highContrast,
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(width: 12),
-                    AnimatedBuilder(
-                      animation: pulseAnimation,
-                      builder: (context, child) {
-                        return Transform.scale(
-                          scale: pulseAnimation.value,
-                          child: Tooltip(
-                            message:
-                                'Análisis IA - Explora tu situación financiera',
-                            child: IconButton(
-                              onPressed: onAiTap,
-                              icon: Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                    gradient: LinearGradient(colors: [
-                                      highContrast
-                                          ? Colors.white
-                                          : const Color(0xFF0D9488),
-                                      highContrast
-                                          ? Colors.grey.shade300
-                                          : const Color(0xFF0EA5A5)
-                                    ]),
-                                    borderRadius: BorderRadius.circular(16),
-                                    boxShadow: highContrast
-                                        ? []
-                                        : [
-                                            BoxShadow(
-                                              color: const Color(0xFF0D9488)
-                                                  .withOpacity(0.4),
-                                              blurRadius: 12,
-                                              offset: const Offset(0, 4),
-                                            )
-                                          ]),
-                                child: Icon(
-                                  Iconsax.magic_star,
-                                  color: highContrast
-                                      ? Colors.black
-                                      : Colors.white,
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  @override
-  bool shouldRebuild(covariant _PremiumHeaderDelegate oldDelegate) {
-    return data != oldDelegate.data ||
-        pulseAnimation != oldDelegate.pulseAnimation ||
-        breatheAnimation != oldDelegate.breatheAnimation ||
-        onAiTap != oldDelegate.onAiTap ||
-        highContrast != oldDelegate.highContrast;
-  }
-}
-
-// ============================================================================
-// BALANCE HERO CARD CON KPI PILLS
-// ============================================================================
-
-class _BalanceHeroCard extends StatelessWidget {
-  final DashboardData data;
-  final VoidCallback onSimulateTap;
-  final bool highContrast;
-
-  const _BalanceHeroCard({
-    required this.data,
-    required this.onSimulateTap,
-    required this.highContrast,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final currencyFormat =
-        NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(20, 0, 20, 14),
-      padding: const EdgeInsets.all(28),
-      decoration: BoxDecoration(
-        gradient: highContrast
-            ? null
-            : LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: isDark
-                    ? [const Color(0xFF0D9488), const Color(0xFF0EA5A5)]
-                    : [const Color(0xFF0D9488), const Color(0xFF14B8A6)],
-              ),
-        color: highContrast ? Colors.black : null,
-        border: highContrast ? Border.all(color: Colors.white, width: 2) : null,
-        borderRadius: BorderRadius.circular(32),
-        boxShadow: highContrast
-            ? []
-            : [
-                BoxShadow(
-                  color: (isDark
-                          ? const Color(0xFF0EA5A5)
-                          : const Color(0xFF0D9488))
-                      .withOpacity(0.3),
-                  blurRadius: 24,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Balance Total',
-                style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white.withOpacity(0.95)),
-              ),
-              if (data.alerts.isNotEmpty)
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(highContrast ? 0.9 : 0.2),
-                      borderRadius: BorderRadius.circular(20)),
-                  child: Row(
-                    children: [
-                      Icon(Iconsax.danger,
-                          size: 14,
-                          color: highContrast ? Colors.red : Colors.white),
-                      const SizedBox(width: 6),
-                      Text(
-                          '${data.alerts.length} Alerta${data.alerts.length > 1 ? 's' : ''}',
-                          style: GoogleFonts.poppins(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color:
-                                  highContrast ? Colors.black : Colors.white)),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0, end: data.totalBalance),
-            duration: 1500.ms,
-            curve: Curves.easeOutCubic,
-            builder: (context, value, child) {
-              return Text(
-                currencyFormat.format(value),
-                style: GoogleFonts.poppins(
-                    fontSize: 44,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    height: 1.1,
-                    letterSpacing: -1.5),
-              );
-            },
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Proyección fin de mes: ${currencyFormat.format(data.monthlyProjection)}',
-            style: GoogleFonts.poppins(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: Colors.white.withOpacity(0.85)),
-          ),
-          const SizedBox(height: 20),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _KpiPill(
-                icon: Iconsax.wallet_2,
-                label: 'Disponible',
-                value: currencyFormat.format(data.totalBalance * 0.7),
-                highContrast: highContrast,
-              ),
-              _KpiPill(
-                icon: Iconsax.chart_1,
-                label: 'Ahorro mes',
-                value: currencyFormat.format(data.totalBalance * 0.15),
-                highContrast: highContrast,
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          FilledButton.icon(
-            onPressed: onSimulateTap,
-            icon: const Icon(Iconsax.calculator, size: 20),
-            label: const Text('Simular impacto'),
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: const Color(0xFF0D9488),
-              minimumSize: const Size(double.infinity, 50),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _KpiPill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final bool highContrast;
-
-  const _KpiPill({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.highContrast,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: highContrast
-            ? Colors.white.withOpacity(0.9)
-            : Colors.white.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(20),
-        border: highContrast ? Border.all(color: Colors.white, width: 1) : null,
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon,
-              size: 16, color: highContrast ? Colors.black : Colors.white),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: GoogleFonts.poppins(
-                  fontSize: 10,
-                  color: highContrast
-                      ? Colors.black54
-                      : Colors.white.withOpacity(0.8),
-                ),
-              ),
-              Text(
-                value,
-                style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: highContrast ? Colors.black : Colors.white,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ============================================================================
-// LIVE RECOMMENDATIONS FEED
-// ============================================================================
-
-class _LiveRecommendationsFeed extends StatefulWidget {
-  final DashboardData data;
-  final bool highContrast;
-
-  const _LiveRecommendationsFeed({
-    required this.data,
-    required this.highContrast,
-  });
-
-  @override
-  State<_LiveRecommendationsFeed> createState() =>
-      _LiveRecommendationsFeedState();
-}
-
-class _LiveRecommendationsFeedState extends State<_LiveRecommendationsFeed> {
-  bool _showUndoToast = false;
-  String _lastAppliedRecommendation = '';
-
-  void _applyRecommendation(String recommendation) {
-    setState(() {
-      _lastAppliedRecommendation = recommendation;
-      _showUndoToast = true;
-    });
-
-    // Ocultar el toast después de 7 segundos
-    Future.delayed(const Duration(seconds: 7), () {
-      if (mounted) {
-        setState(() {
-          _showUndoToast = false;
-        });
-      }
-    });
-
-    // Aquí iría la lógica real de aplicar la recomendación
-    developer.log("✅ Aplicando recomendación: $recommendation",
-        name: "Dashboard");
-  }
-
-  void _undoRecommendation() {
-    setState(() {
-      _showUndoToast = false;
-    });
-    developer.log("↩️ Deshaciendo recomendación: $_lastAppliedRecommendation",
-        name: "Dashboard");
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    // Mock de recomendaciones basadas en datos
-    final recommendations = _generateRecommendations(widget.data);
-
-    if (recommendations.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-          child: Row(
-            children: [
-              Icon(
-                Iconsax.lamp_charge,
-                size: 20,
-                color: widget.highContrast
-                    ? Colors.white
-                    : theme.colorScheme.primary,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Recomendaciones Inteligentes',
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: widget.highContrast ? Colors.white : null,
-                ),
-              ),
-            ],
-          ),
-        ),
-        SizedBox(
-          height: 120, // Aumentado para que quepa bien el contenido
-          child: PageView.builder(
-            scrollDirection: Axis.horizontal,
-            //padding: const EdgeInsets.symmetric(horizontal: 20),
-            itemCount: recommendations.length,
-            //separatorBuilder: (context, index) => const SizedBox(width: 12),
-            itemBuilder: (context, index) {
-              final rec = recommendations[index];
-              //return SizedBox(
-              //width: 220, // <--- AJUSTA ESTE ANCHO
-              //child: _RecommendationCard(
-              //recommendation: rec,
-              //onApply: () => _applyRecommendation(rec['title']!),
-              //highContrast: widget.highContrast,
-              //),
-              //);
-              return Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 20), // <-- PADDING LATERAL
-                child: _RecommendationCard(
-                  recommendation: rec,
-                  onApply: () => _applyRecommendation(rec['title']!),
-                  highContrast: widget.highContrast,
-                ),
-              );
-            },
-          ),
-        ),
-        if (_showUndoToast)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-            child: _UndoToast(
-              message: 'Recomendación aplicada',
-              onUndo: _undoRecommendation,
-              highContrast: widget.highContrast,
-            ),
-          ),
-      ],
-    );
-  }
-
-  List<Map<String, String>> _generateRecommendations(DashboardData data) {
-    final recommendations = <Map<String, String>>[];
-
-    // Recomendación 1: Reducción de gasto
-    if (data.featuredBudgets.isNotEmpty) {
-      final budget = data.featuredBudgets.first;
-      if (budget.amount > 0) {
-        final percentUsed = (budget.spentAmount / budget.amount * 100).round();
-        if (percentUsed > 70) {
-          recommendations.add({
-            'title': 'Reduce en ${budget.category}',
-            'description':
-                'Llevas $percentUsed% gastado. Reducir \$50.000 te ahorra \$600.000/año',
-            'impact': 'Alto',
-            'icon': 'chart_down',
-          });
-        }
-      }
-    }
-
-    // Recomendación 2: Oportunidad de ahorro
-    if (data.monthlyProjection > data.totalBalance * 0.8) {
-      final projectedSavings = data.monthlyProjection - data.totalBalance * 0.8;
-      recommendations.add({
-        'title': 'Mueve a Ahorro',
-        'description':
-            'Proyectas un excedente de \$${NumberFormat.compact(locale: 'es_CO').format(projectedSavings)}. ¡Ahorra ahora!',
-        'impact': 'Medio',
-        'icon': 'security',
-      });
-    }
-
-    // Recomendación 3: Alerta de presupuesto
-    if (data.alerts.isNotEmpty) {
-      recommendations.add({
-        'title': 'Ajusta Presupuestos',
-        'description':
-            'Tienes ${data.alerts.length} alerta${data.alerts.length > 1 ? 's' : ''}. Revisa y optimiza tus límites.',
-        'impact': 'Crítico',
-        'icon': 'warning',
-      });
-    }
-
-    if (recommendations.isEmpty) {
-      recommendations.add({
-        'title': '¡Vas muy bien!',
-        'description':
-            'Sigue así. No hemos encontrado alertas críticas en tus finanzas este mes.',
-        'impact': 'Positivo',
-        'icon': 'shield_tick',
-      });
-    }
-
-    return recommendations;
-  }
-}
-
-class _RecommendationCard extends StatelessWidget {
-  final Map<String, String> recommendation;
-  final VoidCallback onApply;
-  final bool highContrast;
-
-  const _RecommendationCard({
-    required this.recommendation,
-    required this.onApply,
-    required this.highContrast,
-  });
-
-  Color _getImpactColor(String impact) {
-    switch (impact) {
-      case 'Crítico':
-        return Colors.red;
-      case 'Alto':
-        return Colors.orange;
-      case 'Medio':
-        return Colors.blue;
-      default:
-        return Colors.green;
-    }
-  }
-
-  IconData _getIcon(String iconName) {
-    switch (iconName) {
-      case 'chart_down':
-        return Iconsax.chart_21;
-      case 'security':
-        return Iconsax.security_safe;
-      case 'warning':
-        return Iconsax.warning_2;
-      case 'shield_tick':
-        return Iconsax.shield_tick;
-      default:
-        return Iconsax.lamp_on;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final impactColor = _getImpactColor(recommendation['impact']!);
-
-    return Container(
-      width: 280,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: highContrast
-            ? Colors.black
-            : theme.colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(20),
-        border: highContrast
-            ? Border.all(color: Colors.white, width: 2)
-            : Border.all(color: impactColor.withOpacity(0.3), width: 1.5),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: highContrast
-                      ? Colors.white
-                      : impactColor.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  _getIcon(recommendation['icon']!),
-                  size: 20,
-                  color: highContrast ? Colors.black : impactColor,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  recommendation['title']!,
-                  style: GoogleFonts.poppins(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: highContrast ? Colors.white : null,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: Text(
-              recommendation['description']!,
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                color: highContrast
-                    ? Colors.white70
-                    : theme.colorScheme.onSurfaceVariant,
-                height: 1.4,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          const SizedBox(height: 8),
-          if (recommendation['impact'] != 'Positivo')
-            SizedBox(
-              width: double.infinity,
-              //child: FilledButton.tonal(
-              //onPressed: onApply,
-              //style: FilledButton.styleFrom(
-              //backgroundColor: highContrast
-              //  ? Colors.white
-              //: impactColor.withOpacity(0.2),
-              //foregroundColor: highContrast ? Colors.black : impactColor,
-              //padding: const EdgeInsets.symmetric(vertical: 10),
-              //shape: RoundedRectangleBorder(
-              //borderRadius: BorderRadius.circular(12),
-              //),
-              //),
-              //child: const Text('Aplicar',
-              //  style:
-              //    TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-              //),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _UndoToast extends StatelessWidget {
-  final String message;
-  final VoidCallback onUndo;
-  final bool highContrast;
-
-  const _UndoToast({
-    required this.message,
-    required this.onUndo,
-    required this.highContrast,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: highContrast ? Colors.black : theme.colorScheme.inverseSurface,
-        borderRadius: BorderRadius.circular(16),
-        border: highContrast ? Border.all(color: Colors.white, width: 2) : null,
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Iconsax.tick_circle,
-            color: highContrast
-                ? Colors.white
-                : theme.colorScheme.onInverseSurface,
-            size: 20,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              message,
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                color: highContrast
-                    ? Colors.white
-                    : theme.colorScheme.onInverseSurface,
-              ),
-            ),
-          ),
-          TextButton(
-            onPressed: onUndo,
-            child: Text(
-              'DESHACER',
-              style: GoogleFonts.poppins(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: highContrast
-                    ? Colors.white
-                    : theme.colorScheme.inversePrimary,
-              ),
-            ),
-          ),
-        ],
-      ),
-    ).animate().fadeIn().slideX(begin: 0.2);
-  }
-}
-
-// ============================================================================
-// QUICK ACTIONS
-// ============================================================================
-
-class _QuickActions extends StatelessWidget {
-  final VoidCallback onSimulateTap;
-  final VoidCallback onAddTap;
-  final VoidCallback onGoalsTap;
-  final VoidCallback onManifestationsTap;
-
-  const _QuickActions({
-    required this.onSimulateTap,
-    required this.onAddTap,
-    required this.onGoalsTap,
-    required this.onManifestationsTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0), 
-      child: Row(
-        children: [
-          _QuickActionButton(
-              icon: Iconsax.calculator, label: 'Simular', onTap: onSimulateTap),
-          const SizedBox(width: 12),
-          _QuickActionButton(
-              icon: Iconsax.add_circle, label: 'Agregar', onTap: onAddTap),
-          const SizedBox(width: 12),
-          _QuickActionButton(
-              icon: Iconsax.flag, label: 'Metas', onTap: onGoalsTap),
-          const SizedBox(width: 12),
-          _QuickActionButton(
-              icon: Iconsax.magicpen, label: 'Manifestar', onTap: onManifestationsTap),
-        ],
-      ),
-    );
-  }
-}
-
-class _QuickActionButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  const _QuickActionButton(
-      {required this.icon, required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Expanded(
-      child: Material(
-        color: theme.colorScheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(24),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(24),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 20),
-            child: Column(
-              children: [
-                Icon(icon, size: 28, color: theme.colorScheme.primary),
-                const SizedBox(height: 8),
-                Text(
-                  label,
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: theme.colorScheme.onSurface,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================================
-// BUDGETS CAROUSEL CON SIMULACIÓN
-// ============================================================================
-
-class _BudgetsCarousel extends StatelessWidget {
-  final List<Budget> budgets;
-  final bool highContrast;
-
-  const _BudgetsCarousel({
-    required this.budgets,
-    required this.highContrast,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    if (budgets.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: highContrast
-                ? Colors.black
-                : Theme.of(context).colorScheme.surfaceContainer,
-            borderRadius: BorderRadius.circular(24),
-            border:
-                highContrast ? Border.all(color: Colors.white, width: 2) : null,
-          ),
-          child: Row(
-            children: [
-              Icon(
-                Iconsax.wallet_add,
-                color: highContrast ? Colors.white : null,
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Text(
-                  "Aún no tienes presupuestos. ¡Crea uno para empezar a controlar tu gasto!",
-                  style: TextStyle(color: highContrast ? Colors.white : null),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Tus Presupuestos',
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: highContrast ? Colors.white : null,
-                ),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                    builder: (context) => const BudgetsScreen())),
-                child: const Text('Ver todos'),
-              )
-            ],
-          ),
-        ),
-        SizedBox(
-          height: 160,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            itemCount: budgets.length,
-            separatorBuilder: (context, index) => const SizedBox(width: 12),
-            itemBuilder: (context, index) =>
-                _BudgetCard(budget: budgets[index], highContrast: highContrast),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _BudgetCard extends StatelessWidget {
+class _BudgetCard extends StatefulWidget {
   final Budget budget;
-  final bool highContrast;
+  const _BudgetCard({required this.budget});
+  @override
+  State<_BudgetCard> createState() => _BudgetCardState();
+}
 
-  const _BudgetCard({
-    required this.budget,
-    required this.highContrast,
-  });
+class _BudgetCardState extends State<_BudgetCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
 
-  (Color, IconData) getStatusInfo(double progress) {
-    if (progress >= 0.9) return (Colors.red, Iconsax.danger);
-    if (progress >= 0.7) return (Colors.orange, Iconsax.warning_2);
-    return (Colors.green, Iconsax.shield_tick);
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this,
+        duration: const Duration(milliseconds: 80));
+  }
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  (Color, IconData) _status(double p) {
+    if (p >= 0.9) return (const Color(0xFFFF453A), Iconsax.danger);
+    if (p >= 0.7) return (const Color(0xFFFF9F0A), Iconsax.warning_2);
+    return (const Color(0xFF30D158), Iconsax.shield_tick);
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final currencyFormat =
-        NumberFormat.compactCurrency(locale: 'es_CO', symbol: '\$');
-    final progress =
-        (budget.amount > 0 ? budget.spentAmount / budget.amount : 0.0)
-            .clamp(0.0, 1.0);
-    final (statusColor, statusIcon) = getStatusInfo(progress);
+    final fmt = NumberFormat.compactCurrency(locale: 'es_CO', symbol: '\$');
+    final progress = (widget.budget.amount > 0
+        ? widget.budget.spentAmount / widget.budget.amount
+        : 0.0).clamp(0.0, 1.0);
+    final (statusColor, statusIcon) = _status(progress);
+    final onSurface = theme.colorScheme.onSurface;
 
-    return SizedBox(
-      width: 220,
-      child: Material(
-        color: highContrast
-            ? Colors.black
-            : theme.colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(24),
-        child: InkWell(
-          onTap: () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (context) => BudgetDetailsScreen(budgetId: budget.id))),
-          borderRadius: BorderRadius.circular(24),
+    return GestureDetector(
+      onTapDown: (_) { _ctrl.forward(); HapticFeedback.selectionClick(); },
+      onTapUp: (_) {
+        _ctrl.reverse();
+        Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => BudgetDetailsScreen(budgetId: widget.budget.id)));
+      },
+      onTapCancel: () => _ctrl.reverse(),
+      child: AnimatedBuilder(
+        animation: _ctrl,
+        builder: (_, __) => Transform.scale(
+          scale: lerpDouble(1.0, 0.96, _ctrl.value)!,
           child: Container(
+            width: 180,
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              border: highContrast
-                  ? Border.all(color: Colors.white, width: 2)
-                  : null,
+              color: theme.colorScheme.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(_D.r),
             ),
-            padding: const EdgeInsets.all(16.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Categoría + ícono de estado
                 Row(
                   children: [
-                    Icon(
-                      Iconsax.folder_2,
-                      size: 18,
-                      color: highContrast
-                          ? Colors.white
-                          : theme.colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        budget.category,
-                        style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.bold,
-                          color: highContrast ? Colors.white : null,
-                        ),
+                        widget.budget.category,
+                        style: _D.label(14, w: FontWeight.w700, color: onSurface),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    Icon(statusIcon, color: statusColor, size: 18)
+                    Icon(statusIcon, size: 16, color: statusColor),
                   ],
                 ),
                 const Spacer(),
+
+                // Montos
                 Text(
-                  '${currencyFormat.format(budget.spentAmount)} de ${currencyFormat.format(budget.amount)}',
-                  style: GoogleFonts.poppins(
-                    fontSize: 13,
-                    color: highContrast
-                        ? Colors.white70
-                        : theme.colorScheme.onSurfaceVariant,
-                  ),
+                  fmt.format(widget.budget.spentAmount),
+                  style: _D.display(20, color: onSurface),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 2),
+                Text(
+                  'de ${fmt.format(widget.budget.amount)}',
+                  style: _D.caption(11,
+                      color: onSurface.withOpacity(0.45)),
+                ),
+                const SizedBox(height: 10),
+
+                // Barra de progreso
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(6),
                   child: LinearProgressIndicator(
                     value: progress,
-                    minHeight: 8,
-                    backgroundColor: highContrast
-                        ? Colors.white24
-                        : theme.colorScheme.surfaceContainer,
-                    valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+                    minHeight: 5,
+                    backgroundColor: statusColor.withOpacity(0.12),
+                    valueColor: AlwaysStoppedAnimation(statusColor),
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Text(
                   '${(progress * 100).toInt()}% usado',
-                  style: GoogleFonts.poppins(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: statusColor,
-                  ),
+                  style: _D.label(10,
+                      w: FontWeight.w600, color: statusColor),
                 ),
               ],
             ),
@@ -1452,275 +1020,195 @@ class _BudgetCard extends StatelessWidget {
   }
 }
 
-// ============================================================================
-// FINANCIAL HEALTH METER
-// ============================================================================
+// ─────────────────────────────────────────────────────────────────────────────
+// CELEBRATION DIALOG
+// ─────────────────────────────────────────────────────────────────────────────
 
-class _FinancialHealthMeter extends StatelessWidget {
-  final double score;
-  final double progress;
-  final bool highContrast;
-
-  const _FinancialHealthMeter({
-    required this.score,
-    required this.progress,
-    required this.highContrast,
-  });
-
-  (Color, String, String) getHealthStatus(double score) {
-    if (score >= 80) return (Colors.green, 'Excelente', '😊');
-    if (score >= 60) return (Colors.blue, 'Bueno', '👍');
-    if (score >= 40) return (Colors.orange, 'Regular', '⚠️');
-    return (Colors.red, 'Peligro', '🚨');
-  }
+class _CelebrationDialog extends StatelessWidget {
+  final UserChallenge challenge;
+  final bool reduceMotion;
+  const _CelebrationDialog({required this.challenge, required this.reduceMotion});
 
   @override
   Widget build(BuildContext context) {
-    final (color, label, emoji) = getHealthStatus(score);
-    final textStyle = GoogleFonts.poppins(
-        fontSize: 12,
-        fontWeight: FontWeight.bold,
-        color: highContrast ? Colors.white : color);
-
-    return Opacity(
-      opacity: (progress * 2 - 0.5).clamp(0, 1),
-      child: Transform.scale(
-        scale: progress.clamp(0.8, 1.0),
-        child: Tooltip(
-          message: 'Salud Financiera: $label ($score/100)',
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: highContrast ? Colors.black : color.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(30),
-              border: Border.all(
-                color: highContrast ? Colors.white : color.withOpacity(0.5),
-                width: highContrast ? 2 : 1,
+    final theme = Theme.of(context);
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      backgroundColor: theme.colorScheme.surface,
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (!reduceMotion)
+              SizedBox(
+                width: 180, height: 130,
+                child: Lottie.asset(
+                    'assets/animations/confetti_celebration.json',
+                    repeat: false),
+              ),
+            Text('¡Reto Completado!',
+                style: _D.label(20, w: FontWeight.w800,
+                    color: theme.colorScheme.onSurface)),
+            const SizedBox(height: 8),
+            Text(challenge.challengeDetails.title,
+                textAlign: TextAlign.center,
+                style: _D.caption(14,
+                    color: theme.colorScheme.onSurfaceVariant)),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: _D.gold.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Iconsax.star_1, size: 16, color: _D.gold),
+                  const SizedBox(width: 6),
+                  Text('+${challenge.challengeDetails.rewardXp} XP',
+                      style: _D.label(14,
+                          w: FontWeight.w700, color: _D.gold)),
+                ],
               ),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _CircularScoreIndicator(
-                    score: score, color: highContrast ? Colors.white : color),
-                const SizedBox(width: 8),
-                Text(label, style: textStyle),
-                const SizedBox(width: 4),
-                Text(emoji, style: const TextStyle(fontSize: 14)),
-              ],
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: FilledButton.styleFrom(
+                  backgroundColor: _D.teal,
+                  minimumSize: const Size(double.infinity, 50),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                ),
+                child: Text('¡Genial!',
+                    style: _D.label(15, w: FontWeight.w700,
+                        color: Colors.white)),
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _CircularScoreIndicator extends StatelessWidget {
-  final double score;
-  final Color color;
-  const _CircularScoreIndicator({required this.score, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 22,
-      height: 22,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          CircularProgressIndicator(
-            value: score / 100,
-            strokeWidth: 3,
-            backgroundColor: color.withOpacity(0.2),
-            valueColor: AlwaysStoppedAnimation<Color>(color),
-          ),
-          Text(
-            '${score.toInt()}',
-            style: GoogleFonts.poppins(
-              fontSize: 8,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          )
-        ],
-      ),
-    );
-  }
-}
-
-// ============================================================================
-// PANTALLA COMPLETA DE ANÁLISIS IA CON BEFORE/AFTER
-// ============================================================================
+// ─────────────────────────────────────────────────────────────────────────────
+// AI ANALYSIS SCREEN (pantalla de simulación, sin cambios estructurales)
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _AiAnalysisFullScreen extends StatefulWidget {
   final DashboardData dashboardData;
-
   const _AiAnalysisFullScreen({required this.dashboardData});
-
   @override
   State<_AiAnalysisFullScreen> createState() => _AiAnalysisFullScreenState();
 }
 
 class _AiAnalysisFullScreenState extends State<_AiAnalysisFullScreen> {
-  double _simulatedExpenseChange = 0;
-  double _simulatedSavingsChange = 0;
-  Timer? _debounceTimer;
+  double _expenseChange = 0;
+  double _savingsChange = 0;
+  Timer? _debounce;
 
   @override
-  void dispose() {
-    _debounceTimer?.cancel();
-    super.dispose();
-  }
+  void dispose() { _debounce?.cancel(); super.dispose(); }
 
-  void _onSliderChange(double value, String type) {
-    if (_debounceTimer?.isActive ?? false) _debounceTimer?.cancel();
-    _debounceTimer = Timer(const Duration(milliseconds: 200), () {
+  void _slide(double v, String type) {
+    _debounce?.cancel();
+    _debounce = Timer(200.ms, () {
       setState(() {
-        if (type == 'expense') {
-          _simulatedExpenseChange = value;
-        } else {
-          _simulatedSavingsChange = value;
-        }
+        if (type == 'expense') _expenseChange = v;
+        else _savingsChange = v;
       });
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final currencyFormat =
-        NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
-
-    // Cálculos before/after
-    final currentBalance = widget.dashboardData.totalBalance;
-    final currentProjection = widget.dashboardData.monthlyProjection;
-
-    final newBalance =
-        currentBalance - _simulatedExpenseChange + _simulatedSavingsChange;
-    final newProjection =
-        currentProjection - _simulatedExpenseChange + _simulatedSavingsChange;
-
-    final balanceDiff = newBalance - currentBalance;
-    final projectionDiff = newProjection - currentProjection;
+    final fmt = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+    final cb = widget.dashboardData.totalBalance;
+    final cp = widget.dashboardData.monthlyProjection;
+    final nb = cb - _expenseChange + _savingsChange;
+    final np = cp - _expenseChange + _savingsChange;
 
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF0D9488), Color(0xFF0EA5A5)],
-                ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child:
-                  const Icon(Iconsax.magic_star, size: 20, color: Colors.white),
+        title: Row(children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                  colors: [Color(0xFF00C896), Color(0xFF00A3FF)]),
+              borderRadius: BorderRadius.circular(12),
             ),
-            const SizedBox(width: 12),
-            const Text('Análisis IA'),
-          ],
-        ),
+            child: const Icon(Iconsax.magic_star, size: 18, color: Colors.white),
+          ),
+          const SizedBox(width: 10),
+          Text('Simulación', style: _D.label(18, w: FontWeight.w700)),
+        ]),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(_D.h),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Resumen en 3 bullets
-            _AiSummaryCard(
-              healthScore: widget.dashboardData.healthScore,
-              alertsCount: widget.dashboardData.alerts.length,
-            ),
-
-            const SizedBox(height: 24),
-
-            // Controles de simulación
-            Text(
-              'Simula cambios en tus finanzas',
-              style: GoogleFonts.poppins(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            Text('Ajusta los valores', style: _D.label(18, w: FontWeight.w700)),
             const SizedBox(height: 16),
-
-            _SimulationSlider(
-              label: 'Reducir gastos mensuales',
-              value: _simulatedExpenseChange,
-              max: 500000,
-              onChanged: (v) => _onSliderChange(v, 'expense'),
+            _Slider(
+              label: 'Reducir gastos',
+              value: _expenseChange, max: 500000,
+              color: const Color(0xFFFF453A),
               icon: Iconsax.arrow_down_1,
-              color: Colors.red.shade400,
+              onChanged: (v) => _slide(v, 'expense'),
             ),
-
-            const SizedBox(height: 16),
-
-            _SimulationSlider(
-              label: 'Aumentar ahorro mensual',
-              value: _simulatedSavingsChange,
-              max: 300000,
-              onChanged: (v) => _onSliderChange(v, 'savings'),
-              icon: Iconsax.arrow_up_1,
-              color: Colors.green.shade400,
-            ),
-
-            const SizedBox(height: 32),
-
-            // Before/After Comparison
-            Text(
-              'Impacto en tus finanzas',
-              style: GoogleFonts.poppins(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            _BeforeAfterComparison(
-              title: 'Balance Total',
-              beforeValue: currencyFormat.format(currentBalance),
-              afterValue: currencyFormat.format(newBalance),
-              difference: currencyFormat.format(balanceDiff),
-              isPositive: balanceDiff >= 0,
-            ),
-
             const SizedBox(height: 12),
-
-            _BeforeAfterComparison(
-              title: 'Proyección fin de mes',
-              beforeValue: currencyFormat.format(currentProjection),
-              afterValue: currencyFormat.format(newProjection),
-              difference: currencyFormat.format(projectionDiff),
-              isPositive: projectionDiff >= 0,
+            _Slider(
+              label: 'Aumentar ahorro',
+              value: _savingsChange, max: 300000,
+              color: const Color(0xFF30D158),
+              icon: Iconsax.arrow_up_1,
+              onChanged: (v) => _slide(v, 'savings'),
             ),
-
-            const SizedBox(height: 32),
-
-            // CTA para aplicar cambios
-            if (_simulatedExpenseChange > 0 || _simulatedSavingsChange > 0)
-              FilledButton.icon(
-                onPressed: () {
-                  // Aquí iría la lógica para aplicar los cambios
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Cambios aplicados exitosamente'),
-                      duration: Duration(seconds: 2),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                  Navigator.pop(context);
-                },
-                icon: const Icon(Iconsax.tick_circle),
-                label: const Text('Aplicar cambios sugeridos'),
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 56),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+            const SizedBox(height: 28),
+            Text('Impacto', style: _D.label(18, w: FontWeight.w700)),
+            const SizedBox(height: 12),
+            _Comparison(
+              title: 'Balance Total',
+              before: fmt.format(cb), after: fmt.format(nb),
+              diff: fmt.format(nb - cb), isPos: nb >= cb,
+            ),
+            const SizedBox(height: 12),
+            _Comparison(
+              title: 'Proyección mensual',
+              before: fmt.format(cp), after: fmt.format(np),
+              diff: fmt.format(np - cp), isPos: np >= cp,
+            ),
+            if (_expenseChange > 0 || _savingsChange > 0) ...[
+              const SizedBox(height: 28),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Cambios guardados'),
+                          behavior: SnackBarBehavior.floating),
+                    );
+                    Navigator.pop(context);
+                  },
+                  icon: const Icon(Iconsax.tick_circle),
+                  label: Text('Aplicar cambios',
+                      style: _D.label(15, w: FontWeight.w700)),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _D.teal,
+                    minimumSize: const Size(double.infinity, 52),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
                   ),
                 ),
               ),
+            ],
           ],
         ),
       ),
@@ -1728,302 +1216,97 @@ class _AiAnalysisFullScreenState extends State<_AiAnalysisFullScreen> {
   }
 }
 
-class _AiSummaryCard extends StatelessWidget {
-  final double healthScore;
-  final int alertsCount;
-
-  const _AiSummaryCard({
-    required this.healthScore,
-    required this.alertsCount,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Iconsax.chart, color: theme.colorScheme.onSurface),
-              const SizedBox(width: 12),
-              Text(
-                'Resumen Inteligente',
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.onSurface,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _BulletPoint(
-            icon: Iconsax.health,
-            text: 'Tu salud financiera está en ${healthScore.toInt()}/100.',
-          ),
-          _BulletPoint(
-            icon: alertsCount > 0 ? Iconsax.danger : Iconsax.shield_tick,
-            text: alertsCount > 0
-                ? 'Tienes $alertsCount alerta${alertsCount > 1 ? 's' : ''} que requieren atención.'
-                : 'No tienes alertas críticas este mes. ¡Excelente!',
-          ),
-          _BulletPoint(
-            icon: Iconsax.lamp_on,
-            text: 'Reducir gastos en \$100.000/mes te ahorra \$1.2M al año.',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BulletPoint extends StatelessWidget {
-  final IconData icon;
-  final String text;
-
-  const _BulletPoint({required this.icon, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              text,
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                height: 1.4,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SimulationSlider extends StatelessWidget {
+class _Slider extends StatelessWidget {
   final String label;
-  final double value;
-  final double max;
-  final ValueChanged<double> onChanged;
-  final IconData icon;
+  final double value, max;
   final Color color;
+  final IconData icon;
+  final ValueChanged<double> onChanged;
 
-  const _SimulationSlider({
-    required this.label,
-    required this.value,
-    required this.max,
-    required this.onChanged,
-    required this.icon,
-    required this.color,
-  });
+  const _Slider({required this.label, required this.value, required this.max,
+    required this.color, required this.icon, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
-    final currencyFormat =
-        NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+    final fmt = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
     final theme = Theme.of(context);
-
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(_D.r),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 20, color: color),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  label,
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              Text(
-                currencyFormat.format(value),
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
-              ),
-            ],
-          ),
-          Slider(
-            value: value,
-            max: max,
-            divisions: 20,
-            onChanged: onChanged,
-            activeColor: color,
-          ),
-        ],
-      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 10),
+          Expanded(child: Text(label, style: _D.label(14, w: FontWeight.w600))),
+          Text(fmt.format(value),
+              style: _D.label(15, w: FontWeight.w700, color: color)),
+        ]),
+        Slider(value: value, max: max, divisions: 20,
+            onChanged: onChanged, activeColor: color),
+      ]),
     );
   }
 }
 
-class _BeforeAfterComparison extends StatelessWidget {
-  final String title;
-  final String beforeValue;
-  final String afterValue;
-  final String difference;
-  final bool isPositive;
-
-  const _BeforeAfterComparison({
-    required this.title,
-    required this.beforeValue,
-    required this.afterValue,
-    required this.difference,
-    required this.isPositive,
-  });
+class _Comparison extends StatelessWidget {
+  final String title, before, after, diff;
+  final bool isPos;
+  const _Comparison({required this.title, required this.before,
+    required this.after, required this.diff, required this.isPos});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final positiveColor = Colors.green.shade400;
-    final negativeColor = Colors.red.shade400;
-    final displayColor = isPositive ? positiveColor : negativeColor;
-
+    final color = isPos ? const Color(0xFF30D158) : const Color(0xFFFF453A);
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(_D.r),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Título del indicador
-          Text(
-            title,
-            style: GoogleFonts.poppins(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(title, style: _D.caption(13, color: theme.colorScheme.onSurfaceVariant)),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Antes', style: _D.caption(11, color: theme.colorScheme.onSurfaceVariant)),
+            const SizedBox(height: 3),
+            Text(before, style: _D.display(18, color: theme.colorScheme.onSurface)),
+          ])),
+          Icon(Iconsax.arrow_right_3, size: 18,
+              color: theme.colorScheme.onSurfaceVariant.withOpacity(0.4)),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Text('Después', style: _D.caption(11, color: theme.colorScheme.onSurfaceVariant)),
+            const SizedBox(height: 3),
+            Text(after, style: _D.display(18, color: color)),
+          ])),
+        ]),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(20),
           ),
-          const SizedBox(height: 20),
-
-          // Fila de comparación
-          Row(
-            children: [
-              // Columna "Antes"
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Antes',
-                      style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      beforeValue,
-                      style: GoogleFonts.poppins(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Icono de flecha
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                child: Icon(
-                  Iconsax.arrow_right_3,
-                  size: 20,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-
-              // Columna "Después"
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      'Después',
-                      style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      afterValue,
-                      style: GoogleFonts.poppins(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: displayColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Chip con la diferencia
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: displayColor.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    isPositive ? Iconsax.arrow_up_2 : Iconsax.arrow_down_2,
-                    size: 16,
-                    color: displayColor,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${difference.contains('-') ? "" : "+"}$difference',
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: displayColor,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.2);
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(isPos ? Iconsax.arrow_up_2 : Iconsax.arrow_down_2,
+                size: 14, color: color),
+            const SizedBox(width: 5),
+            Text('${isPos ? "+" : ""}$diff',
+                style: _D.label(12, w: FontWeight.w700, color: color)),
+          ]),
+        ),
+      ]),
+    ).animate().fadeIn(delay: 100.ms).slideY(begin: 0.06);
   }
+}
+
+// ── No-op TickerProvider for static/fallback AnimationControllers ────────────
+class _NoVsync implements TickerProvider {
+  const _NoVsync();
+  @override
+  Ticker createTicker(TickerCallback onTick) => Ticker(onTick);
 }

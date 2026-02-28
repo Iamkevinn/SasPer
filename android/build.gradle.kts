@@ -9,7 +9,7 @@ buildscript {
     }
     dependencies {
         // Le decimos a Gradle cómo encontrar las herramientas para construir
-        classpath("com.android.tools.build:gradle:8.13.0")
+        classpath("com.android.tools.build:gradle:8.5.2")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
         classpath("com.google.gms:google-services:4.4.4") // ¡La línea clave!
     }

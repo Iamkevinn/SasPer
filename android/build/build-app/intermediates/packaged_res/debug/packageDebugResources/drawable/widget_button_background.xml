@@ -1,6 +1,0 @@
-<!-- android/app/src/main/res/drawable/widget_button_background.xml -->
-<shape xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="oval">
-    <!-- Usamos un color del tema Material You que contrasta con el fondo -->
-    <solid android:color="?attr/colorTertiaryContainer" />
-</shape>

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sasper/services/affirmation_widget_service.dart';
 
+
 /// 🎨 Pantalla de configuración del widget de afirmaciones
 class AffirmationWidgetSettingsScreen extends StatefulWidget {
   const AffirmationWidgetSettingsScreen({super.key});

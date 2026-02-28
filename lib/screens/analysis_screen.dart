@@ -1,26 +1,29 @@
 // lib/screens/analysis_screen.dart
+//
+// ┌─────────────────────────────────────────────────────────────────────────────┐
+// │  FILOSOFÍA DE DISEÑO — Apple iOS                                            │
+// │  • El AppBar no compite con el contenido. Título con padding generoso.     │
+// │  • Jerarquía de información: insight principal → stats → gráficos.         │
+// │  • Cada sección respira. El espacio en blanco es intencional.              │
+// │  • Colores semánticos vivos pero controlados — siempre adaptativos.        │
+// │  • El ícono de IA tiene su momento; no pulsa constantemente.               │
+// │  • Las tarjetas de gráficos son contenedores neutros: el gráfico habla.    │
+// └─────────────────────────────────────────────────────────────────────────────┘
 
 import 'dart:async';
 import 'dart:developer' as developer;
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter/services.dart';
 import 'package:sasper/widgets/analysis_charts/average_analysis_section.dart';
 import 'package:sasper/widgets/analysis_charts/mood_by_day_chart.dart';
-import 'package:shimmer/shimmer.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
-// Repositorios y Modelos
 import 'package:sasper/data/analysis_repository.dart';
 import 'package:sasper/models/analysis_models.dart';
 import 'package:sasper/models/insight_model.dart';
-
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:lottie/lottie.dart';
 import 'package:sasper/widgets/analysis_charts/mood_spending_analysis_card.dart';
-
-// Widgets de la Pantalla
 import 'package:sasper/widgets/analysis_charts/heatmap_section.dart';
 import 'package:sasper/widgets/analysis_charts/monthly_cashflow_chart.dart';
 import 'package:sasper/widgets/analysis_charts/net_worth_trend_chart.dart';
@@ -30,7 +33,63 @@ import 'package:sasper/widgets/analysis_charts/expense_pie_chart.dart';
 import 'package:sasper/widgets/analysis_charts/income_pie_chart.dart';
 import 'package:sasper/widgets/shared/empty_state_card.dart';
 import 'package:sasper/widgets/analysis/insight_card.dart';
+import 'package:intl/intl.dart';
 
+// ─── TOKENS DINÁMICOS ────────────────────────────────────────────────────────
+class _C {
+  final BuildContext ctx;
+  _C(this.ctx);
+
+  bool get isDark => Theme.of(ctx).brightness == Brightness.dark;
+
+  // Superficies
+  Color get bg =>
+      isDark ? const Color(0xFF000000) : const Color(0xFFF2F2F7);
+  Color get surface =>
+      isDark ? const Color(0xFF1C1C1E) : Colors.white;
+  Color get surfaceRaised =>
+      isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF5F5F7);
+  Color get separator =>
+      isDark ? const Color(0xFF38383A) : const Color(0xFFE5E5EA);
+
+  // Texto
+  Color get label =>
+      isDark ? const Color(0xFFFFFFFF) : const Color(0xFF1C1C1E);
+  Color get label2 =>
+      isDark ? const Color(0xFFEBEBF5) : const Color(0xFF3A3A3C);
+  Color get label3 =>
+      isDark ? const Color(0xFF8E8E93) : const Color(0xFF636366);
+  Color get label4 =>
+      isDark ? const Color(0xFF48484A) : const Color(0xFFAEAEB2);
+
+  // Semánticos — iOS colors
+  static const Color expense = Color(0xFFFF3B30);
+  static const Color income  = Color(0xFF30D158);
+  static const Color warning = Color(0xFFFF9F0A);
+  static const Color accent  = Color(0xFF0A84FF);
+  static const Color purple  = Color(0xFFBF5AF2);
+
+  // Espaciado
+  static const double xs  = 4.0;
+  static const double sm  = 8.0;
+  static const double md  = 16.0;
+  static const double lg  = 24.0;
+  static const double xl  = 32.0;
+
+  // Radios
+  static const double rSM = 8.0;
+  static const double rMD = 12.0;
+  static const double rLG = 16.0;
+  static const double rXL = 20.0;
+
+  // Animaciones
+  static const Duration fast  = Duration(milliseconds: 150);
+  static const Duration mid   = Duration(milliseconds: 280);
+  static const Duration slow  = Duration(milliseconds: 440);
+  static const Curve curveOut = Curves.easeOutCubic;
+}
+
+// ─── PANTALLA PRINCIPAL ──────────────────────────────────────────────────────
 class AnalysisScreen extends StatefulWidget {
   const AnalysisScreen({super.key});
 
@@ -47,9 +106,10 @@ class AnalysisScreenState extends State<AnalysisScreen>
   RealtimeChannel? _realtimeChannel;
   Timer? _debounce;
 
-  // Animación para el ícono de IA
-  late AnimationController _aiPulseController;
-  late Animation<double> _aiPulseAnimation;
+  // Controlador de animación del ícono IA — solo en la entrada, no en bucle
+  late AnimationController _aiEntryController;
+  late Animation<double> _aiScale;
+  late Animation<double> _aiOpacity;
 
   @override
   void initState() {
@@ -57,32 +117,39 @@ class AnalysisScreenState extends State<AnalysisScreen>
     _analysisFuture = _fetchAllScreenData();
     _setupRealtimeSubscription();
 
-    // Inicializar animación del ícono IA
-    _aiPulseController = AnimationController(
-      duration: const Duration(seconds: 2),
+    // Entra suavemente una sola vez — no pulsa infinitamente
+    _aiEntryController = AnimationController(
+      duration: const Duration(milliseconds: 600),
       vsync: this,
-    )..repeat(reverse: true);
-
-    _aiPulseAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
-      CurvedAnimation(parent: _aiPulseController, curve: Curves.easeInOut),
     );
+
+    _aiScale = Tween<double>(begin: 0.6, end: 1.0).animate(
+      CurvedAnimation(parent: _aiEntryController, curve: Curves.elasticOut),
+    );
+
+    _aiOpacity = CurvedAnimation(
+      parent: _aiEntryController,
+      curve: const Interval(0.0, 0.5, curve: Curves.easeOut),
+    );
+
+    // Inicia la animación del ícono IA con un delay
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) _aiEntryController.forward();
+    });
   }
 
   Future<({AnalysisData charts, List<Insight> insights})>
       _fetchAllScreenData() async {
     final results = await Future.wait([
       _repository.fetchAllAnalysisData().catchError((e) {
-        developer.log('Fallo al cargar datos de gráficos',
-            name: 'AnalysisScreen', error: e);
+        developer.log('Error gráficos', name: 'AnalysisScreen', error: e);
         return AnalysisData.empty();
       }),
       _repository.getInsights().catchError((e) {
-        developer.log('Fallo al cargar insights',
-            name: 'AnalysisScreen', error: e);
+        developer.log('Error insights', name: 'AnalysisScreen', error: e);
         return <Insight>[];
       }),
     ]);
-
     return (
       charts: results[0] as AnalysisData,
       insights: results[1] as List<Insight>
@@ -121,54 +188,55 @@ class AnalysisScreenState extends State<AnalysisScreen>
       Supabase.instance.client.removeChannel(_realtimeChannel!);
     }
     _debounce?.cancel();
-    _aiPulseController.dispose();
+    _aiEntryController.dispose();
     super.dispose();
   }
 
   Future<void> _handleRefresh() async {
     if (mounted) {
-      setState(() {
-        _analysisFuture = _fetchAllScreenData();
-      });
+      setState(() => _analysisFuture = _fetchAllScreenData());
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: RefreshIndicator(
+    final c = _C(context);
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness:
+            c.isDark ? Brightness.light : Brightness.dark,
+        statusBarBrightness:
+            c.isDark ? Brightness.dark : Brightness.light,
+      ),
+      child: Scaffold(
+        backgroundColor: c.bg,
+        body: RefreshIndicator(
           onRefresh: _handleRefresh,
+          color: _C.accent,
+          strokeWidth: 1.5,
           child: FutureBuilder<({AnalysisData charts, List<Insight> insights})>(
             future: _analysisFuture,
             builder: (context, snapshot) {
-              final isLoading =
-                  snapshot.connectionState == ConnectionState.waiting;
-
-              if (isLoading) {
-                return _buildShimmer();
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return _SkeletonLoader(c: c);
               }
-
               if (snapshot.hasError) {
-                return _buildErrorState(snapshot.error);
+                return _ErrorState(
+                    error: '${snapshot.error}', c: c,
+                    onRetry: _handleRefresh);
               }
-
               if (!snapshot.hasData) {
-                return _buildLottieEmptyState(onRefresh: _handleRefresh);
+                return _EmptyState(c: c, onRefresh: _handleRefresh);
               }
 
               final data = snapshot.data!;
-              final chartData = data.charts;
-              final insights = data.insights;
-
-              final bool hasAnyData = insights.isNotEmpty || chartData.hasData;
-
-              if (!hasAnyData) {
-                return _buildLottieEmptyState(onRefresh: _handleRefresh);
+              if (!data.charts.hasData && data.insights.isEmpty) {
+                return _EmptyState(c: c, onRefresh: _handleRefresh);
               }
 
-              return _buildAnalysisContent(chartData, insights);
+              return _buildContent(data.charts, data.insights, c);
             },
           ),
         ),
@@ -176,329 +244,466 @@ class AnalysisScreenState extends State<AnalysisScreen>
     );
   }
 
-  // ==================== CONTENIDO PRINCIPAL ====================
-  Widget _buildAnalysisContent(AnalysisData chartData, List<Insight> insights) {
-    developer.log(
-      '--- ESTADO DE DATOS PARA GRÁFICOS ---\n'
-      'Tendencia Patrimonial: ${chartData.netWorthLineData.length} items\n'
-      'Análisis Emocional: ${chartData.moodAnalysisData.length} items\n'
-      'Flujo de Efectivo: ${chartData.cashflowBarData.length} items\n'
-      'Comparativa Categoría: ${chartData.categoryComparisonData.length} items\n'
-      'Análisis de Promedios: ${chartData.monthlyAverage.monthCount} meses\n'
-      'Ingresos vs Gastos: ${chartData.incomeExpenseBarData.length} items\n'
-      'Gráfico Gastos (Pie): ${chartData.expensePieData.length} items\n'
-      'Gráfico Ingresos (Pie): ${chartData.incomePieData.length} items\n'
-      'Ánimo por Día: ${chartData.moodByDayData.length} items\n'
-      'Mapa de Calor: ${chartData.heatmapData.length} items',
-      name: 'AnalysisScreen',
-    );
-    final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
+  // ── Contenido principal ──────────────────────────────────────────────────
+  Widget _buildContent(
+      AnalysisData chartData, List<Insight> insights, _C c) {
     return CustomScrollView(
       physics: const BouncingScrollPhysics(),
       slivers: [
-        // HEADER PREMIUM CON IA
-        _buildPremiumHeader(colorScheme, isDark, insights),
+        // ── HEADER ────────────────────────────────────────────────────────
+        _buildSliverHeader(insights, c),
 
-        // INSIGHT HERO CARD (EL MÁS IMPORTANTE)
+        // ── INSIGHT HERO ──────────────────────────────────────────────────
         if (insights.isNotEmpty)
           SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-              child: _buildHeroInsightCard(insights.first, colorScheme, isDark),
+            child: _FadeSlide(
+              delay: 60,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                    _C.md, _C.md, _C.md, 0),
+                child: _HeroInsightCard(
+                    insight: insights.first, c: c),
+              ),
             ),
           ),
 
-        // QUICK STATS (3 MÉTRICAS CLAVE)
+        // ── QUICK STATS ───────────────────────────────────────────────────
         SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-            child: _buildQuickStats(chartData, colorScheme, isDark),
+          child: _FadeSlide(
+            delay: 100,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                  _C.md, _C.md, _C.md, 0),
+              child: _QuickStats(data: chartData, c: c),
+            ),
           ),
         ),
 
-        // SECCIÓN: INSIGHTS SECUNDARIOS
+        // ── INSIGHTS SECUNDARIOS ──────────────────────────────────────────
         if (insights.length > 1) ...[
-          _buildSectionHeader('Descubrimientos Clave', colorScheme),
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            sliver: SliverList.separated(
-              itemCount: insights.length - 1, // Excluimos el hero
-              itemBuilder: (context, index) =>
-                  InsightCard(insight: insights[index + 1])
-                      .animate()
-                      .fadeIn(duration: 500.ms, delay: (100 * index).ms)
-                      .slideY(begin: 0.2, curve: Curves.easeOutCubic),
-              separatorBuilder: (context, index) => const SizedBox(height: 12),
+          SliverToBoxAdapter(
+            child: _SectionLabel(
+              label: 'Descubrimientos clave',
+              c: c,
+              topPadding: _C.lg,
             ),
           ),
-          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: _C.md),
+            sliver: SliverList.separated(
+              itemCount: insights.length - 1,
+              separatorBuilder: (_, __) =>
+                  const SizedBox(height: _C.sm + 2),
+              itemBuilder: (context, i) => _FadeSlide(
+                delay: 140 + i * 50,
+                child: InsightCard(insight: insights[i + 1]),
+              ),
+            ),
+          ),
         ],
 
-        // SECCIÓN: GRÁFICOS PRIORITARIOS
+        // ── GRÁFICOS ──────────────────────────────────────────────────────
         if (chartData.hasData) ...[
-          _buildSectionHeader('Análisis Detallado', colorScheme),
-
-          // GRÁFICO 1: Balance proyectado (NetWorth)
-          if (chartData.netWorthLineData.isNotEmpty)
-            _buildChartSection(
-              title: 'Tendencia Patrimonial',
-              subtitle: 'Tu evolución financiera en el tiempo',
-              icon: Iconsax.trend_up,
-              child: NetWorthTrendChart(data: chartData.netWorthLineData),
-              colorScheme: colorScheme,
+          SliverToBoxAdapter(
+            child: _SectionLabel(
+              label: 'Análisis detallado',
+              c: c,
+              topPadding: _C.lg,
             ),
+          ),
 
-          // GRÁFICO 2: Comportamiento emocional (PRIORIDAD ALTA)
-          if (chartData.moodAnalysisData.isNotEmpty)
-            _buildChartSection(
-              title: 'Análisis Emocional de Gastos',
-              subtitle: 'Cómo tu estado de ánimo afecta tus finanzas',
-              icon: Iconsax.emoji_happy,
-              child: MoodSpendingAnalysisCard(
-                  analysisData: chartData.moodAnalysisData),
-              colorScheme: colorScheme,
-              isHighlight: true,
+          _chartSliver(
+            delay: 160,
+            title: 'Tendencia patrimonial',
+            subtitle: 'Tu evolución financiera',
+            icon: Iconsax.trend_up,
+            color: _C.accent,
+            c: c,
+            visible: chartData.netWorthLineData.isNotEmpty,
+            child: NetWorthTrendChart(data: chartData.netWorthLineData),
+          ),
+
+          _chartSliver(
+            delay: 200,
+            title: 'Análisis emocional',
+            subtitle: 'Cómo tu ánimo afecta tus finanzas',
+            icon: Iconsax.emoji_happy,
+            color: _C.purple,
+            c: c,
+            visible: chartData.moodAnalysisData.isNotEmpty,
+            highlight: true,
+            child: MoodSpendingAnalysisCard(
+                analysisData: chartData.moodAnalysisData),
+          ),
+
+          _chartSliver(
+            delay: 240,
+            title: 'Flujo de efectivo',
+            subtitle: 'Balance mensual',
+            icon: Iconsax.chart_21,
+            color: _C.income,
+            c: c,
+            visible: chartData.cashflowBarData.isNotEmpty,
+            child: MonthlyCashflowChart(data: chartData.cashflowBarData),
+          ),
+
+          _chartSliver(
+            delay: 280,
+            title: 'Categorías',
+            subtitle: 'Patrones de gasto mensuales',
+            icon: Iconsax.category,
+            color: _C.warning,
+            c: c,
+            visible: chartData.categoryComparisonData.isNotEmpty,
+            child: CategoryComparisonChart(
+                data: chartData.categoryComparisonData),
+          ),
+
+          _chartSliver(
+            delay: 320,
+            title: 'Promedios',
+            subtitle: 'Comportamiento financiero promedio',
+            icon: Iconsax.chart_square,
+            color: _C.accent,
+            c: c,
+            visible: chartData.monthlyAverage.monthCount > 0 &&
+                chartData.categoryAverages.isNotEmpty,
+            child: AverageAnalysisSection(
+              monthlyData: chartData.monthlyAverage,
+              categoryData: chartData.categoryAverages,
             ),
+          ),
 
-          // GRÁFICO 3: Flujo de caja
-          if (chartData.cashflowBarData.isNotEmpty)
-            _buildChartSection(
-              title: 'Flujo de Efectivo Mensual',
-              subtitle: 'Balance entre ingresos y gastos',
-              icon: Iconsax.chart_21,
-              child: MonthlyCashflowChart(data: chartData.cashflowBarData),
-              colorScheme: colorScheme,
+          _chartSliver(
+            delay: 360,
+            title: 'Ingresos vs Gastos',
+            subtitle: 'Comparativa mensual',
+            icon: Iconsax.money_recive,
+            color: _C.income,
+            c: c,
+            visible: chartData.incomeExpenseBarData.isNotEmpty,
+            child: IncomeExpenseBarChart(
+                data: chartData.incomeExpenseBarData),
+          ),
+
+          _chartSliver(
+            delay: 400,
+            title: 'Distribución de gastos',
+            subtitle: 'Dónde se va tu dinero',
+            icon: Iconsax.chart_1,
+            color: _C.expense,
+            c: c,
+            visible: chartData.expensePieData.isNotEmpty,
+            child: ExpensePieChart(data: chartData.expensePieData),
+          ),
+
+          _chartSliver(
+            delay: 440,
+            title: 'Fuentes de ingreso',
+            subtitle: 'De dónde viene tu dinero',
+            icon: Iconsax.wallet_money,
+            color: _C.income,
+            c: c,
+            visible: chartData.incomePieData.isNotEmpty,
+            child: IncomePieChart(data: chartData.incomePieData),
+          ),
+
+          _chartSliver(
+            delay: 480,
+            title: 'Ánimo semanal',
+            subtitle: 'Patrones emocionales por día',
+            icon: Iconsax.calendar,
+            color: _C.purple,
+            c: c,
+            visible: chartData.moodByDayData.isNotEmpty,
+            child: MoodByDayChart(analysisData: chartData.moodByDayData),
+          ),
+
+          _chartSliver(
+            delay: 520,
+            title: 'Actividad diaria',
+            subtitle: 'Tu comportamiento financiero',
+            icon: Iconsax.grid_1,
+            color: _C.accent,
+            c: c,
+            visible: chartData.heatmapData.isNotEmpty,
+            child: HeatmapSection(
+              data: chartData.heatmapData,
+              startDate:
+                  DateTime.now().subtract(const Duration(days: 119)),
+              endDate: DateTime.now(),
             ),
-
-          // GRÁFICO 4: Comparativa de categorías
-          if (chartData.categoryComparisonData.isNotEmpty)
-            _buildChartSection(
-              title: 'Comparativa por Categoría',
-              subtitle: 'Tus patrones de gasto mensuales',
-              icon: Iconsax.category,
-              child: CategoryComparisonChart(
-                  data: chartData.categoryComparisonData),
-              colorScheme: colorScheme,
-            ),
-
-          // GRÁFICO 5: Promedios y análisis
-          if (chartData.monthlyAverage.monthCount > 0 &&
-              chartData.categoryAverages.isNotEmpty)
-            _buildChartSection(
-              title: 'Análisis de Promedios',
-              subtitle: 'Tu comportamiento financiero promedio',
-              icon: Iconsax.chart_square,
-              child: AverageAnalysisSection(
-                monthlyData: chartData.monthlyAverage,
-                categoryData: chartData.categoryAverages,
-              ),
-              colorScheme: colorScheme,
-            ),
-
-          // GRÁFICO 6: Ingresos vs Gastos
-          if (chartData.incomeExpenseBarData.isNotEmpty)
-            _buildChartSection(
-              title: 'Ingresos vs Gastos',
-              subtitle: 'Comparativa mensual detallada',
-              icon: Iconsax.money_recive,
-              child:
-                  IncomeExpenseBarChart(data: chartData.incomeExpenseBarData),
-              colorScheme: colorScheme,
-            ),
-
-          // GRÁFICO 7: Distribución de gastos (Pie)
-          if (chartData.expensePieData.isNotEmpty)
-            _buildChartSection(
-              title: 'Distribución de Gastos',
-              subtitle: 'Dónde se va tu dinero',
-              icon: Iconsax.chart_1,
-              child: ExpensePieChart(data: chartData.expensePieData),
-              colorScheme: colorScheme,
-            ),
-
-          // GRÁFICO 8: Distribución de ingresos (Pie)
-          if (chartData.incomePieData.isNotEmpty)
-            _buildChartSection(
-              title: 'Fuentes de Ingreso',
-              subtitle: 'De dónde proviene tu dinero',
-              icon: Iconsax.wallet_money,
-              child: IncomePieChart(data: chartData.incomePieData),
-              colorScheme: colorScheme,
-            ),
-
-          // GRÁFICO 9: Estado de ánimo por día
-          if (chartData.moodByDayData.isNotEmpty)
-            _buildChartSection(
-              title: 'Ánimo por Día de la Semana',
-              subtitle: 'Patrones emocionales semanales',
-              icon: Iconsax.calendar,
-              child: MoodByDayChart(analysisData: chartData.moodByDayData),
-              colorScheme: colorScheme,
-            ),
-
-          // GRÁFICO 10: Heatmap de actividad
-          if (chartData.heatmapData.isNotEmpty)
-            _buildChartSection(
-              title: 'Mapa de Calor de Actividad',
-              subtitle: 'Tu comportamiento financiero diario',
-              icon: Iconsax.grid_1,
-              child: HeatmapSection(
-                data: chartData.heatmapData,
-                startDate: DateTime.now().subtract(const Duration(days: 119)),
-                endDate: DateTime.now(),
-              ),
-              colorScheme: colorScheme,
-            ),
-
-          // SPACING PARA NAVIGATION BAR
-          const SliverToBoxAdapter(child: SizedBox(height: 100)),
+          ),
         ],
+
+        // Espacio para la nav bar
+        const SliverToBoxAdapter(child: SizedBox(height: 100)),
       ],
     );
   }
 
-  // ==================== HEADER PREMIUM ====================
-  Widget _buildPremiumHeader(
-      ColorScheme colorScheme, bool isDark, List<Insight> insights) {
+  // ── AppBar ───────────────────────────────────────────────────────────────
+  // El título está indentado para no chocar con el botón de regreso.
+  // Usa padding explícito en lugar de depender del default del AppBar.
+  Widget _buildSliverHeader(List<Insight> insights, _C c) {
+    final statusMsg = _statusMessage(insights);
+
     return SliverAppBar(
       pinned: true,
-      floating: true,
+      floating: false,
       elevation: 0,
-      backgroundColor: colorScheme.surface.withOpacity(0.95),
-      toolbarHeight: 100,
-      flexibleSpace: ClipRRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(color: Colors.transparent),
-        ),
-      ),
-      title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                'Inteligencia Financiera',
-                style: GoogleFonts.poppins(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
-                ),
-              ),
-              const SizedBox(width: 8),
-              AnimatedBuilder(
-                animation: _aiPulseAnimation,
-                builder: (context, child) {
-                  return Transform.scale(
-                    scale: _aiPulseAnimation.value,
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [colorScheme.primary, colorScheme.tertiary],
+      scrolledUnderElevation: 0,
+      expandedHeight: 110,
+      backgroundColor: c.bg,
+      surfaceTintColor: Colors.transparent,
+
+      // Sin leading — esta pantalla es un tab, no tiene back button.
+      // Si en tu app tiene back button, el padding ya lo compensa.
+      automaticallyImplyLeading: false,
+
+      flexibleSpace: LayoutBuilder(
+        builder: (context, constraints) {
+          final percent = ((constraints.maxHeight - kToolbarHeight) /
+                  (110 - kToolbarHeight))
+              .clamp(0.0, 1.0);
+
+          return FlexibleSpaceBar(
+            titlePadding: EdgeInsets.zero,
+            title: SafeArea(
+              bottom: false,
+              child: Padding(
+                // Padding izquierdo generoso: nunca choca con el back button
+                padding: const EdgeInsets.fromLTRB(
+                    _C.md, 0, _C.md, _C.sm),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // Eyebrow — solo visible cuando está expandido
+                        Expanded(
+                          child: AnimatedOpacity(
+                            opacity: percent,
+                            duration: _C.mid,
+                            child: Text(
+                              'INTELIGENCIA',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1.4,
+                                color: _C.accent,
+                              ),
+                            ),
+                          ),
                         ),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        Iconsax.magic_star,
-                        size: 16,
-                        color: colorScheme.onPrimary,
+                        // Ícono IA — entra animado una sola vez
+                        FadeTransition(
+                          opacity: _aiOpacity,
+                          child: ScaleTransition(
+                            scale: _aiScale,
+                            child: Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [_C.accent, _C.purple],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Iconsax.magic_star,
+                                size: 14,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    // Título principal
+                    Text(
+                      'Financiero',
+                      style: TextStyle(
+                        fontSize: percent > 0.5 ? 28 : 20,
+                        fontWeight: FontWeight.w800,
+                        color: c.label,
+                        letterSpacing: -0.8,
+                        height: 1.1,
                       ),
                     ),
-                  );
-                },
+                    // Subtítulo — desaparece al colapsar
+                    AnimatedOpacity(
+                      opacity: percent,
+                      duration: _C.mid,
+                      child: Text(
+                        statusMsg,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: c.label3,
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            _getFinancialStatusMessage(insights),
-            style: GoogleFonts.poppins(
-              fontSize: 13,
-              color: colorScheme.onSurfaceVariant,
             ),
-          ),
-        ],
+            background: Container(color: c.bg),
+          );
+        },
       ),
     );
   }
 
-  String _getFinancialStatusMessage(List<Insight> insights) {
-    if (insights.isEmpty) return 'Analizando tu situación financiera...';
-
-    // Filtra por la SEVERIDAD del insight, no por su tipo.
-    final positiveInsights =
-        insights.where((i) => i.severity == InsightSeverity.success);
-
-    if (positiveInsights.isNotEmpty) {
-      // Puedes personalizar el mensaje si quieres.
-      return '${positiveInsights.length} buenas noticias detectadas';
-    }
-
+  String _statusMessage(List<Insight> insights) {
+    if (insights.isEmpty) return 'Analizando tu situación...';
+    final positive =
+        insights.where((i) => i.severity == InsightSeverity.success).length;
+    if (positive > 0) return '$positive buenas noticias detectadas';
     return '${insights.length} insights disponibles';
   }
 
-  // ==================== HERO INSIGHT CARD ====================
-  Widget _buildHeroInsightCard(
-      Insight insight, ColorScheme colorScheme, bool isDark) {
-    // 1. Obtiene el color principal y el icono directamente desde la extensión.
-    final Color iconColor = insight.severity.getColor(context);
-    final IconData icon = insight.severity.icon;
+  // ── Sliver de gráfico ────────────────────────────────────────────────────
+  Widget _chartSliver({
+    required int delay,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required _C c,
+    required bool visible,
+    required Widget child,
+    bool highlight = false,
+  }) {
+    if (!visible) return const SliverToBoxAdapter(child: SizedBox.shrink());
 
-    // 2. El color de fondo del card puede ser el mismo color con baja opacidad.
-    final Color cardColor = iconColor;
+    return SliverToBoxAdapter(
+      child: _FadeSlide(
+        delay: delay,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+              _C.md, 0, _C.md, _C.md),
+          child: _ChartCard(
+            title: title,
+            subtitle: subtitle,
+            icon: icon,
+            color: color,
+            c: c,
+            highlight: highlight,
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── LABEL DE SECCIÓN ────────────────────────────────────────────────────────
+// Devuelve un Widget normal — el llamador decide si lo envuelve en Sliver.
+class _SectionLabel extends StatelessWidget {
+  final String label;
+  final _C c;
+  final double topPadding;
+
+  const _SectionLabel({
+    required this.label,
+    required this.c,
+    this.topPadding = _C.md,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(_C.md, topPadding, _C.md, _C.sm),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.2,
+          color: c.label3,
+        ),
+      ),
+    );
+  }
+}
+
+// ─── HERO INSIGHT CARD ───────────────────────────────────────────────────────
+// El insight más importante. Tiene peso visual propio pero no grita.
+class _HeroInsightCard extends StatelessWidget {
+  final Insight insight;
+  final _C c;
+
+  const _HeroInsightCard({required this.insight, required this.c});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = insight.severity.getColor(context);
+    final icon  = insight.severity.icon;
 
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(_C.lg),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            cardColor.withOpacity(0.15),
-            cardColor.withOpacity(0.05),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: cardColor.withOpacity(0.3),
-          width: 2,
-        ),
+        color: c.surface,
+        borderRadius: BorderRadius.circular(_C.rXL),
+        border: Border.all(color: color.withOpacity(0.2), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(c.isDark ? 0.12 : 0.06),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(c.isDark ? 0.2 : 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 1),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Fila superior: ícono + etiqueta + título
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  color: cardColor.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
+                  color: color.withOpacity(c.isDark ? 0.18 : 0.1),
+                  borderRadius: BorderRadius.circular(_C.rMD),
                 ),
-                child: Icon(icon, color: iconColor, size: 24),
+                child: Icon(icon, color: color, size: 20),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: _C.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Insight Principal',
-                      style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: colorScheme.onSurfaceVariant,
+                      'INSIGHT PRINCIPAL',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.9,
+                        color: c.label3,
                       ),
                     ),
+                    const SizedBox(height: 2),
                     Text(
                       insight.title,
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: iconColor,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: color,
+                        letterSpacing: -0.2,
+                        height: 1.2,
                       ),
                     ),
                   ],
@@ -506,273 +711,38 @@ class AnalysisScreenState extends State<AnalysisScreen>
               ),
             ],
           ),
-          const SizedBox(height: 16),
+
+          const SizedBox(height: _C.md),
+
+          // Descripción
           Text(
             insight.description,
-            style: GoogleFonts.poppins(
+            style: TextStyle(
               fontSize: 15,
               height: 1.5,
-              color: colorScheme.onSurface,
+              color: c.label2,
+              letterSpacing: 0.1,
             ),
           ),
-          const SizedBox(height: 16),
-          FilledButton.tonal(
-            onPressed: () {},
-            style: FilledButton.styleFrom(
-              backgroundColor: cardColor.withOpacity(0.2),
-              foregroundColor: iconColor,
-            ),
-            child: const Text('Ver detalles'),
-          ),
-        ],
-      ),
-    ).animate().fadeIn(duration: 600.ms).slideY(begin: 0.3);
-  }
 
-  // ==================== QUICK STATS ====================
-  Widget _buildQuickStats(
-      AnalysisData data, ColorScheme colorScheme, bool isDark) {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildStatCard(
-            'Balance',
-            data.netWorthLineData.isNotEmpty
-                ? '\$${data.netWorthLineData.last.totalBalance.toStringAsFixed(0)}'
-                : '\$0',
-            Iconsax.wallet_3,
-            colorScheme.primary,
-            colorScheme,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildStatCard(
-            'Este Mes',
-            data.cashflowBarData.isNotEmpty
-                ? '\$${data.cashflowBarData.last.cashFlow.toStringAsFixed(0)}'
-                : '\$0',
-            Iconsax.trend_up,
-            Colors.green,
-            colorScheme,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildStatCard(
-            'Gastos',
-            data.expensePieData.isNotEmpty
-                ? '\$${data.expensePieData.fold<double>(0, (sum, item) => sum + item.totalSpent).toStringAsFixed(0)}'
-                : '\$0',
-            Iconsax.card,
-            Colors.orange,
-            colorScheme,
-          ),
-        ),
-      ],
-    );
-  }
+          const SizedBox(height: _C.md),
 
-  Widget _buildStatCard(String label, String value, IconData icon,
-      Color accentColor, ColorScheme colorScheme) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 20, color: accentColor),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: colorScheme.onSurface,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          Text(
-            label,
-            style: GoogleFonts.poppins(
-              fontSize: 11,
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ==================== SECTION HEADER ====================
-  Widget _buildSectionHeader(String title, ColorScheme colorScheme) {
-    return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
-        child: Text(
-          title,
-          style: GoogleFonts.poppins(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: colorScheme.onSurface,
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ==================== CHART SECTION ====================
-  Widget _buildChartSection({
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required Widget child,
-    required ColorScheme colorScheme,
-    bool isHighlight = false,
-  }) {
-    return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-        child: Container(
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainer,
-            borderRadius: BorderRadius.circular(24),
-            border: isHighlight
-                ? Border.all(
-                    color: colorScheme.primary.withOpacity(0.3), width: 2)
-                : null,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: colorScheme.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(icon, size: 20, color: colorScheme.primary),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title,
-                            style: GoogleFonts.poppins(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: colorScheme.onSurface,
-                            ),
-                          ),
-                          Text(
-                            subtitle,
-                            style: GoogleFonts.poppins(
-                              fontSize: 12,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              child,
-            ],
-          ),
-        ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.2),
-      ),
-    );
-  }
-
-  // ==================== ESTADOS DE CARGA Y ERROR ====================
-
-  Widget _buildErrorState(Object? error) {
-    developer.log(
-      'Error capturado por FutureBuilder en AnalysisScreen',
-      name: 'AnalysisScreen',
-      error: error,
-    );
-
-    return Center(
-      child: EmptyStateCard(
-        title: 'Ocurrió un Error',
-        message:
-            'No se pudieron cargar los datos de análisis.\n\nError: $error',
-        icon: Iconsax.warning_2,
-      ),
-    );
-  }
-
-  Widget _buildShimmer() {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final baseColor = isDarkMode ? Colors.grey[800]! : Colors.grey[300]!;
-    final highlightColor = isDarkMode ? Colors.grey[700]! : Colors.grey[100]!;
-
-    return Shimmer.fromColors(
-      baseColor: baseColor,
-      highlightColor: highlightColor,
-      child: ListView(
-        physics: const NeverScrollableScrollPhysics(),
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
-            child: Container(width: 250, height: 28.0, color: Colors.white),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0),
-            child: Column(
+          // CTA mínimo
+          GestureDetector(
+            onTap: () => HapticFeedback.selectionClick(),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  height: 160,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
+                Text(
+                  'Ver detalles',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: color,
                   ),
                 ),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        height: 100,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Container(
-                        height: 100,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 32),
-                Container(
-                  height: 250,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                ),
+                const SizedBox(width: 4),
+                Icon(Icons.chevron_right_rounded, color: color, size: 18),
               ],
             ),
           ),
@@ -780,55 +750,495 @@ class AnalysisScreenState extends State<AnalysisScreen>
       ),
     );
   }
+}
 
-  Widget _buildLottieEmptyState({required Future<void> Function() onRefresh}) {
+// ─── QUICK STATS ─────────────────────────────────────────────────────────────
+// 3 métricas clave. Compactas, legibles, con un color por métrica.
+class _QuickStats extends StatelessWidget {
+  final AnalysisData data;
+  final _C c;
+
+  const _QuickStats({required this.data, required this.c});
+
+  @override
+  Widget build(BuildContext context) {
+    final fmt = NumberFormat.compactCurrency(
+        locale: 'es_CO', symbol: '\$', decimalDigits: 1);
+
+    final balance = data.netWorthLineData.isNotEmpty
+        ? data.netWorthLineData.last.totalBalance
+        : 0.0;
+    final cashflow = data.cashflowBarData.isNotEmpty
+        ? data.cashflowBarData.last.cashFlow
+        : 0.0;
+    final totalExpenses = data.expensePieData.isNotEmpty
+        ? data.expensePieData.fold<double>(
+            0, (sum, item) => sum + item.totalSpent)
+        : 0.0;
+
+    return Row(
+      children: [
+        Expanded(
+          child: _StatTile(
+            label: 'Balance',
+            value: fmt.format(balance),
+            icon: Iconsax.wallet_3,
+            color: balance >= 0 ? _C.income : _C.expense,
+            c: c,
+          ),
+        ),
+        const SizedBox(width: _C.sm),
+        Expanded(
+          child: _StatTile(
+            label: 'Flujo',
+            value: fmt.format(cashflow),
+            icon: Iconsax.trend_up,
+            color: cashflow >= 0 ? _C.income : _C.expense,
+            c: c,
+          ),
+        ),
+        const SizedBox(width: _C.sm),
+        Expanded(
+          child: _StatTile(
+            label: 'Gastos',
+            value: fmt.format(totalExpenses),
+            icon: Iconsax.card,
+            color: _C.expense,
+            c: c,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatTile extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+  final _C c;
+
+  const _StatTile({
+    required this.label, required this.value,
+    required this.icon, required this.color, required this.c,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(_C.md),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(_C.rLG),
+        border: Border.all(color: c.separator.withOpacity(0.5), width: 0.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(c.isDark ? 0.2 : 0.04),
+            blurRadius: 8, offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 32, height: 32,
+            decoration: BoxDecoration(
+              color: color.withOpacity(c.isDark ? 0.18 : 0.1),
+              borderRadius: BorderRadius.circular(_C.rSM),
+            ),
+            child: Icon(icon, size: 16, color: color),
+          ),
+          const SizedBox(height: _C.sm),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: c.label,
+              letterSpacing: -0.3,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: TextStyle(fontSize: 12, color: c.label3),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── CHART CARD ──────────────────────────────────────────────────────────────
+// Contenedor neutro para cada gráfico.
+// El gráfico habla; la tarjeta solo lo enmarca.
+class _ChartCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final _C c;
+  final Widget child;
+  final bool highlight;
+
+  const _ChartCard({
+    required this.title, required this.subtitle, required this.icon,
+    required this.color, required this.c, required this.child,
+    this.highlight = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(_C.rXL),
+        border: highlight
+            ? Border.all(
+                color: color.withOpacity(0.25),
+                width: 1,
+              )
+            : Border.all(color: c.separator.withOpacity(0.4), width: 0.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(c.isDark ? 0.18 : 0.04),
+            blurRadius: 12, offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header de la tarjeta
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+                _C.md, _C.md, _C.md, _C.sm),
+            child: Row(
+              children: [
+                Container(
+                  width: 36, height: 36,
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(c.isDark ? 0.18 : 0.1),
+                    borderRadius: BorderRadius.circular(_C.rSM + 2),
+                  ),
+                  child: Icon(icon, size: 17, color: color),
+                ),
+                const SizedBox(width: _C.sm + 4),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: c.label,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      Text(
+                        subtitle,
+                        style: TextStyle(fontSize: 12, color: c.label3),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Línea separadora sutil
+          Container(
+              height: 0.5,
+              margin: const EdgeInsets.symmetric(horizontal: _C.md),
+              color: c.separator),
+
+          // El gráfico en sí — sin padding adicional para que respire su propia manera
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+// ─── ESTADOS ─────────────────────────────────────────────────────────────────
+class _EmptyState extends StatelessWidget {
+  final _C c;
+  final Future<void> Function() onRefresh;
+
+  const _EmptyState({required this.c, required this.onRefresh});
+
+  @override
+  Widget build(BuildContext context) {
     return RefreshIndicator(
       onRefresh: onRefresh,
+      color: _C.accent,
+      strokeWidth: 1.5,
       child: Stack(
         children: [
-          ListView(),
+          ListView(), // hace que el RefreshIndicator funcione
           Center(
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              child: Padding(
-                padding: const EdgeInsets.all(32.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Lottie.asset(
-                      'assets/animations/analysis_animation.json',
-                      width: 250,
-                      height: 250,
+            child: Padding(
+              padding: const EdgeInsets.all(_C.xl),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Lottie.asset(
+                    'assets/animations/analysis_animation.json',
+                    width: 200, height: 200,
+                  ),
+                  const SizedBox(height: _C.lg),
+                  Text(
+                    'Sin datos aún',
+                    style: TextStyle(
+                      fontSize: 22, fontWeight: FontWeight.w800,
+                      color: c.label, letterSpacing: -0.5,
                     ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Sin Datos Suficientes',
-                      style: GoogleFonts.poppins(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Registra algunas transacciones para empezar a ver tus análisis inteligentes.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: _C.sm),
+                  Text(
+                    'Registra algunas transacciones para ver tus análisis.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontSize: 15, color: c.label3, height: 1.45),
+                  ),
+                ],
               ),
             ),
           ),
         ],
       ),
-    ).animate().fadeIn(duration: 400.ms);
+    );
   }
 }
 
-// ==================== EXTENSIÓN ====================
+class _ErrorState extends StatelessWidget {
+  final String error;
+  final _C c;
+  final VoidCallback onRetry;
+
+  const _ErrorState(
+      {required this.error, required this.c, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(_C.xl),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 64, height: 64,
+              decoration: BoxDecoration(
+                color: _C.expense.withOpacity(c.isDark ? 0.18 : 0.09),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Iconsax.warning_2,
+                  size: 28, color: _C.expense),
+            ),
+            const SizedBox(height: _C.lg),
+            Text('Algo salió mal',
+                style: TextStyle(
+                  fontSize: 20, fontWeight: FontWeight.w700,
+                  color: c.label, letterSpacing: -0.3,
+                )),
+            const SizedBox(height: _C.sm),
+            Text(error,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, color: c.label3)),
+            const SizedBox(height: _C.lg),
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.lightImpact();
+                onRetry();
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: _C.lg, vertical: 12),
+                decoration: BoxDecoration(
+                    color: _C.accent,
+                    borderRadius: BorderRadius.circular(_C.rMD)),
+                child: const Text('Reintentar',
+                    style: TextStyle(
+                        color: Colors.white, fontSize: 15,
+                        fontWeight: FontWeight.w600)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── SKELETON LOADER ─────────────────────────────────────────────────────────
+class _SkeletonLoader extends StatefulWidget {
+  final _C c;
+  const _SkeletonLoader({required this.c});
+
+  @override
+  State<_SkeletonLoader> createState() => _SkeletonLoaderState();
+}
+
+class _SkeletonLoaderState extends State<_SkeletonLoader>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        duration: const Duration(milliseconds: 1000), vsync: this)
+      ..repeat(reverse: true);
+    _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut);
+  }
+
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.c;
+    return AnimatedBuilder(
+      animation: _anim,
+      builder: (_, __) {
+        final shimmer =
+            Color.lerp(c.surface, c.surfaceRaised, _anim.value)!;
+
+        return CustomScrollView(
+          physics: const NeverScrollableScrollPhysics(),
+          slivers: [
+            // Simula el header
+            SliverToBoxAdapter(
+              child: Container(
+                height: 110,
+                color: c.bg,
+                padding: const EdgeInsets.fromLTRB(
+                    _C.md, 60, _C.md, _C.md),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _shimmerBox(shimmer, 80, 10, _C.rSM),
+                    const SizedBox(height: 6),
+                    _shimmerBox(shimmer, 160, 22, _C.rSM),
+                  ],
+                ),
+              ),
+            ),
+
+            // Hero card
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                    _C.md, _C.md, _C.md, 0),
+                child: _shimmerBox(shimmer, double.infinity, 140, _C.rXL),
+              ),
+            ),
+
+            // Quick stats
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                    _C.md, _C.md, _C.md, 0),
+                child: Row(
+                  children: [
+                    Expanded(
+                        child: _shimmerBox(
+                            shimmer, double.infinity, 90, _C.rLG)),
+                    const SizedBox(width: _C.sm),
+                    Expanded(
+                        child: _shimmerBox(
+                            shimmer, double.infinity, 90, _C.rLG)),
+                    const SizedBox(width: _C.sm),
+                    Expanded(
+                        child: _shimmerBox(
+                            shimmer, double.infinity, 90, _C.rLG)),
+                  ],
+                ),
+              ),
+            ),
+
+            // Gráficos
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(
+                  _C.md, _C.lg, _C.md, 0),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (_, i) => Padding(
+                    padding: const EdgeInsets.only(bottom: _C.md),
+                    child: _shimmerBox(
+                        shimmer, double.infinity, 220, _C.rXL),
+                  ),
+                  childCount: 3,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _shimmerBox(
+      Color color, double w, double h, double radius) {
+    return Container(
+      width: w, height: h,
+      decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(radius)),
+    );
+  }
+}
+
+// ─── ANIMACIÓN DE ENTRADA ────────────────────────────────────────────────────
+class _FadeSlide extends StatefulWidget {
+  final Widget child;
+  final int delay;
+  const _FadeSlide({required this.child, required this.delay});
+
+  @override
+  State<_FadeSlide> createState() => _FadeSlideState();
+}
+
+class _FadeSlideState extends State<_FadeSlide>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _opacity;
+  late Animation<Offset> _slide;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(duration: _C.slow, vsync: this);
+    _opacity = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
+    _slide = Tween<Offset>(
+            begin: const Offset(0, 0.05), end: Offset.zero)
+        .animate(
+            CurvedAnimation(parent: _ctrl, curve: _C.curveOut));
+    Future.delayed(Duration(milliseconds: widget.delay),
+        () { if (mounted) _ctrl.forward(); });
+  }
+
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _opacity,
+      child: SlideTransition(position: _slide, child: widget.child),
+    );
+  }
+}
+
+// ─── EXTENSIÓN ───────────────────────────────────────────────────────────────
 extension on AnalysisData {
   bool get hasData =>
       moodByDayData.isNotEmpty ||
