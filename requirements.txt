@@ -3,6 +3,5 @@ charset-normalizer==3.4.2
 duolingo-api==0.5.4
 idna==3.10
 requests
-supabase-py
 requests==2.32.3
 urllib3==2.4.0

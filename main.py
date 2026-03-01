@@ -81,11 +81,7 @@ async def generar_analisis_financiero(
         print("4. Prompt generado. Enviando a Gemini...")
 
         # --- PASO C: Llamar a Gemini ---
-        safety_settings = {
-            'HARM_CATEGORY_HARASSMENT': 'BLOCK_NONE', 'HARM_CATEGORY_HATE_SPEECH': 'BLOCK_NONE',
-            'HARM_CATEGORY_SEXUALLY_EXPLICIT': 'BLOCK_NONE', 'HARM_CATEGORY_DANGEROUS_CONTENT': 'BLOCK_NONE',
-        }
-        gemini_response = gemini_model.generate_content(prompt, safety_settings=safety_settings)
+        gemini_response = gemini_model.generate_content(prompt)
         
         print("5. ¡ÉXITO! Análisis recibido de Gemini.")
         return {"analisis": gemini_response.text}
