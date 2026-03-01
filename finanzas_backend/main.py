@@ -2,11 +2,9 @@
 
 import os
 import json
-import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query,Request
 from supabase import create_client, Client
-from supabase.lib.client_options import ClientOptions
 import google.generativeai as genai
 import firebase_admin
 from firebase_admin import credentials, messaging
@@ -26,8 +24,7 @@ if not supabase_url or not supabase_key:
 
 # Creamos la opción para deshabilitar la verificación SSL.
 # Es útil para algunos entornos de desarrollo locales y no daña la producción.
-options = ClientOptions(httpx_client=httpx.Client(verify=False))
-supabase: Client = create_client(supabase_url, supabase_key, options=options)
+supabase: Client = create_client(supabase_url, supabase_key)
 print("✅ Cliente de Supabase inicializado.")
 
 try:
