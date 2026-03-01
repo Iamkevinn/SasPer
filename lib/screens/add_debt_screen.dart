@@ -39,6 +39,7 @@ class _AddDebtScreenState extends State<AddDebtScreen>
 
   // Estado
   DebtType _selectedDebtType = DebtType.debt;
+  DebtImpactType _selectedImpactType = DebtImpactType.liquid; // <--- NUEVO
   Account? _selectedAccount;
   DateTime? _dueDate;
   bool _isLoading = false;
@@ -207,6 +208,7 @@ class _AddDebtScreenState extends State<AddDebtScreen>
         accountId: _selectedAccount!.id,
         dueDate: _dueDate,
         transactionDate: DateTime.now(),
+        impactType: _selectedImpactType, // <--- NUEVO
       );
 
       if (mounted) {
@@ -362,7 +364,23 @@ class _AddDebtScreenState extends State<AddDebtScreen>
                                 'Detalles', Iconsax.setting_2, accentColor),
                             const SizedBox(height: 12),
                             _buildAccountAndDatePickers(accentColor),
+const SizedBox(height: 32),
 
+                            // NUEVO: SELECTOR DE IMPACTO (El corazón de nuestra lógica)
+                            _buildSectionLabel('¿Cómo afecta tu cuenta?', Iconsax.shuffle, accentColor),
+                            const SizedBox(height: 12),
+                            _ImpactTypeSelectorPremium(
+                              selectedImpact: _selectedImpactType,
+                              debtType: _selectedDebtType,
+                              accentColor: accentColor,
+                              onChanged: (val) {
+                                setState(() => _selectedImpactType = val);
+                              },
+                            ),
+
+                            const SizedBox(height: 32),
+
+                            // TARJETA DE IMPACTO FINANCIERO ...
                             const SizedBox(height: 32),
 
                             // TARJETA DE IMPACTO FINANCIERO
@@ -376,6 +394,7 @@ class _AddDebtScreenState extends State<AddDebtScreen>
                                   ).animate(_impactAnimation),
                                   child: _FinancialImpactCard(
                                     debtType: _selectedDebtType,
+                                    impactType: _selectedImpactType,
                                     amount: amount,
                                     account: _selectedAccount!,
                                     accentColor: accentColor,
@@ -1296,8 +1315,10 @@ class _DatePickerPremium extends StatelessWidget {
 }
 
 // 7. TARJETA DE IMPACTO FINANCIERO
+// 7. TARJETA DE IMPACTO FINANCIERO (ACTUALIZADA)
 class _FinancialImpactCard extends StatelessWidget {
   final DebtType debtType;
+  final DebtImpactType impactType; // <--- NUEVO
   final double amount;
   final Account account;
   final Color accentColor;
@@ -1305,6 +1326,7 @@ class _FinancialImpactCard extends StatelessWidget {
 
   const _FinancialImpactCard({
     required this.debtType,
+    required this.impactType, // <--- NUEVO
     required this.amount,
     required this.account,
     required this.accentColor,
@@ -1313,18 +1335,19 @@ class _FinancialImpactCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final currencyFormat = NumberFormat.currency(
-      locale: 'es_CO',
-      symbol: '\$',
-      decimalDigits: 0,
-    );
+    final currencyFormat = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
 
-    final projectedBalance = debtType == DebtType.debt
-        ? account.balance - amount
-        : account.balance + amount;
+    // Lógica contable real
+    double projectedBalance = account.balance;
+    if (impactType != DebtImpactType.direct) {
+      projectedBalance = debtType == DebtType.debt
+          ? account.balance + amount // Me prestaron -> Entra dinero
+          : account.balance - amount; // Yo presté -> Sale dinero
+    }
 
-    final impactPercentage = (amount / account.balance * 100).clamp(0, 100);
-    final isHighImpact = impactPercentage > 15;
+    final isDirect = impactType == DebtImpactType.direct;
+    final impactPercentage = isDirect ? 0.0 : (amount / account.balance * 100).clamp(0, 100);
+    final isHighImpact = impactPercentage > 15 && !isDirect;
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -1332,62 +1355,31 @@ class _FinancialImpactCard extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            accentColor.withOpacity(0.15),
-            accentColor.withOpacity(0.05),
-          ],
+          colors:[accentColor.withOpacity(0.15), accentColor.withOpacity(0.05)],
         ),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: accentColor.withOpacity(0.3),
-          width: 2,
-        ),
+        border: Border.all(color: accentColor.withOpacity(0.3), width: 2),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            children: [
+            children:[
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [accentColor, accentColor.withOpacity(0.7)],
-                  ),
+                  gradient: LinearGradient(colors: [accentColor, accentColor.withOpacity(0.7)]),
                   borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: accentColor.withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
                 ),
-                child: const Icon(
-                  Iconsax.chart_success,
-                  color: Colors.white,
-                  size: 24,
-                ),
+                child: const Icon(Iconsax.chart_success, color: Colors.white, size: 24),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Impacto Financiero',
-                      style: GoogleFonts.poppins(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      'Así afectará tu cuenta',
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
+                  children:[
+                    Text('Impacto Financiero', style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold)),
+                    Text('Así afectará tu cuenta', style: GoogleFonts.inter(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant)),
                   ],
                 ),
               ),
@@ -1404,106 +1396,82 @@ class _FinancialImpactCard extends StatelessWidget {
                 border: Border.all(color: Colors.orange.withOpacity(0.3)),
               ),
               child: Row(
-                children: [
-                  Icon(Iconsax.info_circle,
-                      color: Colors.orange.shade700, size: 20),
+                children:[
+                  Icon(Iconsax.info_circle, color: Colors.orange.shade700, size: 20),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       '⚠️ Esta operación representa el ${impactPercentage.toStringAsFixed(1)}% del saldo disponible',
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.orange.shade900,
-                      ),
+                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.orange.shade900),
                     ),
                   ),
                 ],
               ),
             ),
-          _ImpactRow(
-            icon: Iconsax.wallet_money,
-            label: 'Saldo actual en ${account.name}',
-            value: currencyFormat.format(account.balance),
-            color: Theme.of(context).colorScheme.primary,
-          ),
+          _ImpactRow(icon: Iconsax.wallet_money, label: 'Saldo actual en ${account.name}', value: currencyFormat.format(account.balance), color: Theme.of(context).colorScheme.primary),
           const SizedBox(height: 16),
-          _ImpactRow(
-            icon: debtType == DebtType.debt
-                ? Iconsax.arrow_down
-                : Iconsax.arrow_up,
-            label: debtType == DebtType.debt
-                ? 'Monto que deberás'
-                : 'Monto que te deberán',
-            value: currencyFormat.format(amount),
-            color: accentColor,
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: projectedBalance > 0
-                  ? Colors.green.withOpacity(0.1)
-                  : Colors.red.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: projectedBalance > 0
-                    ? Colors.green.withOpacity(0.3)
-                    : Colors.red.withOpacity(0.3),
+          
+          if (isDirect)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(color: Colors.grey.withOpacity(0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey.withOpacity(0.3))),
+              child: Row(
+                children:[
+                  const Icon(Iconsax.info_circle, color: Colors.grey, size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text('Como es un pago directo, el saldo de tu cuenta no cambiará.', style: GoogleFonts.inter(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                  ),
+                ],
+              ),
+            )
+          else ...[
+            _ImpactRow(
+              icon: debtType == DebtType.debt ? Iconsax.arrow_up : Iconsax.arrow_down,
+              label: debtType == DebtType.debt ? 'Entrará a tu cuenta' : 'Saldrá de tu cuenta',
+              value: currencyFormat.format(amount),
+              color: accentColor,
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: projectedBalance >= 0 ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: projectedBalance >= 0 ? Colors.green.withOpacity(0.3) : Colors.red.withOpacity(0.3)),
+              ),
+              child: Row(
+                children:[
+                  Icon(projectedBalance >= 0 ? Iconsax.tick_circle : Iconsax.danger, color: projectedBalance >= 0 ? Colors.green : Colors.red, size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children:[
+                        Text('Saldo proyectado', style: GoogleFonts.inter(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                        const SizedBox(height: 4),
+                        Text(currencyFormat.format(projectedBalance), style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold, color: projectedBalance >= 0 ? Colors.green : Colors.red)),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-            child: Row(
-              children: [
-                Icon(
-                  projectedBalance > 0 ? Iconsax.tick_circle : Iconsax.danger,
-                  color: projectedBalance > 0 ? Colors.green : Colors.red,
-                  size: 20,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Saldo proyectado',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        currencyFormat.format(projectedBalance),
-                        style: GoogleFonts.poppins(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color:
-                              projectedBalance > 0 ? Colors.green : Colors.red,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+          ],
           const SizedBox(height: 20),
           Text(
-            debtType == DebtType.debt
-                ? '💡 Recuerda: Esta deuda se restará de tu saldo disponible'
-                : '💡 Registra préstamos para mantener control de quién te debe',
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              fontStyle: FontStyle.italic,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
+             impactType == DebtImpactType.restricted 
+                ? '💡 Recuerda: Este dinero estará reservado, no lo gastes libremente.'
+                : (debtType == DebtType.debt
+                    ? '💡 Esta deuda se sumará a tus pasivos totales.'
+                    : '💡 Mantén control de a quién le prestas dinero.'),
+            style: GoogleFonts.inter(fontSize: 13, fontStyle: FontStyle.italic, color: Theme.of(context).colorScheme.onSurfaceVariant),
           ),
         ],
       ),
     ).animate().fadeIn(duration: 600.ms).slideY(begin: 0.2);
   }
 }
-
 class _ImpactRow extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -1803,5 +1771,117 @@ class _ConfettiCelebration extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+// NUEVO: SELECTOR DE IMPACTO FINANCIERO PREMIUM
+class _ImpactTypeSelectorPremium extends StatelessWidget {
+  final DebtImpactType selectedImpact;
+  final DebtType debtType;
+  final Color accentColor;
+  final Function(DebtImpactType) onChanged;
+
+  const _ImpactTypeSelectorPremium({
+    required this.selectedImpact,
+    required this.debtType,
+    required this.accentColor,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children:[
+        _buildImpactOption(
+          context: context,
+          type: DebtImpactType.liquid,
+          title: debtType == DebtType.debt ? 'Entró a mi cuenta' : 'Salió de mi cuenta',
+          subtitle: 'Afecta mi saldo disponible',
+          icon: Iconsax.wallet_add_1,
+        ),
+        const SizedBox(height: 12),
+        _buildImpactOption(
+          context: context,
+          type: DebtImpactType.restricted,
+          title: 'Tiene un propósito fijo',
+          subtitle: 'Es para una meta o pago reservado',
+          icon: Iconsax.lock_1,
+        ),
+        const SizedBox(height: 12),
+        _buildImpactOption(
+          context: context,
+          type: DebtImpactType.direct,
+          title: debtType == DebtType.debt ? 'Alguien pagó por mí' : 'Pagué por alguien más',
+          subtitle: 'El dinero nunca tocó mis cuentas',
+          icon: Iconsax.cards,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildImpactOption({
+    required BuildContext context,
+    required DebtImpactType type,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+  }) {
+    final isSelected = selectedImpact == type;
+    
+    return Material(
+      color: isSelected ? accentColor.withOpacity(0.1) : Theme.of(context).colorScheme.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: () => onChanged(type),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: isSelected ? accentColor.withOpacity(0.5) : Colors.transparent,
+              width: 1.5,
+            ),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children:[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isSelected ? accentColor.withOpacity(0.2) : Theme.of(context).colorScheme.surface,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: isSelected ? accentColor : Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children:[
+                    Text(
+                      title,
+                      style: GoogleFonts.poppins(
+                        fontSize: 15,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                        color: isSelected ? accentColor : null,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (isSelected)
+                Icon(Iconsax.tick_circle, color: accentColor)
+            ],
+          ),
+        ),
+      ),
+    ).animate(target: isSelected ? 1 : 0).scale(begin: const Offset(1, 1), end: const Offset(1.02, 1.02), duration: 200.ms);
   }
 }

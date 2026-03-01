@@ -38,11 +38,18 @@ class DashboardAlert extends Equatable {
   }
   
   @override
-  List<Object?> get props => [id, type, message];
+  List<Object?> get props =>[id, type, message];
 }
 
 class DashboardData extends Equatable {
-  final double totalBalance;
+  final double totalBalance; // Saldo Contable Total (Cuentas)
+  
+  // --- 👇 NUEVAS VARIABLES CONTABLES ---
+  final double availableBalance; // Saldo Operativo (Disponible para gastar)
+  final double restrictedBalance; // Saldo Reservado (Metas + Préstamos Restringidos)
+  final double totalDebt; // Deuda Total Acumulada
+  // -------------------------------------
+
   final String fullName;
   final double healthScore;
   final List<DashboardAlert> alerts;
@@ -57,6 +64,9 @@ class DashboardData extends Equatable {
 
   const DashboardData({
     required this.totalBalance,
+    required this.availableBalance, // NUEVO
+    required this.restrictedBalance, // NUEVO
+    required this.totalDebt, // NUEVO
     required this.fullName,
     required this.healthScore,
     required this.alerts,
@@ -66,35 +76,39 @@ class DashboardData extends Equatable {
     required this.goals,
     required this.expenseSummaryForWidget,
     this.isLoading = false,
-    this.categorySpendingSummary = const [],
+    this.categorySpendingSummary = const[],
     required this.monthlyProjection,
   });
 
   /// **ETAPA 1:** Crea una instancia con solo los datos esenciales.
   factory DashboardData.fromPartialMap(Map<String, dynamic> map, {bool loadingDetails = true}) {
-    // --- 👇 ESTE ES EL ÚNICO MÉTODO MODIFICADO ---
+    final tBalance = (map['total_balance'] as num?)?.toDouble() ?? 0.0;
+    
     return DashboardData(
       fullName: map['full_name'] as String? ?? 'Usuario',
-      totalBalance: (map['total_balance'] as num?)?.toDouble() ?? 0.0,
+      totalBalance: tBalance,
+      
+      // En la Etapa 1, igualamos el disponible al total temporalmente.
+      // Se recalculará de forma exacta en la Etapa 2.
+      availableBalance: tBalance, 
+      restrictedBalance: 0.0,
+      totalDebt: 0.0,
+      
       healthScore: (map['health_score'] as num?)?.toDouble() ?? 0.0,
       monthlyProjection: (map['monthly_projection'] as num?)?.toDouble() ?? 0.0,
-      
-      // En la Etapa 1, las alertas y otras listas siempre están vacías.
-      // Se cargarán en la Etapa 2.
-      alerts: const [], // <-- CORRECCIÓN CLAVE
-      
+      alerts: const [],
       goals: const [],
-      recentTransactions: const [],
+      recentTransactions: const[],
       budgets: const [],
       featuredBudgets: const [],
-      expenseSummaryForWidget: const [],
+      expenseSummaryForWidget: const[],
       isLoading: loadingDetails,
-      categorySpendingSummary: const [],
+      categorySpendingSummary: const[],
     );
   }
 
   /// **ETAPA 2:** Crea una copia del objeto actual, pero poblando las listas.
-   DashboardData copyWithDetails(Map<String, dynamic> map) {
+  DashboardData copyWithDetails(Map<String, dynamic> map) {
     final List<Budget> allBudgets = (map['budgets_progress'] as List<dynamic>?)
         ?.map((b) => Budget.fromMap(b as Map<String, dynamic>))
         .toList() ?? budgets;
@@ -102,10 +116,15 @@ class DashboardData extends Equatable {
     return DashboardData(
       fullName: fullName,
       totalBalance: totalBalance,
+      
+      // --- 👇 ASIGNAMOS LOS VALORES CALCULADOS EN EL REPOSITORIO ---
+      availableBalance: (map['available_balance'] as num?)?.toDouble() ?? availableBalance,
+      restrictedBalance: (map['restricted_balance'] as num?)?.toDouble() ?? restrictedBalance,
+      totalDebt: (map['total_debt'] as num?)?.toDouble() ?? totalDebt,
+      
       healthScore: (map['health_score'] as num?)?.toDouble() ?? healthScore,
       monthlyProjection: (map['monthly_projection'] as num?)?.toDouble() ?? monthlyProjection,
       
-      // Aquí sí leemos las alertas, porque vienen en la Etapa 2.
       alerts: (map['alerts'] as List<dynamic>?)
           ?.map((a) => DashboardAlert.fromMap(a as Map<String, dynamic>))
           .toList() ?? alerts,
@@ -125,7 +144,7 @@ class DashboardData extends Equatable {
           .toList() ?? expenseSummaryForWidget,
       
       isLoading: false, 
-      categorySpendingSummary: const [],
+      categorySpendingSummary: const[],
     );
   }
 
@@ -133,23 +152,29 @@ class DashboardData extends Equatable {
   factory DashboardData.empty() {
     return const DashboardData(
       totalBalance: 0.0,
+      availableBalance: 0.0,
+      restrictedBalance: 0.0,
+      totalDebt: 0.0,
       fullName: 'Cargando...',
       healthScore: 0.0,
       monthlyProjection: 0.0,
       alerts: [],
       recentTransactions: [],
       budgets: [],
-      featuredBudgets: [],
+      featuredBudgets:[],
       goals: [],
-      expenseSummaryForWidget: [],
+      expenseSummaryForWidget:[],
       isLoading: true, 
-      categorySpendingSummary: [],
+      categorySpendingSummary:[],
     );
   }
 
   /// Método `copyWith` genérico para crear copias modificadas.
   DashboardData copyWith({
     double? totalBalance,
+    double? availableBalance,
+    double? restrictedBalance,
+    double? totalDebt,
     String? fullName,
     double? healthScore,
     List<DashboardAlert>? alerts,
@@ -164,6 +189,9 @@ class DashboardData extends Equatable {
   }) {
     return DashboardData(
       totalBalance: totalBalance ?? this.totalBalance,
+      availableBalance: availableBalance ?? this.availableBalance,
+      restrictedBalance: restrictedBalance ?? this.restrictedBalance,
+      totalDebt: totalDebt ?? this.totalDebt,
       fullName: fullName ?? this.fullName,
       healthScore: healthScore ?? this.healthScore,
       alerts: alerts ?? this.alerts,
@@ -179,8 +207,11 @@ class DashboardData extends Equatable {
   }
 
   @override
-  List<Object?> get props => [
+  List<Object?> get props =>[
         totalBalance,
+        availableBalance,
+        restrictedBalance,
+        totalDebt,
         fullName,
         healthScore,
         alerts,

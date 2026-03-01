@@ -86,7 +86,7 @@ class DebtRepository {
   }
 
   /// Llama a un RPC para crear una deuda y su transacción inicial.
-  Future<void> addDebtAndInitialTransaction({
+   Future<void> addDebtAndInitialTransaction({
     required String name,
     required DebtType type,
     String? entityName,
@@ -94,8 +94,9 @@ class DebtRepository {
     required String accountId,
     DateTime? dueDate,
     DateTime? transactionDate,
+    required DebtImpactType impactType, // <--- 1. AGREGAMOS ESTO
   }) async {
-    developer.log('➕ [Repo] Añadiendo nueva deuda: "$name"', name: 'DebtRepository');
+    developer.log('➕ [Repo] Añadiendo nueva deuda: "$name" con impacto ${impactType.name}', name: 'DebtRepository');
     try {
       await client.rpc('create_debt_and_transaction', params: {
         'p_name': name,
@@ -105,8 +106,9 @@ class DebtRepository {
         'p_account_id': accountId,
         'p_due_date': dueDate?.toIso8601String(),
         'p_transaction_date': (transactionDate ?? DateTime.now()).toIso8601String(),
+        'p_impact_type': impactType.name, // <--- 2. LO ENVIAMOS AL RPC
       });
-      developer.log('✅ [Repo] Deuda y transacción inicial creadas con éxito.', name: 'DebtRepository');
+      developer.log('✅[Repo] Deuda y transacción inicial creadas con éxito.', name: 'DebtRepository');
     } catch (e, stackTrace) {
       developer.log('🔥 [Repo] Error añadiendo deuda: $e', name: 'DebtRepository', error: e, stackTrace: stackTrace);
       throw Exception('No se pudo añadir la deuda. Por favor, inténtalo de nuevo.');

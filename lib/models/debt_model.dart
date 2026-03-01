@@ -25,6 +25,25 @@ enum DebtStatus {
   }
 }
 
+// NUEVO: Enum para el tipo de impacto del dinero
+enum DebtImpactType {
+  liquid,
+  restricted,
+  direct;
+
+  static DebtImpactType fromString(String? type) {
+    switch (type?.toLowerCase()) {
+      case 'liquid':
+        return DebtImpactType.liquid;
+      case 'restricted':
+        return DebtImpactType.restricted;
+      case 'direct':
+        return DebtImpactType.direct;
+      default:
+        return DebtImpactType.liquid; // Por defecto asumimos que es líquido
+    }
+  }
+}
 
 // 2. Hacemos la clase inmutable y comparable.
 class Debt extends Equatable {
@@ -39,6 +58,7 @@ class Debt extends Equatable {
   final DateTime? dueDate;
   final double interestRate;
   final DebtStatus status;
+  final DebtImpactType impactType; // NUEVO CAMPO
   final DateTime createdAt;
 
   const Debt({
@@ -53,6 +73,7 @@ class Debt extends Equatable {
     this.dueDate,
     this.interestRate = 0.0,
     required this.status,
+    required this.impactType, // NUEVO
     required this.createdAt,
   });
 
@@ -65,6 +86,7 @@ class Debt extends Equatable {
       initialAmount: 1000.0,
       currentBalance: 500.0,
       status: DebtStatus.active,
+      impactType: DebtImpactType.liquid, // NUEVO
       createdAt: DateTime.now(),
       // Los campos opcionales pueden ser nulos
       entityName: null,
@@ -89,6 +111,7 @@ class Debt extends Equatable {
         dueDate: map['due_date'] != null ? DateTime.parse(map['due_date'] as String) : null,
         interestRate: (map['interest_rate'] as num? ?? 0.0).toDouble(),
         status: DebtStatus.fromString(map['status'] as String?),
+        impactType: DebtImpactType.fromString(map['impact_type'] as String?), // NUEVO
         createdAt: DateTime.parse(map['created_at'] as String),
       );
     } catch (e) {
@@ -109,6 +132,7 @@ class Debt extends Equatable {
     DateTime? dueDate,
     double? interestRate,
     DebtStatus? status,
+    DebtImpactType? impactType, // NUEVO
     DateTime? createdAt,
     
   }) {
@@ -124,6 +148,7 @@ class Debt extends Equatable {
       dueDate: dueDate ?? this.dueDate,
       interestRate: interestRate ?? this.interestRate,
       status: status ?? this.status,
+      impactType: impactType ?? this.impactType, // NUEVO
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -139,7 +164,7 @@ class Debt extends Equatable {
 
   // 5. Propiedades para Equatable.
   @override
-  List<Object?> get props => [
+  List<Object?> get props =>[
         id,
         userId,
         name,
@@ -151,6 +176,7 @@ class Debt extends Equatable {
         dueDate,
         interestRate,
         status,
+        impactType, // NUEVO
         createdAt,
       ];
 }

@@ -94,7 +94,7 @@ class _PlanningHubScreenState extends State<PlanningHubScreen>
   // Kept as a no-op placeholder in case future animations need it.
   AnimationController? _mountCtrl;
 
-  List<_Section> get _sections => [
+  late final List<_Section> _sections =[
     _Section(
       title: 'FINANZAS',
       footnote: 'Administra el flujo de tu dinero.',
@@ -286,14 +286,11 @@ class _HeaderDelegate extends SliverPersistentHeaderDelegate {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               // Subtítulo — desaparece al colapsar
-              AnimatedOpacity(
+              Opacity(
                 opacity: subtitleOpacity,
-                duration: const Duration(milliseconds: 60),
                 child: Text(
                   'PLANIFICACIÓN',
-                  style: _T.label(10,
-                      w: FontWeight.w700,
-                      c: onSurface.withOpacity(0.35)),
+                  style: _T.label(10, w: FontWeight.w700, c: onSurface.withOpacity(0.35)),
                 ),
               ),
               const SizedBox(height: 2),

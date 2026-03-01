@@ -40,33 +40,32 @@ class DebtService {
 
   /// Añade una nueva deuda y su transacción inicial asociada.
   /// Lanza una excepción si la operación falla.
-  Future<void> addDebtAndInitialTransaction({
+   Future<void> addDebtAndInitialTransaction({
     required String name,
     required DebtType type,
     String? entityName,
     required double amount,
     required String accountId,
     DateTime? dueDate,
+    required DebtImpactType impactType, // <--- 1. AGREGAMOS ESTO
   }) async {
     developer.log('➕ [Service] Adding new debt: "$name"', name: 'DebtService');
     try {
-      // 3. Usamos la RPC que ya tienes para la lógica transaccional
       await _client.rpc('create_debt_and_transaction', params: {
         'p_name': name,
-        'p_type': type.name, // 'debt' o 'loan'
+        'p_type': type.name,
         'p_entity_name': entityName,
         'p_amount': amount,
         'p_account_id': accountId,
         'p_due_date': dueDate?.toIso8601String(),
+        'p_impact_type': impactType.name, // <--- 2. LO ENVIAMOS AL RPC
       });
       developer.log('✅ Debt and initial transaction created successfully.', name: 'DebtService');
-      // Notificamos a otras partes de la app que los datos han cambiado
       EventService.instance.fire(AppEvent.debtsChanged);
       EventService.instance.fire(AppEvent.transactionsChanged);
 
     } catch (e, stackTrace) {
       developer.log('🔥 [Service] Error adding debt: $e', name: 'DebtService', error: e, stackTrace: stackTrace);
-      // 4. Re-lanzamos la excepción para que la UI pueda mostrar un error al usuario.
       throw Exception('No se pudo añadir la deuda. Por favor, inténtalo de nuevo.');
     }
   }

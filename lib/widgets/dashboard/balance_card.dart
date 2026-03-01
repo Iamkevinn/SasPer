@@ -3,10 +3,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:lottie/lottie.dart';
-// NOVEDAD: Importamos el paquete para guardar las preferencias.
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:iconsax/iconsax.dart';
 
-// El enum y la extensión se mantienen, son una excelente práctica.
 enum BalanceStatus { positive, negative, neutral }
 
 extension BalanceStatusX on BalanceStatus {
@@ -24,20 +23,26 @@ extension BalanceStatusX on BalanceStatus {
 }
 
 class BalanceCard extends StatefulWidget {
-  final double totalBalance;
+  // NUEVO: Ahora recibimos los 3 pilares financieros
+  final double availableBalance; // Saldo operativo (Efectivo - Restringido)
+  final double restrictedBalance; // Dinero reservado para metas/pagos
+  final double totalDebt; // Deudas acumuladas
 
-  const BalanceCard({super.key, required this.totalBalance});
+  const BalanceCard({
+    super.key, 
+    required this.availableBalance,
+    required this.restrictedBalance,
+    required this.totalDebt,
+  });
 
   @override
   State<BalanceCard> createState() => _BalanceCardState();
 }
 
 class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStateMixin {
-  // Se mantiene el valor inicial en true, pero se sobrescribirá al cargar las preferencias.
   bool _isBalanceVisible = true;
   late final AnimationController _eyeAnimationController;
 
-  // NOVEDAD: Definimos una clave constante para guardar la preferencia.
   static const String _balanceVisibilityKey = 'balance_visibility_preference';
 
   @override
@@ -47,32 +52,27 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
-    // NOVEDAD: Llamamos a la función para cargar la preferencia del usuario.
     _loadVisibilityPreference();
   }
   
-  // NOVEDAD: Nueva función asíncrona para cargar el estado de visibilidad.
   Future<void> _loadVisibilityPreference() async {
     final prefs = await SharedPreferences.getInstance();
-    // Leemos el valor guardado. Si no existe (la primera vez que se usa la app),
-    // el valor por defecto será 'true' (visible).
-    setState(() {
-      _isBalanceVisible = prefs.getBool(_balanceVisibilityKey) ?? true;
-      // Sincronizamos la animación del ojo con el estado cargado.
-      if (_isBalanceVisible) {
-        _eyeAnimationController.value = 0; // Ojo abierto
-      } else {
-        _eyeAnimationController.value = 1; // Ojo cerrado
-      }
-    });
+    if (mounted) {
+      setState(() {
+        _isBalanceVisible = prefs.getBool(_balanceVisibilityKey) ?? true;
+        if (_isBalanceVisible) {
+          _eyeAnimationController.value = 0; // Ojo abierto
+        } else {
+          _eyeAnimationController.value = 1; // Ojo cerrado
+        }
+      });
+    }
   }
 
-  // NOVEDAD: Nueva función asíncrona para guardar el estado de visibilidad.
   Future<void> _saveVisibilityPreference(bool isVisible) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_balanceVisibilityKey, isVisible);
   }
-
 
   @override
   void dispose() {
@@ -80,7 +80,6 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
     super.dispose();
   }
 
-  // NOVEDAD: La función ahora es 'async' para poder guardar la preferencia.
   void _toggleVisibility() async {
     setState(() {
       _isBalanceVisible = !_isBalanceVisible;
@@ -90,13 +89,13 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
         _eyeAnimationController.forward();
       }
     });
-    // NOVEDAD: Guardamos el nuevo estado cada vez que se cambia.
     await _saveVisibilityPreference(_isBalanceVisible);
   }
 
-  BalanceStatus get _status => widget.totalBalance > 0
+  // El estatus ahora se basa en el saldo DISPONIBLE
+  BalanceStatus get _status => widget.availableBalance > 0
       ? BalanceStatus.positive
-      : widget.totalBalance < 0
+      : widget.availableBalance < 0
           ? BalanceStatus.negative
           : BalanceStatus.neutral;
 
@@ -107,7 +106,7 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
     final textTheme = theme.textTheme;
 
     final statusColor = _status.getColor(context);
-    final currencyFormat = NumberFormat.currency(locale: 'es_CO', symbol: '\$');
+    final currencyFormat = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -120,7 +119,8 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
           border: Border(left: BorderSide(color: statusColor, width: 6)),
         ),
         child: Stack(
-          children: [
+          children:[
+            // Pintor de fondo original
             Positioned(
               bottom: -2,
               right: -2,
@@ -137,18 +137,26 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
             ),
             
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+                children:[
+                  // --- SECCIÓN 1: SALDO DISPONIBLE (HERO) ---
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Saldo Total',
-                        style: textTheme.titleMedium?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
+                    children:[
+                      Row(
+                        children:[
+                          Icon(Iconsax.wallet_money, size: 20, color: statusColor),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Disponible para gastar',
+                            style: textTheme.titleMedium?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
                       GestureDetector(
                         onTap: _toggleVisibility,
@@ -161,23 +169,111 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 4),
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 350),
-                    transitionBuilder: (child, animation) {
-                      return FadeTransition(opacity: animation, child: child);
-                    },
                     child: Text(
                       key: ValueKey<bool>(_isBalanceVisible),
                       _isBalanceVisible
-                          ? currencyFormat.format(widget.totalBalance)
+                          ? currencyFormat.format(widget.availableBalance)
                           : '∗∗∗∗',
                       style: textTheme.headlineLarge?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: statusColor,
                         letterSpacing: _isBalanceVisible ? -1 : 4,
+                        fontSize: 36,
                       ),
                     ),
+                  ),
+                  
+                  const SizedBox(height: 20),
+                  Divider(color: statusColor.withOpacity(0.2), thickness: 1),
+                  const SizedBox(height: 16),
+                  
+                  // --- SECCIÓN 2: RESERVADO Y DEUDAS ---
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children:[
+                      // Bloque Reservado
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children:[
+                                Icon(Iconsax.lock_1, size: 14, color: Colors.blue.shade600),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Reservado / Metas',
+                                  style: textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 350),
+                              child: Text(
+                                key: ValueKey<bool>(_isBalanceVisible),
+                                _isBalanceVisible
+                                    ? currencyFormat.format(widget.restrictedBalance)
+                                    : '∗∗∗',
+                                style: textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blue.shade700,
+                                  letterSpacing: _isBalanceVisible ? 0 : 2,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      
+                      // Separador vertical
+                      Container(
+                        height: 30,
+                        width: 1,
+                        color: statusColor.withOpacity(0.2),
+                      ),
+                      const SizedBox(width: 16),
+                      
+                      // Bloque Deudas
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children:[
+                            Row(
+                              children:[
+                                Icon(Iconsax.chart_fail, size: 14, color: colorScheme.error),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Deuda Total',
+                                  style: textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 350),
+                              child: Text(
+                                key: ValueKey<bool>(_isBalanceVisible),
+                                _isBalanceVisible
+                                    ? currencyFormat.format(widget.totalDebt)
+                                    : '∗∗∗',
+                                style: textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: colorScheme.error,
+                                  letterSpacing: _isBalanceVisible ? 0 : 2,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -189,7 +285,7 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
   }
 }
 
-// El widget _BalanceTrendPainter no necesita cambios.
+// Pintor de fondo
 class _BalanceTrendPainter extends CustomPainter {
   final BalanceStatus status;
   final Color color;

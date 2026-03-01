@@ -525,6 +525,8 @@ class AccountsScreenState extends State<AccountsScreen> {
 
 // ─── BALANCE HERO ─────────────────────────────────────────────────────────────
 // El número grande. El protagonista. Todo lo demás es soporte.
+// ─── BALANCE HERO (Actualizado) ───────────────────────────────────────────────
+// El número grande. El protagonista. Todo lo demás es soporte.
 class _BalanceHero extends StatelessWidget {
   final double total;
   final int accountCount;
@@ -555,7 +557,7 @@ class _BalanceHero extends StatelessWidget {
         borderRadius: BorderRadius.circular(28),
         border: Border.all(
             color: color.withOpacity(0.12), width: 0.5),
-        boxShadow: [
+        boxShadow:[
           BoxShadow(
             color: color.withOpacity(c.isDark ? 0.12 : 0.06),
             blurRadius: 24,
@@ -570,17 +572,17 @@ class _BalanceHero extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+        children:[
           // Eyebrow
           Row(
-            children: [
+            children:[
               Container(
                   width: 6, height: 6,
                   decoration: BoxDecoration(
                       shape: BoxShape.circle, color: color)),
               const SizedBox(width: 6),
               Text(
-                'BALANCE TOTAL',
+                'SALDO CONTABLE (FÍSICO)', // <-- Cambio de etiqueta
                 style: TextStyle(
                   fontSize: 10, fontWeight: FontWeight.w700,
                   letterSpacing: 0.9, color: c.label3,
@@ -603,25 +605,48 @@ class _BalanceHero extends StatelessWidget {
           ),
           const SizedBox(height: 10),
 
-          // Metadata: cuántas cuentas
+          // Metadata: cuántas cuentas + Nota educativa
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
               color: c.surfaceRaised,
               borderRadius: BorderRadius.circular(_C.rSM),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Iconsax.card, size: 13, color: c.label3),
-                const SizedBox(width: 5),
-                Text(
-                  '$accountCount cuenta${accountCount != 1 ? 's' : ''} activa${accountCount != 1 ? 's' : ''}',
-                  style: TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.w500,
-                    color: c.label3,
-                  ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children:[
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children:[
+                    Icon(Iconsax.card, size: 13, color: c.label3),
+                    const SizedBox(width: 5),
+                    Text(
+                      '$accountCount cuenta${accountCount != 1 ? 's' : ''} activa${accountCount != 1 ? 's' : ''}',
+                      style: TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w500,
+                        color: c.label3,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                // --- NUEVA NOTA EDUCATIVA ---
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children:[
+                    Icon(Iconsax.info_circle, size: 12, color: _C.accent.withOpacity(0.8)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Este es el dinero exacto que hay en tus bancos (incluye tu dinero reservado). Ve a Inicio para ver tu saldo disponible.',
+                        style: TextStyle(
+                          fontSize: 11, 
+                          color: c.label4, 
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -631,7 +656,6 @@ class _BalanceHero extends StatelessWidget {
     );
   }
 }
-
 // ─── ACCIONES RÁPIDAS ────────────────────────────────────────────────────────
 // Dos acciones frecuentes: transferir y añadir. Sin más ruido.
 class _QuickActions extends StatelessWidget {

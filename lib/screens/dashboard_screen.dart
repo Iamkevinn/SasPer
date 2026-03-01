@@ -279,7 +279,7 @@ class _DashboardBody extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// COMPACT HEADER — Hero compacto con saludo, balance y salud financiera
+// COMPACT HEADER — Hero compacto con Saldo Operativo, Reservado y Deudas
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _CompactHeaderDelegate extends SliverPersistentHeaderDelegate {
@@ -293,8 +293,9 @@ class _CompactHeaderDelegate extends SliverPersistentHeaderDelegate {
     required this.onAiTap,
   });
 
-  @override double get minExtent => 100;
-  @override double get maxExtent => 155;
+  // Aumentamos ligeramente la altura para acomodar la nueva información
+  @override double get minExtent => 110;
+  @override double get maxExtent => 170;
 
   @override
   bool shouldRebuild(covariant _CompactHeaderDelegate old) =>
@@ -328,35 +329,52 @@ class _CompactHeaderDelegate extends SliverPersistentHeaderDelegate {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.end,
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Fila superior: saludo + IA button
+            children:[
+              // Fila superior: saludo + Disponible + IA button
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
+                children:[
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                      children:[
                         // Saludo — se desvanece al hacer scroll
                         AnimatedOpacity(
                           opacity: (1 - t * 2).clamp(0.0, 1.0),
                           duration: const Duration(milliseconds: 80),
                           child: Text(
                             _greeting(data.fullName),
-                            style: _D.caption(13,
-                                color: onSurface.withOpacity(0.55)),
+                            style: _D.caption(13, color: onSurface.withOpacity(0.55)),
                           ),
                         ),
                         const SizedBox(height: 2),
-                        // Balance — se comprime al hacer scroll
+                        
+                        // Balance Operativo (Disponible)
                         AnimatedBuilder(
                           animation: breathe,
-                          builder: (_, __) => Text(
-                            fmt.format(data.totalBalance),
-                            style: _D.display(
-                              lerpDouble(38, 24, t)!,
-                              color: onSurface,
-                            ),
+                          builder: (_, __) => Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children:[
+                              Text(
+                                // NOTA: Aquí usamos availableBalance
+                                fmt.format(data.availableBalance),
+                                style: _D.display(lerpDouble(38, 24, t)!, color: onSurface),
+                              ),
+                              AnimatedOpacity(
+                                opacity: (1 - t * 2).clamp(0.0, 1.0),
+                                duration: const Duration(milliseconds: 80),
+                                child: Row(
+                                  children:[
+                                    Icon(Iconsax.wallet_money, size: 12, color: _D.teal.withOpacity(0.9)),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Disponible para gastar',
+                                      style: _D.label(11, color: _D.teal.withOpacity(0.9), w: FontWeight.w600),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -368,22 +386,31 @@ class _CompactHeaderDelegate extends SliverPersistentHeaderDelegate {
                 ],
               ),
 
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
 
-              // Barra de subtítulos: proyección + salud
+              // Barra de subtítulos: Reservado + Deuda + Salud
               AnimatedOpacity(
                 opacity: (1 - t * 1.5).clamp(0.0, 1.0),
                 duration: const Duration(milliseconds: 80),
                 child: Row(
-                  children: [
-                    Icon(Iconsax.trend_up, size: 13,
-                        color: _D.teal.withOpacity(0.9)),
-                    const SizedBox(width: 5),
+                  children:[
+                    // Reservado
+                    Icon(Iconsax.lock_1, size: 13, color: Colors.blue.shade400),
+                    const SizedBox(width: 4),
                     Text(
-                      'Proyección: ${fmt.format(data.monthlyProjection)}',
-                      style: _D.caption(12,
-                          color: onSurface.withOpacity(0.5)),
+                      fmt.format(data.restrictedBalance),
+                      style: _D.caption(12, color: onSurface.withOpacity(0.7)),
                     ),
+                    const SizedBox(width: 12),
+                    
+                    // Deuda
+                    Icon(Iconsax.chart_fail, size: 13, color: _D.rose),
+                    const SizedBox(width: 4),
+                    Text(
+                      fmt.format(data.totalDebt),
+                      style: _D.caption(12, color: onSurface.withOpacity(0.7)),
+                    ),
+                    
                     const Spacer(),
                     _HealthPill(score: data.healthScore),
                   ],
@@ -1128,14 +1155,16 @@ class _AiAnalysisFullScreenState extends State<_AiAnalysisFullScreen> {
   @override
   Widget build(BuildContext context) {
     final fmt = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
-    final cb = widget.dashboardData.totalBalance;
+    
+    // NOTA: La simulación ahora se hace sobre el saldo DISPONIBLE, no el total
+    final cb = widget.dashboardData.availableBalance; 
     final cp = widget.dashboardData.monthlyProjection;
     final nb = cb - _expenseChange + _savingsChange;
     final np = cp - _expenseChange + _savingsChange;
 
     return Scaffold(
       appBar: AppBar(
-        title: Row(children: [
+        title: Row(children:[
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
@@ -1153,7 +1182,7 @@ class _AiAnalysisFullScreenState extends State<_AiAnalysisFullScreen> {
         padding: const EdgeInsets.all(_D.h),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+          children:[
             Text('Ajusta los valores', style: _D.label(18, w: FontWeight.w700)),
             const SizedBox(height: 16),
             _Slider(
@@ -1175,7 +1204,7 @@ class _AiAnalysisFullScreenState extends State<_AiAnalysisFullScreen> {
             Text('Impacto', style: _D.label(18, w: FontWeight.w700)),
             const SizedBox(height: 12),
             _Comparison(
-              title: 'Balance Total',
+              title: 'Disponible para gastar', // <-- Actualizado
               before: fmt.format(cb), after: fmt.format(nb),
               diff: fmt.format(nb - cb), isPos: nb >= cb,
             ),
@@ -1215,7 +1244,6 @@ class _AiAnalysisFullScreenState extends State<_AiAnalysisFullScreen> {
     );
   }
 }
-
 class _Slider extends StatelessWidget {
   final String label;
   final double value, max;
