@@ -1,6 +1,25 @@
-import 'dart:async';
-import 'dart:math' as math;
-import 'dart:ui' as ui;
+// lib/screens/ai_financial_analysis_screen.dart
+// ─────────────────────────────────────────────────────────────────────────────
+// SASPER · Análisis IA — Apple-first redesign
+//
+// Eliminado:
+// · SliverAppBar.large + FlexibleSpaceBar → header blur sticky
+// · RadialGradient pulsante en ícono → ícono simple con opacity
+// · _FeaturesGrid con GridView + Border.all → lista de features limpia
+// · FilledButton.icon Material → _PillBtn con press state
+// · _NeuralNetworkPainter (red neuronal giratoria) → texto que rota
+// · _LoadingSteps con 3 CircularProgressIndicator → paso único animado
+// · LinearGradient + Border.all(width:2) + BoxShadow en HeroCard
+// · Border.all colorido en métricas y tarjetas
+// · InkWell + ripple Material → GestureDetector con press state
+// · GoogleFonts.poppins + .inter mezclados → _T tokens DM Sans / DM Mono
+// · flutter_animate .scale() .slideY() agresivos → fade sutil staggered
+// · AlertDialog para troubleshooting → _TroubleshootSheet blur
+// · _SettingsTile Material → _SheetRow pattern
+// ─────────────────────────────────────────────────────────────────────────────
+
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
@@ -8,61 +27,73 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 import 'package:sasper/services/ai_analysis_service.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 
-// =============================================================================
-// 🤖 AI ANALYSIS MODELS
-// =============================================================================
+// ── Tokens ─────────────────────────────────────────────────────────────────────
+class _T {
+  static TextStyle display(double s,
+          {Color? c, FontWeight w = FontWeight.w700}) =>
+      GoogleFonts.dmSans(
+          fontSize: s, fontWeight: w, color: c,
+          letterSpacing: -0.4, height: 1.1);
 
-enum AiAnalysisState { initial, loading, success, error }
+  static TextStyle label(double s,
+          {Color? c, FontWeight w = FontWeight.w500}) =>
+      GoogleFonts.dmSans(fontSize: s, fontWeight: w, color: c);
 
-enum FinancialHealth { critical, poor, fair, good, excellent }
+  static TextStyle mono(double s,
+          {Color? c, FontWeight w = FontWeight.w600}) =>
+      GoogleFonts.dmMono(fontSize: s, fontWeight: w, color: c);
 
-class FinancialInsight {
-  final String title;
-  final String description;
-  final String impact;
+  static const double h = 20.0;
+  static const double r = 18.0;
+}
+
+// ── Paleta iOS ──────────────────────────────────────────────────────────────────
+const _kBlue   = Color(0xFF0A84FF);
+const _kGreen  = Color(0xFF30D158);
+const _kRed    = Color(0xFFFF453A);
+const _kOrange = Color(0xFFFF9F0A);
+const _kPurple = Color(0xFFBF5AF2);
+
+final _fmt = NumberFormat.currency(
+    locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+
+// ── Modelos ─────────────────────────────────────────────────────────────────────
+enum _AiState { initial, loading, success, error }
+enum _Health  { critical, poor, fair, good, excellent }
+
+class _Insight {
+  final String title, description, impact;
   final IconData icon;
   final Color color;
   final String actionLabel;
   final VoidCallback? onAction;
-
-  FinancialInsight({
-    required this.title,
-    required this.description,
-    required this.impact,
-    required this.icon,
-    required this.color,
-    required this.actionLabel,
+  const _Insight({
+    required this.title, required this.description,
+    required this.impact, required this.icon,
+    required this.color, required this.actionLabel,
     this.onAction,
   });
 }
 
-class AIRecommendation {
-  final String title;
-  final String description;
+class _Rec {
+  final String title, description, impactUnit;
   final double projectedImpact;
-  final String impactUnit;
   final IconData icon;
   final Color color;
-
-  AIRecommendation({
-    required this.title,
-    required this.description,
-    required this.projectedImpact,
-    required this.impactUnit,
-    required this.icon,
-    required this.color,
+  const _Rec({
+    required this.title, required this.description,
+    required this.projectedImpact, required this.impactUnit,
+    required this.icon, required this.color,
   });
 }
 
-// =============================================================================
-// 🎯 MAIN SCREEN
-// =============================================================================
+// ─────────────────────────────────────────────────────────────────────────────
+// SCREEN
+// ─────────────────────────────────────────────────────────────────────────────
 
 class AiFinancialAnalysisScreen extends StatefulWidget {
   const AiFinancialAnalysisScreen({super.key});
-
   @override
   State<AiFinancialAnalysisScreen> createState() =>
       _AiFinancialAnalysisScreenState();
@@ -70,1182 +101,865 @@ class AiFinancialAnalysisScreen extends StatefulWidget {
 
 class _AiFinancialAnalysisScreenState extends State<AiFinancialAnalysisScreen>
     with TickerProviderStateMixin {
-  final AiAnalysisService _aiService = AiAnalysisService();
+  final _aiService = AiAnalysisService();
 
-  AiAnalysisState _currentState = AiAnalysisState.initial;
-  String? _analysisResult;
-  String? _aiErrorMessage;
+  _AiState _state  = _AiState.initial;
+  String? _result;
+  String? _errorMsg;
 
-  late AnimationController _pulseController;
-  late AnimationController _brainController;
-  late AnimationController _scoreController;
+  // Score ring
+  late final AnimationController _scoreCtrl = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 1800),
+      value: 0);
+
+  // Loading — texto que rota
+  late final AnimationController _loadingCtrl = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 900))
+    ..repeat();
+  int _loadingStep = 0;
+  static const _loadingMessages = [
+    'Analizando transacciones…',
+    'Detectando patrones…',
+    'Generando recomendaciones…',
+    'Preparando tu análisis…',
+  ];
 
   // Mock data
-  final FinancialHealth _healthScore = FinancialHealth.good;
-  final double _scoreValue = 78;
-  final double _savingsImprovement = 12;
-  final int _monthsAhead = 4;
+  final _health     = _Health.good;
+  final _score      = 78.0;
+  final _savingsAdv = 12.0;
+  final _monthsAdv  = 4;
 
-  final List<AIRecommendation> _recommendations = [];
-  final List<FinancialInsight> _insights = [];
+  late final _recs = <_Rec>[
+    const _Rec(title: 'Reducir gastos fijos',
+        description: 'Al bajar 5% en recurrentes liberarás más capital',
+        projectedImpact: 200000, impactUnit: '/mes',
+        icon: Iconsax.money_remove, color: _kOrange),
+    const _Rec(title: 'Automatizar inversiones',
+        description: 'Invierte excedentes automáticamente cada mes',
+        projectedImpact: 8, impactUnit: '% anual',
+        icon: Iconsax.chart_success, color: _kGreen),
+    const _Rec(title: 'Optimizar deudas',
+        description: 'Consolida deudas de alta tasa en un solo préstamo',
+        projectedImpact: 150000, impactUnit: '/año',
+        icon: Iconsax.receipt_discount, color: _kBlue),
+  ];
+
+  late final _insights = <_Insight>[
+    _Insight(title: 'Riesgo de sobregiro',
+        description: 'Tu flujo de caja podría estar en riesgo en 21 días',
+        impact: 'Riesgo alto', icon: Iconsax.danger, color: _kRed,
+        actionLabel: 'Prevenir ahora'),
+    _Insight(title: 'Oportunidad de ahorro',
+        description: 'Puedes redirigir \$300.000 a inversiones este mes',
+        impact: '+\$3.6M al año', icon: Iconsax.coin_1, color: _kGreen,
+        actionLabel: 'Activar ahorro'),
+  ];
 
   @override
   void initState() {
     super.initState();
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2000),
-    )..repeat(reverse: true);
-
-    _brainController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 3000),
-    )..repeat();
-
-    _scoreController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2000),
-    );
-
-    _initializeMockData();
-  }
-
-  void _initializeMockData() {
-    _recommendations.addAll([
-      AIRecommendation(
-        title: 'Reducir gastos fijos',
-        description:
-            'Al disminuir gastos recurrentes en 5%, liberarás más capital',
-        projectedImpact: 200000,
-        impactUnit: '/mes',
-        icon: Iconsax.money_remove,
-        color: Colors.orange,
-      ),
-      AIRecommendation(
-        title: 'Automatizar inversiones',
-        description: 'Invierte excedentes automáticamente cada mes',
-        projectedImpact: 8,
-        impactUnit: '% anual',
-        icon: Iconsax.chart_success,
-        color: Colors.green,
-      ),
-      AIRecommendation(
-        title: 'Optimizar deudas',
-        description: 'Consolida deudas de alta tasa en un solo préstamo',
-        projectedImpact: 150000,
-        impactUnit: '/año',
-        icon: Iconsax.receipt_discount,
-        color: Colors.blue,
-      ),
-    ]);
-
-    _insights.addAll([
-      FinancialInsight(
-        title: 'Riesgo de sobregiro',
-        description:
-            'Tu flujo de efectivo podría estar en riesgo dentro de 21 días',
-        impact: 'Alto riesgo',
-        icon: Iconsax.danger,
-        color: Colors.red,
-        actionLabel: 'Prevenir ahora',
-      ),
-      FinancialInsight(
-        title: 'Oportunidad de ahorro',
-        description: 'Puedes redirigir \$300.000 a inversiones este mes',
-        impact: '+\$3.6M anual',
-        icon: Iconsax.coin_1,
-        color: Colors.green,
-        actionLabel: 'Activar ahorro',
-      ),
-    ]);
+    _loadingCtrl.addStatusListener((s) {
+      if (s == AnimationStatus.completed) {
+        _loadingCtrl.repeat();
+        if (mounted && _state == _AiState.loading) {
+          setState(() =>
+              _loadingStep = (_loadingStep + 1) % _loadingMessages.length);
+        }
+      }
+    });
   }
 
   @override
   void dispose() {
-    _pulseController.dispose();
-    _brainController.dispose();
-    _scoreController.dispose();
+    _scoreCtrl.dispose();
+    _loadingCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _fetchAnalysis() async {
+  Future<void> _run() async {
     HapticFeedback.mediumImpact();
-    setState(() => _currentState = AiAnalysisState.loading);
-    _scoreController.forward(from: 0);
-
+    setState(() { _state = _AiState.loading; _loadingStep = 0; });
     try {
       await Future.delayed(const Duration(milliseconds: 2500));
-      final result = await _aiService.getFinancialAnalysis();
-
-      if (mounted) {
-        setState(() {
-          _analysisResult = result;
-          _currentState = AiAnalysisState.success;
-        });
-        HapticFeedback.heavyImpact();
-      }
+      final r = await _aiService.getFinancialAnalysis();
+      if (!mounted) return;
+      setState(() { _result = r; _state = _AiState.success; });
+      _scoreCtrl.forward(from: 0);
+      HapticFeedback.heavyImpact();
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _aiErrorMessage = e.toString().replaceFirst("Exception: ", "");
-          _currentState = AiAnalysisState.error;
-        });
-        HapticFeedback.heavyImpact();
-      }
+      if (!mounted) return;
+      setState(() {
+        _errorMsg = e.toString().replaceFirst('Exception: ', '');
+        _state = _AiState.error;
+      });
+      HapticFeedback.heavyImpact();
     }
   }
 
+  // ── Build ─────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    final theme   = Theme.of(context);
+    final onSurf  = theme.colorScheme.onSurface;
+    final statusH = MediaQuery.of(context).padding.top;
+
     return Scaffold(
-      extendBodyBehindAppBar: true,
-      body: CustomScrollView(
-        slivers: [
-          _buildGlassAppBar(),
-          SliverToBoxAdapter(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 500),
-              child: _buildContentForCurrentState(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ==========================================================================
-  // GLASS APP BAR
-  // ==========================================================================
-
-  Widget _buildGlassAppBar() {
-    return SliverAppBar.large(
-      expandedHeight: 160,
-      floating: false,
-      pinned: true,
-      backgroundColor: Colors.transparent,
-      flexibleSpace: ClipRRect(
-        child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Theme.of(context).colorScheme.surface.withOpacity(0.8),
-                  Theme.of(context).colorScheme.surface.withOpacity(0.6),
-                ],
-              ),
-            ),
-            child: FlexibleSpaceBar(
-              title: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AnimatedBuilder(
-                    animation: _pulseController,
-                    builder: (context, child) {
-                      return Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: RadialGradient(
-                            colors: [
-                              Theme.of(context)
-                                  .colorScheme
-                                  .primary
-                                  .withOpacity(0.3 * _pulseController.value),
-                              Theme.of(context)
-                                  .colorScheme
-                                  .primary
-                                  .withOpacity(0.1 * _pulseController.value),
-                            ],
-                          ),
-                        ),
-                        child: Icon(
-                          Iconsax.cpu_charge5,
-                          color: Theme.of(context).colorScheme.primary,
-                          size: 24,
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Análisis IA',
-                    style: GoogleFonts.poppins(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 24,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                ],
-              ),
-              centerTitle: false,
-              titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
+      backgroundColor: theme.scaffoldBackgroundColor,
+      body: Column(children: [
+        // ── Header blur sticky ───────────────────────────────────────────
+        ClipRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            child: Container(
+              color: theme.scaffoldBackgroundColor.withOpacity(0.93),
+              padding: EdgeInsets.only(
+                  top: statusH + 10, left: _T.h + 4,
+                  right: 8, bottom: 14),
+              child: Row(children: [
+                Expanded(child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('SASPER',
+                        style: _T.label(10, w: FontWeight.w700,
+                            c: onSurf.withOpacity(0.35))),
+                    Text('Análisis IA',
+                        style: _T.display(28, c: onSurf)),
+                  ],
+                )),
+                // Refrescar (solo en success)
+                if (_state == _AiState.success)
+                  _HeaderBtn(icon: Iconsax.refresh, onTap: _run),
+                _HeaderBtn(
+                  icon: Iconsax.setting_4,
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    _openSettings();
+                  },
+                ),
+                const SizedBox(width: 8),
+              ]),
             ),
           ),
         ),
-      ),
-      actions: [
-        if (_currentState == AiAnalysisState.success)
-          IconButton(
-            icon: const Icon(Iconsax.refresh),
-            onPressed: _fetchAnalysis,
-            tooltip: 'Recalcular análisis',
+
+        // ── Contenido ────────────────────────────────────────────────────
+        Expanded(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 380),
+            switchInCurve: Curves.easeOut,
+            switchOutCurve: Curves.easeIn,
+            transitionBuilder: (child, anim) =>
+                FadeTransition(opacity: anim, child: child),
+            child: _buildBody(),
           ),
-        IconButton(
-          icon: const Icon(Iconsax.setting_4),
-          onPressed: () {
-            HapticFeedback.lightImpact();
-            _showSettingsSheet();
-          },
-          tooltip: 'Configuración de IA',
         ),
-      ],
+      ]),
     );
   }
 
-  void _showSettingsSheet() {
+  Widget _buildBody() {
+    return switch (_state) {
+      _AiState.initial => _InitialView(onStart: _run),
+      _AiState.loading => _LoadingView(
+          ctrl: _loadingCtrl,
+          message: _loadingMessages[_loadingStep]),
+      _AiState.success => _SuccessView(
+          health:      _health,
+          score:       _score,
+          savingsAdv:  _savingsAdv,
+          monthsAdv:   _monthsAdv,
+          scoreCtrl:   _scoreCtrl,
+          insights:    _insights,
+          recs:        _recs,
+          result:      _result,
+          onRecTap:    _openRecDetail,
+        ),
+      _AiState.error => _ErrorView(
+          message: _errorMsg,
+          onRetry: _run,
+          onHelp:  _openTroubleshoot,
+        ),
+    };
+  }
+
+  void _openSettings() {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => _AISettingsSheet(),
-    );
-  }
-
-  // ==========================================================================
-  // CONTENT SWITCHER
-  // ==========================================================================
-
-  Widget _buildContentForCurrentState() {
-    switch (_currentState) {
-      case AiAnalysisState.initial:
-        return _buildInitialState();
-      case AiAnalysisState.loading:
-        return _buildLoadingState();
-      case AiAnalysisState.success:
-        return _buildSuccessState();
-      case AiAnalysisState.error:
-        return _buildErrorState();
-    }
-  }
-
-  // ==========================================================================
-  // INITIAL STATE
-  // ==========================================================================
-
-  Widget _buildInitialState() {
-    return Padding(
-      padding: const EdgeInsets.all(20.0),
-      child: Column(
-        key: const ValueKey('initial'),
-        children: [
-          const SizedBox(height: 40),
-
-          // AI Illustration
-          Container(
-            width: 200,
-            height: 200,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: RadialGradient(
-                colors: [
-                  Theme.of(context).colorScheme.primaryContainer,
-                  Theme.of(context).colorScheme.surface,
-                ],
-              ),
-            ),
-            child: Center(
-              child: Icon(
-                Iconsax.cpu_charge5,
-                size: 80,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-            ),
-          ).animate().scale(delay: 200.ms, duration: 600.ms),
-
-          const SizedBox(height: 40),
-
-          Text(
-            'Tu Asesor Financiero Personal',
-            style: GoogleFonts.poppins(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              height: 1.2,
-            ),
-            textAlign: TextAlign.center,
-          ).animate().fadeIn(delay: 400.ms),
-
-          const SizedBox(height: 16),
-
-          Text(
-            'Activa el análisis inteligente para recibir recomendaciones personalizadas, detectar oportunidades y optimizar tu salud financiera en tiempo real.',
-            style: GoogleFonts.inter(
-              fontSize: 16,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              height: 1.6,
-            ),
-            textAlign: TextAlign.center,
-          ).animate().fadeIn(delay: 600.ms),
-
-          const SizedBox(height: 40),
-
-          // Features Grid
-          _FeaturesGrid().animate().fadeIn(delay: 800.ms),
-
-          const SizedBox(height: 40),
-
-          // CTA Button
-          FilledButton.icon(
-            onPressed: _fetchAnalysis,
-            icon: const Icon(Iconsax.flash_15, size: 24),
-            label: Text(
-              'Activar Análisis Inteligente',
-              style: GoogleFonts.poppins(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
-              minimumSize: const Size(double.infinity, 64),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-            ),
-          ).animate().slideY(begin: 0.3, delay: 1000.ms),
-
-          const SizedBox(height: 60),
-        ],
+      builder: (_) => BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: const _SettingsSheet(),
       ),
     );
   }
 
-  // ==========================================================================
-  // LOADING STATE
-  // ==========================================================================
-
-  Widget _buildLoadingState() {
-    return Padding(
-      padding: const EdgeInsets.all(20.0),
-      child: Column(
-        key: const ValueKey('loading'),
-        children: [
-          const SizedBox(height: 60),
-
-          // Animated Brain Processing
-          AnimatedBuilder(
-            animation: _brainController,
-            builder: (context, child) {
-              return CustomPaint(
-                size: const Size(200, 200),
-                painter: _NeuralNetworkPainter(
-                  progress: _brainController.value,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-              );
-            },
-          ),
-
-          const SizedBox(height: 40),
-
-          Text(
-            'Procesando tu información financiera',
-            style: GoogleFonts.poppins(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-            textAlign: TextAlign.center,
-          ),
-
-          const SizedBox(height: 16),
-
-          Text(
-            'La IA está analizando patrones, detectando oportunidades y generando recomendaciones personalizadas...',
-            style: GoogleFonts.inter(
-              fontSize: 15,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              height: 1.6,
-            ),
-            textAlign: TextAlign.center,
-          ),
-
-          const SizedBox(height: 40),
-
-          // Loading Steps
-          _LoadingSteps().animate().fadeIn(),
-
-          const SizedBox(height: 60),
-        ],
-      ),
-    );
-  }
-
-  // ==========================================================================
-  // SUCCESS STATE
-  // ==========================================================================
-
-  Widget _buildSuccessState() {
-    return Column(
-      key: const ValueKey('success'),
-      children: [
-        const SizedBox(height: 20),
-
-        // Hero Insight Card
-        _HeroInsightCard(
-          healthScore: _healthScore,
-          scoreValue: _scoreValue,
-          savingsImprovement: _savingsImprovement,
-          monthsAhead: _monthsAhead,
-          scoreController: _scoreController,
-        ).animate().fadeIn(delay: 100.ms).slideY(begin: 0.2),
-
-        const SizedBox(height: 24),
-
-        // Financial Health Dashboard
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Tu Salud Financiera',
-                style: GoogleFonts.poppins(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 16),
-              _HealthMetricsRow().animate().fadeIn(delay: 300.ms),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 32),
-
-        // AI Insights
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Iconsax.eye,
-                      color: Theme.of(context).colorScheme.primary),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Insights Detectados',
-                    style: GoogleFonts.poppins(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              ..._insights.asMap().entries.map((entry) {
-                return _InsightCard(
-                  insight: entry.value,
-                ).animate().fadeIn(delay: (400 + (entry.key * 100)).ms);
-              }),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 32),
-
-        // AI Recommendations
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Iconsax.lamp_on5,
-                      color: Theme.of(context).colorScheme.primary),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Recomendaciones Inteligentes',
-                    style: GoogleFonts.poppins(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              ..._recommendations.asMap().entries.map((entry) {
-                return _RecommendationChip(
-                  recommendation: entry.value,
-                  onTap: () {
-                    HapticFeedback.mediumImpact();
-                    _showRecommendationDetails(entry.value);
-                  },
-                ).animate().fadeIn(delay: (600 + (entry.key * 100)).ms);
-              }),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 32),
-
-        // Markdown Analysis
-        if (_analysisResult != null)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                color: Theme.of(context)
-                    .colorScheme
-                    .surfaceContainer
-                    .withOpacity(0.5),
-                border: Border.all(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .outlineVariant
-                      .withOpacity(0.3),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Iconsax.document_text5,
-                          color: Theme.of(context).colorScheme.primary),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Análisis Detallado',
-                        style: GoogleFonts.poppins(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  MarkdownBody(
-                    data: _analysisResult!,
-                    styleSheet: MarkdownStyleSheet.fromTheme(
-                      Theme.of(context),
-                    ).copyWith(
-                      p: GoogleFonts.inter(
-                        fontSize: 14,
-                        height: 1.7,
-                      ),
-                      h3: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        height: 2.0,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ).animate().fadeIn(delay: 800.ms),
-          ),
-
-        const SizedBox(height: 100),
-      ],
-    );
-  }
-
-  void _showRecommendationDetails(AIRecommendation recommendation) {
+  void _openRecDetail(_Rec rec) {
+    HapticFeedback.selectionClick();
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) => _RecommendationDetailSheet(
-        recommendation: recommendation,
+      builder: (_) => BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: _RecDetailSheet(rec: rec),
       ),
     );
   }
 
-  // ==========================================================================
-  // ERROR STATE
-  // ==========================================================================
-
-  Widget _buildErrorState() {
-    return Padding(
-      padding: const EdgeInsets.all(32.0),
-      child: Column(
-        key: const ValueKey('error'),
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const SizedBox(height: 60),
-          Container(
-            padding: const EdgeInsets.all(32),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Theme.of(context).colorScheme.errorContainer,
-            ),
-            child: Icon(
-              Iconsax.warning_25,
-              size: 60,
-              color: Theme.of(context).colorScheme.error,
-            ),
-          ),
-          const SizedBox(height: 32),
-          Text(
-            'Ups, algo salió mal',
-            style: GoogleFonts.poppins(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            _aiErrorMessage ??
-                'No pudimos completar el análisis. Por favor, intenta nuevamente.',
-            style: GoogleFonts.inter(
-              fontSize: 15,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              height: 1.6,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 40),
-          FilledButton.icon(
-            onPressed: _fetchAnalysis,
-            icon: const Icon(Iconsax.refresh),
-            label: const Text('Reintentar con IA Mejorada'),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
-            ),
-          ),
-          const SizedBox(height: 16),
-          OutlinedButton.icon(
-            onPressed: () {
-              HapticFeedback.lightImpact();
-              _showTroubleshootingTips();
-            },
-            icon: const Icon(Iconsax.info_circle),
-            label: const Text('Ver Soluciones'),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
-            ),
-          ),
-          const SizedBox(height: 60),
-        ],
-      ),
-    );
-  }
-
-  void _showTroubleshootingTips() {
-    showDialog(
+  void _openTroubleshoot() {
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          '💡 Consejos para Solucionar',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-        ),
-        content: Text(
-          '• Verifica tu conexión a internet\n'
-          '• Asegúrate de tener transacciones registradas\n'
-          '• Intenta cerrar y abrir la app\n'
-          '• Si el problema persiste, contacta soporte',
-          style: GoogleFonts.inter(height: 1.8),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Entendido'),
-          ),
-        ],
+      backgroundColor: Colors.transparent,
+      builder: (_) => BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: const _TroubleshootSheet(),
       ),
     );
   }
 }
 
-// =============================================================================
-// 🎨 CUSTOM WIDGETS
-// =============================================================================
+// ─────────────────────────────────────────────────────────────────────────────
+// ESTADO INICIAL
+// ─────────────────────────────────────────────────────────────────────────────
+// Una sola propuesta de valor clara + botón. Sin grid de features que
+// bloquee la acción principal. El usuario llega, entiende, pulsa.
 
-class _FeaturesGrid extends StatelessWidget {
+class _InitialView extends StatelessWidget {
+  final VoidCallback onStart;
+  const _InitialView({required this.onStart});
+
+  static const _features = <(IconData, String, String)>[
+    (Iconsax.chart_success, 'Proyecciones', 'Anticipa tu flujo futuro'),
+    (Iconsax.shield_tick,   'Riesgos',      'Detecta amenazas a tiempo'),
+    (Iconsax.lamp_on,       'Oportunidades','Descubre dónde mejorar'),
+    (Iconsax.trend_up,      'Optimización', 'Acciones concretas y claras'),
+  ];
+
   @override
   Widget build(BuildContext context) {
-    final features = [
-      {'icon': Iconsax.chart_success, 'label': 'Proyecciones\nIA'},
-      {'icon': Iconsax.shield_tick, 'label': 'Detección\nde Riesgos'},
-      {'icon': Iconsax.lamp_on, 'label': 'Recomendaciones\nPersonalizadas'},
-      {'icon': Iconsax.trend_up, 'label': 'Optimización\nAutomática'},
-    ];
+    final onSurf = Theme.of(context).colorScheme.onSurface;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: 1.2,
-      ),
-      itemCount: features.length,
-      itemBuilder: (context, index) {
-        final feature = features[index];
-        return Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            color: Theme.of(context).colorScheme.surfaceContainer,
-            border: Border.all(
-              color:
-                  Theme.of(context).colorScheme.outlineVariant.withOpacity(0.3),
+    return ListView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(_T.h, 32, _T.h, 100),
+      children: [
+        // Ícono central — sin gradiente, sin sombra
+        Center(
+          child: Container(
+            width: 88, height: 88,
+            decoration: BoxDecoration(
+              color: _kBlue.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(26),
             ),
+            child: Center(
+                child: Icon(Iconsax.cpu_charge5,
+                    size: 42, color: _kBlue)),
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                feature['icon'] as IconData,
-                size: 36,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                feature['label'] as String,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+        ),
+        const SizedBox(height: 28),
+
+        // Headline
+        Text('Tu asesor financiero\npersonal',
+            style: _T.display(30, c: onSurf),
+            textAlign: TextAlign.center),
+        const SizedBox(height: 12),
+        Text(
+          'Activa el análisis para recibir recomendaciones personalizadas '
+          'y optimizar tu salud financiera.',
+          style: _T.label(15,
+              c: onSurf.withOpacity(0.48), w: FontWeight.w400),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 36),
+
+        // Features — lista limpia, sin tarjetas con borde
+        _FeatureList(features: _features),
+        const SizedBox(height: 36),
+
+        // CTA
+        _PillBtn(
+          label: 'Activar análisis',
+          icon: Iconsax.flash_15,
+          onTap: onStart,
+        ),
+      ],
     );
   }
 }
 
-class _LoadingSteps extends StatelessWidget {
+class _FeatureList extends StatelessWidget {
+  final List<(IconData, String, String)> features;
+  const _FeatureList({required this.features});
+
   @override
   Widget build(BuildContext context) {
-    final steps = [
-      'Analizando transacciones...',
-      'Detectando patrones...',
-      'Generando recomendaciones...',
-    ];
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final onSurf = Theme.of(context).colorScheme.onSurface;
+    final bg     = isDark
+        ? Colors.white.withOpacity(0.07)
+        : Colors.black.withOpacity(0.04);
 
-    return Column(
-      children: steps.asMap().entries.map((entry) {
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 16),
-          child: Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Theme.of(context).colorScheme.primaryContainer,
-                ),
-                child: Center(
-                  child: Text(
-                    '${entry.key + 1}',
-                    style: GoogleFonts.poppins(
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
+    return Container(
+      decoration: BoxDecoration(
+          color: bg, borderRadius: BorderRadius.circular(_T.r)),
+      child: Column(
+        children: features.indexed.map((e) {
+          final (i, (icon, title, sub)) = e;
+          final isLast = i == features.length - 1;
+          return Column(children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 16, vertical: 14),
+              child: Row(children: [
+                Container(
+                  width: 36, height: 36,
+                  decoration: BoxDecoration(
+                    color: _kBlue.withOpacity(0.10),
+                    borderRadius: BorderRadius.circular(10),
                   ),
+                  child: Center(
+                      child: Icon(icon, size: 17, color: _kBlue)),
                 ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Text(
-                  entry.value,
-                  style: GoogleFonts.inter(fontSize: 14),
-                ),
-              ),
-              SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            ],
-          ),
-        ).animate(delay: (entry.key * 500).ms).fadeIn();
-      }).toList(),
+                const SizedBox(width: 14),
+                Expanded(child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: _T.label(14,
+                            w: FontWeight.w700, c: onSurf)),
+                    const SizedBox(height: 1),
+                    Text(sub,
+                        style: _T.label(12,
+                            c: onSurf.withOpacity(0.42))),
+                  ],
+                )),
+              ]),
+            ),
+            if (!isLast)
+              Padding(
+                padding: const EdgeInsets.only(left: 66),
+                child: Container(
+                    height: 0.5,
+                    color: onSurf.withOpacity(0.07))),
+          ]);
+        }).toList(),
+      ),
     );
   }
 }
 
-class _NeuralNetworkPainter extends CustomPainter {
-  final double progress;
-  final Color color;
+// ─────────────────────────────────────────────────────────────────────────────
+// ESTADO LOADING
+// ─────────────────────────────────────────────────────────────────────────────
+// Un solo mensaje que cambia cada ciclo. Sin spinners múltiples.
+// El punto animado (...) comunica actividad sin ansiedad.
 
-  _NeuralNetworkPainter({required this.progress, required this.color});
+class _LoadingView extends StatelessWidget {
+  final AnimationController ctrl;
+  final String message;
+  const _LoadingView({required this.ctrl, required this.message});
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color.withOpacity(0.3)
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke;
+  Widget build(BuildContext context) {
+    final onSurf = Theme.of(context).colorScheme.onSurface;
 
-    final nodePaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 3;
-
-    // Draw rotating neural network
-    for (var i = 0; i < 8; i++) {
-      final angle = (i * math.pi / 4) + (progress * math.pi * 2);
-      final x = center.dx + radius * math.cos(angle);
-      final y = center.dy + radius * math.sin(angle);
-      final nodePos = Offset(x, y);
-
-      // Draw connections
-      canvas.drawLine(center, nodePos, paint);
-
-      // Draw nodes
-      canvas.drawCircle(nodePos, 6, nodePaint);
-    }
-
-    // Draw center node
-    canvas.drawCircle(center, 10, nodePaint);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Spinner iOS — delgado, color primario
+            SizedBox(
+              width: 56, height: 56,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                valueColor:
+                    AlwaysStoppedAnimation<Color>(_kBlue),
+              ),
+            ),
+            const SizedBox(height: 32),
+            Text('Procesando',
+                style: _T.display(22, c: onSurf)),
+            const SizedBox(height: 10),
+            // Mensaje que cambia — fade in/out suave
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              child: Text(
+                message,
+                key: ValueKey(message),
+                style: _T.label(15,
+                    c: onSurf.withOpacity(0.48),
+                    w: FontWeight.w400),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'La IA analiza patrones y genera recomendaciones\npersonalizadas para tu situación.',
+              style: _T.label(13,
+                  c: onSurf.withOpacity(0.30),
+                  w: FontWeight.w400),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
   }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 
-class _HeroInsightCard extends StatelessWidget {
-  final FinancialHealth healthScore;
-  final double scoreValue;
-  final double savingsImprovement;
-  final int monthsAhead;
-  final AnimationController scoreController;
+// ─────────────────────────────────────────────────────────────────────────────
+// ESTADO SUCCESS
+// ─────────────────────────────────────────────────────────────────────────────
 
-  const _HeroInsightCard({
-    required this.healthScore,
-    required this.scoreValue,
-    required this.savingsImprovement,
-    required this.monthsAhead,
-    required this.scoreController,
+class _SuccessView extends StatelessWidget {
+  final _Health health;
+  final double score, savingsAdv;
+  final int monthsAdv;
+  final AnimationController scoreCtrl;
+  final List<_Insight> insights;
+  final List<_Rec> recs;
+  final String? result;
+  final void Function(_Rec) onRecTap;
+
+  const _SuccessView({
+    required this.health, required this.score,
+    required this.savingsAdv, required this.monthsAdv,
+    required this.scoreCtrl, required this.insights,
+    required this.recs, required this.result,
+    required this.onRecTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    Color healthColor;
-    String healthLabel;
+    return ListView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(0, 8, 0, 100),
+      children: [
+        // Hero — score ring
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: _T.h),
+          child: _ScoreCard(
+            health: health, score: score,
+            savingsAdv: savingsAdv, monthsAdv: monthsAdv,
+            ctrl: scoreCtrl,
+          ),
+        ),
+        const SizedBox(height: 28),
 
-    switch (healthScore) {
-      case FinancialHealth.excellent:
-        healthColor = Colors.green;
-        healthLabel = 'Excelente';
-        break;
-      case FinancialHealth.good:
-        healthColor = Colors.blue;
-        healthLabel = 'Buena';
-        break;
-      case FinancialHealth.fair:
-        healthColor = Colors.orange;
-        healthLabel = 'Regular';
-        break;
-      case FinancialHealth.poor:
-        healthColor = Colors.deepOrange;
-        healthLabel = 'Mejorable';
-        break;
-      case FinancialHealth.critical:
-        healthColor = Colors.red;
-        healthLabel = 'Crítica';
-        break;
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        padding: const EdgeInsets.all(28),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(32),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              healthColor.withOpacity(0.15),
-              Theme.of(context).colorScheme.surfaceContainer.withOpacity(0.8),
+        // Métricas rápidas
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: _T.h),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _SectionLabel('ESTE MES'),
+              const SizedBox(height: 10),
+              _MetricsRow(),
             ],
           ),
-          border: Border.all(color: healthColor.withOpacity(0.3), width: 2),
-          boxShadow: [
-            BoxShadow(
-              color: healthColor.withOpacity(0.2),
-              blurRadius: 24,
-              offset: const Offset(0, 12),
-            ),
-          ],
         ),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: healthColor.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: healthColor.withOpacity(0.4)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Iconsax.cpu_charge5, size: 14, color: healthColor),
-                      const SizedBox(width: 6),
-                      Text(
-                        'IA en tiempo real',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: healthColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            AnimatedBuilder(
-              animation: scoreController,
-              builder: (context, child) {
-                return SizedBox(
-                  width: 140,
-                  height: 140,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      CircularProgressIndicator(
-                        value: scoreController.value * (scoreValue / 100),
-                        strokeWidth: 12,
-                        backgroundColor:
-                            Theme.of(context).colorScheme.surfaceContainer,
-                        valueColor: AlwaysStoppedAnimation<Color>(healthColor),
-                      ),
-                      Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            '${(scoreValue * scoreController.value).toInt()}',
-                            style: GoogleFonts.poppins(
-                              fontSize: 48,
-                              fontWeight: FontWeight.bold,
-                              color: healthColor,
-                              height: 1,
-                            ),
-                          ),
-                          Text(
-                            healthLabel,
-                            style: GoogleFonts.inter(
-                              fontSize: 14,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Tu capacidad de ahorro ha mejorado un ${savingsImprovement.toStringAsFixed(0)}%',
-              style: GoogleFonts.poppins(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                height: 1.3,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Iconsax.flash_15, size: 16, color: healthColor),
-                const SizedBox(width: 8),
-                Text(
-                  'Te acerca a tu objetivo $monthsAhead meses antes',
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ],
+        const SizedBox(height: 28),
+
+        // Alertas e insights
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: _T.h),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _SectionLabel('ALERTAS'),
+              const SizedBox(height: 10),
+              ...insights.asMap().entries.map((e) =>
+                _InsightTile(insight: e.value,
+                    delay: 80 * e.key)),
+            ],
+          ),
         ),
-      ),
+        const SizedBox(height: 28),
+
+        // Recomendaciones
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: _T.h),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _SectionLabel('RECOMENDACIONES'),
+              const SizedBox(height: 10),
+              ...recs.asMap().entries.map((e) =>
+                _RecTile(rec: e.value,
+                    delay: 80 * e.key,
+                    onTap: () => onRecTap(e.value))),
+            ],
+          ),
+        ),
+
+        // Markdown análisis detallado
+        if (result != null) ...[
+          const SizedBox(height: 28),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: _T.h),
+            child: _AnalysisCard(markdown: result!),
+          ),
+        ],
+      ],
     );
   }
 }
 
-class _HealthMetricsRow extends StatelessWidget {
+// ── Score card ────────────────────────────────────────────────────────────────
+// Surface limpia. El número es el protagonista.
+// Sin LinearGradient, sin border coloreado, sin boxShadow enorme.
+
+class _ScoreCard extends StatelessWidget {
+  final _Health health;
+  final double score, savingsAdv;
+  final int monthsAdv;
+  final AnimationController ctrl;
+  const _ScoreCard({
+    required this.health, required this.score,
+    required this.savingsAdv, required this.monthsAdv,
+    required this.ctrl,
+  });
+
+  Color get _color => switch (health) {
+    _Health.excellent => _kGreen,
+    _Health.good      => _kBlue,
+    _Health.fair      => _kOrange,
+    _Health.poor      => _kOrange,
+    _Health.critical  => _kRed,
+  };
+
+  String get _label => switch (health) {
+    _Health.excellent => 'Excelente',
+    _Health.good      => 'Buena',
+    _Health.fair      => 'Regular',
+    _Health.poor      => 'Mejorable',
+    _Health.critical  => 'Crítica',
+  };
+
   @override
   Widget build(BuildContext context) {
-    final metrics = [
-      {
-        'label': 'Ingresos',
-        'value': '\$3.2M',
-        'trend': '+12%',
-        'color': Colors.green
-      },
-      {
-        'label': 'Gastos',
-        'value': '\$2.1M',
-        'trend': '-5%',
-        'color': Colors.blue
-      },
-      {
-        'label': 'Ahorro',
-        'value': '\$1.1M',
-        'trend': '+34%',
-        'color': Colors.purple
-      },
-    ];
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final onSurf = Theme.of(context).colorScheme.onSurface;
+    final bg     = isDark
+        ? Colors.white.withOpacity(0.07)
+        : Colors.black.withOpacity(0.04);
 
-    return Row(
-      children: metrics.map((metric) {
-        return Expanded(
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+          color: bg, borderRadius: BorderRadius.circular(22)),
+      child: Row(children: [
+        // Score ring
+        AnimatedBuilder(
+          animation: ctrl,
+          builder: (_, __) => SizedBox(
+            width: 90, height: 90,
+            child: Stack(alignment: Alignment.center, children: [
+              CircularProgressIndicator(
+                value: ctrl.value * (score / 100),
+                strokeWidth: 6,
+                backgroundColor: onSurf.withOpacity(0.08),
+                valueColor: AlwaysStoppedAnimation<Color>(_color),
+                strokeCap: StrokeCap.round,
+              ),
+              Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Text(
+                  '${(score * ctrl.value).toInt()}',
+                  style: _T.display(28, c: _color)),
+                Text(_label,
+                    style: _T.label(10,
+                        c: onSurf.withOpacity(0.42))),
+              ]),
+            ]),
+          ),
+        ),
+        const SizedBox(width: 20),
+        Expanded(child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Salud financiera',
+                style: _T.label(12,
+                    c: onSurf.withOpacity(0.40))),
+            const SizedBox(height: 4),
+            Text('Ahorro mejoró\n${savingsAdv.toStringAsFixed(0)}% este mes',
+                style: _T.display(17, c: onSurf)),
+            const SizedBox(height: 8),
+            Row(children: [
+              Icon(Iconsax.flash_15,
+                  size: 13, color: _color),
+              const SizedBox(width: 5),
+              Expanded(child: Text(
+                '$monthsAdv  meses antes a tu objetivo',
+                style: _T.label(12,
+                    c: onSurf.withOpacity(0.48)))),
+            ]),
+          ],
+        )),
+      ]),
+    );
+  }
+}
+
+// ── Métricas rápidas ──────────────────────────────────────────────────────────
+// Sin border, sin color de fondo colorido. Número protagonista.
+
+class _MetricsRow extends StatelessWidget {
+  static const _data = <(String, String, String, Color)>[
+    ('Ingresos', '\$3.2M', '+12%', _kGreen),
+    ('Gastos',   '\$2.1M', '-5%',  _kBlue),
+    ('Ahorro',   '\$1.1M', '+34%', _kPurple),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final onSurf = Theme.of(context).colorScheme.onSurface;
+    final bg     = isDark
+        ? Colors.white.withOpacity(0.07)
+        : Colors.black.withOpacity(0.04);
+
+    return Row(children: _data.indexed.map((e) {
+      final (i, (label, value, trend, color)) = e;
+      final isLast = i == _data.length - 1;
+      return Expanded(
+        child: Container(
+          margin: EdgeInsets.only(right: isLast ? 0 : 10),
+          padding: const EdgeInsets.symmetric(
+              vertical: 14, horizontal: 12),
+          decoration: BoxDecoration(
+              color: bg, borderRadius: BorderRadius.circular(14)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label,
+                  style: _T.label(11,
+                      c: onSurf.withOpacity(0.40))),
+              const SizedBox(height: 4),
+              Text(value,
+                  style: _T.mono(16, c: onSurf)),
+              const SizedBox(height: 4),
+              Text(trend,
+                  style: _T.label(11,
+                      c: color, w: FontWeight.w700)),
+            ],
+          ),
+        ),
+      );
+    }).toList());
+  }
+}
+
+// ── Insight tile ──────────────────────────────────────────────────────────────
+// Surface con accent sutil. Sin border coloreado.
+
+class _InsightTile extends StatefulWidget {
+  final _Insight insight;
+  final int delay;
+  const _InsightTile({required this.insight, this.delay = 0});
+  @override
+  State<_InsightTile> createState() => _InsightTileState();
+}
+
+class _InsightTileState extends State<_InsightTile>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 70));
+  @override void dispose() { _c.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark  = Theme.of(context).brightness == Brightness.dark;
+    final onSurf  = Theme.of(context).colorScheme.onSurface;
+    final ins     = widget.insight;
+    final bg      = isDark
+        ? ins.color.withOpacity(0.09)
+        : ins.color.withOpacity(0.06);
+
+    return GestureDetector(
+      onTapDown: (_) {
+        _c.forward(); HapticFeedback.selectionClick(); },
+      onTapUp: (_) {
+        _c.reverse(); ins.onAction?.call(); },
+      onTapCancel: () => _c.reverse(),
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (_, __) => Transform.scale(
+          scale: lerpDouble(1.0, 0.985, _c.value)!,
           child: Container(
-            margin: const EdgeInsets.only(right: 12),
+            margin: const EdgeInsets.only(bottom: 10),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              color: (metric['color'] as Color).withOpacity(0.1),
-              border: Border.all(
-                color: (metric['color'] as Color).withOpacity(0.3),
+                color: bg, borderRadius: BorderRadius.circular(_T.r)),
+            child: Row(children: [
+              Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(
+                  color: ins.color.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Center(child: Icon(ins.icon,
+                    color: ins.color, size: 18)),
               ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  metric['label'] as String,
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  metric['value'] as String,
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Icon(
-                      Iconsax.arrow_up_3,
-                      size: 12,
-                      color: metric['color'] as Color,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      metric['trend'] as String,
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: metric['color'] as Color,
+              const SizedBox(width: 12),
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Expanded(child: Text(ins.title,
+                        style: _T.label(14,
+                            w: FontWeight.w700, c: onSurf))),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: ins.color.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(8),
                       ),
+                      child: Text(ins.impact,
+                          style: _T.label(10,
+                              c: ins.color,
+                              w: FontWeight.w700)),
                     ),
-                  ],
-                ),
-              ],
-            ),
+                  ]),
+                  const SizedBox(height: 3),
+                  Text(ins.description,
+                      style: _T.label(13,
+                          c: onSurf.withOpacity(0.48),
+                          w: FontWeight.w400)),
+                ],
+              )),
+            ]),
           ),
-        );
-      }).toList(),
+        ),
+      ),
     );
   }
 }
 
-class _InsightCard extends StatelessWidget {
-  final FinancialInsight insight;
+// ── Rec tile ──────────────────────────────────────────────────────────────────
 
-  const _InsightCard({required this.insight});
+class _RecTile extends StatefulWidget {
+  final _Rec rec;
+  final int delay;
+  final VoidCallback onTap;
+  const _RecTile({required this.rec, required this.onTap, this.delay = 0});
+  @override State<_RecTile> createState() => _RecTileState();
+}
+
+class _RecTileState extends State<_RecTile>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 70));
+  @override void dispose() { _c.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final onSurf = Theme.of(context).colorScheme.onSurface;
+    final rec    = widget.rec;
+    final bg     = isDark
+        ? Colors.white.withOpacity(0.07)
+        : Colors.black.withOpacity(0.04);
+
+    final impactStr = rec.impactUnit.contains('%')
+        ? '+${rec.projectedImpact.toStringAsFixed(0)}${rec.impactUnit}'
+        : '+${_fmt.format(rec.projectedImpact)}${rec.impactUnit}';
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown:   (_) { _c.forward(); HapticFeedback.selectionClick(); },
+      onTapUp:     (_) { _c.reverse(); widget.onTap(); },
+      onTapCancel: ()  { _c.reverse(); },
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (_, __) => Transform.scale(
+          scale: lerpDouble(1.0, 0.985, _c.value)!,
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+                color: bg, borderRadius: BorderRadius.circular(_T.r)),
+            child: Row(children: [
+              Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(
+                  color: rec.color.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Center(child: Icon(rec.icon,
+                    color: rec.color, size: 18)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(rec.title,
+                      style: _T.label(14,
+                          w: FontWeight.w700, c: onSurf)),
+                  const SizedBox(height: 2),
+                  Text(rec.description,
+                      style: _T.label(12,
+                          c: onSurf.withOpacity(0.45),
+                          w: FontWeight.w400)),
+                  const SizedBox(height: 6),
+                  Text(impactStr,
+                      style: _T.mono(12, c: rec.color)),
+                ],
+              )),
+              Icon(Icons.chevron_right_rounded,
+                  size: 17,
+                  color: onSurf.withOpacity(0.22)),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Análisis markdown ─────────────────────────────────────────────────────────
+
+class _AnalysisCard extends StatelessWidget {
+  final String markdown;
+  const _AnalysisCard({required this.markdown});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final onSurf = Theme.of(context).colorScheme.onSurface;
+    final bg     = isDark
+        ? Colors.white.withOpacity(0.07)
+        : Colors.black.withOpacity(0.04);
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        color: insight.color.withOpacity(0.08),
-        border: Border.all(color: insight.color.withOpacity(0.3), width: 1.5),
-      ),
+          color: bg, borderRadius: BorderRadius.circular(_T.r)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: insight.color.withOpacity(0.15),
-                ),
-                child: Icon(insight.icon, color: insight.color, size: 20),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      insight.title,
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      insight.impact,
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: insight.color,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            insight.description,
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              height: 1.5,
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: () {
-              HapticFeedback.mediumImpact();
-              insight.onAction?.call();
-            },
-            icon: Icon(Iconsax.flash_15, size: 18),
-            label: Text(insight.actionLabel),
-            style: FilledButton.styleFrom(
-              backgroundColor: insight.color,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          Row(children: [
+            Icon(Iconsax.document_text5, size: 16, color: _kBlue),
+            const SizedBox(width: 8),
+            Text('Análisis detallado',
+                style: _T.label(13,
+                    c: onSurf.withOpacity(0.60),
+                    w: FontWeight.w700)),
+          ]),
+          const SizedBox(height: 14),
+          MarkdownBody(
+            data: markdown,
+            styleSheet: MarkdownStyleSheet.fromTheme(
+                Theme.of(context)).copyWith(
+              p: _T.label(14, w: FontWeight.w400,
+                  c: onSurf.withOpacity(0.80)).copyWith(height: 1.65),
+              h3: _T.label(15, w: FontWeight.w700,
+                  c: onSurf).copyWith(height: 2.0),
             ),
           ),
         ],
@@ -1254,393 +968,501 @@ class _InsightCard extends StatelessWidget {
   }
 }
 
-class _RecommendationChip extends StatelessWidget {
-  final AIRecommendation recommendation;
-  final VoidCallback onTap;
+// ─────────────────────────────────────────────────────────────────────────────
+// ESTADO ERROR
+// ─────────────────────────────────────────────────────────────────────────────
 
-  const _RecommendationChip({
-    required this.recommendation,
-    required this.onTap,
+class _ErrorView extends StatelessWidget {
+  final String? message;
+  final VoidCallback onRetry, onHelp;
+  const _ErrorView({
+    required this.message,
+    required this.onRetry, required this.onHelp,
   });
 
   @override
   Widget build(BuildContext context) {
-    final currencyFormat = NumberFormat.currency(
-      locale: 'es_CO',
-      symbol: '\$',
-      decimalDigits: 0,
-    );
+    final onSurf = Theme.of(context).colorScheme.onSurface;
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          gradient: LinearGradient(
-            colors: [
-              recommendation.color.withOpacity(0.1),
-              Theme.of(context).colorScheme.surfaceContainer.withOpacity(0.5),
-            ],
-          ),
-          border: Border.all(
-            color: recommendation.color.withOpacity(0.3),
-            width: 1.5,
-          ),
-        ),
-        child: Row(
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(12),
+              width: 72, height: 72,
               decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    recommendation.color.withOpacity(0.3),
-                    recommendation.color.withOpacity(0.1),
-                  ],
-                ),
+                color: _kRed.withOpacity(0.10),
+                borderRadius: BorderRadius.circular(22),
               ),
-              child: Icon(
-                recommendation.icon,
-                color: recommendation.color,
-                size: 24,
-              ),
+              child: Center(
+                  child: Icon(Iconsax.warning_25,
+                      size: 34, color: _kRed)),
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    recommendation.title,
-                    style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                    ),
+            const SizedBox(height: 24),
+            Text('Algo salió mal',
+                style: _T.display(22, c: onSurf)),
+            const SizedBox(height: 10),
+            Text(
+              message ??
+                  'No se pudo completar el análisis.\nIntenta nuevamente.',
+              style: _T.label(14,
+                  c: onSurf.withOpacity(0.48), w: FontWeight.w400),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            _PillBtn(
+                label: 'Reintentar',
+                icon: Iconsax.refresh,
+                onTap: onRetry),
+            const SizedBox(height: 12),
+            _GhostBtn(
+                label: 'Ver soluciones',
+                onTap: onHelp),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SHEETS
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _RecDetailSheet extends StatelessWidget {
+  final _Rec rec;
+  const _RecDetailSheet({required this.rec});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark  = Theme.of(context).brightness == Brightness.dark;
+    final sheetBg = isDark
+        ? Colors.white.withOpacity(0.10)
+        : Colors.white.withOpacity(0.92);
+    final onSurf  = Theme.of(context).colorScheme.onSurface;
+
+    final impactStr = rec.impactUnit.contains('%')
+        ? '+${rec.projectedImpact.toStringAsFixed(0)}${rec.impactUnit}'
+        : '+${_fmt.format(rec.projectedImpact)}${rec.impactUnit}';
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(width: 36, height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                  color: onSurf.withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(2))),
+          Container(
+            width: double.infinity, padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+                color: sheetBg, borderRadius: BorderRadius.circular(20)),
+            child: Column(children: [
+              Container(
+                width: 56, height: 56,
+                decoration: BoxDecoration(
+                  color: rec.color.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Center(child: Icon(rec.icon,
+                    size: 26, color: rec.color)),
+              ),
+              const SizedBox(height: 14),
+              Text(rec.title, style: _T.display(20, c: onSurf),
+                  textAlign: TextAlign.center),
+              const SizedBox(height: 8),
+              Text(rec.description,
+                  style: _T.label(14,
+                      c: onSurf.withOpacity(0.50), w: FontWeight.w400),
+                  textAlign: TextAlign.center),
+              const SizedBox(height: 20),
+              // Impacto proyectado — número protagonista
+              Column(children: [
+                Text('Impacto proyectado',
+                    style: _T.label(11,
+                        c: onSurf.withOpacity(0.38))),
+                const SizedBox(height: 4),
+                Text(impactStr,
+                    style: _T.mono(32, c: rec.color)),
+              ]),
+              const SizedBox(height: 24),
+              Row(children: [
+                Expanded(child: _InlineBtn(
+                    label: 'Cancelar', color: onSurf,
+                    onTap: () => Navigator.pop(context))),
+                const SizedBox(width: 10),
+                Expanded(child: _InlineBtn(
+                    label: 'Activar', color: rec.color, impact: true,
+                    onTap: () {
+                      Navigator.pop(context);
+                      HapticFeedback.heavyImpact();
+                    })),
+              ]),
+            ]),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+class _TroubleshootSheet extends StatelessWidget {
+  const _TroubleshootSheet();
+
+  static const _tips = <(IconData, String)>[
+    (Iconsax.wifi,          'Verifica tu conexión a internet'),
+    (Iconsax.receipt_add,   'Asegúrate de tener transacciones registradas'),
+    (Iconsax.refresh,       'Cierra y abre la app'),
+    (Iconsax.message_question, 'Si persiste, contacta soporte'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark  = Theme.of(context).brightness == Brightness.dark;
+    final sheetBg = isDark
+        ? Colors.white.withOpacity(0.10)
+        : Colors.white.withOpacity(0.92);
+    final onSurf  = Theme.of(context).colorScheme.onSurface;
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(width: 36, height: 4,
+              margin: const EdgeInsets.only(bottom: 14),
+              decoration: BoxDecoration(
+                  color: onSurf.withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(2))),
+          Text('Posibles soluciones',
+              style: _T.label(13,
+                  c: onSurf.withOpacity(0.42), w: FontWeight.w400)),
+          const SizedBox(height: 10),
+          Container(
+            decoration: BoxDecoration(
+                color: sheetBg, borderRadius: BorderRadius.circular(16)),
+            child: Column(children: [
+              ..._tips.indexed.map((e) {
+                final (i, (icon, text)) = e;
+                final isLast = i == _tips.length - 1;
+                return Column(children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 18, vertical: 14),
+                    child: Row(children: [
+                      Icon(icon, size: 16,
+                          color: onSurf.withOpacity(0.50)),
+                      const SizedBox(width: 14),
+                      Expanded(child: Text(text,
+                          style: _T.label(14, c: onSurf))),
+                    ]),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    recommendation.description,
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
+                  if (!isLast)
+                    Padding(padding: const EdgeInsets.only(left: 48),
+                        child: Container(height: 0.5,
+                            color: onSurf.withOpacity(0.07))),
+                ]);
+              }),
+            ]),
+          ),
+          const SizedBox(height: 10),
+          _CancelRow(),
+        ]),
+      ),
+    );
+  }
+}
+
+class _SettingsSheet extends StatelessWidget {
+  const _SettingsSheet();
+
+  static const _items = <(IconData, String, String)>[
+    (Iconsax.personalcard, 'Personalización',         'Alto'),
+    (Iconsax.notification, 'Notificaciones predictivas', 'Activadas'),
+    (Iconsax.timer_1,      'Frecuencia de análisis',   'Diaria'),
+    (Iconsax.shield_tick,  'Privacidad de datos',       'Máxima seguridad'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark  = Theme.of(context).brightness == Brightness.dark;
+    final sheetBg = isDark
+        ? Colors.white.withOpacity(0.10)
+        : Colors.white.withOpacity(0.92);
+    final onSurf  = Theme.of(context).colorScheme.onSurface;
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(width: 36, height: 4,
+              margin: const EdgeInsets.only(bottom: 14),
+              decoration: BoxDecoration(
+                  color: onSurf.withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(2))),
+          Text('Configuración IA',
+              style: _T.label(13,
+                  c: onSurf.withOpacity(0.42), w: FontWeight.w400)),
+          const SizedBox(height: 10),
+          Container(
+            decoration: BoxDecoration(
+                color: sheetBg, borderRadius: BorderRadius.circular(16)),
+            child: Column(children: [
+              ..._items.indexed.map((e) {
+                final (i, (icon, title, val)) = e;
+                final isFirst = i == 0;
+                final isLast  = i == _items.length - 1;
+                final topR = isFirst
+                    ? const Radius.circular(16) : Radius.zero;
+                final botR = isLast
+                    ? const Radius.circular(16) : Radius.zero;
+                return Column(children: [
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: recommendation.color.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      recommendation.impactUnit.contains('%')
-                          ? '+${recommendation.projectedImpact}${recommendation.impactUnit}'
-                          : '+${currencyFormat.format(recommendation.projectedImpact)}${recommendation.impactUnit}',
-                      style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: recommendation.color,
-                      ),
+                      borderRadius: BorderRadius.only(
+                          topLeft: topR, topRight: topR,
+                          bottomLeft: botR, bottomRight: botR)),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 18, vertical: 14),
+                      child: Row(children: [
+                        Icon(icon, size: 16,
+                            color: onSurf.withOpacity(0.50)),
+                        const SizedBox(width: 14),
+                        Expanded(child: Text(title,
+                            style: _T.label(14, c: onSurf))),
+                        Text(val,
+                            style: _T.label(13,
+                                c: _kBlue, w: FontWeight.w600)),
+                        const SizedBox(width: 6),
+                        Icon(Icons.chevron_right_rounded,
+                            size: 16,
+                            color: onSurf.withOpacity(0.22)),
+                      ]),
                     ),
                   ),
-                ],
-              ),
-            ),
-            Icon(
-              Iconsax.arrow_right_3,
-              color: recommendation.color,
-              size: 20,
-            ),
-          ],
-        ),
+                  if (!isLast)
+                    Padding(padding: const EdgeInsets.only(left: 48),
+                        child: Container(height: 0.5,
+                            color: onSurf.withOpacity(0.07))),
+                ]);
+              }),
+            ]),
+          ),
+          const SizedBox(height: 10),
+          _PillBtn(label: 'Guardar cambios', onTap: () => Navigator.pop(context)),
+          const SizedBox(height: 10),
+          _CancelRow(),
+        ]),
       ),
     );
   }
 }
 
-class _RecommendationDetailSheet extends StatelessWidget {
-  final AIRecommendation recommendation;
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPONENTES COMPARTIDOS
+// ─────────────────────────────────────────────────────────────────────────────
 
-  const _RecommendationDetailSheet({required this.recommendation});
-
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  const _SectionLabel(this.text);
   @override
   Widget build(BuildContext context) {
-    final currencyFormat = NumberFormat.currency(
-      locale: 'es_CO',
-      symbol: '\$ ',
-      decimalDigits: 0,
-    );
-
-    return ClipRRect(
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface.withOpacity(0.95),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-          ),
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 5,
-                decoration: BoxDecoration(
-                  color:
-                      Theme.of(context).colorScheme.onSurface.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      recommendation.color.withOpacity(0.3),
-                      recommendation.color.withOpacity(0.1),
-                    ],
-                  ),
-                ),
-                child: Icon(
-                  recommendation.icon,
-                  size: 48,
-                  color: recommendation.color,
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                recommendation.title,
-                style: GoogleFonts.poppins(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                recommendation.description,
-                style: GoogleFonts.inter(
-                  fontSize: 15,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  height: 1.6,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  color: recommendation.color.withOpacity(0.1),
-                  border: Border.all(
-                    color: recommendation.color.withOpacity(0.3),
-                  ),
-                ),
-                child: Column(
-                  children: [
-                    Text(
-                      'Impacto Proyectado',
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      recommendation.impactUnit.contains('%')
-                          ? '+${recommendation.projectedImpact}${recommendation.impactUnit}'
-                          : '+${currencyFormat.format(recommendation.projectedImpact)}${recommendation.impactUnit}',
-                      style: GoogleFonts.poppins(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: recommendation.color,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 32),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: const Text('Cancelar'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: () {
-                        HapticFeedback.heavyImpact();
-                        Navigator.pop(context);
-                      },
-                      style: FilledButton.styleFrom(
-                        backgroundColor: recommendation.color,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: const Text('Activar Ahora'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    final onSurf = Theme.of(context).colorScheme.onSurface;
+    return Text(text,
+        style: _T.label(11, w: FontWeight.w700,
+            c: onSurf.withOpacity(0.35)));
   }
 }
 
-class _AISettingsSheet extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface.withOpacity(0.95),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-          ),
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 5,
-                decoration: BoxDecoration(
-                  color:
-                      Theme.of(context).colorScheme.onSurface.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Icon(Iconsax.setting_45,
-                      color: Theme.of(context).colorScheme.primary),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Configuración de IA',
-                    style: GoogleFonts.poppins(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              _SettingsTile(
-                icon: Iconsax.personalcard,
-                title: 'Nivel de Personalización',
-                subtitle: 'Alto',
-                onTap: () {},
-              ),
-              _SettingsTile(
-                icon: Iconsax.notification,
-                title: 'Notificaciones Predictivas',
-                subtitle: 'Activadas',
-                onTap: () {},
-              ),
-              _SettingsTile(
-                icon: Iconsax.timer_1,
-                title: 'Frecuencia de Análisis',
-                subtitle: 'Diaria',
-                onTap: () {},
-              ),
-              _SettingsTile(
-                icon: Iconsax.shield_tick,
-                title: 'Privacidad de Datos',
-                subtitle: 'Máxima seguridad',
-                onTap: () {},
-              ),
-              const SizedBox(height: 24),
-              FilledButton(
-                onPressed: () => Navigator.pop(context),
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 56),
-                ),
-                child: const Text('Guardar Cambios'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SettingsTile extends StatelessWidget {
+class _HeaderBtn extends StatefulWidget {
   final IconData icon;
-  final String title;
-  final String subtitle;
   final VoidCallback onTap;
+  const _HeaderBtn({required this.icon, required this.onTap});
+  @override State<_HeaderBtn> createState() => _HeaderBtnState();
+}
 
-  const _SettingsTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
-
+class _HeaderBtnState extends State<_HeaderBtn>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 70));
+  @override void dispose() { _c.dispose(); super.dispose(); }
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          color: Theme.of(context).colorScheme.surfaceContainer,
+    final onSurf = Theme.of(context).colorScheme.onSurface;
+    return GestureDetector(
+      onTapDown: (_) { _c.forward(); HapticFeedback.selectionClick(); },
+      onTapUp:   (_) { _c.reverse(); widget.onTap(); },
+      onTapCancel: () => _c.reverse(),
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (_, __) => Transform.scale(
+          scale: lerpDouble(1.0, 0.85, _c.value)!,
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Icon(widget.icon,
+                size: 20, color: onSurf.withOpacity(0.60)),
+          ),
         ),
-        child: Row(
-          children: [
-            Icon(icon, color: Theme.of(context).colorScheme.primary),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      ),
+    );
+  }
+}
+
+class _PillBtn extends StatefulWidget {
+  final String label;
+  final IconData? icon;
+  final VoidCallback onTap;
+  const _PillBtn({required this.label, required this.onTap, this.icon});
+  @override State<_PillBtn> createState() => _PillBtnState();
+}
+
+class _PillBtnState extends State<_PillBtn>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 70));
+  @override void dispose() { _c.dispose(); super.dispose(); }
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) { _c.forward(); HapticFeedback.mediumImpact(); },
+      onTapUp:   (_) { _c.reverse(); widget.onTap(); },
+      onTapCancel: () => _c.reverse(),
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (_, __) => Transform.scale(
+          scale: lerpDouble(1.0, 0.96, _c.value)!,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            decoration: BoxDecoration(
+              color: _kBlue, borderRadius: BorderRadius.circular(14)),
+            child: Row(mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    title,
-                    style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  Text(
-                    subtitle,
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              Iconsax.arrow_right_3,
-              size: 20,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ],
+              if (widget.icon != null) ...[
+                Icon(widget.icon!, size: 17, color: Colors.white),
+                const SizedBox(width: 8),
+              ],
+              Text(widget.label,
+                  style: _T.label(16,
+                      c: Colors.white, w: FontWeight.w700)),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GhostBtn extends StatefulWidget {
+  final String label;
+  final VoidCallback onTap;
+  const _GhostBtn({required this.label, required this.onTap});
+  @override State<_GhostBtn> createState() => _GhostBtnState();
+}
+
+class _GhostBtnState extends State<_GhostBtn>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 70));
+  @override void dispose() { _c.dispose(); super.dispose(); }
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) { _c.forward(); HapticFeedback.selectionClick(); },
+      onTapUp:   (_) { _c.reverse(); widget.onTap(); },
+      onTapCancel: () => _c.reverse(),
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (_, __) => Transform.scale(
+          scale: lerpDouble(1.0, 0.97, _c.value)!,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Text(widget.label,
+                style: _T.label(15, c: _kBlue, w: FontWeight.w600)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InlineBtn extends StatefulWidget {
+  final String label; final Color color;
+  final bool impact; final VoidCallback onTap;
+  const _InlineBtn({required this.label, required this.color,
+      required this.onTap, this.impact = false});
+  @override State<_InlineBtn> createState() => _InlineBtnState();
+}
+
+class _InlineBtnState extends State<_InlineBtn>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 65));
+  @override void dispose() { _c.dispose(); super.dispose(); }
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) {
+        _c.forward();
+        widget.impact ? HapticFeedback.mediumImpact()
+                      : HapticFeedback.selectionClick();
+      },
+      onTapUp: (_) { _c.reverse(); widget.onTap(); },
+      onTapCancel: () => _c.reverse(),
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (_, __) => Transform.scale(
+          scale: lerpDouble(1.0, 0.96, _c.value)!,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 13),
+            decoration: BoxDecoration(
+              color: widget.color.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(12)),
+            child: Center(child: Text(widget.label,
+                style: _T.label(15,
+                    w: FontWeight.w600, c: widget.color))),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CancelRow extends StatefulWidget {
+  @override State<_CancelRow> createState() => _CancelRowState();
+}
+
+class _CancelRowState extends State<_CancelRow>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 65));
+  @override void dispose() { _c.dispose(); super.dispose(); }
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg     = isDark
+        ? Colors.white.withOpacity(0.10)
+        : Colors.white.withOpacity(0.92);
+    return GestureDetector(
+      onTapDown: (_) { _c.forward(); HapticFeedback.selectionClick(); },
+      onTapUp:   (_) { _c.reverse(); Navigator.pop(context); },
+      onTapCancel: () => _c.reverse(),
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (_, __) => Transform.scale(
+          scale: lerpDouble(1.0, 0.97, _c.value)!,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            decoration: BoxDecoration(
+                color: bg, borderRadius: BorderRadius.circular(16)),
+            child: Center(child: Text('Cancelar',
+                style: _T.label(16,
+                    w: FontWeight.w600, c: _kBlue))),
+          ),
         ),
       ),
     );

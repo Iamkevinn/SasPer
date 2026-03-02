@@ -56,57 +56,75 @@ def read_root():
     return {"status": "ok", "message": "Servidor de Finanzas Personales con IA en funcionamiento."}
 
 @app.get("/api/analisis-financiero", tags=["Análisis IA"])
-async def generar_analisis_financiero(
-    user_id: str = Query(..., description="El UUID del usuario de Supabase a analizar.")
-):
-    print(f"\n--- [NUEVA PETICIÓN] para el usuario: {user_id} ---")
-    
+@app.post("/api/analisis-financiero", tags=["Análisis IA"]) # 👈 Cambiado de @app.get a @app.post
+async def generar_analisis_financiero(request: Request):
     try:
-        # --- PASO A: Consultar Supabase ---
-        print("1. Consultando transacciones en Supabase...")
+        # 1. Recibir los datos enriquecidos desde Flutter
+        data = await request.json()
+        user_id = data.get('user_id')
+        financial_state = data.get('financial_state', {})
+        mood_context = data.get('spending_mood_context', {})
+        debt_context = data.get('debt_context', [])
+
+        if not user_id:
+            raise HTTPException(status_code=400, detail="user_id es requerido en el cuerpo JSON")
+
+        print(f"\n--- [NUEVA PETICIÓN IA] para el usuario: {user_id} ---")
         
-        # ¡IMPORTANTE! Asegúrate de que este sea el nombre correcto de tu columna de fecha.
-        COLUMNA_FECHA = 'created_at' 
-        
+        # --- PASO A: Consultar historial en Supabase (Contexto histórico) ---
+        COLUMNA_FECHA = 'transaction_date' # Cambiado a transaction_date para mayor precisión
         response = supabase.table('transactions') \
                            .select(f'description, amount, type, category, {COLUMNA_FECHA}') \
                            .eq('user_id', user_id) \
                            .order(COLUMNA_FECHA, desc=True) \
-                           .limit(50) \
+                           .limit(40) \
                            .execute()
         
-        if not response.data:
-            print("Resultado: No se encontraron transacciones.")
-            return {"analisis": "No he encontrado transacciones para analizar. ¡Empieza a registrar tus gastos para recibir tu primer análisis!"}
+        transactions = response.data if response.data else []
 
-        transactions = response.data
-        print(f"2. Se encontraron {len(transactions)} transacciones.")
-
-        # --- PASO B: Construir el Prompt ---
-        print("3. Construyendo el prompt para Gemini...")
-        transactions_json = json.dumps(transactions, indent=2, default=str)
-        prompt = f"""
-        Eres 'Financiero AI', un asesor financiero experto y amigable.
-        Analiza las siguientes transacciones de un usuario y proporciónale un resumen claro, una observación clave y un consejo práctico.
-        Mantén un tono motivador y cercano.
+        # --- PASO B: Construir el Prompt Maestro para Gemini ---
+        # Combinamos lo que viene de la App (Vivo) con lo de la BD (Historial)
         
-        Datos de las transacciones:
-        ```json
-        {transactions_json}
-        ```
+        prompt = f"""
+        Actúa como 'SasPer AI', el asesor financiero senior personal de este usuario. 
+        Tu objetivo es analizar su situación actual y dar consejos tácticos y emocionales.
+
+        SITUACIÓN ACTUAL (Datos en tiempo real):
+        - Saldo disponible para gastar: {financial_state.get('available_balance')} (Ya descontando ahorros y obligaciones)
+        - Patrimonio Neto: {financial_state.get('net_worth')}
+        - Ingreso Mensual: {financial_state.get('monthly_income')}
+        - Dinero Comprometido (Ahorro/Deudas): {financial_state.get('restricted_money')}
+
+        CONTEXTO EMOCIONAL:
+        - Ánimo predominante en gastos recientes: {mood_context.get('predominant')}
+        - Historial de ánimos: {mood_context.get('history')}
+
+        DEUDAS A CUOTAS ACTIVAS:
+        {json.dumps(debt_context, indent=2)}
+
+        HISTORIAL RECIENTE (Últimas transacciones):
+        {json.dumps(transactions, indent=2, default=str)}
+
+        TAREA:
+        Escribe un reporte breve con el siguiente formato Markdown:
+        1. Un resumen de 2 líneas sobre su salud financiera actual.
+        2. Un 'Insight Emocional': Analiza si su estado de ánimo está afectando sus gastos (usa el contexto de ánimo).
+        3. Una 'Estrategia de Deuda': Si tiene cuotas, sugiere si vale la pena abonar a capital o cómo liberar flujo de caja.
+        4. Un consejo práctico para mejorar el 'Saldo disponible' esta semana.
+
+        REGLA: Sé directo, motivador y usa un lenguaje financiero profesional pero amigable.
         """
-        print("4. Prompt generado. Enviando a Gemini...")
 
         # --- PASO C: Llamar a Gemini ---
         gemini_response = gemini_model.generate_content(prompt)
         
-        print("5. ¡ÉXITO! Análisis recibido de Gemini.")
+        print("✅ Análisis generado con éxito usando contexto enriquecido.")
         return {"analisis": gemini_response.text}
 
     except Exception as e:
-        print(f"--- ¡ERROR! Ocurrió un error inesperado: {e} ---")
-        raise HTTPException(status_code=500, detail=f"No se pudo completar el análisis. Error: {str(e)}")
-
+        print(f"--- ¡ERROR IA!: {e} ---")
+        raise HTTPException(status_code=500, detail=f"Error interno en el asesor IA: {str(e)}")
+        
 # --- AÑADE EL NUEVO ENDPOINT DE NOTIFICACIONES ---
 # Pega este código en tu app.py, reemplazando la función anterior.
 
