@@ -7,6 +7,7 @@
 // 4. _loadInitialData con log de error explícito para debug
 
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -32,6 +33,47 @@ import 'package:sasper/screens/place_search_screen.dart';
 import 'package:geolocator/geolocator.dart';
 
 // ─── DESIGN TOKENS ────────────────────────────────────────────────────────────
+
+class _C {
+  final BuildContext ctx;
+  _C(this.ctx);
+
+  bool get isDark => Theme.of(ctx).brightness == Brightness.dark;
+
+  Color get bg      => isDark ? const Color(0xFF000000) : const Color(0xFFF2F2F7);
+  Color get surface => isDark ? const Color(0xFF1C1C1E) : Colors.white;
+  Color get raised  => isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF5F5F7);
+  Color get sep     => isDark ? const Color(0xFF38383A) : const Color(0xFFE5E5EA);
+
+  Color get label  => isDark ? const Color(0xFFFFFFFF) : const Color(0xFF1C1C1E);
+  Color get label2 => isDark ? const Color(0xFFEBEBF5) : const Color(0xFF3A3A3C);
+  Color get label3 => isDark ? const Color(0xFF8E8E93) : const Color(0xFF636366);
+  Color get label4 => isDark ? const Color(0xFF48484A) : const Color(0xFFAEAEB2);
+
+  static const Color red    = Color(0xFFFF3B30);
+  static const Color green  = Color(0xFF30D158);
+  static const Color orange = Color(0xFFFF9F0A);
+  static const Color blue   = Color(0xFF0A84FF);
+  static const Color purple = Color(0xFFBF5AF2);
+
+  static const double xs   = 4.0;
+  static const double sm   = 8.0;
+  static const double md   = 16.0;
+  static const double lg   = 24.0;
+  static const double xl   = 32.0;
+  static const double rSM  = 8.0;
+  static const double rMD  = 12.0;
+  static const double rLG  = 16.0;
+  static const double rXL  = 22.0;
+  static const double r2XL = 28.0;
+
+  static const Duration fast   = Duration(milliseconds: 140);
+  static const Duration mid    = Duration(milliseconds: 260);
+  static const Duration slow   = Duration(milliseconds: 420);
+  static const Curve   easeOut = Curves.easeOutCubic;
+}
+
+
 abstract class _T {
   static const Color bg             = Color(0xFF0A0A0F);
   static const Color surface        = Color(0xFF111118);
@@ -108,6 +150,38 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
   bool     _isFetchingLocation = false;
   bool     _amountHasValue     = false;
   Debt?    _smartSuggestion;
+  bool _isInterestFree = false; // Añade este estado al inicio de tu clase
+
+  // --- NUEVOS ESTADOS PARA TARJETAS ---
+  int _installments = 1; // Por defecto 1 cuota
+  bool get _isCreditCard => _selectedAccount?.type == 'Tarjeta de Crédito';
+
+  // Cálculo de interés (IA)
+  double _calculateInterestCost() {
+    final amount = double.tryParse(_amountController.text.trim().replaceAll(',', '.')) ?? 0.0;
+    final rate = _selectedAccount?.interestRate ?? 0.0;
+    if (_installments <= 1 || amount <= 0 || rate <= 0) return 0;
+    
+    // Fórmula de interés compuesto para cuotas fijas (Aproximación francesa)
+    double monthlyRate = (rate / 100) / 12;
+    double monthlyPayment = amount * (monthlyRate * math.pow(1 + monthlyRate, _installments)) / 
+                          (math.pow(1 + monthlyRate, _installments) - 1);
+    return (monthlyPayment * _installments) - amount;
+  }
+
+  // Consejo de fecha de corte (IA)
+  String? _getCreditCardAdvice() {
+    if (!_isCreditCard || _selectedAccount?.closingDay == null) return null;
+    
+    final closingDay = _selectedAccount!.closingDay!;
+    final today = DateTime.now();
+    final daysUntilClosing = closingDay - today.day;
+
+    if (daysUntilClosing >= 0 && daysUntilClosing <= 3) {
+      return "💡 Tip IA: Tu tarjeta corta en $daysUntilClosing días. Si esperas al día ${closingDay + 1}, ganarás casi 45 días para pagar esta compra.";
+    }
+    return null;
+  }
 
   // Cuenta y fondo seleccionados — objetos completos, no solo IDs
   // Esto evita el DropdownButtonFormField que causa parentDataDirty
@@ -470,6 +544,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
           locationName: _selectedLocationName,
           latitude: _selectedLat,
           longitude: _selectedLng,
+          creditCardId: _isCreditCard ? _selectedAccount!.id : null,
+          installmentsTotal: _isCreditCard ? _installments : 1,
+          installmentsCurrent: _isCreditCard ? 1 : null,
+          isInstallment: _isCreditCard && _installments > 1,
+          isInterestFree: _isInterestFree,
         );
       }
 
@@ -612,6 +691,21 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                       ],
                       _FadeSlide(delay: 120, child: _buildAccountSection()),
                       const SizedBox(height: _T.md),
+                      // --- NUEVA SECCIÓN: CUOTAS E INTELIGENCIA DE TARJETA ---
+                      if (_isExpense && _isCreditCard) ...[
+                        _FadeSlide(
+                          delay: 140,
+                          child: _buildInstallmentSection(),
+                        ),
+                        const SizedBox(height: _T.md),
+                        
+                        if (_getCreditCardAdvice() != null) 
+                          _FadeSlide(
+                            delay: 150,
+                            child: _AITipCard(message: _getCreditCardAdvice()!),
+                          ),
+                        const SizedBox(height: _T.md),
+                      ],
                       _FadeSlide(delay: 160, child: _buildDateSection()),
                       const SizedBox(height: _T.md),
                       _FadeSlide(delay: 200, child: _buildCategorySection()),
@@ -659,6 +753,104 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     );
   }
 
+  // Widget para seleccionar cuotas
+Widget _buildInstallmentSection() {
+  final c = _C(context);
+  final interest = _isInterestFree ? 0.0 : _calculateInterestCost();
+  final commonInstallments = [1, 2, 3, 6, 12, 18, 24, 36, 48];
+
+  return _Section(
+    label: 'Configuración de Cuotas',
+    child: Column(
+      children: [
+        // Selector horizontal (Mucho más rápido)
+        SizedBox(
+          height: 60,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            itemCount: commonInstallments.length,
+            itemBuilder: (context, index) {
+              final n = commonInstallments[index];
+              final isSel = _installments == n;
+              return GestureDetector(
+                onTap: () {
+                  setState(() => _installments = n);
+                  HapticFeedback.selectionClick();
+                },
+                child: AnimatedContainer(
+                  duration: _T.fast,
+                  margin: const EdgeInsets.only(right: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: isSel ? _T.accent : _T.surfaceHighest,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: isSel ? _T.accent : _T.border),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    '$n ${n == 1 ? 'Cuota' : 'Cuotas'}',
+                    style: TextStyle(
+                      color: isSel ? Colors.white : _T.textSecondary,
+                      fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        
+        const Divider(height: 1, color: _T.borderSubtle),
+
+        // Switch de "Sin Intereses" (Punto 3)
+        _TappableRow(
+          onTap: () => setState(() => _isInterestFree = !_isInterestFree),
+          child: Row(
+            children: [
+              const Icon(Iconsax.flash_1, size: 18, color: _T.incomeColor),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Promoción Sin Intereses', 
+                      style: TextStyle(color: _T.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+                    Text('Activa si la tienda ofrece 0% de interés', 
+                      style: TextStyle(color: _T.textSecondary, fontSize: 11)),
+                  ],
+                ),
+              ),
+              Switch.adaptive(
+                value: _isInterestFree,
+                activeColor: _T.incomeColor,
+                onChanged: (v) => setState(() => _isInterestFree = v),
+              ),
+            ],
+          ),
+        ),
+
+        if (interest > 0) ...[
+          const Divider(height: 1, color: _T.borderSubtle),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                const Icon(Iconsax.info_circle, size: 14, color: _T.expenseColor),
+                const SizedBox(width: 8),
+                Text(
+                  'Costo total en intereses: \$${interest.toStringAsFixed(0)}',
+                  style: const TextStyle(color: _T.expenseColor, fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ),
+        ]
+      ],
+    ),
+  );
+}  
   // ── MONTO HERO ────────────────────────────────────────────────────────────
 
   Widget _buildAmountHero() {
@@ -1593,6 +1785,36 @@ class _FadeSlideState extends State<_FadeSlide>
     return FadeTransition(
       opacity: _opacity,
       child: SlideTransition(position: _slide, child: widget.child),
+    );
+  }
+}
+
+// Tarjeta de consejo IA
+class _AITipCard extends StatelessWidget {
+  final String message;
+  const _AITipCard({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _T.accent.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(_T.rMD),
+        border: Border.all(color: _T.accent.withOpacity(0.2)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Iconsax.lamp_on, color: _T.accent, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(color: _T.textSecondary, fontSize: 13, height: 1.4),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

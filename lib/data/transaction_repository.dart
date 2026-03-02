@@ -65,6 +65,12 @@ class TransactionRepository {
     String? locationName,
     double? latitude,
     double? longitude,
+    // --- NUEVOS CAMPOS PARA CRÉDITO ---
+    String? creditCardId,      // ID de la cuenta tipo tarjeta
+    int? installmentsTotal,    // Total de cuotas (ej: 12)
+    int? installmentsCurrent,  // Cuota actual (ej: 1)
+    bool isInstallment = false, // ¿Es a cuotas?
+    bool isInterestFree = false,
   }) async {
     try {
       await client.from('transactions').insert({
@@ -80,12 +86,52 @@ class TransactionRepository {
         'location_name': locationName,
         'latitude': latitude,
         'longitude': longitude,
+        // --- INSERCIÓN DE NUEVOS CAMPOS ---
+        'credit_card_id': creditCardId,
+        'installments_total': installmentsTotal,
+        'installments_current': installmentsCurrent,
+        'is_installment': isInstallment,
+        'is_interest_free': isInterestFree,
       });
+      
+      developer.log('✅ Transacción guardada (Cuotas: $isInstallment)', name: 'TransactionRepository');
     } catch (e) {
       developer.log('🔥 Error al añadir transacción: $e', name: 'TransactionRepository');
       throw Exception('No se pudo añadir la transacción.');
     }
   }
+
+  /// Registra el pago de una cuota y actualiza el contador de la deuda.
+Future<void> payInstallment({
+  required Transaction originalTransaction,
+  required String paymentSourceAccountId, // Desde dónde sale el dinero (Ej: Bancolombia)
+}) async {
+  // 1. Validar que no hayamos terminado ya
+  if (originalTransaction.installmentsCurrent! > originalTransaction.installmentsTotal!) {
+    throw Exception("Esta deuda ya está pagada.");
+  }
+
+  // 2. Calcular el valor de la cuota individual
+  final installmentAmount = originalTransaction.amount.abs() / originalTransaction.installmentsTotal!;
+
+  // 3. Crear la transacción del pago (Gasto real)
+  await addTransaction(
+    accountId: paymentSourceAccountId,
+    amount: -installmentAmount, // Sale dinero
+    type: 'Gasto',
+    category: 'Pago Tarjeta', // O la categoría original
+    description: 'Pago cuota ${originalTransaction.installmentsCurrent} de: ${originalTransaction.description}',
+    transactionDate: DateTime.now(),
+    isInstallment: false, // El pago en sí no es una cuota, es un gasto puntual
+  );
+
+  // 4. Actualizar la transacción original (Avanzar el contador)
+  await client.from('transactions').update({
+    'installments_current': originalTransaction.installmentsCurrent! + 1,
+  }).eq('id', originalTransaction.id);
+
+  developer.log('✅ Cuota pagada y avanzada', name: 'TransactionRepository');
+}
 
   /// Actualiza una transacción existente.
   Future<void> updateTransaction({

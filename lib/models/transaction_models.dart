@@ -2,7 +2,7 @@
 
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
-import 'package:sasper/models/enums/transaction_mood_enum.dart'; // NOVEDAD: Importamos el enum
+import 'package:sasper/models/enums/transaction_mood_enum.dart';
 
 class Transaction extends Equatable {
   final int id;
@@ -17,10 +17,17 @@ class Transaction extends Equatable {
   final String? debtId;
   final String? goalId;
   final String? transferId;
-  final TransactionMood? mood; // NOVEDAD: Añadimos el nuevo campo.
+  final TransactionMood? mood;
   final String? locationName;
   final double? latitude;
   final double? longitude;
+  
+  // --- NUEVOS CAMPOS PARA CRÉDITO Y CUOTAS ---
+  final String? creditCardId;
+  final int? installmentsTotal;
+  final int? installmentsCurrent;
+  final bool isInstallment;
+  final bool isInterestFree;
 
   const Transaction({
     required this.id,
@@ -35,10 +42,16 @@ class Transaction extends Equatable {
     this.debtId,
     this.goalId,
     this.transferId,
-    this.mood, // NOVEDAD: Añadimos al constructor.
+    this.mood,
     this.locationName,
     this.latitude,
     this.longitude,
+    // Inicializamos los nuevos campos
+    this.creditCardId,
+    this.installmentsTotal,
+    this.installmentsCurrent,
+    this.isInstallment = false,
+    this.isInterestFree = false,
   });
 
   factory Transaction.empty() {
@@ -55,12 +68,15 @@ class Transaction extends Equatable {
       debtId: null,
       goalId: null,
       transferId: null,
-      mood: null, // NOVEDAD: Añadimos el valor por defecto.
+      mood: null,
+      creditCardId: null,
+      installmentsTotal: null,
+      installmentsCurrent: null,
+      isInstallment: false,
+      isInterestFree: false,
     );
   }
   
-  // NOVEDAD: Renombramos `toJson` a `toMap` para consistencia y lo completamos.
-  // Este mapa se usa para ENVIAR datos a Supabase.
   Map<String, dynamic> toJson() => {
         'user_id': userId,
         'account_id': accountId,
@@ -73,18 +89,22 @@ class Transaction extends Equatable {
         'debt_id': debtId,
         'goal_id': goalId,
         'transfer_id': transferId,
-        'mood': mood?.name, // NOVEDAD: Convertimos el enum a texto para Supabase.
+        'mood': mood?.name,
+        // Añadimos los nuevos campos al JSON
+        'credit_card_id': creditCardId,
+        'installments_total': installmentsTotal,
+        'installments_current': installmentsCurrent,
+        'is_installment': isInstallment,
+        'is_interest_free': isInterestFree,
       };
 
   factory Transaction.fromMap(Map<String, dynamic> map) {
     try {
-      // NOVEDAD: Lógica para parsear el estado de ánimo desde la base de datos.
       TransactionMood? parsedMood;
       if (map['mood'] != null && map['mood'] is String) {
         try {
           parsedMood = TransactionMood.values.byName(map['mood']);
         } catch (e) {
-          // Si el valor en la DB no es un enum válido, se ignora.
           parsedMood = null;
           if (kDebugMode) {
             print("⚠️ Mood desconocido en la DB: '${map['mood']}'. Se establecerá como null.");
@@ -105,16 +125,21 @@ class Transaction extends Equatable {
         debtId: map['debt_id'] as String?,
         goalId: map['goal_id'] as String?,
         transferId: map['transfer_id'] as String?,
-        mood: parsedMood, // NOVEDAD: Asignamos el mood parseado.
+        mood: parsedMood,
         locationName: map['location_name'] as String?,
         latitude: (map['latitude'] as num?)?.toDouble(),
         longitude: (map['longitude'] as num?)?.toDouble(),
+        // Parseamos los nuevos campos desde Supabase
+        creditCardId: map['credit_card_id'] as String?,
+        installmentsTotal: map['installments_total'] as int?,
+        installmentsCurrent: map['installments_current'] as int?,
+        isInstallment: map['is_installment'] as bool? ?? false,
+        isInterestFree: map['is_interest_free'] as bool? ?? false,
       );
     } catch (e, stackTrace) {
       if (kDebugMode) {
         print('🔥🔥🔥 ERROR FATAL al parsear Transaction: $e');
         print('🔥🔥🔥 Mapa que causó el error: $map');
-        print('🔥🔥🔥 StackTrace: $stackTrace');
       }
       rethrow;
     }
@@ -133,7 +158,13 @@ class Transaction extends Equatable {
     String? debtId,
     String? goalId,
     String? transferId,
-    TransactionMood? mood, // NOVEDAD: Añadimos al copyWith.
+    TransactionMood? mood,
+    // Nuevos campos en el copyWith
+    String? creditCardId,
+    int? installmentsTotal,
+    int? installmentsCurrent,
+    bool? isInstallment,
+    bool? isInterestFree,
   }) {
     return Transaction(
       id: id ?? this.id,
@@ -148,12 +179,17 @@ class Transaction extends Equatable {
       debtId: debtId ?? this.debtId,
       goalId: goalId ?? this.goalId,
       transferId: transferId ?? this.transferId,
-      mood: mood ?? this.mood, // NOVEDAD: Asignamos el mood en copyWith.
+      mood: mood ?? this.mood,
+      creditCardId: creditCardId ?? this.creditCardId,
+      installmentsTotal: installmentsTotal ?? this.installmentsTotal,
+      installmentsCurrent: installmentsCurrent ?? this.installmentsCurrent,
+      isInstallment: isInstallment ?? this.isInstallment,
+      isInterestFree: isInterestFree ?? this.isInterestFree,
     );
   }
 
   @override
-  List<Object?> get props => [
+  List<Object?> get props =>[
         id,
         userId,
         accountId,
@@ -166,6 +202,15 @@ class Transaction extends Equatable {
         debtId,
         goalId,
         transferId,
-        mood, // NOVEDAD: Añadimos a la lista de props para Equatable.
+        mood,
+        locationName,
+        latitude,
+        longitude,
+        // Nuevos campos
+        creditCardId,
+        installmentsTotal,
+        installmentsCurrent,
+        isInstallment,
+        isInterestFree,
       ];
 }

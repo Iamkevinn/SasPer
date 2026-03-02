@@ -55,25 +55,62 @@ class AccountRepository {
   Future<void> refreshData() => _fetchAccountsWithBalance();
 
   /// Añade una nueva cuenta para el usuario actual.
-  Future<void> addAccount({
-    required String name,
-    required String type,
-    required double initialBalance,
-  }) async {
-    try {
-      await client.from('accounts').insert({
-        'user_id': client.auth.currentUser!.id,
-        'name': name,
-        'type': type,
-        'initial_balance': initialBalance,
-        'balance': initialBalance,
-      });
-    } catch (e) {
-      developer.log('🔥 Error al añadir cuenta: $e', name: 'AccountRepository');
-      throw Exception('No se pudo añadir la cuenta.');
-    }
+Future<void> addAccount({
+  required String name,
+  required String type,
+  required double initialBalance,
+  double? creditLimit,
+  int? closingDay,
+  int? dueDay,
+  double? interestRate,
+  double? maintenanceFee, // 👈 1. AÑADE ESTA LÍNEA AQUÍ
+}) async {
+  final userId = client.auth.currentUser!.id;
+  
+  await client.from('accounts').insert({
+    'user_id': userId,
+    'name': name,
+    'type': type,
+    'balance': initialBalance,
+    'initial_balance': initialBalance,
+    'credit_limit': creditLimit ?? 0,
+    'closing_day': closingDay,
+    'due_day': dueDay,
+    'interest_rate': interestRate ?? 0,
+    'maintenance_fee': maintenanceFee ?? 0, // 👈 2. Y ESTA LÍNEA AQUÍ
+  });
+}
+Future<Map<String, double>> getCreditCardAnalytics(String cardId) async {
+  final client = Supabase.instance.client;
+  
+  // 1. Obtener todas las transacciones a cuotas de esta tarjeta que no han terminado
+  final response = await client
+      .from('transactions')
+      .select('amount, installments_total, installments_current')
+      .eq('credit_card_id', cardId)
+      .eq('is_installment', true);
+
+  double totalDebt = 0;
+  double monthlyObligation = 0;
+
+  for (var tx in response) {
+    double fullAmount = (tx['amount'] as num).toDouble().abs();
+    int total = tx['installments_total'] as int;
+    int current = tx['installments_current'] as int;
+    
+    // Lo que falta por pagar de esta compra
+    int remainingInstallments = (total - current) + 1; 
+    double oneInstallment = fullAmount / total;
+    
+    totalDebt += (oneInstallment * remainingInstallments);
+    monthlyObligation += oneInstallment;
   }
 
+  return {
+    'totalDebt': totalDebt,
+    'monthlyObligation': monthlyObligation,
+  };
+}
   /// Actualiza los detalles de una cuenta existente.
   Future<void> updateAccount(Account account) async {
     try {

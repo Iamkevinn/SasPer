@@ -1,11 +1,41 @@
 // lib/screens/can_i_afford_it_screen.dart
+//
+// ┌─────────────────────────────────────────────────────────────────────────────┐
+// │  FILOSOFÍA — Apple iOS / Health + Calculator                                │
+// │                                                                             │
+// │  Pregunta que responde en < 1 segundo:                                     │
+// │  "¿Puedo permitirme esto?"                                                 │
+// │                                                                             │
+// │  Apple lo resuelve como Face ID: respuesta INSTANTÁNEA, veredicto visual,  │
+// │  sin que el usuario tenga que procesar texto para entender el resultado.   │
+// │                                                                             │
+// │  JERARQUÍA DE INFORMACIÓN:                                                 │
+// │  1. Hero card — Gauge + porcentaje + veredicto. Todo junto. Un bloque.    │
+// │     El color del gauge ES la respuesta. El texto la confirma.             │
+// │  2. Balance bar — contexto compacto en una línea.                         │
+// │  3. Input del monto — grande, el borde refleja el riesgo en tiempo real.  │
+// │  4. Quick amounts — 10% / 25% / 50% con montos reales al lado.           │
+// │  5. Categoría — contextualiza el análisis de IA.                          │
+// │  6. Métricas (aparecen al escribir) — 3 celdas: quedan, % presupuesto,   │
+// │     % saldo. Cada una con color semántico.                                │
+// │  7. Una recomendación — la más relevante. Sin carrusel.                   │
+// │  8. Botón "Análisis completo con IA" — único CTA primario.               │
+// │                                                                             │
+// │  ELIMINADO vs original:                                                    │
+// │  • "Simulación Inteligente" con ícono pulsante infinito → ruido           │
+// │  • Carrusel horizontal de 3 recomendaciones → requiere trabajo del user   │
+// │  • Gradientes decorativos en tarjetas → distracción visual                │
+// │  • Gauge y métricas separados → unificados en hero card                   │
+// └─────────────────────────────────────────────────────────────────────────────┘
+
 import 'dart:math' as math;
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:sasper/data/account_repository.dart'; // <<< PASO 1: Importar
-import 'package:sasper/data/budget_repository.dart'; // <<< PASO 1: Importar
+import 'package:intl/intl.dart';
+import 'package:sasper/data/account_repository.dart';
+import 'package:sasper/data/budget_repository.dart';
 import 'package:sasper/data/category_repository.dart';
 import 'package:sasper/data/simulation_repository.dart';
 import 'package:sasper/models/category_model.dart';
@@ -14,6 +44,87 @@ import 'package:sasper/screens/simulation_result_screen.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 
+// ─── TOKENS ──────────────────────────────────────────────────────────────────
+class _C {
+  final BuildContext ctx;
+  _C(this.ctx);
+
+  bool get isDark => Theme.of(ctx).brightness == Brightness.dark;
+
+  // Superficies iOS systemGroupedBackground
+  Color get bg      => isDark ? const Color(0xFF000000) : const Color(0xFFF2F2F7);
+  Color get surface => isDark ? const Color(0xFF1C1C1E) : Colors.white;
+  Color get raised  => isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF5F5F7);
+  Color get sep     => isDark ? const Color(0xFF38383A) : const Color(0xFFE5E5EA);
+
+  // Escala label iOS
+  Color get label  => isDark ? const Color(0xFFFFFFFF) : const Color(0xFF1C1C1E);
+  Color get label2 => isDark ? const Color(0xFFEBEBF5) : const Color(0xFF3A3A3C);
+  Color get label3 => isDark ? const Color(0xFF8E8E93) : const Color(0xFF636366);
+  Color get label4 => isDark ? const Color(0xFF48484A) : const Color(0xFFAEAEB2);
+
+  // Semánticos iOS
+  static const Color red    = Color(0xFFFF3B30);
+  static const Color green  = Color(0xFF30D158);
+  static const Color orange = Color(0xFFFF9F0A);
+  static const Color blue   = Color(0xFF0A84FF);
+  static const Color indigo = Color(0xFF5E5CE6);
+
+  // Layout
+  static const double xs   = 4.0;
+  static const double sm   = 8.0;
+  static const double md   = 16.0;
+  static const double lg   = 24.0;
+  static const double xl   = 32.0;
+  static const double rMD  = 12.0;
+  static const double rLG  = 16.0;
+  static const double rXL  = 22.0;
+  static const double r2XL = 28.0;
+
+  static const Duration fast   = Duration(milliseconds: 130);
+  static const Duration mid    = Duration(milliseconds: 270);
+  static const Duration slow   = Duration(milliseconds: 480);
+  static const Curve   easeOut = Curves.easeOutCubic;
+  static const Curve   spring  = Curves.easeOutBack;
+}
+
+// ─── NIVEL DE RIESGO ─────────────────────────────────────────────────────────
+// Enum rico: cada nivel lleva todo lo que necesita la UI.
+// El color ES la respuesta — el texto la confirma.
+enum RiskLevel {
+  safe(
+    verdict:    'Puedes permitírtelo',
+    advice:     'Tu situación financiera lo soporta sin comprometer tus metas.',
+    color:      _C.green,
+    icon:       Iconsax.shield_tick,
+  ),
+  moderate(
+    verdict:    'Con precaución',
+    advice:     'Es posible, pero ajusta otros gastos esta semana.',
+    color:      _C.orange,
+    icon:       Iconsax.warning_2,
+  ),
+  high(
+    verdict:    'Riesgo alto',
+    advice:     'Comprometería tu estabilidad financiera este mes.',
+    color:      _C.red,
+    icon:       Iconsax.danger,
+  );
+
+  final String verdict;
+  final String advice;
+  final Color  color;
+  final IconData icon;
+
+  const RiskLevel({
+    required this.verdict,
+    required this.advice,
+    required this.color,
+    required this.icon,
+  });
+}
+
+// ─── PANTALLA ─────────────────────────────────────────────────────────────────
 class CanIAffordItScreen extends StatefulWidget {
   const CanIAffordItScreen({super.key});
 
@@ -23,1306 +134,1234 @@ class CanIAffordItScreen extends StatefulWidget {
 
 class _CanIAffordItScreenState extends State<CanIAffordItScreen>
     with TickerProviderStateMixin {
-  final _formKey = GlobalKey<FormState>();
-  final _amountController = TextEditingController();
+  final _formKey     = GlobalKey<FormState>();
+  final _amountCtrl  = TextEditingController();
+  final _amountFocus = FocusNode();
 
-  // --- PASO 1: Instanciar los repositorios necesarios ---
-  final SimulationRepository _simulationRepo = SimulationRepository.instance;
-  final CategoryRepository _categoryRepo = CategoryRepository.instance;
-  final AccountRepository _accountRepo = AccountRepository.instance;
-  final BudgetRepository _budgetRepo = BudgetRepository.instance;
+  final SimulationRepository _simRepo     = SimulationRepository.instance;
+  final CategoryRepository   _catRepo     = CategoryRepository.instance;
+  final AccountRepository    _accountRepo = AccountRepository.instance;
+  final BudgetRepository     _budgetRepo  = BudgetRepository.instance;
 
   Category? _selectedCategory;
-  bool _isLoading = false; // Para el botón de simulación
-  bool _showInsights = false;
+  bool _isLoading     = false;
+  bool _isDataLoading = true;
+  String _dataError   = '';
+
   late Future<List<Category>> _categoriesFuture;
 
-  // --- PASO 2: Añadir estados para la carga y los datos financieros ---
-  bool _isFinancialDataLoading = true; // Controla la carga inicial de datos
-  String _financialDataError = ''; // Almacena un mensaje de error si la carga falla
+  // Datos financieros reales
+  double _balance  = 0.0;
+  double _budget   = 0.0;
+  double _spent    = 0.0;
 
-  // Datos de simulación en tiempo real (inicializados en 0)
-  double _currentAmount = 0.0;
-  // --- Se eliminan los datos simulados ---
-  double _availableBalance = 0.0;
-  double _monthlyBudget = 0.0;
-  double _spentThisMonth = 0.0;
+  // Estado reactivo
+  double    _amount  = 0.0;
+  bool      _hasAmt  = false;
+  RiskLevel _risk    = RiskLevel.safe;
 
-  RiskLevel _currentRisk = RiskLevel.safe;
+  // Animaciones
+  late AnimationController _gaugeCtrl;   // Progreso del arco
+  late AnimationController _revealCtrl;  // Aparición de métricas
+  late AnimationController _switchCtrl;  // Cambio de veredicto
 
-  // Animación controllers
-  late AnimationController _pulseController;
-  late AnimationController _slideController;
-  late AnimationController _scaleController;
+  late Animation<double> _gaugeAnim;
+  late Animation<double> _revealAnim;
+  late Animation<double> _switchAnim;
 
+  // Para animar el cambio de color del gauge
+  Color _prevColor   = _C.green;
+  Color _targetColor = _C.green;
 
   @override
   void initState() {
     super.initState();
-    _categoriesFuture = _categoryRepo.getExpenseCategories();
+    _categoriesFuture = _catRepo.getExpenseCategories();
+    _loadData();
 
-    // --- PASO 3: Cargar los datos financieros al iniciar la pantalla ---
-    _loadFinancialData();
+    _gaugeCtrl = AnimationController(duration: _C.slow, vsync: this);
+    _gaugeAnim = CurvedAnimation(parent: _gaugeCtrl, curve: _C.easeOut);
 
-    // El resto de la inicialización...
-    _pulseController = AnimationController(
-      duration: const Duration(seconds: 2),
-      vsync: this,
-    )..repeat(reverse: true);
+    _revealCtrl = AnimationController(duration: _C.mid, vsync: this);
+    _revealAnim = CurvedAnimation(parent: _revealCtrl, curve: _C.easeOut);
 
-    _slideController = AnimationController(
-      duration: const Duration(milliseconds: 600),
-      vsync: this,
-    );
+    _switchCtrl = AnimationController(duration: _C.mid, vsync: this);
+    _switchAnim = CurvedAnimation(parent: _switchCtrl, curve: _C.spring);
 
-    _scaleController = AnimationController(
-      duration: const Duration(milliseconds: 300),
-      vsync: this,
-    );
-
-    _amountController.addListener(_onAmountChanged);
+    _amountCtrl.addListener(_onAmount);
   }
-
-  // --- PASO 3: Método para cargar los datos financieros reales ---
-  Future<void> _loadFinancialData() async {
-    try {
-      // Usamos Future.wait para ejecutar ambas llamadas a la API en paralelo
-      final results = await Future.wait([
-        _accountRepo.getAccounts(), // Llama al repo de cuentas
-        _budgetRepo.getOverallBudgetSummary(), // Llama al repo de presupuestos
-      ]);
-
-      // Procesamos los resultados de las cuentas
-      final accounts = results[0] as List<dynamic>;
-      final totalBalance = accounts.fold<double>(
-          0.0, (sum, account) => sum + account.balance);
-
-      // Procesamos el resumen del presupuesto
-      // Asumimos que `getOverallBudgetSummary` devuelve un objeto con `totalBudget` y `totalSpent`
-      final budgetSummary = results[1] as (double, double);
-
-      if (mounted) {
-        setState(() {
-          _availableBalance = totalBalance;
-          _monthlyBudget = budgetSummary.$1;
-          _spentThisMonth = budgetSummary.$2;
-          _isFinancialDataLoading = false; // Datos cargados, ocultar loading
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _financialDataError = 'Error al cargar los datos financieros.';
-          _isFinancialDataLoading = false; // Ocultar loading incluso si hay error
-        });
-      }
-    }
-  }
-
 
   @override
   void dispose() {
-    _amountController.dispose();
-    _pulseController.dispose();
-    _slideController.dispose();
-    _scaleController.dispose();
+    _amountCtrl.dispose();
+    _amountFocus.dispose();
+    _gaugeCtrl.dispose();
+    _revealCtrl.dispose();
+    _switchCtrl.dispose();
     super.dispose();
   }
 
-  void _onAmountChanged() {
-    final text = _amountController.text.replaceAll(',', '.');
-    final amount = double.tryParse(text) ?? 0.0;
-
-    setState(() {
-      _currentAmount = amount;
-      _showInsights = amount > 0;
-      // Asegurarse de que el presupuesto no sea cero para evitar división por cero
-      if (_monthlyBudget > 0) {
-        _currentRisk = _calculateRisk(amount);
-      }
-    });
-
-    if (_showInsights) {
-      _slideController.forward();
-      _scaleController.forward(from: 0);
-    } else {
-      _slideController.reverse();
-    }
-  }
-
-  RiskLevel _calculateRisk(double amount) {
-    if (_monthlyBudget <= 0) return RiskLevel.safe; // Valor por defecto si no hay presupuesto
-    
-    final remaining = _availableBalance - amount;
-    final percentOfBudget = (amount / _monthlyBudget) * 100;
-
-    if (remaining < 0 || percentOfBudget > 50) return RiskLevel.high;
-    if (percentOfBudget > 25 || remaining < _monthlyBudget * 0.2) {
-      return RiskLevel.moderate;
-    }
-    return RiskLevel.safe;
-  }
-
-  Future<void> _runSimulation() async {
-    if (!_formKey.currentState!.validate() || _selectedCategory == null) {
-      NotificationHelper.show(
-        message: 'Por favor, completa todos los campos.',
-        type: NotificationType.error,
-      );
-      return;
-    }
-
-    HapticFeedback.mediumImpact();
-    setState(() => _isLoading = true);
-
+  // ── Carga de datos ────────────────────────────────────────────────────────
+  Future<void> _loadData() async {
     try {
-      final amount = double.parse(_amountController.text.replaceAll(',', '.'));
-      final categoryName = _selectedCategory!.name;
-
-      final SimulationResult result =
-          await _simulationRepo.getExpenseSimulation(
-        amount: amount,
-        categoryName: categoryName,
-      );
-
+      final res = await Future.wait([
+        _accountRepo.getAccounts(),
+        _budgetRepo.getOverallBudgetSummary(),
+      ]);
+      final accounts    = res[0] as List<dynamic>;
+      final totalBal    = accounts.fold<double>(0, (s, a) => s + a.balance);
+      final budgetTuple = res[1] as (double, double);
       if (mounted) {
-        HapticFeedback.lightImpact();
-        Navigator.of(context).push(
-          PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) =>
-                SimulationResultScreen(result: result),
-            transitionsBuilder:
-                (context, animation, secondaryAnimation, child) {
-              return FadeTransition(
-                opacity: animation,
-                child: SlideTransition(
-                  position: Tween<Offset>(
-                    begin: const Offset(0, 0.1),
-                    end: Offset.zero,
-                  ).animate(CurvedAnimation(
-                    parent: animation,
-                    curve: Curves.easeOutCubic,
-                  )),
-                  child: child,
-                ),
-              );
-            },
-          ),
-        );
+        setState(() {
+          _balance     = totalBal;
+          _budget      = budgetTuple.$1;
+          _spent       = budgetTuple.$2;
+          _isDataLoading = false;
+        });
       }
     } catch (e) {
       if (mounted) {
-        NotificationHelper.show(
-          message: e.toString().replaceFirst("Exception: ", ""),
-          type: NotificationType.error,
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() { _dataError = 'No se pudieron cargar los datos.'; _isDataLoading = false; });
       }
     }
   }
 
+  // ── Reactivo al monto ─────────────────────────────────────────────────────
+  void _onAmount() {
+    final raw    = _amountCtrl.text.replaceAll(',', '.');
+    final parsed = double.tryParse(raw) ?? 0.0;
+    final newRisk = parsed > 0 ? _calcRisk(parsed) : RiskLevel.safe;
+
+    final riskChanged = newRisk != _risk;
+
+    if (riskChanged) {
+      _prevColor   = _risk.color;
+      _targetColor = newRisk.color;
+      _switchCtrl.forward(from: 0);
+    }
+
+    setState(() {
+      _amount = parsed;
+      _hasAmt = parsed > 0;
+      _risk   = newRisk;
+    });
+
+    if (parsed > 0) {
+      final pct = _balance > 0 ? (parsed / _balance).clamp(0.0, 1.0) : 0.0;
+      _gaugeCtrl.animateTo(pct, duration: _C.slow, curve: _C.easeOut);
+      _revealCtrl.forward();
+    } else {
+      _gaugeCtrl.animateTo(0, duration: _C.mid);
+      _revealCtrl.reverse();
+    }
+  }
+
+  RiskLevel _calcRisk(double amount) {
+    final remaining   = _balance - amount;
+    final pctOfBudget = _budget > 0 ? (amount / _budget) * 100 : 0.0;
+    if (remaining < 0 || pctOfBudget > 50) return RiskLevel.high;
+    if (pctOfBudget > 25 || remaining < _budget * 0.2) return RiskLevel.moderate;
+    return RiskLevel.safe;
+  }
+
+  // ── Simulación ────────────────────────────────────────────────────────────
+  Future<void> _simulate() async {
+    if (!_formKey.currentState!.validate() || _selectedCategory == null) {
+      HapticFeedback.vibrate();
+      NotificationHelper.show(
+          message: 'Selecciona una categoría para continuar.',
+          type: NotificationType.error);
+      return;
+    }
+    HapticFeedback.mediumImpact();
+    setState(() => _isLoading = true);
+    try {
+      final amount       = double.parse(_amountCtrl.text.replaceAll(',', '.'));
+      final categoryName = _selectedCategory!.name;
+      final result       = await _simRepo.getExpenseSimulation(
+          amount: amount, categoryName: categoryName);
+      if (mounted) {
+        HapticFeedback.lightImpact();
+        Navigator.of(context).push(PageRouteBuilder(
+          pageBuilder:      (_, a, __) => SimulationResultScreen(result: result),
+          transitionDuration: _C.slow,
+          transitionsBuilder: (_, anim, __, child) => FadeTransition(
+            opacity: CurvedAnimation(parent: anim, curve: _C.easeOut),
+            child: SlideTransition(
+              position: Tween<Offset>(
+                      begin: const Offset(0, 0.04), end: Offset.zero)
+                  .animate(CurvedAnimation(parent: anim, curve: _C.easeOut)),
+              child: child,
+            ),
+          ),
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        HapticFeedback.vibrate();
+        NotificationHelper.show(
+            message: e.toString().replaceFirst('Exception: ', ''),
+            type: NotificationType.error);
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // ─── BUILD ────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    // --- PASO 4: Mostrar UI de carga o de contenido ---
-    return Scaffold(
-      backgroundColor: colorScheme.surface,
-      body: _isFinancialDataLoading
-          ? Center(child: CircularProgressIndicator()) // UI de Carga
-          : _financialDataError.isNotEmpty
-              ? Center(child: Text(_financialDataError)) // UI de Error
-              : _buildContent(theme, colorScheme), // UI Principal
-    );
-  }
-
-  // Se extrajo el contenido principal a su propio método para mayor claridad
-  Widget _buildContent(ThemeData theme, ColorScheme colorScheme) {
-    return CustomScrollView(
-      physics: const BouncingScrollPhysics(),
-      slivers: [
-        _buildAppBar(theme, colorScheme),
-        SliverToBoxAdapter(
-          child: Form(
-            key: _formKey,
-            child: Column(
-              children: [
-                _buildAIHeader(theme, colorScheme),
-                const SizedBox(height: 24),
-                _buildBalanceOverview(theme, colorScheme),
-                const SizedBox(height: 32),
-                _buildAmountInput(theme, colorScheme),
-                const SizedBox(height: 20),
-                _buildCategorySelector(theme, colorScheme),
-                if (_showInsights) ...[
-                  const SizedBox(height: 32),
-                  _buildRealTimeInsights(theme, colorScheme),
-                  const SizedBox(height: 24),
-                  _buildImpactIndicator(theme, colorScheme),
-                  const SizedBox(height: 24),
-                  _buildAIRecommendations(theme, colorScheme),
-                ],
-                const SizedBox(height: 32),
-                _buildAnalyzeButton(theme, colorScheme),
-                const SizedBox(height: 40),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // --- El resto de los widgets (_buildAppBar, etc.) no necesitan cambios ---
-  // ... (Pega aquí el resto de tus métodos _build... sin modificarlos) ...
-  // ... por brevedad, no se repiten aquí. Asegúrate de tenerlos en tu archivo.
-
-  //<editor-fold desc="Widgets de la UI (sin cambios)">
-  Widget _buildAppBar(ThemeData theme, ColorScheme colorScheme) {
-    return SliverAppBar.large(
-      floating: true,
-      pinned: false,
-      backgroundColor: colorScheme.surface,
-      surfaceTintColor: Colors.transparent,
-      leading: IconButton(
-        icon: Icon(Iconsax.arrow_left, color: colorScheme.onSurface),
-        onPressed: () => Navigator.pop(context),
+    final c = _C(context);
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor:         Colors.transparent,
+        statusBarIconBrightness: c.isDark ? Brightness.light : Brightness.dark,
+        statusBarBrightness:     c.isDark ? Brightness.dark  : Brightness.light,
       ),
-      flexibleSpace: FlexibleSpaceBar(
-        titlePadding: const EdgeInsets.only(left: 16, bottom: 16, right: 16),
-        title: Text(
-          '¿Me lo puedo permitir?',
-          style: GoogleFonts.manrope(
-            fontSize: 24,
-            fontWeight: FontWeight.w800,
-            color: colorScheme.onSurface,
-          ),
-        ),
+      child: Scaffold(
+        backgroundColor: c.bg,
+        body: _isDataLoading
+            ? _Loader(c: c)
+            : _dataError.isNotEmpty
+                ? _ErrState(msg: _dataError, c: c, onRetry: () {
+                    setState(() { _isDataLoading = true; _dataError = ''; });
+                    _loadData();
+                  })
+                : _body(c),
       ),
     );
   }
 
-  Widget _buildAIHeader(ThemeData theme, ColorScheme colorScheme) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            colorScheme.primaryContainer.withOpacity(0.4),
-            colorScheme.secondaryContainer.withOpacity(0.3),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: colorScheme.outline.withOpacity(0.1),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: colorScheme.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: AnimatedBuilder(
-              animation: _pulseController,
-              builder: (context, child) {
-                return Transform.scale(
-                  scale: 1.0 + (_pulseController.value * 0.1),
-                  child: Icon(
-                    Iconsax.cpu,
-                    color: colorScheme.primary,
-                    size: 28,
-                  ),
-                );
-              },
-            ),
+  Widget _body(_C c) {
+    return Form(
+      key: _formKey,
+      child: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          // AppBar
+          SliverAppBar(
+            pinned: true,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            backgroundColor: c.bg,
+            surfaceTintColor: Colors.transparent,
+            automaticallyImplyLeading: false,
+            leading: _BackBtn(c: c),
+            title: Text('¿Me lo puedo permitir?',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600,
+                    color: c.label, letterSpacing: -0.3)),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Simulación Inteligente',
-                  style: GoogleFonts.manrope(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'IA analizando tu impacto financiero en tiempo real',
-                  style: GoogleFonts.manrope(
-                    fontSize: 12,
-                    color: colorScheme.onSurface.withOpacity(0.6),
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildBalanceOverview(ThemeData theme, ColorScheme colorScheme) {
-    // Evitar división por cero si el presupuesto es 0
-    final progressValue = (_monthlyBudget > 0) ? _spentThisMonth / _monthlyBudget : 0.0;
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(_C.md, _C.sm, _C.md, 0),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: colorScheme.outline.withOpacity(0.1),
-        ),
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Saldo Disponible',
-                    style: GoogleFonts.manrope(
-                      fontSize: 13,
-                      color: colorScheme.onSurface.withOpacity(0.6),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '\$${_availableBalance.toStringAsFixed(2)}',
-                    style: GoogleFonts.manrope(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w800,
-                      color: colorScheme.onSurface,
-                    ),
-                  ),
-                ],
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: colorScheme.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
+                // ── 1. HERO CARD — gauge + veredicto ─────────────────
+                _HeroCard(
+                  gaugeAnim:   _gaugeAnim,
+                  switchAnim:  _switchAnim,
+                  prevColor:   _prevColor,
+                  targetColor: _targetColor,
+                  risk:        _risk,
+                  hasAmt:      _hasAmt,
+                  amount:      _amount,
+                  balance:     _balance,
+                  c:           c,
                 ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Iconsax.trend_up,
-                      size: 16,
-                      color: colorScheme.primary,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '+12%', // Este dato aún es estático, podrías conectarlo luego
-                      style: GoogleFonts.manrope(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: colorScheme.primary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: progressValue,
-              minHeight: 8,
-              backgroundColor: colorScheme.surfaceContainerHighest,
-              valueColor: AlwaysStoppedAnimation(colorScheme.primary),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Gastado este mes',
-                style: GoogleFonts.manrope(
-                  fontSize: 12,
-                  color: colorScheme.onSurface.withOpacity(0.6),
-                ),
-              ),
-              Text(
-                '\$${_spentThisMonth.toStringAsFixed(0)} / \$${_monthlyBudget.toStringAsFixed(0)}',
-                style: GoogleFonts.manrope(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.onSurface,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+                const SizedBox(height: _C.md),
 
-  Widget _buildAmountInput(ThemeData theme, ColorScheme colorScheme) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Monto del gasto',
-            style: GoogleFonts.manrope(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: _showInsights
-                    ? colorScheme.primary.withOpacity(0.3)
-                    : colorScheme.outline.withOpacity(0.2),
-                width: 2,
-              ),
-            ),
-            child: TextFormField(
-              controller: _amountController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              style: GoogleFonts.manrope(
-                fontSize: 24,
-                fontWeight: FontWeight.w700,
-                color: colorScheme.onSurface,
-              ),
-              decoration: InputDecoration(
-                prefixIcon: Padding(
-                  padding: const EdgeInsets.only(left: 20, right: 12),
-                  child: Icon(
-                    Iconsax.dollar_circle,
-                    color: colorScheme.primary,
-                    size: 28,
-                  ),
+                // ── 2. BALANCE BAR — contexto compacto ───────────────
+                _BalanceBar(
+                  balance: _balance, budget: _budget,
+                  spent: _spent, currentAmount: _amount, c: c,
                 ),
-                hintText: '0.00',
-                hintStyle: GoogleFonts.manrope(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  color: colorScheme.onSurface.withOpacity(0.3),
-                ),
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 20,
-                ),
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) return 'Ingresa un monto';
-                final amount = double.tryParse(value.replaceAll(',', '.'));
-                if (amount == null || amount <= 0) return 'Monto inválido';
-                return null;
-              },
-            ),
-          ),
-          const SizedBox(height: 12),
-          _buildQuickAmounts(colorScheme),
-        ],
-      ),
-    );
-  }
+                const SizedBox(height: _C.lg),
 
-  Widget _buildQuickAmounts(ColorScheme colorScheme) {
-    final amounts = [
-      (_availableBalance * 0.1, '10%'),
-      (_availableBalance * 0.25, '25%'),
-      (_availableBalance * 0.5, '50%'),
-    ];
-
-    return Row(
-      children: amounts.map((data) {
-        return Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: InkWell(
-              onTap: () {
-                _amountController.text = data.$1.toStringAsFixed(2);
-                HapticFeedback.selectionClick();
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: colorScheme.outline.withOpacity(0.1),
-                  ),
+                // ── 3. MONTO ──────────────────────────────────────────
+                _Label(text: 'Monto del gasto', c: c),
+                const SizedBox(height: _C.sm),
+                _AmountInput(
+                  ctrl: _amountCtrl, focus: _amountFocus,
+                  risk: _risk, hasAmt: _hasAmt, c: c,
                 ),
-                child: Column(
-                  children: [
-                    Text(
-                      data.$2,
-                      style: GoogleFonts.manrope(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: colorScheme.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '\$${data.$1.toStringAsFixed(0)}',
-                      style: GoogleFonts.manrope(
-                        fontSize: 10,
-                        color: colorScheme.onSurface.withOpacity(0.6),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
+                const SizedBox(height: _C.sm),
 
-  Widget _buildCategorySelector(ThemeData theme, ColorScheme colorScheme) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Categoría del gasto',
-            style: GoogleFonts.manrope(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 12),
-          FutureBuilder<List<Category>>(
-            future: _categoriesFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(20),
-                    child: CircularProgressIndicator(),
-                  ),
-                );
-              }
-              if (snapshot.hasError ||
-                  !snapshot.hasData ||
-                  snapshot.data!.isEmpty) {
-                return const Text('No se pudieron cargar las categorías.');
-              }
+                // Quick amounts 10 / 25 / 50 %
+                _QuickRow(balance: _balance, c: c, onTap: (v) {
+                  HapticFeedback.selectionClick();
+                  _amountCtrl.text = v.toStringAsFixed(0);
+                  _amountCtrl.selection = TextSelection.fromPosition(
+                      TextPosition(offset: _amountCtrl.text.length));
+                }),
+                const SizedBox(height: _C.lg),
 
-              final categories = snapshot.data!;
-              return Container(
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: _selectedCategory != null
-                        ? colorScheme.primary.withOpacity(0.3)
-                        : colorScheme.outline.withOpacity(0.2),
-                    width: 2,
-                  ),
-                ),
-                child: DropdownButtonFormField<Category>(
-                  value: _selectedCategory,
-                  decoration: InputDecoration(
-                    prefixIcon: Padding(
-                      padding: const EdgeInsets.only(left: 20, right: 12),
-                      child: Icon(
-                        Iconsax.category,
-                        color: colorScheme.primary,
-                        size: 24,
-                      ),
-                    ),
-                    hintText: 'Selecciona una categoría',
-                    hintStyle: GoogleFonts.manrope(
-                      color: colorScheme.onSurface.withOpacity(0.4),
-                    ),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 20,
-                    ),
-                  ),
-                  dropdownColor: colorScheme.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(16),
-                  icon: Icon(
-                    Iconsax.arrow_down_1,
-                    color: colorScheme.onSurface.withOpacity(0.6),
-                  ),
-                  items: categories.map((Category category) {
-                    return DropdownMenuItem<Category>(
-                      value: category,
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: category.colorAsObject.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Icon(
-                              category.icon,
-                              color: category.colorAsObject,
-                              size: 20,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            category.name,
-                            style: GoogleFonts.manrope(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (newValue) {
-                    setState(() => _selectedCategory = newValue);
+                // ── 4. CATEGORÍA ──────────────────────────────────────
+                _Label(text: 'Categoría', c: c),
+                const SizedBox(height: _C.sm),
+                _CatPicker(
+                  future: _categoriesFuture, selected: _selectedCategory,
+                  c: c,
+                  onChanged: (cat) {
                     HapticFeedback.selectionClick();
+                    setState(() => _selectedCategory = cat);
                   },
-                  validator: (value) =>
-                      value == null ? 'Selecciona una categoría' : null,
                 ),
-              );
-            },
+
+                // ── 5. MÉTRICAS — aparecen al escribir ────────────────
+                AnimatedSize(
+                  duration: _C.mid, curve: _C.easeOut,
+                  child: _hasAmt
+                      ? Column(children: [
+                          const SizedBox(height: _C.lg),
+                          _Label(text: 'Impacto en tu bolsillo', c: c),
+                          const SizedBox(height: _C.sm),
+                          FadeTransition(
+                            opacity: _revealAnim,
+                            child: SlideTransition(
+                              position: Tween<Offset>(
+                                begin: const Offset(0, 0.06),
+                                end: Offset.zero,
+                              ).animate(_revealAnim),
+                              child: _MetricsRow(
+                                amount: _amount, balance: _balance,
+                                budget: _budget, risk: _risk, c: c,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: _C.md),
+                          FadeTransition(
+                            opacity: _revealAnim,
+                            child: _RecCard(
+                              risk: _risk, amount: _amount,
+                              balance: _balance, c: c,
+                            ),
+                          ),
+                        ])
+                      : const SizedBox.shrink(),
+                ),
+
+                const SizedBox(height: _C.xl),
+
+                // ── 6. CTA ────────────────────────────────────────────
+                _SimBtn(isLoading: _isLoading, c: c, onTap: _simulate),
+
+                SizedBox(height: _C.xl + MediaQuery.of(context).padding.bottom),
+              ]),
+            ),
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildRealTimeInsights(ThemeData theme, ColorScheme colorScheme) {
-    final remaining = _availableBalance - _currentAmount;
-    final percentage = _monthlyBudget > 0 ? (_currentAmount / _monthlyBudget * 100).clamp(0, 100) : 0.0;
+// ─── HERO CARD ────────────────────────────────────────────────────────────────
+// El único elemento visual grande de toda la pantalla.
+// Gauge + porcentaje + veredicto — todo en un solo bloque cohesionado.
+// El color del arco ES la respuesta. No necesitas leer el texto para entender.
+class _HeroCard extends StatelessWidget {
+  final Animation<double> gaugeAnim;
+  final Animation<double> switchAnim;
+  final Color prevColor;
+  final Color targetColor;
+  final RiskLevel risk;
+  final bool hasAmt;
+  final double amount;
+  final double balance;
+  final _C c;
 
-    return SlideTransition(
-      position: Tween<Offset>(
-        begin: const Offset(0, 0.3),
-        end: Offset.zero,
-      ).animate(CurvedAnimation(
-        parent: _slideController,
-        curve: Curves.easeOutCubic,
-      )),
-      child: FadeTransition(
-        opacity: _slideController,
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16),
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                _currentRisk.color.withOpacity(0.1),
-                _currentRisk.color.withOpacity(0.05),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: _currentRisk.color.withOpacity(0.3),
-              width: 2,
-            ),
-          ),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: _currentRisk.color.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      _currentRisk.icon,
-                      color: _currentRisk.color,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _currentRisk.title,
-                          style: GoogleFonts.manrope(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: colorScheme.onSurface,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _currentRisk.subtitle,
-                          style: GoogleFonts.manrope(
-                            fontSize: 12,
-                            color: colorScheme.onSurface.withOpacity(0.6),
-                            height: 1.4,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildInsightCard(
-                      'Te quedarían',
-                      '\$${remaining.toStringAsFixed(2)}',
-                      Iconsax.wallet_3,
-                      colorScheme,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildInsightCard(
-                      'Del presupuesto',
-                      '${percentage.toStringAsFixed(1)}%',
-                      Iconsax.percentage_circle,
-                      colorScheme,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  const _HeroCard({
+    required this.gaugeAnim, required this.switchAnim,
+    required this.prevColor, required this.targetColor,
+    required this.risk, required this.hasAmt,
+    required this.amount, required this.balance, required this.c,
+  });
 
-  Widget _buildInsightCard(
-    String label,
-    String value,
-    IconData icon,
-    ColorScheme colorScheme,
-  ) {
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(
+          _C.lg, _C.lg, _C.lg, _C.md),
       decoration: BoxDecoration(
-        color: colorScheme.surface.withOpacity(0.6),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: colorScheme.outline.withOpacity(0.1),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 20, color: colorScheme.primary),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: GoogleFonts.manrope(
-              fontSize: 11,
-              color: colorScheme.onSurface.withOpacity(0.6),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: GoogleFonts.manrope(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: colorScheme.onSurface,
-            ),
-          ),
+        color: c.surface,
+        borderRadius: BorderRadius.circular(_C.r2XL),
+        border: Border.all(color: c.sep.withOpacity(0.4), width: 0.5),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(c.isDark ? 0.18 : 0.04),
+              blurRadius: 12, offset: const Offset(0, 3)),
         ],
       ),
-    );
-  }
+      child: Column(children: [
+        // ── Gauge animado ──────────────────────────────────────────────
+        SizedBox(
+          height: 140,
+          child: AnimatedBuilder(
+            animation: Listenable.merge([gaugeAnim, switchAnim]),
+            builder: (_, __) {
+              // Interpolar color entre estado anterior y nuevo
+              final animColor = Color.lerp(
+                prevColor, targetColor, switchAnim.value) ?? targetColor;
 
-  Widget _buildImpactIndicator(ThemeData theme, ColorScheme colorScheme) {
-    return ScaleTransition(
-      scale: CurvedAnimation(
-        parent: _scaleController,
-        curve: Curves.easeOutBack,
-      ),
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16),
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest.withOpacity(0.4),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: colorScheme.outline.withOpacity(0.1),
-          ),
-        ),
-        child: Column(
-          children: [
-            Text(
-              'Indicador de Impacto',
-              style: GoogleFonts.manrope(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: colorScheme.onSurface,
-              ),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              height: 120,
-              child: CustomPaint(
-                painter: _ImpactGaugePainter(
-                  progress: _availableBalance > 0
-                      ? (_currentAmount / _availableBalance).clamp(0.0, 1.0)
-                      : 0.0,
-                  color: _currentRisk.color,
-                  backgroundColor: colorScheme.surfaceContainerHighest,
+              return CustomPaint(
+                painter: _GaugePainter(
+                  progress:   gaugeAnim.value,
+                  fillColor:  animColor,
+                  trackColor: c.sep,
+                  isDark:     c.isDark,
                 ),
                 child: Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        _availableBalance > 0
-                            ? '${((_currentAmount / _availableBalance) * 100).clamp(0, 100).toStringAsFixed(0)}%'
-                            : '0%',
-                        style: GoogleFonts.manrope(
-                          fontSize: 32,
+                      const SizedBox(height: 24), // compensa arco superior
+                      AnimatedDefaultTextStyle(
+                        duration: _C.mid,
+                        style: TextStyle(
+                          fontSize: 42,
                           fontWeight: FontWeight.w800,
-                          color: _currentRisk.color,
+                          color: hasAmt ? animColor : c.label4,
+                          letterSpacing: -1.2,
+                          height: 1.0,
+                        ),
+                        child: Text(
+                          hasAmt && balance > 0
+                              ? '${((amount / balance) * 100).clamp(0, 999).toStringAsFixed(0)}%'
+                              : '—',
                         ),
                       ),
-                      Text(
-                        'de tu saldo',
-                        style: GoogleFonts.manrope(
-                          fontSize: 11,
-                          color: colorScheme.onSurface.withOpacity(0.6),
-                        ),
-                      ),
+                      const SizedBox(height: 3),
+                      Text('de tu saldo',
+                          style: TextStyle(
+                              fontSize: 11, color: c.label3)),
                     ],
                   ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAIRecommendations(ThemeData theme, ColorScheme colorScheme) {
-    final recommendations = _getRecommendations();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            children: [
-              Icon(
-                Iconsax.lamp_charge,
-                size: 20,
-                color: colorScheme.primary,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Recomendaciones IA',
-                style: GoogleFonts.manrope(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: colorScheme.onSurface,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        SizedBox(
-          height: 140,
-          child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            itemCount: recommendations.length,
-            itemBuilder: (context, index) {
-              final rec = recommendations[index];
-              return Container(
-                width: 260,
-                margin: EdgeInsets.only(
-                  right: index < recommendations.length - 1 ? 12 : 0,
-                ),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      rec.color.withOpacity(0.1),
-                      rec.color.withOpacity(0.05),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: rec.color.withOpacity(0.2),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: rec.color.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(
-                            rec.icon,
-                            color: rec.color,
-                            size: 18,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            rec.title,
-                            style: GoogleFonts.manrope(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: colorScheme.onSurface,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      rec.description,
-                      style: GoogleFonts.manrope(
-                        fontSize: 12,
-                        color: colorScheme.onSurface.withOpacity(0.7),
-                        height: 1.5,
-                      ),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
                 ),
               );
             },
           ),
         ),
-      ],
-    );
-  }
 
-  List<AIRecommendation> _getRecommendations() {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+        const SizedBox(height: _C.sm),
 
-    if (_currentRisk == RiskLevel.safe) {
-      return [
-        AIRecommendation(
-          title: 'Gasto Saludable',
-          description:
-              'Este gasto encaja perfectamente con tus hábitos financieros inteligentes. Tu dinero está trabajando contigo.',
-          icon: Iconsax.verify,
-          color: Colors.green,
-        ),
-        AIRecommendation(
-          title: 'Ahorro Protegido',
-          description:
-              'Mantienes \$${(_availableBalance - _currentAmount).toStringAsFixed(0)} disponible. Tus metas de ahorro siguen intactas.',
-          icon: Iconsax.shield_tick,
-          color: colorScheme.primary,
-        ),
-        AIRecommendation(
-          title: 'Continúa Así',
-          description:
-              'Con este ritmo, alcanzarás tus objetivos financieros 2 semanas antes de lo planeado.',
-          icon: Iconsax.chart_success,
-          color: Colors.blue,
-        ),
-      ];
-    } else if (_currentRisk == RiskLevel.moderate) {
-      return [
-        AIRecommendation(
-          title: 'Precaución Moderada',
-          description:
-              'Este gasto es posible, pero considera reducir gastos variables en los próximos días.',
-          icon: Iconsax.warning_2,
-          color: Colors.orange,
-        ),
-        AIRecommendation(
-          title: 'Alternativa Inteligente',
-          description:
-              'Si esperas 5 días, tu flujo de caja será 23% más saludable para este gasto.',
-          icon: Iconsax.calendar_tick,
-          color: colorScheme.primary,
-        ),
-        AIRecommendation(
-          title: 'Balance Ajustado',
-          description:
-              'Podrías cubrir este gasto reduciendo 15% en entretenimiento esta semana.',
-          icon: Iconsax.status_up,
-          color: Colors.teal,
-        ),
-      ];
-    } else {
-      return [
-        AIRecommendation(
-          title: 'Riesgo Detectado',
-          description:
-              'Este gasto comprometería tus metas críticas. Considera alternativas o posponerlo.',
-          icon: Iconsax.danger,
-          color: Colors.red,
-        ),
-        AIRecommendation(
-          title: 'Impacto en Metas',
-          description:
-              'Afectaría tu objetivo de ahorro para "Fondo de Emergencia" en 3 semanas.',
-          icon: Iconsax.flag,
-          color: Colors.deepOrange,
-        ),
-        AIRecommendation(
-          title: 'Plan B Sugerido',
-          description:
-              'Te recomendamos reducir el monto a \$${(_availableBalance * 0.25).toStringAsFixed(0)} para mantener estabilidad.',
-          icon: Iconsax.star_1,
-          color: colorScheme.primary,
-        ),
-      ];
-    }
-  }
-
-  Widget _buildAnalyzeButton(ThemeData theme, ColorScheme colorScheme) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: _isLoading ? null : _runSimulation,
-          borderRadius: BorderRadius.circular(20),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 18),
-            decoration: BoxDecoration(
-              gradient: _isLoading
-                  ? LinearGradient(
-                      colors: [
-                        colorScheme.primary.withOpacity(0.5),
-                        colorScheme.primary.withOpacity(0.3),
-                      ],
-                    )
-                  : LinearGradient(
-                      colors: [
-                        colorScheme.primary,
-                        colorScheme.primary.withOpacity(0.8),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: _isLoading
-                  ? []
-                  : [
-                      BoxShadow(
-                        color: colorScheme.primary.withOpacity(0.3),
-                        blurRadius: 16,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (_isLoading)
-                  SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      valueColor: AlwaysStoppedAnimation(colorScheme.onPrimary),
-                    ),
-                  )
-                else ...[
-                  Icon(
-                    Iconsax.cpu,
-                    color: colorScheme.onPrimary,
-                    size: 24,
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Analizar con IA',
-                    style: GoogleFonts.manrope(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: colorScheme.onPrimary,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ],
-              ],
+        // ── Veredicto — cambia con AnimatedSwitcher ────────────────────
+        AnimatedSwitcher(
+          duration: _C.mid,
+          switchInCurve: _C.easeOut,
+          transitionBuilder: (child, anim) => FadeTransition(
+            opacity: anim,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                      begin: const Offset(0, 0.12), end: Offset.zero)
+                  .animate(anim),
+              child: child,
             ),
           ),
+          child: hasAmt
+              ? _VerdictRow(risk: risk, c: c, key: ValueKey(risk))
+              : Padding(
+                  key: const ValueKey('empty'),
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Text(
+                    'Escribe un monto para ver el veredicto',
+                    style: TextStyle(fontSize: 14, color: c.label4),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
         ),
-      ),
+      ]),
     );
   }
-  //</editor-fold>
 }
 
+class _VerdictRow extends StatelessWidget {
+  final RiskLevel risk;
+  final _C c;
+  const _VerdictRow({required this.risk, required this.c, super.key});
 
-// --- El resto de las clases (RiskLevel, AIRecommendation, _ImpactGaugePainter) no cambian ---
-// ... (Pega aquí el resto de tus clases auxiliares sin modificarlas) ...
-
-//<editor-fold desc="Clases auxiliares (sin cambios)">
-enum RiskLevel {
-  safe(
-    'Gasto Seguro',
-    'Este gasto no compromete tus finanzas',
-    Colors.green,
-    Iconsax.shield_tick,
-  ),
-  moderate(
-    'Precaución Moderada',
-    'Posible con ajustes en otros gastos',
-    Colors.orange,
-    Iconsax.warning_2,
-  ),
-  high(
-    'Riesgo Alto',
-    'Podría afectar tus objetivos financieros',
-    Colors.red,
-    Iconsax.danger,
-  );
-
-  final String title;
-  final String subtitle;
-  final Color color;
-  final IconData icon;
-
-  const RiskLevel(this.title, this.subtitle, this.color, this.icon);
+  @override
+  Widget build(BuildContext context) {
+    return Column(children: [
+      Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Container(
+          width: 28, height: 28,
+          decoration: BoxDecoration(
+              color: risk.color.withOpacity(c.isDark ? 0.22 : 0.10),
+              shape: BoxShape.circle),
+          child: Icon(risk.icon, size: 14, color: risk.color),
+        ),
+        const SizedBox(width: _C.sm),
+        Text(
+          risk.verdict,
+          style: TextStyle(
+            fontSize: 16, fontWeight: FontWeight.w700,
+            color: risk.color, letterSpacing: -0.3,
+          ),
+        ),
+      ]),
+      const SizedBox(height: 5),
+      Text(
+        risk.advice,
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 13, color: c.label3, height: 1.4),
+      ),
+    ]);
+  }
 }
 
-class AIRecommendation {
-  final String title;
-  final String description;
-  final IconData icon;
-  final Color color;
-
-  AIRecommendation({
-    required this.title,
-    required this.description,
-    required this.icon,
-    required this.color,
-  });
-}
-
-class _ImpactGaugePainter extends CustomPainter {
+// ─── GAUGE PAINTER ────────────────────────────────────────────────────────────
+class _GaugePainter extends CustomPainter {
   final double progress;
-  final Color color;
-  final Color backgroundColor;
+  final Color fillColor;
+  final Color trackColor;
+  final bool isDark;
 
-  _ImpactGaugePainter({
-    required this.progress,
-    required this.color,
-    required this.backgroundColor,
+  const _GaugePainter({
+    required this.progress, required this.fillColor,
+    required this.trackColor, required this.isDark,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = math.min(size.width / 2, size.height / 2) - 10;
-    const startAngle = math.pi;
-    const sweepAngle = math.pi;
+    final cx = size.width / 2;
+    final cy = size.height * 0.78;
+    final r  = math.min(size.width / 2, size.height) - 16.0;
 
-    final bgPaint = Paint()
-      ..color = backgroundColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 12
-      ..strokeCap = StrokeCap.round;
+    const start = math.pi;
+    const sweep = math.pi;
 
+    // Track
     canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      startAngle,
-      sweepAngle,
-      false,
-      bgPaint,
+      Rect.fromCircle(center: Offset(cx, cy), radius: r),
+      start, sweep, false,
+      Paint()
+        ..color      = trackColor.withOpacity(isDark ? 0.30 : 0.18)
+        ..style      = PaintingStyle.stroke
+        ..strokeWidth = 10
+        ..strokeCap   = StrokeCap.round,
     );
 
-    final progressPaint = Paint()
-      ..shader = LinearGradient(
-        colors: [color.withOpacity(0.6), color],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ).createShader(Rect.fromCircle(center: center, radius: radius))
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 12
-      ..strokeCap = StrokeCap.round;
+    if (progress > 0.008) {
+      final fill = progress.clamp(0.0, 1.0);
 
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      startAngle,
-      sweepAngle * progress,
-      false,
-      progressPaint,
-    );
-
-    if (progress > 0) {
-      final glowPaint = Paint()
-        ..color = color.withOpacity(0.2)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 20
-        ..strokeCap = StrokeCap.round
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
-
+      // Glow — aparece solo con progreso
       canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius),
-        startAngle,
-        sweepAngle * progress,
-        false,
-        glowPaint,
+        Rect.fromCircle(center: Offset(cx, cy), radius: r),
+        start, sweep * fill, false,
+        Paint()
+          ..color      = fillColor.withOpacity(isDark ? 0.28 : 0.18)
+          ..style      = PaintingStyle.stroke
+          ..strokeWidth = 20
+          ..strokeCap   = StrokeCap.round
+          ..maskFilter  = const MaskFilter.blur(BlurStyle.normal, 7),
+      );
+
+      // Fill
+      canvas.drawArc(
+        Rect.fromCircle(center: Offset(cx, cy), radius: r),
+        start, sweep * fill, false,
+        Paint()
+          ..color      = fillColor
+          ..style      = PaintingStyle.stroke
+          ..strokeWidth = 10
+          ..strokeCap   = StrokeCap.round,
       );
     }
   }
 
   @override
-  bool shouldRepaint(_ImpactGaugePainter oldDelegate) {
-    return oldDelegate.progress != progress ||
-        oldDelegate.color != color ||
-        oldDelegate.backgroundColor != backgroundColor;
+  bool shouldRepaint(_GaugePainter o) =>
+      o.progress != progress || o.fillColor != fillColor;
+}
+
+// ─── BALANCE BAR ─────────────────────────────────────────────────────────────
+// Dos columnas en una tarjeta compacta.
+// Izquierda: saldo disponible (dinámico si hay monto).
+// Derecha: progreso del presupuesto mensual.
+class _BalanceBar extends StatelessWidget {
+  final double balance;
+  final double budget;
+  final double spent;
+  final double currentAmount;
+  final _C c;
+
+  const _BalanceBar({
+    required this.balance, required this.budget,
+    required this.spent, required this.currentAmount, required this.c,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final compact   = NumberFormat.compactCurrency(
+        locale: 'es_CO', symbol: '\$', decimalDigits: 1);
+    final remaining  = balance - currentAmount;
+    final spentPct   = budget > 0 ? (spent / budget).clamp(0.0, 1.0) : 0.0;
+    final hasAmt     = currentAmount > 0;
+
+    return Container(
+      padding: const EdgeInsets.all(_C.md),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(_C.rXL),
+        border: Border.all(color: c.sep.withOpacity(0.4), width: 0.5),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(c.isDark ? 0.14 : 0.03),
+              blurRadius: 8, offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Row(children: [
+        // Saldo disponible
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('SALDO DISPONIBLE',
+                style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700,
+                    letterSpacing: 0.8, color: c.label3)),
+            const SizedBox(height: 4),
+            AnimatedDefaultTextStyle(
+              duration: _C.fast,
+              style: TextStyle(
+                fontSize: 22, fontWeight: FontWeight.w800,
+                letterSpacing: -0.6, height: 1.0,
+                color: hasAmt
+                    ? (remaining < 0 ? _C.red : _C.green)
+                    : c.label,
+              ),
+              child: Text(compact.format(hasAmt ? remaining : balance)),
+            ),
+            if (hasAmt && remaining >= 0) ...[
+              const SizedBox(height: 2),
+              Text('después del gasto',
+                  style: TextStyle(fontSize: 10, color: c.label3)),
+            ],
+          ]),
+        ),
+
+        // Separador
+        Container(width: 0.5, height: 46,
+            margin: const EdgeInsets.symmetric(horizontal: _C.md),
+            color: c.sep),
+
+        // Presupuesto del mes
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('PRESUPUESTO MES',
+                style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700,
+                    letterSpacing: 0.8, color: c.label3)),
+            const SizedBox(height: 6),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: LinearProgressIndicator(
+                value: spentPct,
+                minHeight: 5,
+                backgroundColor: c.sep.withOpacity(0.5),
+                valueColor: AlwaysStoppedAnimation(
+                  spentPct > 0.8 ? _C.red
+                      : spentPct > 0.5 ? _C.orange : _C.green,
+                ),
+              ),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              '${compact.format(spent)} / ${compact.format(budget)}',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                  color: c.label2),
+            ),
+          ]),
+        ),
+      ]),
+    );
   }
 }
-//</editor-fold>
+
+// ─── AMOUNT INPUT ─────────────────────────────────────────────────────────────
+// El monto es el protagonista — fontSize 34, bold.
+// El borde cambia de color según el riesgo en tiempo real.
+// Sin leer el texto del veredicto, el usuario ya sabe la respuesta.
+class _AmountInput extends StatefulWidget {
+  final TextEditingController ctrl;
+  final FocusNode focus;
+  final RiskLevel risk;
+  final bool hasAmt;
+  final _C c;
+
+  const _AmountInput({
+    required this.ctrl, required this.focus,
+    required this.risk, required this.hasAmt, required this.c,
+  });
+
+  @override
+  State<_AmountInput> createState() => _AmountInputState();
+}
+
+class _AmountInputState extends State<_AmountInput> {
+  bool _focused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.focus.addListener(() {
+      if (mounted) setState(() => _focused = widget.focus.hasFocus);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.c;
+    final borderColor = widget.hasAmt
+        ? widget.risk.color.withOpacity(_focused ? 0.65 : 0.38)
+        : (_focused ? _C.blue.withOpacity(0.55) : c.sep.withOpacity(0.45));
+    final shadowColor = widget.hasAmt
+        ? widget.risk.color.withOpacity(c.isDark ? 0.12 : 0.07)
+        : Colors.black.withOpacity(c.isDark ? 0.14 : 0.03);
+
+    return AnimatedContainer(
+      duration: _C.mid,
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(_C.rXL),
+        border: Border.all(
+            color: borderColor, width: _focused || widget.hasAmt ? 1.4 : 0.5),
+        boxShadow: [
+          BoxShadow(color: shadowColor,
+              blurRadius: _focused ? 14 : 6, offset: const Offset(0, 2)),
+        ],
+      ),
+      child: TextFormField(
+        controller: widget.ctrl,
+        focusNode: widget.focus,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        style: TextStyle(
+          fontSize: 34, fontWeight: FontWeight.w800,
+          color: widget.hasAmt ? widget.risk.color : c.label,
+          letterSpacing: -0.8,
+        ),
+        validator: (v) {
+          if (v == null || v.isEmpty) return '';
+          final n = double.tryParse(v.replaceAll(',', '.'));
+          if (n == null || n <= 0) return '';
+          return null;
+        },
+        decoration: InputDecoration(
+          hintText: '0',
+          hintStyle: TextStyle(fontSize: 34, fontWeight: FontWeight.w800,
+              color: c.label4, letterSpacing: -0.8),
+          prefixIcon: Padding(
+            padding: const EdgeInsets.only(left: 6),
+            child: AnimatedDefaultTextStyle(
+              duration: _C.fast,
+              style: TextStyle(
+                fontSize: 20, fontWeight: FontWeight.w700,
+                color: widget.hasAmt ? widget.risk.color
+                    : (_focused ? _C.blue : c.label4),
+              ),
+              child: const Text(' \$ '),
+            ),
+          ),
+          prefixIconConstraints: const BoxConstraints(minWidth: 0),
+          border:         InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+              horizontal: _C.md, vertical: 18),
+          errorStyle: const TextStyle(height: 0, fontSize: 0),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── QUICK AMOUNTS ROW ────────────────────────────────────────────────────────
+// 10% / 25% / 50% del saldo — con la cantidad real debajo.
+// El usuario entiende el compromiso antes de tocar.
+class _QuickRow extends StatelessWidget {
+  final double balance;
+  final _C c;
+  final ValueChanged<double> onTap;
+
+  const _QuickRow({
+    required this.balance, required this.c, required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = NumberFormat.compactCurrency(
+        locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+    final items = [(0.10, '10%'), (0.25, '25%'), (0.50, '50%')];
+
+    return Row(children: [
+      for (int i = 0; i < items.length; i++) ...[
+        if (i > 0) const SizedBox(width: _C.sm),
+        Expanded(
+          child: _ScaleBtn(
+            onTap: () => onTap(balance * items[i].$1),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 9),
+              decoration: BoxDecoration(
+                color: c.raised,
+                borderRadius: BorderRadius.circular(_C.rMD),
+                border: Border.all(color: c.sep.withOpacity(0.3), width: 0.5),
+              ),
+              child: Column(children: [
+                Text(items[i].$2,
+                    style: const TextStyle(fontSize: 13,
+                        fontWeight: FontWeight.w700, color: _C.blue)),
+                const SizedBox(height: 2),
+                Text(compact.format(balance * items[i].$1),
+                    style: TextStyle(fontSize: 10, color: c.label3)),
+              ]),
+            ),
+          ),
+        ),
+      ]
+    ]);
+  }
+}
+
+// ─── CATEGORY PICKER ─────────────────────────────────────────────────────────
+class _CatPicker extends StatelessWidget {
+  final Future<List<Category>> future;
+  final Category? selected;
+  final _C c;
+  final ValueChanged<Category?> onChanged;
+
+  const _CatPicker({
+    required this.future, required this.selected,
+    required this.c, required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Category>>(
+      future: future,
+      builder: (_, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return _Skel(c: c);
+        }
+        if (!snap.hasData || snap.data!.isEmpty) {
+          return Text('No se encontraron categorías.',
+              style: TextStyle(fontSize: 13, color: c.label3));
+        }
+        final cats = snap.data!;
+        return AnimatedContainer(
+          duration: _C.fast,
+          decoration: BoxDecoration(
+            color: c.surface,
+            borderRadius: BorderRadius.circular(_C.rXL),
+            border: Border.all(
+              color: selected != null
+                  ? selected!.colorAsObject.withOpacity(0.38)
+                  : c.sep.withOpacity(0.40),
+              width: selected != null ? 1.2 : 0.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withOpacity(c.isDark ? 0.14 : 0.03),
+                  blurRadius: 6, offset: const Offset(0, 1)),
+            ],
+          ),
+          child: DropdownButtonHideUnderline(
+            child: ButtonTheme(
+              alignedDropdown: true,
+              child: DropdownButton<Category>(
+                value: selected,
+                isExpanded: true,
+                borderRadius: BorderRadius.circular(_C.rXL),
+                dropdownColor: c.surface,
+                icon: Icon(Icons.keyboard_arrow_down_rounded,
+                    color: c.label3, size: 20),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: _C.md, vertical: 6),
+                hint: Row(children: [
+                  Icon(Iconsax.category, size: 18, color: c.label4),
+                  const SizedBox(width: _C.md),
+                  Text('Selecciona una categoría',
+                      style: TextStyle(fontSize: 15, color: c.label4)),
+                ]),
+                items: cats.map((cat) => DropdownMenuItem(
+                  value: cat,
+                  child: Row(children: [
+                    Container(
+                      width: 34, height: 34,
+                      decoration: BoxDecoration(
+                          color: cat.colorAsObject.withOpacity(
+                              c.isDark ? 0.18 : 0.09),
+                          borderRadius: BorderRadius.circular(8)),
+                      child: Icon(cat.icon, color: cat.colorAsObject, size: 16),
+                    ),
+                    const SizedBox(width: _C.md),
+                    Text(cat.name, style: TextStyle(fontSize: 15,
+                        fontWeight: FontWeight.w600, color: c.label)),
+                  ]),
+                )).toList(),
+                onChanged: onChanged,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ─── METRICS ROW ─────────────────────────────────────────────────────────────
+// Tres celdas cuadradas — escaneables en un vistazo.
+// Cada color refleja el nivel de riesgo de esa métrica individualmente.
+class _MetricsRow extends StatelessWidget {
+  final double amount;
+  final double balance;
+  final double budget;
+  final RiskLevel risk;
+  final _C c;
+
+  const _MetricsRow({
+    required this.amount, required this.balance,
+    required this.budget, required this.risk, required this.c,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final compact     = NumberFormat.compactCurrency(
+        locale: 'es_CO', symbol: '\$', decimalDigits: 1);
+    final remaining   = balance - amount;
+    final pctBudget   = budget > 0 ? (amount / budget * 100) : 0.0;
+    final pctBalance  = balance > 0 ? (amount / balance * 100) : 0.0;
+
+    return Row(children: [
+      Expanded(child: _Cell(
+        label: 'Te quedarán',
+        value: compact.format(remaining),
+        color: remaining < 0 ? _C.red : _C.green,
+        icon: Iconsax.wallet_3, c: c,
+      )),
+      const SizedBox(width: _C.sm),
+      Expanded(child: _Cell(
+        label: 'Del presupuesto',
+        value: '${pctBudget.toStringAsFixed(1)}%',
+        color: pctBudget > 50 ? _C.red : pctBudget > 25 ? _C.orange : _C.green,
+        icon: Iconsax.chart_1, c: c,
+      )),
+      const SizedBox(width: _C.sm),
+      Expanded(child: _Cell(
+        label: 'Del saldo total',
+        value: '${pctBalance.toStringAsFixed(1)}%',
+        color: risk.color,
+        icon: Iconsax.percentage_circle, c: c,
+      )),
+    ]);
+  }
+}
+
+class _Cell extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  final IconData icon;
+  final _C c;
+
+  const _Cell({
+    required this.label, required this.value,
+    required this.color, required this.icon, required this.c,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(_C.md),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(_C.rLG),
+        border: Border.all(color: color.withOpacity(0.15), width: 0.5),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(c.isDark ? 0.14 : 0.03),
+              blurRadius: 6, offset: const Offset(0, 1)),
+        ],
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(
+          width: 30, height: 30,
+          decoration: BoxDecoration(
+              color: color.withOpacity(c.isDark ? 0.18 : 0.09),
+              borderRadius: BorderRadius.circular(8)),
+          child: Icon(icon, size: 14, color: color),
+        ),
+        const SizedBox(height: _C.sm),
+        Text(label,
+            style: TextStyle(fontSize: 10, color: c.label3,
+                fontWeight: FontWeight.w500)),
+        const SizedBox(height: 3),
+        Text(value,
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800,
+                color: color, letterSpacing: -0.3),
+            overflow: TextOverflow.ellipsis),
+      ]),
+    );
+  }
+}
+
+// ─── RECOMMENDATION CARD ─────────────────────────────────────────────────────
+// UNA recomendación. La más relevante.
+// Un carrusel requiere que el usuario trabaje. Una tarjeta comunica.
+class _RecCard extends StatelessWidget {
+  final RiskLevel risk;
+  final double amount;
+  final double balance;
+  final _C c;
+
+  const _RecCard({
+    required this.risk, required this.amount,
+    required this.balance, required this.c,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = NumberFormat.compactCurrency(
+        locale: 'es_CO', symbol: '\$', decimalDigits: 1);
+
+    final (title, body, icon) = switch (risk) {
+      RiskLevel.safe => (
+        'Hábito financiero saludable',
+        'Este gasto encaja con tu situación. Te quedarán ${compact.format(balance - amount)} disponibles para imprevistos.',
+        Iconsax.verify,
+      ),
+      RiskLevel.moderate => (
+        'Considera ajustar otros gastos',
+        'Es posible, pero reduce gastos variables esta semana para mantener tu fondo de emergencia intacto.',
+        Iconsax.warning_2,
+      ),
+      RiskLevel.high => (
+        'Busca una alternativa',
+        'Este gasto comprometería tu estabilidad. Considera reducir a ${compact.format(balance * 0.20)} o posponerlo.',
+        Iconsax.danger,
+      ),
+    };
+
+    return AnimatedSwitcher(
+      duration: _C.mid,
+      switchInCurve: _C.easeOut,
+      transitionBuilder: (child, anim) => FadeTransition(
+        opacity: anim,
+        child: SlideTransition(
+          position: Tween<Offset>(
+                  begin: const Offset(0, 0.05), end: Offset.zero)
+              .animate(anim),
+          child: child,
+        ),
+      ),
+      child: Container(
+        key: ValueKey(risk),
+        padding: const EdgeInsets.all(_C.md),
+        decoration: BoxDecoration(
+          color: risk.color.withOpacity(c.isDark ? 0.08 : 0.04),
+          borderRadius: BorderRadius.circular(_C.rXL),
+          border: Border.all(
+              color: risk.color.withOpacity(0.20), width: 0.5),
+        ),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            width: 36, height: 36,
+            decoration: BoxDecoration(
+                color: risk.color.withOpacity(c.isDark ? 0.20 : 0.10),
+                borderRadius: BorderRadius.circular(10)),
+            child: Icon(icon, size: 17, color: risk.color),
+          ),
+          const SizedBox(width: _C.md),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title,
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
+                      color: c.label, letterSpacing: -0.1)),
+              const SizedBox(height: 3),
+              Text(body,
+                  style: TextStyle(fontSize: 13, color: c.label3, height: 1.45)),
+            ]),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+// ─── SIMULATE BUTTON ─────────────────────────────────────────────────────────
+class _SimBtn extends StatefulWidget {
+  final bool isLoading;
+  final _C c;
+  final VoidCallback onTap;
+  const _SimBtn({required this.isLoading, required this.c, required this.onTap});
+
+  @override
+  State<_SimBtn> createState() => _SimBtnState();
+}
+
+class _SimBtnState extends State<_SimBtn> {
+  bool _p = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown:   widget.isLoading ? null : (_) => setState(() => _p = true),
+      onTapUp:     widget.isLoading ? null : (_) { setState(() => _p = false); widget.onTap(); },
+      onTapCancel: () => setState(() => _p = false),
+      child: AnimatedScale(
+        scale: _p ? 0.97 : 1.0,
+        duration: const Duration(milliseconds: 80),
+        child: AnimatedContainer(
+          duration: _C.fast,
+          height: 56,
+          decoration: BoxDecoration(
+            color: widget.isLoading ? widget.c.label4 : _C.blue,
+            borderRadius: BorderRadius.circular(_C.rXL),
+            boxShadow: widget.isLoading ? null : [
+              BoxShadow(
+                color: _C.blue.withOpacity(_p ? 0.18 : 0.35),
+                blurRadius: _p ? 8 : 18,
+                offset: Offset(0, _p ? 2 : 6),
+              ),
+            ],
+          ),
+          alignment: Alignment.center,
+          child: widget.isLoading
+              ? const SizedBox(width: 22, height: 22,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white))
+              : const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Iconsax.cpu, color: Colors.white, size: 20),
+                    SizedBox(width: 10),
+                    Text('Análisis completo con IA',
+                        style: TextStyle(color: Colors.white, fontSize: 16,
+                            fontWeight: FontWeight.w700, letterSpacing: -0.2)),
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── UTILS ────────────────────────────────────────────────────────────────────
+class _Label extends StatelessWidget {
+  final String text;
+  final _C c;
+  const _Label({required this.text, required this.c});
+
+  @override
+  Widget build(BuildContext context) => Text(text,
+      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+          color: c.label3, letterSpacing: 0.1));
+}
+
+class _BackBtn extends StatelessWidget {
+  final _C c;
+  const _BackBtn({required this.c});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () { HapticFeedback.lightImpact(); Navigator.of(context).pop(); },
+      child: Container(
+        margin: const EdgeInsets.all(8),
+        decoration: BoxDecoration(color: c.raised, shape: BoxShape.circle),
+        child: Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: c.label),
+      ),
+    );
+  }
+}
+
+class _ScaleBtn extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onTap;
+  const _ScaleBtn({required this.child, required this.onTap});
+
+  @override
+  State<_ScaleBtn> createState() => _ScaleBtnState();
+}
+
+class _ScaleBtnState extends State<_ScaleBtn> {
+  bool _p = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown:   (_) => setState(() => _p = true),
+      onTapUp:     (_) { setState(() => _p = false); widget.onTap(); },
+      onTapCancel: () => setState(() => _p = false),
+      child: AnimatedScale(
+          scale: _p ? 0.94 : 1.0,
+          duration: const Duration(milliseconds: 80),
+          child: widget.child),
+    );
+  }
+}
+
+class _Skel extends StatelessWidget {
+  final _C c;
+  const _Skel({required this.c});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    height: 56,
+    decoration: BoxDecoration(
+        color: c.surface, borderRadius: BorderRadius.circular(_C.rXL)),
+    alignment: Alignment.center,
+    child: SizedBox(width: 20, height: 20,
+        child: CircularProgressIndicator(strokeWidth: 2, color: c.label4)),
+  );
+}
+
+class _Loader extends StatelessWidget {
+  final _C c;
+  const _Loader({required this.c});
+
+  @override
+  Widget build(BuildContext context) => Center(child: Column(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      const SizedBox(width: 24, height: 24,
+          child: CircularProgressIndicator(strokeWidth: 2, color: _C.blue)),
+      const SizedBox(height: _C.md),
+      Text('Cargando datos…',
+          style: TextStyle(fontSize: 15, color: c.label3)),
+    ],
+  ));
+}
+
+class _ErrState extends StatelessWidget {
+  final String msg;
+  final _C c;
+  final VoidCallback onRetry;
+  const _ErrState({required this.msg, required this.c, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(_C.xl),
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Container(
+            width: 64, height: 64,
+            decoration: BoxDecoration(
+                color: _C.red.withOpacity(c.isDark ? 0.18 : 0.09),
+                shape: BoxShape.circle),
+            child: const Icon(Iconsax.danger, size: 28, color: _C.red),
+          ),
+          const SizedBox(height: _C.md),
+          Text(msg, textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 15, color: c.label3, height: 1.4)),
+          const SizedBox(height: _C.lg),
+          _ScaleBtn(
+            onTap: onRetry,
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: _C.lg, vertical: 12),
+              decoration: BoxDecoration(
+                  color: _C.blue, borderRadius: BorderRadius.circular(_C.rMD)),
+              child: const Text('Reintentar',
+                  style: TextStyle(color: Colors.white,
+                      fontSize: 15, fontWeight: FontWeight.w600)),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+}

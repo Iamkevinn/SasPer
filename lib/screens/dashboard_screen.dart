@@ -17,6 +17,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 import 'package:lottie/lottie.dart';
+import 'package:sasper/data/account_repository.dart';
+import 'package:sasper/models/account_model.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
 import 'package:sasper/data/challenge_repository.dart';
@@ -293,8 +295,9 @@ class _CompactHeaderDelegate extends SliverPersistentHeaderDelegate {
     required this.onAiTap,
   });
 
-  @override double get minExtent => 110;
-  @override double get maxExtent => 170;
+  // Aumentamos un poco los márgenes para que Flutter tenga "aire" en los cálculos
+  @override double get minExtent => 118.0; 
+  @override double get maxExtent => 172.0;
 
   @override
   bool shouldRebuild(covariant _CompactHeaderDelegate old) =>
@@ -302,132 +305,149 @@ class _CompactHeaderDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   Widget build(BuildContext ctx, double shrinkOffset, bool overlaps) {
-    final t = (shrinkOffset / (maxExtent - minExtent)).clamp(0.0, 1.0);
-    final statusH = MediaQuery.of(ctx).padding.top;
+    // 1. Calculamos el factor de encogimiento (t)
+    final double t = (shrinkOffset / (maxExtent - minExtent)).clamp(0.0, 1.0);
+    
+    // 2. Obtenemos el padding superior (Safe Area)
+    final double statusH = MediaQuery.of(ctx).padding.top;
+    
     final theme = Theme.of(ctx);
     final isDark = theme.brightness == Brightness.dark;
-    
-    // Formateador compacto para el patrimonio (ej: $12M)
     final fmtCompact = NumberFormat.compactCurrency(locale: 'es_CO', symbol: '\$');
-    // Formateador normal para el saldo disponible (ej: $12.000.000)
     final fmtNormal = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
-    
     final onSurface = theme.colorScheme.onSurface;
 
-    // Colores adaptativos
     final surfaceBg = isDark
         ? theme.scaffoldBackgroundColor.withOpacity(0.92)
         : theme.scaffoldBackgroundColor.withOpacity(0.94);
 
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          color: surfaceBg,
-          padding: EdgeInsets.only(
-            top: statusH + 8,
-            left: _D.h + 4,
-            right: _D.h,
-            bottom: 12,
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.end,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children:[
-              // Fila superior: saludo + Disponible + IA button
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children:[
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children:[
-                        // Saludo
-                        AnimatedOpacity(
-                          opacity: (1 - t * 2).clamp(0.0, 1.0),
-                          duration: const Duration(milliseconds: 80),
-                          child: Text(
-                            _greeting(data.fullName),
-                            style: _D.caption(13, color: onSurface.withOpacity(0.55)),
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        
-                        // BALANCE OPERATIVO (El Disponible)
-                        AnimatedBuilder(
-                          animation: breathe,
-                          builder: (_, __) => Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children:[
-                              Text(
-                                // Usamos formato completo para el número principal si cabe
-                                fmtNormal.format(data.availableBalance),
-                                style: _D.display(lerpDouble(34, 24, t)!, color: onSurface),
-                              ),
-                              AnimatedOpacity(
-                                opacity: (1 - t * 2).clamp(0.0, 1.0),
-                                duration: const Duration(milliseconds: 80),
-                                child: Row(
-                                  children:[
-                                    Icon(Iconsax.wallet_check, size: 12, color: _D.teal.withOpacity(0.9)),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'Disponible para gastar',
-                                      style: _D.label(11, color: _D.teal.withOpacity(0.9), w: FontWeight.w600),
+    // SOLUCIÓN AL ERROR DE GEOMETRÍA:
+    // Usamos LayoutBuilder para que el contenedor hijo ocupe EXACTAMENTE 
+    // lo que el SliverPersistentHeader le asigne, evitando errores de redondeo.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final currentHeight = constraints.maxHeight;
+
+        return ClipRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            child: Container(
+              height: currentHeight, // Forzamos la altura exacta del layout
+              width: double.infinity,
+              color: surfaceBg,
+              padding: EdgeInsets.only(
+                top: statusH + 8,
+                left: _D.h + 4,
+                right: _D.h,
+                bottom: 10,
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // --- SECCIÓN SUPERIOR ---
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.bottomLeft,
+                      child: SizedBox(
+                        width: MediaQuery.of(ctx).size.width - (_D.h * 2),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  AnimatedOpacity(
+                                    opacity: (1 - t * 2).clamp(0.0, 1.0),
+                                    duration: const Duration(milliseconds: 80),
+                                    child: Text(
+                                      _greeting(data.fullName),
+                                      style: _D.caption(13, color: onSurface.withOpacity(0.55)),
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  AnimatedBuilder(
+                                    animation: breathe,
+                                    builder: (_, __) => Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          fmtNormal.format(data.availableBalance),
+                                          style: _D.display(
+                                            (34 - (10 * t)).roundToDouble(), // .roundToDouble ayuda a la precisión
+                                            color: onSurface
+                                          ),
+                                        ),
+                                        AnimatedOpacity(
+                                          opacity: (1 - t * 2).clamp(0.0, 1.0),
+                                          duration: const Duration(milliseconds: 80),
+                                          child: Row(
+                                            children: [
+                                              Icon(Iconsax.wallet_check, size: 12, color: _D.teal.withOpacity(0.9)),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                'Disponible para gastar',
+                                                style: _D.label(11, color: _D.teal.withOpacity(0.9), w: FontWeight.w600),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
+                            ),
+                            const SizedBox(width: 12),
+                            _AiButton(onTap: onAiTap, breathe: breathe),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
 
-                  // IA Pill button
-                  _AiButton(onTap: onAiTap, breathe: breathe),
-                ],
-              ),
+                  // Espaciado dinámico redondeado
+                  SizedBox(height: (12 - (8 * t)).roundToDouble()),
 
-              const SizedBox(height: 12),
-
-              // BARRA INFERIOR: PATRIMONIO NETO + SALUD
-              AnimatedOpacity(
-                opacity: (1 - t * 1.5).clamp(0.0, 1.0),
-                duration: const Duration(milliseconds: 80),
-                child: Row(
-                  children:[
-                    // Patrimonio Neto (Activos - Pasivos)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                  // --- SECCIÓN INFERIOR (Solo visible si no está colapsado) ---
+                  if (t < 0.5)
+                    AnimatedOpacity(
+                      opacity: (1 - t * 2.5).clamp(0.0, 1.0),
+                      duration: const Duration(milliseconds: 60),
                       child: Row(
                         children: [
-                          Icon(Iconsax.bank, size: 13, color: onSurface.withOpacity(0.7)),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Patrimonio: ${fmtCompact.format(data.netWorth)}',
-                            style: _D.label(12, w: FontWeight.w600, color: onSurface.withOpacity(0.7)),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Iconsax.bank, size: 13, color: onSurface.withOpacity(0.7)),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Patrimonio: ${fmtCompact.format(data.netWorth)}',
+                                  style: _D.label(12, w: FontWeight.w600, color: onSurface.withOpacity(0.7)),
+                                ),
+                              ],
+                            ),
                           ),
+                          const Spacer(),
+                          _HealthPill(score: data.healthScore),
                         ],
                       ),
                     ),
-                    
-                    const Spacer(),
-                    
-                    // Salud Financiera (Ya existente)
-                    _HealthPill(score: data.healthScore),
-                  ],
-                ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      }
     );
   }
 
@@ -1344,4 +1364,135 @@ class _NoVsync implements TickerProvider {
   const _NoVsync();
   @override
   Ticker createTicker(TickerCallback onTick) => Ticker(onTick);
+}
+
+class CreditCardAnalysisCard extends StatelessWidget {
+  final Account card;
+  const CreditCardAnalysisCard({super.key, required this.card});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Map<String, double>>(
+      future: AccountRepository.instance.getCreditCardAnalytics(card.id),
+      builder: (context, snapshot) {
+        final data = snapshot.data ?? {'totalDebt': 0.0, 'monthlyObligation': 0.0};
+        final totalDebt = data['totalDebt']!;
+        final cupoDisponible = card.creditLimit - totalDebt;
+        final usagePct = (totalDebt / card.creditLimit).clamp(0.0, 1.0);
+
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: const Color(0xFF111118),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: const Color(0xFF252530)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('DEUDA TOTAL ESTIMADA', 
+                        style: TextStyle(color: Color(0xFF7A7688), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                      Text('\$ ${NumberFormat('#,###').format(totalDebt)}', 
+                        style: const TextStyle(color: Color(0xFFF0ECE4), fontSize: 24, fontWeight: FontWeight.w900)),
+                    ],
+                  ),
+                  _CircularProgress(pct: usagePct),
+                ],
+              ),
+              const SizedBox(height: 20),
+              // Barra de cupo
+              const Text('CUPO UTILIZADO', style: TextStyle(color: Color(0xFF7A7688), fontSize: 10)),
+              const SizedBox(height: 8),
+              LinearProgressIndicator(
+                value: usagePct,
+                backgroundColor: const Color(0xFF1E1E28),
+                valueColor: AlwaysStoppedAnimation(usagePct > 0.8 ? Colors.red : const Color(0xFFC9A96E)),
+                minHeight: 6,
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _MiniData(label: 'Disponible', value: '\$ ${NumberFormat('#,###').format(cupoDisponible)}'),
+                  _MiniData(label: 'Próximo Pago', value: '\$ ${NumberFormat('#,###').format(data['monthlyObligation']! + card.maintenanceFee)}'),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _CircularProgress extends StatelessWidget {
+  final double pct;
+  const _CircularProgress({required this.pct});
+
+  @override
+  Widget build(BuildContext context) {
+    // Cambia a rojo si el uso es mayor al 80%
+    final Color color = pct > 0.8 ? Colors.redAccent : const Color(0xFFC9A96E);
+    
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        SizedBox(
+          width: 50,
+          height: 50,
+          child: CircularProgressIndicator(
+            value: pct,
+            strokeWidth: 4,
+            backgroundColor: const Color(0xFF1E1E28),
+            valueColor: AlwaysStoppedAnimation(color),
+          ),
+        ),
+        Icon(
+          pct > 0.8 ? Iconsax.warning_2 : Iconsax.card_tick,
+          size: 18,
+          color: color,
+        ),
+      ],
+    );
+  }
+}
+
+class _MiniData extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _MiniData({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label.toUpperCase(),
+          style: const TextStyle(
+            color: Color(0xFF7A7688),
+            fontSize: 9,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Color(0xFFF0ECE4),
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
 }

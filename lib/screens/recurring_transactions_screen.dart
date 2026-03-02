@@ -19,6 +19,7 @@ import 'package:sasper/data/recurring_repository.dart';
 import 'package:sasper/models/recurring_transaction_model.dart';
 import 'package:sasper/screens/add_recurring_transaction_screen.dart';
 import 'package:sasper/screens/edit_recurring_transaction_screen.dart';
+import 'package:sasper/screens/pending_payments_screen.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:sasper/services/notification_service.dart';
@@ -467,6 +468,13 @@ class _RecurringList extends StatelessWidget {
     final dueToday = items.where((i) => _day(i) == today).toList();
     final upcoming = items.where((i) => _day(i).isAfter(today)).toList();
 
+    // --- LÓGICA DE LA ALERTA INTELIGENTE ---
+    // Contamos items que vencen hoy o ya vencieron
+    final pendingCount = items.where((i) {
+      final itemDate = DateTime(i.nextDueDate.year, i.nextDueDate.month, i.nextDueDate.day);
+      return itemDate.isBefore(today) || itemDate.isAtSameMomentAs(today);
+    }).length;
+
     return RefreshIndicator(
       onRefresh: onRefresh,
       color: _C.accent,
@@ -482,7 +490,23 @@ class _RecurringList extends StatelessWidget {
                   items: items, isExpense: isExpense, c: c),
             ),
           ),
-
+          // --- AQUÍ INSERTAMOS LA ALERTA ---
+        SliverToBoxAdapter(
+          child: _FadeSlide(
+            delay: 50,
+            child: _PendingAlertBanner(
+              count: pendingCount,
+              c: c,
+              onTap: () {
+                HapticFeedback.mediumImpact();
+                // Navegamos a la pantalla que creamos antes
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const PendingPaymentsScreen()),
+                );
+              },
+            ),
+          ),
+        ),
           if (overdue.isNotEmpty) ...[
             SliverToBoxAdapter(
               child: _SectionLabel(
@@ -1576,6 +1600,75 @@ class _FadeSlideState extends State<_FadeSlide>
     return FadeTransition(
       opacity: _opacity,
       child: SlideTransition(position: _slide, child: widget.child),
+    );
+  }
+}
+
+class _PendingAlertBanner extends StatelessWidget {
+  final int count;
+  final _C c;
+  final VoidCallback onTap;
+
+  const _PendingAlertBanner({required this.count, required this.c, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    if (count == 0) return const SizedBox.shrink();
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(_C.md, _C.md, _C.md, 0),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          // Usamos un gradiente sutil o un color sólido vibrante pero elegante
+          color: _C.warning.withOpacity(c.isDark ? 0.2 : 0.1),
+          borderRadius: BorderRadius.circular(_C.rLG),
+          border: Border.all(color: _C.warning.withOpacity(0.3), width: 0.5),
+        ),
+        child: Row(
+          children: [
+            // Icono animado o con un badge
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(Iconsax.notification, color: _C.warning, size: 22),
+                Positioned(
+                  top: -2, right: -2,
+                  child: Container(
+                    width: 10, height: 10,
+                    decoration: BoxDecoration(
+                      color: _C.expense,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: c.surface, width: 1.5),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Acción requerida',
+                    style: TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w700, 
+                      color: c.label, letterSpacing: -0.2
+                    ),
+                  ),
+                  Text(
+                    'Tienes $count ${count == 1 ? 'pago pendiente' : 'pagos pendientes'} por confirmar.',
+                    style: TextStyle(fontSize: 12, color: c.label2),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: _C.warning),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -6,20 +6,25 @@ import 'package:iconsax/iconsax.dart';
 
 enum AccountStatus { active, archived }
 
-// 1. Hacemos que la clase extienda Equatable para simplificar la comparación.
 class Account extends Equatable {
   final String id;
   final String userId;
   final String name;
   final String type;
-  final double balance; // Mantenemos el balance como el único campo mutable si es necesario.
+  final double balance;
   final double initialBalance;
   final DateTime createdAt;
   final String? iconName;
   final String? color;
   final AccountStatus status;
-  
-  // El constructor ahora es `const`.
+
+  // --- NUEVOS CAMPOS PARA TARJETA DE CRÉDITO ---
+  final double creditLimit;    // Cupo total
+  final int? closingDay;       // Día de corte (1-31)
+  final int? dueDay;           // Día de pago (1-31)
+  final double interestRate;   // Tasa de interés efectiva anual
+  final double maintenanceFee;
+
   const Account({
     required this.id,
     required this.userId,
@@ -31,17 +36,18 @@ class Account extends Equatable {
     this.iconName,
     this.color,
     required this.status,
+    // Inicializamos los nuevos campos
+    this.creditLimit = 0.0,
+    this.closingDay,
+    this.dueDay,
+    this.interestRate = 0.0,
+    this.maintenanceFee = 0.0,
   });
 
-  /// Getter dinámico que convierte el `iconName` (String) en un `IconData` real.
   IconData get icon {
-    // Usa la función helper para buscar el ícono en el mapa.
-    // Proporciona Iconsax.wallet como un ícono de respaldo seguro.
     return _iconMap[iconName?.toLowerCase()] ?? Iconsax.wallet;
   }
 
-  // Mapa estático que asocia los nombres de los íconos (en minúsculas) con los objetos IconData.
-  // Esto es mucho más eficiente que un switch gigante.
   static const Map<String, IconData> _iconMap = {
     'money_3': Iconsax.money_3,
     'building_4': Iconsax.building_4,
@@ -49,12 +55,11 @@ class Account extends Equatable {
     'safe_home': Iconsax.safe_home,
     'chart_1': Iconsax.chart_1,
     'wallet': Iconsax.wallet,
-    // --- Añade aquí más íconos de Iconsax si los necesitas en el futuro ---
     'bank': Iconsax.bank,
     'dollar_circle': Iconsax.dollar_circle,
   };
   
-   factory Account.empty() {
+  factory Account.empty() {
     return Account(
       id: '',
       userId: '',
@@ -64,15 +69,14 @@ class Account extends Equatable {
       initialBalance: 0.0,
       createdAt: DateTime.now(),
       status: AccountStatus.active,
+      creditLimit: 0.0,
+      interestRate: 0.0,
     );
   }
 
-  // 2. Método factory `fromMap` mejorado para ser más estricto.
-   // --- CONSTRUCTOR fromMap SIMPLIFICADO Y CORREGIDO ---
+  // --- fromMap ACTUALIZADO PARA LEER DE SUPABASE ---
   factory Account.fromMap(Map<String, dynamic> map) {
     try {
-      // El RPC nos da 'current_balance'. La tabla nos da 'balance'.
-      // Aceptamos cualquiera de los dos para máxima compatibilidad.
       final currentBalance = (map['current_balance'] as num? ?? map['balance'] as num? ?? 0.0).toDouble();
 
       return Account(
@@ -80,19 +84,26 @@ class Account extends Equatable {
         userId: map['user_id'].toString(),
         name: map['name'] as String? ?? 'Cuenta sin nombre',
         type: map['type'] as String? ?? 'Sin tipo',
-        balance: currentBalance, // Usamos el saldo calculado o el de la tabla
+        balance: currentBalance,
         initialBalance: (map['initial_balance'] as num? ?? 0.0).toDouble(),
         createdAt: DateTime.parse(map['created_at'] as String),
         iconName: map['icon_name'] as String?,
         color: map['color'] as String?,
         status: map['status'] == 'archived' ? AccountStatus.archived : AccountStatus.active,
+        
+        // Mapeo de los nuevos campos desde la BD
+        creditLimit: (map['credit_limit'] as num? ?? 0.0).toDouble(),
+        closingDay: map['closing_day'] as int?,
+        dueDay: map['due_day'] as int?,
+        interestRate: (map['interest_rate'] as num? ?? 0.0).toDouble(),
+        maintenanceFee: (map['maintenance_fee'] as num? ?? 0.0).toDouble(),
       );
     } catch (e) {
       throw FormatException('Error al parsear Account desde el mapa: $e', map);
     }
   }
   
-  // 3. Método `copyWith` para facilitar la creación de copias modificadas.
+  // --- copyWith ACTUALIZADO ---
   Account copyWith({
     String? id,
     String? userId,
@@ -103,6 +114,11 @@ class Account extends Equatable {
     DateTime? createdAt,
     String? iconName,
     String? color,
+    double? creditLimit,
+    int? closingDay,
+    int? dueDay,
+    double? interestRate,
+    double? maintenanceFee,
   }) {
     return Account(
       id: id ?? this.id,
@@ -115,10 +131,14 @@ class Account extends Equatable {
       iconName: iconName ?? this.iconName,
       color: color ?? this.color,
       status: status,
+      creditLimit: creditLimit ?? this.creditLimit,
+      closingDay: closingDay ?? this.closingDay,
+      dueDay: dueDay ?? this.dueDay,
+      interestRate: interestRate ?? this.interestRate,
+      maintenanceFee: maintenanceFee ?? this.maintenanceFee,
     );
   }
 
-  // El getter de color ya estaba perfecto.
   Color get accountColor {
     if (color != null && color!.length >= 6) {
       final hexColor = color!.replaceAll('#', '');
@@ -133,7 +153,6 @@ class Account extends Equatable {
     return Colors.grey.shade700;
   }
 
-  // 4. Propiedades para Equatable. Dos cuentas son "iguales" si todos estos campos coinciden.
   @override
   List<Object?> get props => [
         id,
@@ -145,6 +164,12 @@ class Account extends Equatable {
         createdAt,
         iconName,
         color,
-        status 
+        status,
+        // Añadimos a props para que Equatable sepa comparar estos campos
+        creditLimit,
+        closingDay,
+        dueDay,
+        interestRate,
+        maintenanceFee,
       ];
 }

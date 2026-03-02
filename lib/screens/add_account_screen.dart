@@ -33,6 +33,12 @@ class _AddAccountScreenState extends State<AddAccountScreen>
   late AnimationController _glowController;
   late AnimationController _projectionController;
 
+  final _creditLimitController = TextEditingController();
+  final _closingDayController = TextEditingController();
+  final _dueDayController = TextEditingController();
+  final _interestRateController = TextEditingController();
+  final _maintenanceFeeController = TextEditingController();
+
   String _selectedType = 'Cuenta Bancaria';
   bool _isLoading = false;
   bool _isSuccess = false;
@@ -166,6 +172,12 @@ class _AddAccountScreenState extends State<AddAccountScreen>
         name: _nameController.text.trim(),
         type: _selectedType,
         initialBalance: initialBalance,
+        // Campos extra para Tarjeta de Crédito
+        creditLimit: double.tryParse(_creditLimitController.text),
+        closingDay: int.tryParse(_closingDayController.text),
+        dueDay: int.tryParse(_dueDayController.text),
+        interestRate: double.tryParse(_interestRateController.text),
+        maintenanceFee: double.tryParse(_maintenanceFeeController.text),
       );
 
       if (mounted) {
@@ -259,6 +271,102 @@ class _AddAccountScreenState extends State<AddAccountScreen>
 
                         const SizedBox(height: 24),
                         _buildSmartSuggestions(),
+                        if (_selectedType == 'Tarjeta de Crédito') ...[
+                          const SizedBox(height: 32),
+                          _buildSectionHeader(
+                            'Configuración de la Tarjeta',
+                            'Datos vitales para que la IA evite intereses',
+                          ).animate().fadeIn().slideX(),
+                          const SizedBox(height: 16),
+_PremiumTextFormField(
+  controller: _maintenanceFeeController,
+  labelText: 'Cuota de Manejo',
+  icon: Iconsax.money_send,
+  hintText: 'Ej: 25000',
+  keyboardType: TextInputType.number,
+),
+                                   const SizedBox(height: 16),
+                 // Fila para Cupo Total y Tasa de Interés
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _PremiumTextFormField(
+                                  controller: _creditLimitController,
+                                  labelText: 'Cupo Total',
+                                  icon: Iconsax.card_send,
+                                  hintText: 'Ej: 5000000',
+                                  keyboardType: TextInputType.number,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _PremiumTextFormField(
+                                  controller: _interestRateController,
+                                  labelText: 'Interés EA %',
+                                  icon: Iconsax.percentage_square,
+                                  hintText: 'Ej: 25.5',
+                                  keyboardType: TextInputType.number,
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          // Fila para Corte y Pago
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _PremiumTextFormField(
+                                  controller: _closingDayController,
+                                  labelText: 'Día de Corte',
+                                  icon: Iconsax.calendar_tick,
+                                  hintText: '1 al 31',
+                                  keyboardType: TextInputType.number,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _PremiumTextFormField(
+                                  controller: _dueDayController,
+                                  labelText: 'Día de Pago',
+                                  icon: Iconsax.timer_1,
+                                  hintText: '1 al 31',
+                                  keyboardType: TextInputType.number,
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          // 🤖 Alerta IA de Intereses
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                  color: Colors.orange.withOpacity(0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Iconsax.info_circle5,
+                                    color: Colors.orange),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    'Con una tasa del ${_interestRateController.text}% E.A., pagar a cuotas te costará dinero extra cada mes. ¡Te avisaremos antes de tu fecha de corte!',
+                                    style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        color: Colors.orange,
+                                        fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
 
                         const SizedBox(height: 32),
                         _buildSectionHeader(
@@ -997,7 +1105,9 @@ class _PremiumTextFormField extends StatelessWidget {
     required this.icon,
     required this.hintText,
     // ignore: unused_element_parameter
-    this.validator, this.keyboardType, this.inputFormatters,
+    this.validator,
+    this.keyboardType,
+    this.inputFormatters,
   });
 
   @override
