@@ -26,7 +26,12 @@ class NextPaymentWidgetProvider : HomeWidgetProvider() {
 
     private val ACTION_MARK_AS_PAID = "com.example.sasper.ACTION_MARK_AS_PAID"
 
-    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray, widgetData: SharedPreferences) {
+    override fun onUpdate(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetIds: IntArray,
+        widgetData: SharedPreferences
+    ) {
         println("✅ [NextPaymentWidget] onUpdate triggered.")
         appWidgetIds.forEach { widgetId ->
             println("✅ [NextPaymentWidget] Processing widgetId: $widgetId")
@@ -42,7 +47,7 @@ class NextPaymentWidgetProvider : HomeWidgetProvider() {
             } else {
                 try {
                     println("✅ [NextPaymentWidget] jsonString found. Entering try block.")
-                    
+
                     println("  [DEBUG] Step 1: Parsing JSON with Gson.")
                     val payment = Gson().fromJson(jsonString, UpcomingPayment::class.java)
                     println("  [DEBUG] Step 1 SUCCESS. Payment concept: ${payment.concept}")
@@ -57,12 +62,15 @@ class NextPaymentWidgetProvider : HomeWidgetProvider() {
                     showEmptyState(views)
                 }
             }
-            
+
             println("✅ [NextPaymentWidget] Setting up main container click intent.")
             val launchIntent = Intent(context, MainActivity::class.java)
-            val launchPendingIntent = PendingIntent.getActivity(context, widgetId, launchIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            val launchPendingIntent = PendingIntent.getActivity(
+                context, widgetId, launchIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
             views.setOnClickPendingIntent(R.id.widget_next_payment_container, launchPendingIntent)
-            
+
             println("✅ [NextPaymentWidget] Calling appWidgetManager.updateAppWidget for widgetId: $widgetId")
             appWidgetManager.updateAppWidget(widgetId, views)
             println("✅ [NextPaymentWidget] Update complete for widgetId: $widgetId")
@@ -75,18 +83,24 @@ class NextPaymentWidgetProvider : HomeWidgetProvider() {
         views.setViewVisibility(R.id.empty_view_next_payment, View.VISIBLE)
     }
 
-    private fun showPaymentState(context: Context, views: RemoteViews, payment: UpcomingPayment, widgetId: Int) {
+    private fun showPaymentState(
+        context: Context,
+        views: RemoteViews,
+        payment: UpcomingPayment,
+        widgetId: Int
+    ) {
         println("  [DEBUG] Inside showPaymentState. Payment: $payment")
-        
-        println("    [DETAIL] Setting visibility.")
+
         views.setViewVisibility(R.id.next_payment_content, View.VISIBLE)
         views.setViewVisibility(R.id.empty_view_next_payment, View.GONE)
 
-        println("    [DETAIL] Formatting currency.")
-        val currencyFormat = NumberFormat.getCurrencyInstance(Locale("es", "CO")).apply { maximumFractionDigits = 0 }
+        // ── Formatear monto ───────────────────────────────────────────────────
+        val currencyFormat = NumberFormat.getCurrencyInstance(Locale("es", "CO"))
+            .apply { maximumFractionDigits = 0 }
         val amountText = currencyFormat.format(payment.amount)
         println("    [DETAIL] Amount formatted: $amountText")
 
+        // ── Parsear fecha ─────────────────────────────────────────────────────
         println("    [DETAIL] Parsing date string: ${payment.nextDueDate}")
         val dueDate = try {
             ZonedDateTime.parse(payment.nextDueDate).toLocalDateTime()
@@ -95,50 +109,75 @@ class NextPaymentWidgetProvider : HomeWidgetProvider() {
         }
         println("    [DETAIL] Date parsed successfully: $dueDate")
 
-        println("    [DETAIL] Calculating days remaining.")
+        // ── Calcular días restantes ───────────────────────────────────────────
         val now = LocalDateTime.now()
         val daysRemaining = ChronoUnit.DAYS.between(now.toLocalDate(), dueDate.toLocalDate())
         println("    [DETAIL] Days remaining: $daysRemaining")
 
-        println("    [DETAIL] Determining status text.")
         val statusText = when {
-            daysRemaining < 0 -> context.getString(R.string.payment_overdue, -daysRemaining)
+            daysRemaining < 0  -> context.getString(R.string.payment_overdue, -daysRemaining)
             daysRemaining == 0L -> context.getString(R.string.payment_due_today)
             daysRemaining == 1L -> context.getString(R.string.payment_due_tomorrow)
-            else -> context.getString(R.string.days_until_payment, daysRemaining)
+            else               -> context.getString(R.string.days_until_payment, daysRemaining)
         }
         println("    [DETAIL] Status text: '$statusText'")
 
-        println("    [DETAIL] Applying texts to views.")
+        // ── Texto de categoría / tipo ─────────────────────────────────────────
+        // Prioridad: subtype (texto en español de Dart) > etiqueta local por type.
+        //
+        // subtype viene relleno para freeTrial ("Prueba gratuita") y
+        // creditCard ("Cuota 3 de 12"). Para debt y recurring viene null.
+        //
+        // La cadena en español viene de Dart para no duplicar traducciones.
+        val categoryLabel: String = when {
+            // Si Dart envió subtype, lo usamos directamente
+            !payment.subtype.isNullOrBlank() -> payment.subtype
+
+            // Fallback local por tipo técnico
+            else -> when (payment.type) {
+                "debt"       -> "Deuda"
+                "recurring"  -> "Recurrente"
+                "freeTrial"  -> "Prueba gratuita"
+                "creditCard" -> "Tarjeta de crédito"
+                else         -> payment.type.replaceFirstChar { it.uppercase() }
+            }
+        }
+        println("    [DETAIL] Category label: '$categoryLabel'")
+
+        // ── Aplicar textos ────────────────────────────────────────────────────
         views.setTextViewText(R.id.tv_next_payment_concept, payment.concept)
         views.setTextViewText(R.id.tv_next_payment_amount, amountText)
-        views.setTextViewText(R.id.tv_payment_category, payment.type.replaceFirstChar { it.uppercase() })
+        views.setTextViewText(R.id.tv_payment_category, categoryLabel)
+
         val dateFormatter = DateTimeFormatter.ofPattern("d 'de' MMMM", Locale("es", "ES"))
         views.setTextViewText(R.id.tv_next_payment_date, dateFormatter.format(dueDate))
         views.setTextViewText(R.id.tv_days_until_payment, statusText)
-        println("    [DETAIL] Texts applied.")
-        
-        println("    [DETAIL] Handling urgency badge.")
+
+        // ── Badge de urgencia ─────────────────────────────────────────────────
         val isUrgent = daysRemaining <= 3
-        views.setViewVisibility(R.id.urgency_badge_container, if (isUrgent) View.VISIBLE else View.GONE)
+        views.setViewVisibility(
+            R.id.urgency_badge_container,
+            if (isUrgent) View.VISIBLE else View.GONE
+        )
         if (isUrgent) {
-            val isOverdue = daysRemaining < 0
-            val badgeText = if(isOverdue) "VENCIDO" else "URGENTE"
+            val badgeText = if (daysRemaining < 0) "VENCIDO" else "URGENTE"
             views.setTextViewText(R.id.urgency_badge, badgeText)
         }
-        println("    [DETAIL] Urgency badge handled.")
 
-        println("    [DETAIL] Setting up 'Mark as Paid' button intent.")
+        // ── Botón "Marcar como pagado" ────────────────────────────────────────
         val markAsPaidIntent = Intent(context, NextPaymentWidgetProvider::class.java).apply {
             action = ACTION_MARK_AS_PAID
             putExtra("payment_id", payment.id)
             data = Uri.parse("intent://widget/id/$widgetId/${payment.id}")
         }
-        val markAsPaidPendingIntent = PendingIntent.getBroadcast(context, widgetId, markAsPaidIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val markAsPaidPendingIntent = PendingIntent.getBroadcast(
+            context, widgetId, markAsPaidIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
         views.setOnClickPendingIntent(R.id.mark_as_paid_button, markAsPaidPendingIntent)
         println("    [DETAIL] 'Mark as Paid' button setup complete.")
     }
-    
+
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         if (intent.action == ACTION_MARK_AS_PAID) {

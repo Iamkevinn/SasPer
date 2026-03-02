@@ -19,17 +19,28 @@ data class TransactionWidgetItem(
     @SerializedName("category") val category: String?
 )
 
-// --- [NUEVO Y CRUCIAL] CLASE PARA EL WIDGET DE PRÓXIMO PAGO ---
-// Esta es la clase que faltaba. Sus campos deben coincidir con las claves
-// del JSON que se genera en el método `toJson()` de `UpcomingPayment` en Dart.
+// --- CLASE PARA EL WIDGET DE PRÓXIMO PAGO ---
+// Los campos coinciden exactamente con las claves del toJson() de Dart.
+//
+// Campos nuevos respecto a la versión anterior:
+//   · subtype: texto en español listo para mostrar en pantalla.
+//              Ejemplos: "Prueba gratuita", "Cuota 3 de 12"
+//              Puede ser null para deudas y recurrentes.
+//
+// El campo [type] sigue siendo el identificador técnico del enum Dart:
+//   "debt" | "recurring" | "freeTrial" | "creditCard"
 data class UpcomingPayment(
-    @SerializedName("id") val id: String,
-    @SerializedName("concept") val concept: String,
-    @SerializedName("amount") val amount: Double,
-    @SerializedName("nextDueDate") val nextDueDate: String, // Formato ISO 8601: "2025-11-20T10:00:00.000"
-    @SerializedName("type") val type: String // "debt" o "recurring"
+    @SerializedName("id")          val id: String,
+    @SerializedName("concept")     val concept: String,
+    @SerializedName("amount")      val amount: Double,
+    @SerializedName("nextDueDate") val nextDueDate: String,  // ISO 8601
+    @SerializedName("type")        val type: String,
+    // Nullable — Gson lo dejará null si no viene en el JSON (compatibilidad hacia atrás)
+    @SerializedName("subtype")     val subtype: String? = null,
+    @SerializedName("iconName")    val iconName: String? = null
 )
-// --- [NUEVO] CLASES PARA WIDGET GRANDE ---
+
+// --- CLASES PARA WIDGET GRANDE ---
 data class WidgetBudget(
     @SerializedName("category_name") val category: String,
     val progress: Double

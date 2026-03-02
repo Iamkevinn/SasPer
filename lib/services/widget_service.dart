@@ -640,63 +640,204 @@ class WidgetService {
   // SECCIÓN DE WIDGET DE PRÓXIMOS PAGOS (VERSIÓN FINAL Y CORRECTA)
   //============================================================================
 
-  static Future<List<UpcomingPayment>> getUpcomingPayments() async {
+static Future<List<UpcomingPayment>> getUpcomingPayments() async {
     developer.log(
         '🔄 [WidgetService] Obteniendo datos para el widget de Próximos Pagos...',
         name: _logName);
     final List<UpcomingPayment> upcomingPayments = [];
 
-    // --- Obtener Deudas (Esta parte ya está validada y es correcta) ---
-    final debtRepo = DebtRepository.instance;
-    final debts = await debtRepo.getActiveDebts();
-
-    for (var debt in debts) {
-      // CORRECTO: Usamos los campos `dueDate` y `currentBalance` del modelo `Debt`.
-      if (debt.dueDate != null && debt.currentBalance > 0) {
-        upcomingPayments.add(UpcomingPayment(
-          id: 'debt_${debt.id}',
-          concept: debt.name,
-          amount: debt.currentBalance,
-          nextDueDate: debt.dueDate!,
-          type: UpcomingPaymentType.debt,
-        ));
+    // ── 1. DEUDAS ─────────────────────────────────────────────────────────────
+    // Sin cambios respecto al código original.
+    try {
+      final debtRepo = DebtRepository.instance;
+      final debts = await debtRepo.getActiveDebts();
+      for (var debt in debts) {
+        if (debt.dueDate != null && debt.currentBalance > 0) {
+          upcomingPayments.add(UpcomingPayment(
+            id: 'debt_${debt.id}',
+            concept: debt.name,
+            amount: debt.currentBalance,
+            nextDueDate: debt.dueDate!,
+            type: UpcomingPaymentType.debt,
+          ));
+        }
       }
+      developer.log(
+          '✅ [WidgetService] ${upcomingPayments.length} deudas añadidas.',
+          name: _logName);
+    } catch (e) {
+      developer.log('⚠️ [WidgetService] Error al cargar deudas: $e',
+          name: _logName);
     }
 
-    // --- Obtener Transacciones Recurrentes (AHORA CON LA LÓGICA CORRECTA) ---
-    // CORRECTO: Usamos la instancia Singleton del repositorio.
-    final recurringRepo = RecurringRepository.instance;
-
-    // CORRECTO: Usamos el método `getAll()` que existe en el repositorio.
-    final recurringTxs = await recurringRepo.getAll();
-
-    for (var tx in recurringTxs) {
-      // LÓGICA FINAL Y CORRECTA:
-      // Un pago recurrente es "próximo" si su `nextDueDate` es en el futuro.
-      // No necesitamos verificar `endDate` aquí, porque asumimos que el backend
-      // o una función de base de datos ya no generará una `nextDueDate` futura
-      // si la transacción ha superado su `endDate`.
-      if (tx.nextDueDate.isAfter(DateTime.now())) {
-        upcomingPayments.add(UpcomingPayment(
-          id: 'rec_${tx.id}',
-          // CORRECTO: Usamos los campos `description`, `amount` y `nextDueDate` del modelo `RecurringTransaction`.
-          concept: tx.description,
-          amount: tx.amount,
-          nextDueDate: tx.nextDueDate,
-          type: UpcomingPaymentType.recurring,
-        ));
+    // ── 2. TRANSACCIONES RECURRENTES ──────────────────────────────────────────
+    // Sin cambios respecto al código original.
+    try {
+      final recurringRepo = RecurringRepository.instance;
+      final recurringTxs = await recurringRepo.getAll();
+      final countBefore = upcomingPayments.length;
+      for (var tx in recurringTxs) {
+        if (tx.nextDueDate.isAfter(DateTime.now())) {
+          upcomingPayments.add(UpcomingPayment(
+            id: 'rec_${tx.id}',
+            concept: tx.description,
+            amount: tx.amount,
+            nextDueDate: tx.nextDueDate,
+            type: UpcomingPaymentType.recurring,
+          ));
+        }
       }
+      developer.log(
+          '✅ [WidgetService] ${upcomingPayments.length - countBefore} recurrentes añadidas.',
+          name: _logName);
+    } catch (e) {
+      developer.log('⚠️ [WidgetService] Error al cargar recurrentes: $e',
+          name: _logName);
     }
 
-    // Ordena la lista combinada para mostrar los pagos más cercanos primero.
+    // ── 3. PRUEBAS GRATUITAS ──────────────────────────────────────────────────
+    // Fuente: tabla `free_trials` en Supabase.
+    // Criterios de inclusión:
+    //   · is_cancelled = false  (el usuario no la canceló manualmente)
+    //   · end_date > ahora      (aún no venció — la vencida ya cobró o se perdió)
+    //
+    // Importante: si future_price = 0, igual la incluimos porque el usuario
+    // necesita saber que su prueba vence aunque el precio sea desconocido.
+    try {
+      final supabase = Supabase.instance.client;
+      final userId = supabase.auth.currentUser?.id;
+      if (userId != null) {
+        final now = DateTime.now();
+        final trialRows = await supabase
+            .from('free_trials')
+            .select()
+            .eq('user_id', userId)
+            .eq('is_cancelled', false)
+            .gt('end_date', now.toIso8601String())
+            .order('end_date');
+
+        final countBefore = upcomingPayments.length;
+        for (final row in trialRows) {
+          final endDate = DateTime.parse(row['end_date'] as String);
+          final price = (row['future_price'] as num?)?.toDouble() ?? 0.0;
+          final name = (row['service_name'] as String?)?.trim();
+          if (name == null || name.isEmpty) continue;
+          final id = row['id'] as String;
+
+          upcomingPayments.add(UpcomingPayment(
+            id: 'trial_$id',
+            concept: name,
+            amount: price,
+            nextDueDate: endDate,
+            type: UpcomingPaymentType.freeTrial,
+            // El widget Kotlin muestra `subtype` en tv_payment_category.
+            // Así el usuario ve "Prueba gratuita" en vez de "freeTrial".
+            subtype: 'Prueba gratuita',
+          ));
+        }
+        developer.log(
+            '✅ [WidgetService] ${upcomingPayments.length - countBefore} pruebas gratuitas añadidas.',
+            name: _logName);
+      }
+    } catch (e) {
+      // Error no fatal — el widget sigue funcionando con deudas y recurrentes.
+      developer.log('⚠️ [WidgetService] Error al cargar pruebas gratuitas: $e',
+          name: _logName);
+    }
+
+    // ── 4. CUOTAS DE TARJETA DE CRÉDITO ──────────────────────────────────────
+    // Fuente: tabla `transactions` con is_installment = true.
+    //
+    // Criterios de inclusión:
+    //   · is_installment = true
+    //   · installments_current <= installments_total  (cuotas pendientes)
+    //
+    // Fecha estimada de próximo pago:
+    //   La tabla no tiene payment_due_date — usamos la fecha de la transacción
+    //   como base y calculamos el siguiente vencimiento mensual:
+    //   nextPayment = transaction_date + (installments_current) meses.
+    //   Esto asume ciclos mensuales, que es lo habitual en Colombia.
+    //
+    // Si la fecha estimada ya pasó (cuota teóricamente cobrada), la omitimos.
+    //
+    // Monto por cuota:
+    //   installmentAmount = |amount| / installments_total
+    //
+    // Ejemplo: compra de $1.200.000 en 12 cuotas, cuota actual = 3
+    //   → nextPayment = transactionDate + 3 meses
+    //   → monto = $100.000
+    //   → concept = "Cuota 3 de 12 · descripción"
+    try {
+      final supabase = Supabase.instance.client;
+      final userId = supabase.auth.currentUser?.id;
+      if (userId != null) {
+        final now = DateTime.now();
+        final installmentRows = await supabase
+            .from('transactions')
+            .select()
+            .eq('user_id', userId)
+            .eq('is_installment', true)
+            .order('transaction_date', ascending: false);
+
+        final countBefore = upcomingPayments.length;
+        for (final row in installmentRows) {
+          final total = row['installments_total'] as int?;
+          final current = row['installments_current'] as int?;
+
+          // Validar que la cuota aún esté activa
+          if (total == null || current == null) continue;
+          if (current > total) continue; // Todas las cuotas ya están pagadas
+
+          final rawAmount = (row['amount'] as num).toDouble().abs();
+          final installmentAmount = rawAmount / total;
+          final txDate = DateTime.parse(row['transaction_date'] as String);
+          final description =
+              (row['description'] as String?)?.trim() ?? 'Cuota pendiente';
+          final txId = row['id'] as int;
+
+          // Calcular la fecha del próximo pago (mismo día del mes, un mes adelante
+          // por cada cuota completada).
+          // current = 1 → primera cuota → un mes después de la compra
+          // current = 3 → tercera cuota → tres meses después de la compra
+          final nextPaymentDate = DateTime(
+            txDate.year,
+            txDate.month + current, // current meses después de la compra
+            txDate.day,
+          );
+
+          // Si la fecha calculada ya pasó, esta cuota ya debió haberse cobrado.
+          // La omitimos para no mostrar datos obsoletos.
+          if (nextPaymentDate.isBefore(now)) continue;
+
+          upcomingPayments.add(UpcomingPayment(
+            id: 'installment_$txId',
+            // concept incluye la descripción de la compra para contexto
+            concept: description,
+            amount: installmentAmount,
+            nextDueDate: nextPaymentDate,
+            type: UpcomingPaymentType.creditCard,
+            // subtype visible en el widget como "categoría"
+            subtype: 'Cuota $current de $total',
+          ));
+        }
+        developer.log(
+            '✅ [WidgetService] ${upcomingPayments.length - countBefore} cuotas de tarjeta añadidas.',
+            name: _logName);
+      }
+    } catch (e) {
+      developer.log('⚠️ [WidgetService] Error al cargar cuotas: $e',
+          name: _logName);
+    }
+
+    // ── Ordenar por fecha más próxima ─────────────────────────────────────────
     upcomingPayments.sort((a, b) => a.nextDueDate.compareTo(b.nextDueDate));
 
     developer.log(
-        '✅ [WidgetService] Se encontraron ${upcomingPayments.length} pagos próximos.',
+        '✅ [WidgetService] Total: ${upcomingPayments.length} pagos próximos '
+        '(deudas + recurrentes + pruebas gratuitas + cuotas).',
         name: _logName);
     return upcomingPayments;
   }
-
   //============================================================================
   // [NUEVO] SECCIÓN DE WIDGET DE PRÓXIMO PAGO INDIVIDUAL
   //============================================================================

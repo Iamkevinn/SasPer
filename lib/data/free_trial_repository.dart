@@ -29,6 +29,7 @@ Future<Map<String, dynamic>> addTrial(String name, DateTime date, double price, 
       'end_date': date.toIso8601String(),
       'future_price': price,
       'notification_time': time,
+
     }).eq('id', id);
   }
 
