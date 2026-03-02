@@ -55,75 +55,96 @@ def read_root():
     """Endpoint de bienvenida para verificar que el servidor está en funcionamiento."""
     return {"status": "ok", "message": "Servidor de Finanzas Personales con IA en funcionamiento."}
 
-@app.get("/api/analisis-financiero", tags=["Análisis IA"])
-@app.post("/api/analisis-financiero", tags=["Análisis IA"]) # 👈 Cambiado de @app.get a @app.post
+@app.api_route("/api/analisis-financiero", methods=["GET", "POST"], tags=["Análisis IA"])
 async def generar_analisis_financiero(request: Request):
+    print(f"\n--- [NUEVA PETICIÓN IA] Metodo: {request.method} ---")
+    
     try:
-        # 1. Recibir los datos enriquecidos desde Flutter
-        data = await request.json()
-        user_id = data.get('user_id')
-        financial_state = data.get('financial_state', {})
-        mood_context = data.get('spending_mood_context', {})
-        debt_context = data.get('debt_context', [])
+        # 1. Obtener el user_id dependiendo del método
+        user_id = None
+        financial_state = {}
+        mood_context = {}
+        debt_context = []
+
+        if request.method == "POST":
+            # Extraer del JSON (Nueva versión enriquecida)
+            try:
+                data = await request.json()
+                user_id = data.get('user_id')
+                financial_state = data.get('financial_state', {})
+                mood_context = data.get('spending_mood_context', {})
+                debt_context = data.get('debt_context', [])
+            except Exception as e_json:
+                print(f"⚠️ Error leyendo JSON: {e_json}")
+                raise HTTPException(status_code=400, detail="Cuerpo JSON inválido")
+        else:
+            # Extraer de la URL (Versión antigua GET para compatibilidad)
+            user_id = request.query_params.get('user_id')
 
         if not user_id:
-            raise HTTPException(status_code=400, detail="user_id es requerido en el cuerpo JSON")
+            print("❌ Error: No se proporcionó user_id")
+            raise HTTPException(status_code=400, detail="user_id es requerido")
 
-        print(f"\n--- [NUEVA PETICIÓN IA] para el usuario: {user_id} ---")
-        
-        # --- PASO A: Consultar historial en Supabase (Contexto histórico) ---
-        COLUMNA_FECHA = 'transaction_date' # Cambiado a transaction_date para mayor precisión
-        response = supabase.table('transactions') \
-                           .select(f'description, amount, type, category, {COLUMNA_FECHA}') \
-                           .eq('user_id', user_id) \
-                           .order(COLUMNA_FECHA, desc=True) \
-                           .limit(40) \
-                           .execute()
-        
-        transactions = response.data if response.data else []
+        print(f"ID Usuario: {user_id}")
 
-        # --- PASO B: Construir el Prompt Maestro para Gemini ---
-        # Combinamos lo que viene de la App (Vivo) con lo de la BD (Historial)
-        
-        prompt = f"""
-        Actúa como 'SasPer AI', el asesor financiero senior personal de este usuario. 
-        Tu objetivo es analizar su situación actual y dar consejos tácticos y emocionales.
+        # --- PASO A: Consultar historial en Supabase ---
+        # Usamos transaction_date porque vimos que existe en tu tabla
+        try:
+            response = supabase.table('transactions') \
+                               .select('description, amount, type, category, transaction_date') \
+                               .eq('user_id', user_id) \
+                               .order('transaction_date', desc=True) \
+                               .limit(30) \
+                               .execute()
+            transactions = response.data
+        except Exception as e_db:
+            print(f"⚠️ Error Supabase: {e_db}")
+            transactions = []
 
-        SITUACIÓN ACTUAL (Datos en tiempo real):
-        - Saldo disponible para gastar: {financial_state.get('available_balance')} (Ya descontando ahorros y obligaciones)
-        - Patrimonio Neto: {financial_state.get('net_worth')}
-        - Ingreso Mensual: {financial_state.get('monthly_income')}
-        - Dinero Comprometido (Ahorro/Deudas): {financial_state.get('restricted_money')}
+        # --- PASO B: Construir el Prompt ---
+        # Si no hay datos enriquecidos (viniendo de un GET), usamos un prompt más simple
+        if not financial_state:
+            prompt = f"Analiza estas transacciones y dame consejos: {json.dumps(transactions, default=str)}"
+        else:
+            prompt = f"""
+            Actúa como 'SasPer AI', asesor financiero experto.
+            
+            SITUACIÓN ACTUAL:
+            - Disponible para gastar: ${financial_state.get('available_balance', 0)}
+            - Patrimonio Neto: ${financial_state.get('net_worth', 0)}
+            - Ingreso Mensual: ${financial_state.get('monthly_income', 0)}
+            
+            CONTEXTO EMOCIONAL:
+            - Ánimo predominante: {mood_context.get('predominant', 'neutral')}
+            
+            DEUDAS A CUOTAS:
+            {json.dumps(debt_context, indent=2)}
 
-        CONTEXTO EMOCIONAL:
-        - Ánimo predominante en gastos recientes: {mood_context.get('predominant')}
-        - Historial de ánimos: {mood_context.get('history')}
+            HISTORIAL RECIENTE:
+            {json.dumps(transactions, indent=2, default=str)}
 
-        DEUDAS A CUOTAS ACTIVAS:
-        {json.dumps(debt_context, indent=2)}
-
-        HISTORIAL RECIENTE (Últimas transacciones):
-        {json.dumps(transactions, indent=2, default=str)}
-
-        TAREA:
-        Escribe un reporte breve con el siguiente formato Markdown:
-        1. Un resumen de 2 líneas sobre su salud financiera actual.
-        2. Un 'Insight Emocional': Analiza si su estado de ánimo está afectando sus gastos (usa el contexto de ánimo).
-        3. Una 'Estrategia de Deuda': Si tiene cuotas, sugiere si vale la pena abonar a capital o cómo liberar flujo de caja.
-        4. Un consejo práctico para mejorar el 'Saldo disponible' esta semana.
-
-        REGLA: Sé directo, motivador y usa un lenguaje financiero profesional pero amigable.
-        """
+            TAREA:
+            Escribe un análisis en Markdown con:
+            1. Resumen de salud financiera.
+            2. Insight sobre el ánimo y los gastos.
+            3. Estrategia para sus deudas.
+            4. Una meta para esta semana.
+            """
 
         # --- PASO C: Llamar a Gemini ---
+        print("🧠 Generando con Gemini...")
         gemini_response = gemini_model.generate_content(prompt)
         
-        print("✅ Análisis generado con éxito usando contexto enriquecido.")
+        print("✅ Éxito.")
         return {"analisis": gemini_response.text}
 
     except Exception as e:
-        print(f"--- ¡ERROR IA!: {e} ---")
-        raise HTTPException(status_code=500, detail=f"Error interno en el asesor IA: {str(e)}")
+        import traceback
+        print(f"🔥 ERROR 500 DETALLADO:\n{traceback.format_exc()}")
+        return JSONResponse(
+            status_code=500, 
+            content={"error": "Error interno", "detail": str(e)}
+        )
         
 # --- AÑADE EL NUEVO ENDPOINT DE NOTIFICACIONES ---
 # Pega este código en tu app.py, reemplazando la función anterior.
