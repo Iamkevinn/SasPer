@@ -5,7 +5,7 @@ import 'package:equatable/equatable.dart';
 // El enum para el tipo de deuda ya estaba perfecto.
 enum DebtType { debt, loan }
 
-// 1. Creamos un enum para el estado, igual que hicimos con Goal.
+// 1. Creamos un enum para el estado.
 enum DebtStatus {
   active,
   paid,
@@ -25,7 +25,7 @@ enum DebtStatus {
   }
 }
 
-// NUEVO: Enum para el tipo de impacto del dinero
+// Enum para el tipo de impacto del dinero
 enum DebtImpactType {
   liquid,
   restricted,
@@ -40,7 +40,7 @@ enum DebtImpactType {
       case 'direct':
         return DebtImpactType.direct;
       default:
-        return DebtImpactType.liquid; // Por defecto asumimos que es líquido
+        return DebtImpactType.liquid;
     }
   }
 }
@@ -58,8 +58,11 @@ class Debt extends Equatable {
   final DateTime? dueDate;
   final double interestRate;
   final DebtStatus status;
-  final DebtImpactType impactType; // NUEVO CAMPO
+  final DebtImpactType impactType;
   final DateTime createdAt;
+  
+  // NUEVO: La "Bolsa Virtual" de dinero disponible para gastar de este préstamo
+  final double spendingFund; 
 
   const Debt({
     required this.id,
@@ -73,8 +76,9 @@ class Debt extends Equatable {
     this.dueDate,
     this.interestRate = 0.0,
     required this.status,
-    required this.impactType, // NUEVO
+    required this.impactType,
     required this.createdAt,
+    required this.spendingFund, // NUEVO
   });
 
   factory Debt.empty() {
@@ -86,9 +90,9 @@ class Debt extends Equatable {
       initialAmount: 1000.0,
       currentBalance: 500.0,
       status: DebtStatus.active,
-      impactType: DebtImpactType.liquid, // NUEVO
+      impactType: DebtImpactType.liquid,
       createdAt: DateTime.now(),
-      // Los campos opcionales pueden ser nulos
+      spendingFund: 0.0, // <--- FALTABA ESTO
       entityName: null,
       contactId: null,
       dueDate: null,
@@ -111,15 +115,17 @@ class Debt extends Equatable {
         dueDate: map['due_date'] != null ? DateTime.parse(map['due_date'] as String) : null,
         interestRate: (map['interest_rate'] as num? ?? 0.0).toDouble(),
         status: DebtStatus.fromString(map['status'] as String?),
-        impactType: DebtImpactType.fromString(map['impact_type'] as String?), // NUEVO
+        impactType: DebtImpactType.fromString(map['impact_type'] as String?),
         createdAt: DateTime.parse(map['created_at'] as String),
+        // Leemos la bolsa virtual de la BD
+        spendingFund: (map['spending_fund'] as num? ?? 0.0).toDouble(), 
       );
     } catch (e) {
       throw FormatException('Error al parsear Debt: $e', map);
     }
   }
 
-  // 4. Método `copyWith` para actualizaciones inmutables.
+  // 4. Método `copyWith` actualizado.
   Debt copyWith({
     String? id,
     String? userId,
@@ -132,9 +138,9 @@ class Debt extends Equatable {
     DateTime? dueDate,
     double? interestRate,
     DebtStatus? status,
-    DebtImpactType? impactType, // NUEVO
+    DebtImpactType? impactType,
     DateTime? createdAt,
-    
+    double? spendingFund, // <--- FALTABA AGREGARLO AQUÍ
   }) {
     return Debt(
       id: id ?? this.id,
@@ -148,14 +154,15 @@ class Debt extends Equatable {
       dueDate: dueDate ?? this.dueDate,
       interestRate: interestRate ?? this.interestRate,
       status: status ?? this.status,
-      impactType: impactType ?? this.impactType, // NUEVO
+      impactType: impactType ?? this.impactType,
       createdAt: createdAt ?? this.createdAt,
+      spendingFund: spendingFund ?? this.spendingFund, // <--- Y AQUÍ
     );
   }
 
   // Los getters computados son muy útiles.
   double get progress {
-    if (initialAmount <= 0) return 1.0; // Si no había monto inicial, está "pagada".
+    if (initialAmount <= 0) return 1.0;
     final double paidAmount = initialAmount - currentBalance;
     return (paidAmount / initialAmount).clamp(0.0, 1.0);
   }
@@ -164,7 +171,7 @@ class Debt extends Equatable {
 
   // 5. Propiedades para Equatable.
   @override
-  List<Object?> get props =>[
+  List<Object?> get props => [
         id,
         userId,
         name,
@@ -176,7 +183,8 @@ class Debt extends Equatable {
         dueDate,
         interestRate,
         status,
-        impactType, // NUEVO
+        impactType,
         createdAt,
+        spendingFund, // <--- FALTABA AGREGARLO AQUÍ
       ];
 }

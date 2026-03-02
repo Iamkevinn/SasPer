@@ -23,21 +23,23 @@ extension BalanceStatusX on BalanceStatus {
 }
 
 class BalanceCard extends StatefulWidget {
-  // NUEVO: Ahora recibimos los 3 pilares financieros
-  final double availableBalance; // Saldo operativo (Efectivo - Restringido)
-  final double restrictedBalance; // Dinero reservado para metas/pagos
-  final double totalDebt; // Deudas acumuladas
+  final double availableBalance;
+  final double savingsBalance;   // NUEVO: Metas
+  final double obligatedBalance; // NUEVO: Deudas Restringidas
+  final double totalDebt;
 
   const BalanceCard({
     super.key, 
     required this.availableBalance,
-    required this.restrictedBalance,
+    required this.savingsBalance,
+    required this.obligatedBalance,
     required this.totalDebt,
   });
 
   @override
   State<BalanceCard> createState() => _BalanceCardState();
 }
+
 
 class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStateMixin {
   bool _isBalanceVisible = true;
@@ -169,6 +171,48 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
                       ),
                     ],
                   ),
+                  const SizedBox(height: 20),
+                  Divider(color: statusColor.withOpacity(0.2), thickness: 1),
+                  const SizedBox(height: 16),
+                  
+                  // --- SECCIÓN 2: DESGLOSE INTELIGENTE ---
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // 1. Ahorros (Metas) - Color Dorado/Verde
+                      _BalanceDetailItem(
+                        icon: Iconsax.save_2,
+                        label: 'Ahorros',
+                        amount: widget.savingsBalance,
+                        color: Colors.teal.shade600,
+                        isVisible: _isBalanceVisible,
+                        fmt: currencyFormat,
+                        textTheme: textTheme,
+                      ),
+                      
+                      // 2. Compromisos (Deudas Restringidas) - Color Naranja
+                      _BalanceDetailItem(
+                        icon: Iconsax.lock_1,
+                        label: 'Compromisos',
+                        amount: widget.obligatedBalance,
+                        color: Colors.orange.shade700,
+                        isVisible: _isBalanceVisible,
+                        fmt: currencyFormat,
+                        textTheme: textTheme,
+                      ),
+                      
+                      // 3. Deuda Total - Color Rojo
+                      _BalanceDetailItem(
+                        icon: Iconsax.chart_fail,
+                        label: 'Pasivos',
+                        amount: widget.totalDebt,
+                        color: colorScheme.error,
+                        isVisible: _isBalanceVisible,
+                        fmt: currencyFormat,
+                        textTheme: textTheme,
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 4),
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 350),
@@ -214,17 +258,6 @@ class _BalanceCardState extends State<BalanceCard> with SingleTickerProviderStat
                             const SizedBox(height: 4),
                             AnimatedSwitcher(
                               duration: const Duration(milliseconds: 350),
-                              child: Text(
-                                key: ValueKey<bool>(_isBalanceVisible),
-                                _isBalanceVisible
-                                    ? currencyFormat.format(widget.restrictedBalance)
-                                    : '∗∗∗',
-                                style: textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.blue.shade700,
-                                  letterSpacing: _isBalanceVisible ? 0 : 2,
-                                ),
-                              ),
                             ),
                           ],
                         ),
@@ -331,5 +364,53 @@ class _BalanceTrendPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _BalanceTrendPainter oldDelegate) {
     return oldDelegate.status != status || oldDelegate.color != color;
+  }
+}
+
+// Widget auxiliar para no repetir código en las columnas
+class _BalanceDetailItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final double amount;
+  final Color color;
+  final bool isVisible;
+  final NumberFormat fmt;
+  final TextTheme textTheme;
+
+  const _BalanceDetailItem({
+    required this.icon, required this.label, required this.amount,
+    required this.color, required this.isVisible, required this.fmt,
+    required this.textTheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 14, color: color),
+              const SizedBox(width: 4),
+              Text(label, style: textTheme.bodySmall?.copyWith(fontSize: 11)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 350),
+            child: Text(
+              key: ValueKey<bool>(isVisible),
+              isVisible ? fmt.format(amount) : '***',
+              style: textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: color,
+                letterSpacing: isVisible ? 0 : 2,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

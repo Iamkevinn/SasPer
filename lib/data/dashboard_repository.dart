@@ -105,45 +105,41 @@ class DashboardRepository {
         }).catchError((_) =>[]), // 4
         client.rpc('get_dashboard_alerts', params: {'p_user_id': userId}).catchError((_) =>[]), // 5
         // --- 👇 PETICIÓN NUEVA: BUSCAMOS LAS DEUDAS ---
-        client.from('debts').select('type, current_balance, impact_type').eq('user_id', userId).eq('status', 'active').catchError((_) =>[]), // 6
+                client.from('debts').select('type, current_balance, impact_type, spending_fund').eq('user_id', userId).eq('status', 'active').catchError((_) =>[]), // 6
+
       ]);
 
       // --- 👇 CÁLCULOS CONTABLES INTELIGENTES ---
+       // --- 👇 CÁLCULOS CONTABLES DETALLADOS ---
       double totalDebt = 0.0;
-      double restrictedFromDebts = 0.0;
+      double obligatedBalance = 0.0; // Dinero restringido por DEUDAS (Obligatorio)
       
-      final debtsData = detailsResults[6] as List<dynamic>? ??[];
+      final debtsData = detailsResults[6] as List<dynamic>? ?? [];
       for (var d in debtsData) {
         final type = d['type'];
         final impact = d['impact_type'];
         final balance = (d['current_balance'] as num? ?? 0.0).toDouble();
+        final fund = (d['spending_fund'] as num? ?? 0.0).toDouble(); 
 
         if (type == 'debt') {
-          totalDebt += balance; // Dinero que DEBES pagar
+          totalDebt += balance; // Pasivos Totales
           if (impact == 'restricted') {
-            restrictedFromDebts += balance; // Dinero que te prestaron y debes reservar
+            obligatedBalance += fund; // Restricción obligatoria
           }
         }
       }
 
-      double restrictedFromGoals = 0.0;
-      final goalsData = detailsResults[1] as List<dynamic>? ??[];
+      double savingsBalance = 0.0; // Dinero restringido por METAS (Voluntario)
+      final goalsData = detailsResults[1] as List<dynamic>? ?? [];
       for (var g in goalsData) {
-        restrictedFromGoals += (g['current_amount'] as num? ?? 0.0).toDouble(); // Dinero guardado en metas
+        savingsBalance += (g['current_amount'] as num? ?? 0.0).toDouble();
       }
 
       // Matemáticas Finales
-      double restrictedBalance = restrictedFromDebts + restrictedFromGoals;
-      double availableBalance = partialData.totalBalance - restrictedBalance;
+      double restrictedTotal = obligatedBalance + savingsBalance;
+      double availableBalance = partialData.totalBalance - restrictedTotal;
+      double netWorth = partialData.totalBalance - totalDebt; // Patrimonio = Activos - Pasivos
       // ------------------------------------------
-
-      final categorySummaryData = (detailsResults[4] as List)
-          .map((item) => CategorySpending(
-                categoryName: item['category_name'] as String? ?? 'Sin Categoría',
-                totalAmount: (item['total_amount'] as num? ?? 0).toDouble(),
-                color: item['color'] as String? ?? '#CCCCCC',
-              ))
-          .toList();
 
       final detailsDataMap = {
         'recent_transactions': detailsResults[0],
@@ -151,20 +147,16 @@ class DashboardRepository {
         'budgets_progress': detailsResults[2],
         'expense_summary_for_widget': detailsResults[3],
         'alerts': detailsResults[5],
-        // Pasamos la nueva info calculada al modelo
+        
+        // Pasamos el desglose al modelo
         'available_balance': availableBalance,
-        'restricted_balance': restrictedBalance,
+        'savings_balance': savingsBalance,     // Voluntario
+        'obligated_balance': obligatedBalance, // Obligatorio
+        'net_worth': netWorth,                 // Patrimonio
         'total_debt': totalDebt,
       };
 
       DashboardData fullData = partialData.copyWithDetails(detailsDataMap);
-
-      fullData = fullData.copyWith(
-        categorySpendingSummary: categorySummaryData,
-        isLoading: false,
-      );
-
-      _lastKnownData = fullData;
 
       if (!_dashboardDataController.isClosed) {
         _dashboardDataController.add(fullData);
@@ -204,7 +196,7 @@ class DashboardRepository {
           'p_user_id': userId,
           'client_date': DateFormat('yyyy-MM-dd').format(DateTime.now())
         }).catchError((_) =>[]), // 4
-        client.from('debts').select('type, current_balance, impact_type').eq('user_id', userId).eq('status', 'active').catchError((_) =>[]), // 5
+        client.from('debts').select('type, current_balance, impact_type, spending_fund').eq('user_id', userId).eq('status', 'active').catchError((_) =>[]), // 5
       ]);
 
       final balanceMap = results[0] as Map<String, dynamic>;

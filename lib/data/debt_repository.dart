@@ -66,6 +66,26 @@ class DebtRepository {
     }
   }
 
+    /// Obtiene solo las deudas que tienen "Bolsa Virtual" (fondos disponibles para gastar).
+  /// Se usa en la pantalla de Agregar Transacción.
+  Future<List<Debt>> getDebtsWithSpendingFunds() async {
+    developer.log('🔍 [Repo] Buscando deudas con fondos disponibles...', name: 'DebtRepository');
+    try {
+      final response = await client
+          .from('debts')
+          .select()
+          .gt('spending_fund', 0) // Que tenga saldo en la bolsa
+          .eq('status', 'active'); // Y que esté activa
+
+      final debts = (response as List).map((data) => Debt.fromMap(data)).toList();
+      developer.log('✅ [Repo] Encontradas ${debts.length} deudas con fondos.', name: 'DebtRepository');
+      return debts;
+    } catch (e, stackTrace) {
+      developer.log('🔥 [Repo] Error buscando deudas con fondos: $e', name: 'DebtRepository', error: e, stackTrace: stackTrace);
+      return [];
+    }
+  }
+
   /// Obtiene una lista de deudas activas (llamada única).
   /// Ideal para operaciones de fondo como la actualización de widgets.
   Future<List<Debt>> getActiveDebts() async {
@@ -233,5 +253,30 @@ class DebtRepository {
   /// `dispose` del `StatefulWidget` que la consume.
   void dispose() {
     developer.log('ℹ️ [Repo] DebtRepository no requiere dispose explícito de canales de stream.', name: 'DebtRepository');
+  }
+  /// Llama al RPC especial para registrar un gasto descontando de la bolsa del préstamo.
+  Future<void> addTransactionFromDebtFund({
+    required String accountId,
+    required double amount,
+    required String description,
+    required String category,
+    required String debtId,
+    DateTime? transactionDate,
+  }) async {
+    developer.log('💸 [Repo] Registrando gasto desde fondo de préstamo ($debtId)...', name: 'DebtRepository');
+    try {
+      await client.rpc('register_expense_from_fund', params: {
+        'p_account_id': accountId,
+        'p_amount': amount,
+        'p_description': description,
+        'p_category': category,
+        'p_debt_id': debtId,
+        'p_transaction_date': (transactionDate ?? DateTime.now()).toIso8601String(),
+      });
+      developer.log('✅ [Repo] Gasto registrado y fondo descontado con éxito.', name: 'DebtRepository');
+    } catch (e, stackTrace) {
+      developer.log('🔥 [Repo] Error registrando gasto de fondo: $e', name: 'DebtRepository', error: e, stackTrace: stackTrace);
+      throw Exception('No se pudo registrar el gasto del préstamo.');
+    }
   }
 }

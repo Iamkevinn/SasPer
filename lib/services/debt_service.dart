@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'dart:developer' as developer;
+import 'package:sasper/data/debt_repository.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sasper/models/debt_model.dart';
 import 'package:sasper/services/event_service.dart'; // Para notificar cambios
@@ -38,6 +39,40 @@ class DebtService {
     }
   }
 
+   /// Devuelve la lista de préstamos que tienen dinero disponible para gastar.
+  Future<List<Debt>> getDebtsWithSpendingFunds() async {
+    return await DebtRepository.instance.getDebtsWithSpendingFunds();
+  }
+
+  /// Registra un gasto que consume el saldo de un préstamo específico.
+  Future<void> addTransactionFromDebtFund({
+    required String accountId,
+    required double amount,
+    required String description,
+    required String category,
+    required String debtId,
+    DateTime? transactionDate,
+  }) async {
+    try {
+      await DebtRepository.instance.addTransactionFromDebtFund(
+        accountId: accountId,
+        amount: amount,
+        description: description,
+        category: category,
+        debtId: debtId,
+        transactionDate: transactionDate,
+      );
+      
+      // Notificamos cambios para actualizar Dashboard y Deudas
+      EventService.instance.fire(AppEvent.transactionsChanged);
+      EventService.instance.fire(AppEvent.debtsChanged);
+      EventService.instance.fire(AppEvent.accountUpdated);
+      
+    } catch (e) {
+      // Re-lanzamos para manejo en UI
+      rethrow;
+    }
+  }
   /// Añade una nueva deuda y su transacción inicial asociada.
   /// Lanza una excepción si la operación falla.
    Future<void> addDebtAndInitialTransaction({

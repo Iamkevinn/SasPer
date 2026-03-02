@@ -293,7 +293,6 @@ class _CompactHeaderDelegate extends SliverPersistentHeaderDelegate {
     required this.onAiTap,
   });
 
-  // Aumentamos ligeramente la altura para acomodar la nueva información
   @override double get minExtent => 110;
   @override double get maxExtent => 170;
 
@@ -307,7 +306,12 @@ class _CompactHeaderDelegate extends SliverPersistentHeaderDelegate {
     final statusH = MediaQuery.of(ctx).padding.top;
     final theme = Theme.of(ctx);
     final isDark = theme.brightness == Brightness.dark;
-    final fmt = NumberFormat.compactCurrency(locale: 'es_CO', symbol: '\$');
+    
+    // Formateador compacto para el patrimonio (ej: $12M)
+    final fmtCompact = NumberFormat.compactCurrency(locale: 'es_CO', symbol: '\$');
+    // Formateador normal para el saldo disponible (ej: $12.000.000)
+    final fmtNormal = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+    
     final onSurface = theme.colorScheme.onSurface;
 
     // Colores adaptativos
@@ -338,7 +342,7 @@ class _CompactHeaderDelegate extends SliverPersistentHeaderDelegate {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children:[
-                        // Saludo — se desvanece al hacer scroll
+                        // Saludo
                         AnimatedOpacity(
                           opacity: (1 - t * 2).clamp(0.0, 1.0),
                           duration: const Duration(milliseconds: 80),
@@ -349,23 +353,23 @@ class _CompactHeaderDelegate extends SliverPersistentHeaderDelegate {
                         ),
                         const SizedBox(height: 2),
                         
-                        // Balance Operativo (Disponible)
+                        // BALANCE OPERATIVO (El Disponible)
                         AnimatedBuilder(
                           animation: breathe,
                           builder: (_, __) => Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children:[
                               Text(
-                                // NOTA: Aquí usamos availableBalance
-                                fmt.format(data.availableBalance),
-                                style: _D.display(lerpDouble(38, 24, t)!, color: onSurface),
+                                // Usamos formato completo para el número principal si cabe
+                                fmtNormal.format(data.availableBalance),
+                                style: _D.display(lerpDouble(34, 24, t)!, color: onSurface),
                               ),
                               AnimatedOpacity(
                                 opacity: (1 - t * 2).clamp(0.0, 1.0),
                                 duration: const Duration(milliseconds: 80),
                                 child: Row(
                                   children:[
-                                    Icon(Iconsax.wallet_money, size: 12, color: _D.teal.withOpacity(0.9)),
+                                    Icon(Iconsax.wallet_check, size: 12, color: _D.teal.withOpacity(0.9)),
                                     const SizedBox(width: 4),
                                     Text(
                                       'Disponible para gastar',
@@ -388,30 +392,34 @@ class _CompactHeaderDelegate extends SliverPersistentHeaderDelegate {
 
               const SizedBox(height: 12),
 
-              // Barra de subtítulos: Reservado + Deuda + Salud
+              // BARRA INFERIOR: PATRIMONIO NETO + SALUD
               AnimatedOpacity(
                 opacity: (1 - t * 1.5).clamp(0.0, 1.0),
                 duration: const Duration(milliseconds: 80),
                 child: Row(
                   children:[
-                    // Reservado
-                    Icon(Iconsax.lock_1, size: 13, color: Colors.blue.shade400),
-                    const SizedBox(width: 4),
-                    Text(
-                      fmt.format(data.restrictedBalance),
-                      style: _D.caption(12, color: onSurface.withOpacity(0.7)),
-                    ),
-                    const SizedBox(width: 12),
-                    
-                    // Deuda
-                    Icon(Iconsax.chart_fail, size: 13, color: _D.rose),
-                    const SizedBox(width: 4),
-                    Text(
-                      fmt.format(data.totalDebt),
-                      style: _D.caption(12, color: onSurface.withOpacity(0.7)),
+                    // Patrimonio Neto (Activos - Pasivos)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Iconsax.bank, size: 13, color: onSurface.withOpacity(0.7)),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Patrimonio: ${fmtCompact.format(data.netWorth)}',
+                            style: _D.label(12, w: FontWeight.w600, color: onSurface.withOpacity(0.7)),
+                          ),
+                        ],
+                      ),
                     ),
                     
                     const Spacer(),
+                    
+                    // Salud Financiera (Ya existente)
                     _HealthPill(score: data.healthScore),
                   ],
                 ),
@@ -431,7 +439,6 @@ class _CompactHeaderDelegate extends SliverPersistentHeaderDelegate {
     return 'Buenas noches, $first 🌙';
   }
 }
-
 // ─────────────────────────────────────────────────────────────────────────────
 // AI BUTTON — pill compacto con shimmer
 // ─────────────────────────────────────────────────────────────────────────────
