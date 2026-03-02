@@ -15,9 +15,11 @@ import 'dart:developer' as developer;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/analysis_charts/average_analysis_section.dart';
 import 'package:sasper/widgets/analysis_charts/mood_by_day_chart.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sasper/data/analysis_repository.dart';
 import 'package:sasper/models/analysis_models.dart';
@@ -138,6 +140,29 @@ class AnalysisScreenState extends State<AnalysisScreen>
     });
   }
 
+  // Dentro de AnalysisScreenState
+
+Future<void> _dismissInsight(String id) async {
+  HapticFeedback.mediumImpact();
+  
+  try {
+    // 1. Solo llamamos al repositorio.
+    // El RealtimeChannel de initState() se encargará de refrescar la UI 
+    // automáticamente cuando detecte el cambio en la base de datos.
+    await _repository.markInsightAsRead(id);
+    
+    developer.log('Insight marcado como leído en BD: $id');
+  } catch (e) {
+    developer.log('Error eliminando insight: $e');
+    if (mounted) {
+      NotificationHelper.show(
+        message: 'No se pudo ocultar el consejo',
+        type: NotificationType.error
+      );
+    }
+  }
+}
+
   Future<({AnalysisData charts, List<Insight> insights})>
       _fetchAllScreenData() async {
     final results = await Future.wait([
@@ -193,10 +218,16 @@ class AnalysisScreenState extends State<AnalysisScreen>
   }
 
   Future<void> _handleRefresh() async {
-    if (mounted) {
-      setState(() => _analysisFuture = _fetchAllScreenData());
-    }
-  }
+  if (!mounted) return;
+
+  // 1. Iniciamos la carga fuera del setState
+  final refreshedData = _fetchAllScreenData();
+
+  // 2. Actualizamos la variable de estado sincronamente
+  setState(() {
+    _analysisFuture = refreshedData;
+  });
+}
 
   @override
   Widget build(BuildContext context) {
@@ -262,7 +293,7 @@ class AnalysisScreenState extends State<AnalysisScreen>
                 padding: const EdgeInsets.fromLTRB(
                     _C.md, _C.md, _C.md, 0),
                 child: _HeroInsightCard(
-                    insight: insights.first, c: c),
+                    insight: insights.first, c: c,onDismiss: () => _dismissInsight(insights.first.id),),
               ),
             ),
           ),
@@ -295,9 +326,12 @@ class AnalysisScreenState extends State<AnalysisScreen>
               separatorBuilder: (_, __) =>
                   const SizedBox(height: _C.sm + 2),
               itemBuilder: (context, i) => _FadeSlide(
-                delay: 140 + i * 50,
-                child: InsightCard(insight: insights[i + 1]),
-              ),
+  delay: 140 + i * 50,
+  child: InsightCard(
+    insight: insights[i + 1], 
+    onDismiss: () => _dismissInsight(insights[i + 1].id), // 👈 El cierre debe estar AQUÍ
+  ), 
+),
             ),
           ),
         ],
@@ -638,8 +672,9 @@ class _SectionLabel extends StatelessWidget {
 class _HeroInsightCard extends StatelessWidget {
   final Insight insight;
   final _C c;
+  final VoidCallback onDismiss;
 
-  const _HeroInsightCard({required this.insight, required this.c});
+  const _HeroInsightCard({required this.insight, required this.c, required this.onDismiss});
 
   @override
   Widget build(BuildContext context) {
@@ -709,6 +744,11 @@ class _HeroInsightCard extends StatelessWidget {
                   ],
                 ),
               ),
+              // --- BOTÓN CERRAR ---
+              GestureDetector(
+                onTap: onDismiss,
+                child: Icon(Icons.close_rounded, color: c.label4, size: 20),
+              ),
             ],
           ),
 
@@ -726,7 +766,21 @@ class _HeroInsightCard extends StatelessWidget {
           ),
 
           const SizedBox(height: _C.md),
-
+          // Botón de acción principal
+          GestureDetector(
+            onTap: onDismiss,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                'Entendido',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color),
+              ),
+            ),
+          ),
           // CTA mínimo
           GestureDetector(
             onTap: () => HapticFeedback.selectionClick(),

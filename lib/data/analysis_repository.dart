@@ -158,6 +158,29 @@ class AnalysisRepository {
     }
   }
 
+  Future<void> markInsightAsRead(String insightId) async {
+  try {
+    final userId = client.auth.currentUser?.id;
+    if (userId == null) return;
+
+    // Ejecutamos la actualización asegurando que pertenezca al usuario
+    final response = await client
+        .from('insights')
+        .update({'is_read': true})
+        .eq('id', insightId)
+        .eq('user_id', userId)
+        .select(); // El select ayuda a confirmar que se hizo algo
+
+    if (response.isEmpty) {
+      developer.log('⚠️ No se encontró el insight o no tienes permiso: $insightId');
+    } else {
+      developer.log('✅ Insight $insightId marcado como leído');
+    }
+  } catch (e) {
+    developer.log('🔥 Error al marcar insight como leído: $e');
+    rethrow; // Importante para que la UI sepa que falló
+  }
+}
   /// Obtiene solo el resumen de gastos, ideal para widgets o cargas rápidas.
   Future<List<ExpenseByCategory>> getExpenseSummaryForWidget() async {
     developer.log("📈 [Repo] Obteniendo resumen de gastos para widget...",
