@@ -305,130 +305,101 @@ class NotificationService {
   /// Lógica central para calcular y programar las notificaciones.
   /// ESTRATEGIA: Doble aviso por cada mes (previo + final)
   /// Programa notificaciones para los próximos 12 meses a partir de AHORA
-  Future<void> _scheduleRemindersForTransaction(RecurringTransaction tx) async {
-    final baseId = tx.id.hashCode & 0x7FFFFFFF;
-    final now = tz.TZDateTime.now(tz.local);
+Future<void> _scheduleRemindersForTransaction(RecurringTransaction tx) async {
+  final baseId = tx.id.hashCode & 0x7FFFFFFF;
+  final now = tz.TZDateTime.now(tz.local);
+  final firstDueDate = tz.TZDateTime.from(tx.nextDueDate, tz.local);
 
-    // Convertir la fecha de vencimiento a hora local del dispositivo
-    final dueDateLocal = tz.TZDateTime.from(tx.nextDueDate, tz.local);
+  developer.log('📅 Programando [${tx.frequency}]: ${tx.description}', name: 'NotificationService');
 
-    developer.log(
-      '📅 Programando: ${tx.description} | Vencimiento base: ${dueDateLocal.day}/${dueDateLocal.month} a las ${dueDateLocal.hour}:${dueDateLocal.minute.toString().padLeft(2, '0')} | Hora actual: ${now.hour}:${now.minute.toString().padLeft(2, '0')}',
-      name: 'NotificationService',
-    );
+  int scheduledCount = 0;
+  
+  // En lugar de un simple offset de meses, calculamos la próxima fecha 
+  // basándonos en la frecuencia real.
+  for (var i = 0; i < 12; i++) {
+    tz.TZDateTime dueDate;
 
-    int scheduledCount = 0;
-    int monthsScheduled = 0;
-
-    // Programar hasta 12 ocurrencias futuras
-    for (var monthOffset = 0; monthsScheduled < 12; monthOffset++) {
-      // 1. Calcular la fecha de vencimiento para este offset
-      final dueDate = tz.TZDateTime(
-        tz.local,
-        dueDateLocal.year,
-        dueDateLocal.month + monthOffset,
-        dueDateLocal.day,
-        dueDateLocal.hour,
-        dueDateLocal.minute,
-      );
-
-      // Si esta fecha de vencimiento ya pasó, continuar al siguiente mes
-      if (dueDate.isBefore(now) || dueDate.isAtSameMomentAs(now)) {
-        continue;
-      }
-
-      // Esta es una ocurrencia válida en el futuro
-      monthsScheduled++;
-
-      // 2. AVISO PREVIO: 3 días antes del vencimiento
-      final reminderEarly = dueDate.subtract(const Duration(days: 3));
-      
-      // Solo programar aviso previo si aún no ha pasado
-      if (reminderEarly.isAfter(now)) {
-        final notificationId = baseId + monthOffset;
-        
-        try {
-          await _localNotifier.zonedSchedule(
-            notificationId,
-            '⏰ Recordatorio: ${tx.description}',
-            'Tu pago vence en 3 días (${dueDate.day}/${dueDate.month})',
-            reminderEarly,
-            const NotificationDetails(
-              android: AndroidNotificationDetails(
-                'recurring_payments_channel',
-                'Recordatorios de Pagos',
-                importance: Importance.max,
-                priority: Priority.high,
-                fullScreenIntent: true,
-              ),
-              iOS: DarwinNotificationDetails(
-                presentSound: true,
-                presentAlert: true,
-                presentBadge: true,
-              ),
-            ),
-            androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-          );
-          
-          scheduledCount++;
-          developer.log(
-            '  ✅ Aviso previo #$monthsScheduled: ${reminderEarly.day}/${reminderEarly.month} ${reminderEarly.hour}:${reminderEarly.minute.toString().padLeft(2, '0')}',
-            name: 'NotificationService',
-          );
-        } catch (e) {
-          developer.log('  ❌ Error aviso previo $notificationId: $e', name: 'NotificationService');
-        }
-      } else {
-        developer.log(
-          '  ⏭️ Aviso previo #$monthsScheduled ya pasó, solo programaré aviso final',
-          name: 'NotificationService',
-        );
-      }
-
-      // 3. AVISO FINAL: El mismo día del vencimiento
-      // Usar un ID diferente para evitar colisiones (+ 10000)
-      final notificationId = baseId + monthOffset + 10000;
-      
-      try {
-        await _localNotifier.zonedSchedule(
-          notificationId,
-          '🔴 ¡Hoy vence!: ${tx.description}',
-          'Tu pago vence HOY a las ${dueDate.hour}:${dueDate.minute.toString().padLeft(2, '0')}',
-          dueDate,
-          const NotificationDetails(
-            android: AndroidNotificationDetails(
-              'recurring_payments_channel',
-              'Recordatorios de Pagos',
-              importance: Importance.max,
-              priority: Priority.high,
-              fullScreenIntent: true,
-              color: Color(0xFFFF0000),
-            ),
-            iOS: DarwinNotificationDetails(
-              presentSound: true,
-              presentAlert: true,
-              presentBadge: true,
-            ),
-          ),
-          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        );
-        
-        scheduledCount++;
-        developer.log(
-          '  ✅ Aviso final #$monthsScheduled: ${dueDate.day}/${dueDate.month} ${dueDate.hour}:${dueDate.minute.toString().padLeft(2, '0')}',
-          name: 'NotificationService',
-        );
-      } catch (e) {
-        developer.log('  ❌ Error aviso final $notificationId: $e', name: 'NotificationService');
-      }
+    switch (tx.frequency.toLowerCase()) {
+      case 'diario':
+        dueDate = firstDueDate.add(Duration(days: i));
+        break;
+      case 'semanal':
+        dueDate = firstDueDate.add(Duration(days: i * 7));
+        break;
+      case 'cada_2_semanas':
+        dueDate = firstDueDate.add(Duration(days: i * 14));
+        break;
+      case 'quincenal':
+        dueDate = firstDueDate.add(Duration(days: i * 15));
+        break;
+      case 'mensual':
+        dueDate = tz.TZDateTime(tz.local, firstDueDate.year, firstDueDate.month + i, firstDueDate.day, firstDueDate.hour, firstDueDate.minute);
+        break;
+      case 'bimestral':
+        dueDate = tz.TZDateTime(tz.local, firstDueDate.year, firstDueDate.month + (i * 2), firstDueDate.day, firstDueDate.hour, firstDueDate.minute);
+        break;
+      case 'trimestral':
+        dueDate = tz.TZDateTime(tz.local, firstDueDate.year, firstDueDate.month + (i * 3), firstDueDate.day, firstDueDate.hour, firstDueDate.minute);
+        break;
+      case 'semestral':
+        dueDate = tz.TZDateTime(tz.local, firstDueDate.year, firstDueDate.month + (i * 6), firstDueDate.day, firstDueDate.hour, firstDueDate.minute);
+        break;
+      case 'anual':
+        dueDate = tz.TZDateTime(tz.local, firstDueDate.year + i, firstDueDate.month, firstDueDate.day, firstDueDate.hour, firstDueDate.minute);
+        break;
+      default: // Default mensual
+        dueDate = tz.TZDateTime(tz.local, firstDueDate.year, firstDueDate.month + i, firstDueDate.day, firstDueDate.hour, firstDueDate.minute);
     }
 
-    developer.log(
-      '✅ Programación completada: ${tx.description} | Total: $scheduledCount notificaciones en $monthsScheduled meses',
-      name: 'NotificationService',
+    // Si esta ocurrencia ya pasó, la saltamos
+    if (dueDate.isBefore(now)) continue;
+
+    // --- PROGRAMACIÓN DE ALERTAS (IGUAL A TU LÓGICA ANTERIOR) ---
+    
+    // 1. AVISO PREVIO (3 días antes)
+    // Para frecuencias muy cortas (diario/semanal), quizás 3 días es mucho. 
+    // Podrías poner un IF aquí si quieres evitarlo.
+    final reminderEarly = dueDate.subtract(const Duration(days: 3));
+    if (reminderEarly.isAfter(now)) {
+      await _localNotifier.zonedSchedule(
+        baseId + i,
+        '⏰ Recordatorio: ${tx.description}',
+        'Tu pago vence en 3 días (${dueDate.day}/${dueDate.month})',
+        reminderEarly,
+        _notifDetails(tx.description, isFinal: false),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      );
+      scheduledCount++;
+    }
+
+    // 2. AVISO FINAL (Mismo día)
+    await _localNotifier.zonedSchedule(
+      baseId + i + 10000,
+      '🔴 ¡Hoy vence!: ${tx.description}',
+      'Tu pago vence HOY a las ${dueDate.hour}:${dueDate.minute.toString().padLeft(2, '0')}',
+      dueDate,
+      _notifDetails(tx.description, isFinal: true),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
     );
+    scheduledCount++;
   }
 
+  developer.log('✅ Finalizado: $scheduledCount notificaciones creadas.', name: 'NotificationService');
+}
+
+// Función auxiliar para limpiar el código de detalles
+NotificationDetails _notifDetails(String desc, {required bool isFinal}) {
+  return NotificationDetails(
+    android: AndroidNotificationDetails(
+      'recurring_payments_channel',
+      'Recordatorios de Pagos',
+      importance: Importance.max,
+      priority: Priority.high,
+      color: isFinal ? const Color(0xFFFF0000) : null,
+    ),
+    iOS: const DarwinNotificationDetails(presentAlert: true, presentSound: true),
+  );
+}
   // ============================================================================
   // MÉTODOS AUXILIARES
   // ============================================================================
