@@ -13,6 +13,7 @@ import 'biometric_gate.dart';
 
 import 'package:sasper/services/notification_service.dart';
 import 'package:sasper/services/widget_service.dart' as widget_service; // 🔥 AÑADIDO
+import 'package:sasper/services/global_insight_service.dart';
 
 /// 🔐 Widget "guardián" que gestiona el estado de autenticación
 /// y la inicialización de servicios del usuario
@@ -137,6 +138,13 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     );
   }
 
+  /// 🧠 Inicializa el escucha global de insights de IA
+  void _initializeGlobalInsights() {
+    // Ya no pasamos 'context'
+    GlobalInsightService.instance.startListening(); 
+    developer.log('✅ GlobalInsightService iniciado', name: 'AuthGate');
+  }
+
   /// 🔄 Refresca los datos del widget
   Future<void> _refreshWidgetData() async {
     try {
@@ -241,6 +249,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
 
     try {
       // Ejecutar inicializaciones en paralelo para mayor velocidad
+      _initializeGlobalInsights();
       await Future.wait([
         _initializeNotifications(),
         //_initializeManifestationWidget(),

@@ -3,16 +3,19 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 
-// Enum para la seguridad de tipos en la app
 enum TransactionMood {
   necesario,
   planificado,
   impulsivo,
   social,
   emocional,
+  happy,
+  neutral,
+  sad,
+  stressed, 
+  angry,
 }
 
-// Extensión útil para obtener nombres legibles, iconos y colores para la UI
 extension TransactionMoodExtension on TransactionMood {
   String get displayName {
     switch (this) {
@@ -26,6 +29,16 @@ extension TransactionMoodExtension on TransactionMood {
         return 'Social';
       case TransactionMood.emocional:
         return 'Emocional';
+      case TransactionMood.happy:
+        return 'Feliz';
+      case TransactionMood.neutral:
+        return 'Neutral';
+      case TransactionMood.sad:
+        return 'Triste';
+      case TransactionMood.stressed:
+        return 'Estresado';
+      case TransactionMood.angry:
+        return 'Enojado';
     }
   }
 
@@ -40,7 +53,37 @@ extension TransactionMoodExtension on TransactionMood {
       case TransactionMood.social:
         return Iconsax.people;
       case TransactionMood.emocional:
-        return Iconsax.favorite_chart;
+        return Iconsax.heart;
+      case TransactionMood.happy:
+        return Iconsax.emoji_happy;
+      case TransactionMood.neutral:
+        return Iconsax.emoji_normal;
+      case TransactionMood.sad:
+        return Iconsax.emoji_sad;
+      case TransactionMood.stressed:
+        return Iconsax.danger;
+      case TransactionMood.angry:
+        return Iconsax.info_circle;
+    }
+  }
+
+  // Añadimos color para que las tarjetas de IA se vean mejor en la UI
+  Color get color {
+    switch (this) {
+      case TransactionMood.happy:
+      case TransactionMood.necesario:
+      case TransactionMood.planificado:
+        return Colors.green;
+      case TransactionMood.social:
+      case TransactionMood.neutral:
+        return Colors.blue;
+      case TransactionMood.impulsivo:
+      case TransactionMood.emocional:
+      case TransactionMood.stressed:
+        return Colors.orange;
+      case TransactionMood.sad:
+      case TransactionMood.angry:
+        return Colors.red;
     }
   }
 }

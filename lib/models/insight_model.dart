@@ -1,7 +1,6 @@
 // lib/models/insight_model.dart
 
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:equatable/equatable.dart';
 import 'package:iconsax/iconsax.dart';
@@ -10,22 +9,25 @@ import 'dart:developer' as developer;
 /// Define la severidad o el tono de un insight.
 enum InsightSeverity { info, success, warning, alert }
 
-/// Define el tipo de insight para agruparlos o para lógicas específicas.
+/// Define el tipo de insight para lógicas específicas.
+/// Los nombres coinciden con los strings enviados por los triggers de Supabase.
 enum InsightType {
   unknown,
   weeklySpendingComparison,
-  // ignore: constant_identifier_names
-  monthly_savings_comparison, // Corregido para coincidir con el backend
-  // ignore: constant_identifier_names
-  top_spending_category, // Corregido para coincidir con el backend
-  // ignore: constant_identifier_names
+  monthly_savings_comparison,
+  top_spending_category,
   goal_milestone,
-  // ignore: constant_identifier_names
-  low_balance_warning, // Corregido para coincidir con el backend
-  // ignore: constant_identifier_names
+  low_balance_warning,
   upcoming_payment,
-  // ignore: constant_identifier_names
   budget_exceeded,
+  budget_warning,
+  large_expense,
+  emotional_alert,
+  credit_strategy,
+  cleanup_reminder,
+  savings_opportunity,
+  trial_ending,
+  test_alert,
   warning,
 }
 
@@ -62,15 +64,15 @@ class Insight extends Equatable {
       description: 'Analizando tus datos para encontrar información valiosa.',
       severity: InsightSeverity.info,
       isRead: false,
-      metadata: {},
+      metadata: const {},
     );
   }
 
-  /// Constructor Factory a prueba de fallos para crear una instancia desde un mapa.
+  /// Constructor Factory para crear una instancia desde el mapa de Supabase.
   factory Insight.fromMap(Map<String, dynamic> map) {
     try {
       return Insight(
-        id: map['id'] ?? 'default_id',
+        id: map['id']?.toString() ?? 'default_id',
         userId: map['user_id'] ?? '',
         createdAt: DateTime.tryParse(map['created_at'] ?? '') ?? DateTime.now(),
 
@@ -93,34 +95,17 @@ class Insight extends Equatable {
         ),
 
         isRead: map['is_read'] ?? false,
-
-        // --- CORRECCIÓN CLAVE ---
-        // Maneja el caso en que `metadata` sea nulo o no sea un mapa.
         metadata: (map['metadata'] is Map<String, dynamic>)
             ? map['metadata']
             : <String, dynamic>{},
       );
     } catch (e, st) {
       developer.log(
-          '🔥🔥🔥 ERROR FATAL al parsear Insight. Revisa el mapa de datos.',
+          '🔥🔥🔥 ERROR FATAL al parsear Insight.',
           name: 'InsightModel',
           error: e,
-          stackTrace: st,
-          // Imprime el mapa que causó el error para facilitar la depuración.
-          level: 1000, // Usa un nivel alto para que sea visible
-          zone: Zone.current.fork(zoneValues: {'map_data': map}));
-      // Devuelve un "Insight de error" para no romper la UI.
-      return Insight(
-        id: 'error_id',
-        userId: '',
-        createdAt: DateTime.now(),
-        type: InsightType.unknown,
-        title: 'Error al cargar',
-        description: 'Hubo un problema al procesar este descubrimiento.',
-        severity: InsightSeverity.alert,
-        isRead: false,
-        metadata: {},
-      );
+          stackTrace: st);
+      return Insight.empty();
     }
   }
 
@@ -138,24 +123,22 @@ class Insight extends Equatable {
       ];
 }
 
-/// Extensiones para añadir propiedades visuales a los enums, manteniendo el modelo limpio.
+/// Extensiones visuales para la UI
 extension InsightSeverityX on InsightSeverity {
-  /// Devuelve el color asociado a cada tipo de severidad.
   Color getColor(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     switch (this) {
       case InsightSeverity.info:
-        return colors.secondary;
+        return const Color(0xFF0A84FF); // iOS Blue
       case InsightSeverity.success:
-        return Colors.green.shade600;
+        return const Color(0xFF30D158); // iOS Green
       case InsightSeverity.warning:
-        return Colors.orange.shade700;
+        return const Color(0xFFFF9F0A); // iOS Orange
       case InsightSeverity.alert:
-        return colors.error;
+        return const Color(0xFFFF453A); // iOS Red
     }
   }
 
-  /// Devuelve el icono asociado a cada tipo de severidad.
   IconData get icon {
     switch (this) {
       case InsightSeverity.info:
@@ -168,4 +151,4 @@ extension InsightSeverityX on InsightSeverity {
         return Iconsax.danger;
     }
   }
-}// TODO Implement this library.
+}
