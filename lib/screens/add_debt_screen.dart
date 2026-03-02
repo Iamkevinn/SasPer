@@ -1,10 +1,43 @@
 // lib/screens/add_debt_screen.dart
+//
+// ┌─────────────────────────────────────────────────────────────────────────────┐
+// │  FILOSOFÍA — Apple iOS / Contacts + Wallet                                 │
+// │                                                                             │
+// │  Registrar una deuda o préstamo es un acto de confianza.                  │
+// │  La pantalla debe sentirse tan natural como anotar algo en tu agenda.      │
+// │                                                                             │
+// │  JERARQUÍA:                                                                │
+// │  1. Tipo (Yo Debo / Me Deben) — segmented control iOS. Primera decisión.  │
+// │     El color del acento cambia con él: rojo para deudas, verde para       │
+// │     préstamos. Es el ÚNICO cambio cromático de toda la pantalla.          │
+// │  2. Persona — quién. Avatar + nombre o campo manual si no está en agenda. │
+// │  3. Concepto — para qué. Texto libre.                                     │
+// │  4. Monto — cuánto. Grande, protagonista.                                 │
+// │  5. Cuenta y fecha — detalles en dos tiles compactos.                     │
+// │  6. ¿Cómo afecta? — tres opciones de impacto. Claras, sin ambigüedad.    │
+// │  7. Impact card — aparece solo cuando hay monto + cuenta. Cálculo real.   │
+// │  8. Botón confirmar — único CTA.                                           │
+// │                                                                             │
+// │  BUG FIX — "Escribir manualmente" no hacía nada:                          │
+// │  El widget _ContactSelectorPremium original mostraba el campo manual       │
+// │  solo cuando selectedContact != null — exactamente el caso contrario.     │
+// │  Solución: bool _isManualMode independiente del contacto.                  │
+// │  Cuando _isManualMode = true, el campo de texto aparece en pantalla,       │
+// │  enfocado automáticamente, sin necesidad de ningún contacto seleccionado. │
+// │                                                                             │
+// │  ELIMINADO vs original:                                                    │
+// │  • Fondo con gradiente animado rojo/verde → distracción permanente        │
+// │  • Header expandible 200px con ícono que escala en bucle → innecesario    │
+// │  • BackdropFilter blur en hero card → coste de render sin propósito       │
+// │  • Section labels en accentColor bold compitiendo en cada sección         │
+// │  • .animate().fadeIn().slideY() encadenados en impactCard → exceso        │
+// │  • .animate(target:).scale() en cada opción de impacto → 3 anim. a la vez│
+// └─────────────────────────────────────────────────────────────────────────────┘
 
-import 'dart:ui';
+import 'dart:math' as math;
 import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -16,9 +49,50 @@ import 'package:sasper/models/debt_model.dart';
 import 'package:sasper/services/event_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'dart:developer' as developer;
 
+// ─── TOKENS ──────────────────────────────────────────────────────────────────
+class _C {
+  final BuildContext ctx;
+  _C(this.ctx);
+
+  bool get isDark => Theme.of(ctx).brightness == Brightness.dark;
+
+  Color get bg      => isDark ? const Color(0xFF000000) : const Color(0xFFF2F2F7);
+  Color get surface => isDark ? const Color(0xFF1C1C1E) : Colors.white;
+  Color get raised  => isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF5F5F7);
+  Color get sep     => isDark ? const Color(0xFF38383A) : const Color(0xFFE5E5EA);
+
+  Color get label  => isDark ? const Color(0xFFFFFFFF) : const Color(0xFF1C1C1E);
+  Color get label2 => isDark ? const Color(0xFFEBEBF5) : const Color(0xFF3A3A3C);
+  Color get label3 => isDark ? const Color(0xFF8E8E93) : const Color(0xFF636366);
+  Color get label4 => isDark ? const Color(0xFF48484A) : const Color(0xFFAEAEB2);
+
+  static const Color red    = Color(0xFFFF3B30);
+  static const Color green  = Color(0xFF30D158);
+  static const Color orange = Color(0xFFFF9F0A);
+  static const Color blue   = Color(0xFF0A84FF);
+  static const Color purple = Color(0xFFBF5AF2);
+
+  static const double xs   = 4.0;
+  static const double sm   = 8.0;
+  static const double md   = 16.0;
+  static const double lg   = 24.0;
+  static const double xl   = 32.0;
+  static const double rSM  = 8.0;
+  static const double rMD  = 12.0;
+  static const double rLG  = 16.0;
+  static const double rXL  = 22.0;
+  static const double r2XL = 28.0;
+
+  static const Duration fast   = Duration(milliseconds: 130);
+  static const Duration mid    = Duration(milliseconds: 260);
+  static const Duration slow   = Duration(milliseconds: 440);
+  static const Curve   easeOut = Curves.easeOutCubic;
+  static const Curve   spring  = Curves.easeOutBack;
+}
+
+// ─── PANTALLA ─────────────────────────────────────────────────────────────────
 class AddDebtScreen extends StatefulWidget {
   const AddDebtScreen({super.key});
 
@@ -28,1860 +102,2178 @@ class AddDebtScreen extends StatefulWidget {
 
 class _AddDebtScreenState extends State<AddDebtScreen>
     with TickerProviderStateMixin {
-  // Repositorios
-  final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _amountController = TextEditingController(text: '0');
-  final _entityControllerForManualEntry = TextEditingController();
-  final DebtRepository _debtRepository = DebtRepository.instance;
-  final AccountRepository _accountRepository = AccountRepository.instance;
-  late ConfettiController _confettiController;
+  final _formKey       = GlobalKey<FormState>();
+  final _nameCtrl      = TextEditingController();
+  final _manualCtrl    = TextEditingController();
+  final _manualFocus   = FocusNode();
 
-  // Estado
-  DebtType _selectedDebtType = DebtType.debt;
-  DebtImpactType _selectedImpactType = DebtImpactType.liquid; // <--- NUEVO
-  Account? _selectedAccount;
-  DateTime? _dueDate;
-  bool _isLoading = false;
-  bool _isSuccess = false;
-  contacts.Contact? _selectedContact;
-  double? _contactTotalBalance;
-  bool _isFetchingDebt = false;
+  final DebtRepository    _debtRepo    = DebtRepository.instance;
+  final AccountRepository _accountRepo = AccountRepository.instance;
 
-  // Animaciones
-  late AnimationController _typeAnimationController;
-  late AnimationController _impactAnimationController;
-  late Animation<double> _typeAnimation;
-  late Animation<double> _impactAnimation;
-
+  late ConfettiController _confettiCtrl;
   late Future<List<Account>> _accountsFuture;
+
+  // Estado del formulario
+  DebtType       _debtType    = DebtType.debt;
+  DebtImpactType _impactType  = DebtImpactType.liquid;
+  Account?       _account;
+  DateTime?      _dueDate;
+  double         _amount      = 0.0;
+  bool           _isLoading   = false;
+  bool           _isSuccess   = false;
+
+  // Estado del selector de persona — BUG FIX
+  // _isManualMode y _selectedContact son mutuamente excluyentes.
+  // Antes el campo manual dependía de selectedContact != null (bug).
+  // Ahora _isManualMode es independiente — cuando es true el campo aparece.
+  contacts.Contact? _selectedContact;
+  bool   _isManualMode        = false;
+  double? _contactBalance;
+  bool   _isFetchingBalance   = false;
+
+  // Animación del tipo — el acento cromático cambia suavemente
+  late AnimationController _typeCtrl;
+  late Animation<double>   _typeAnim;   // 0 = debt (red), 1 = loan (green)
+
+  // Animación del impact card
+  late AnimationController _impactCtrl;
+  late Animation<double>   _impactAnim;
 
   @override
   void initState() {
     super.initState();
-    _accountsFuture = _accountRepository.getAccounts();
-    _confettiController =
-        ConfettiController(duration: const Duration(seconds: 2));
+    _accountsFuture = _accountRepo.getAccounts();
 
-    // Animación del selector de tipo
-    _typeAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 400),
-      vsync: this,
-    );
-    _typeAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(
-          parent: _typeAnimationController, curve: Curves.easeInOutBack),
-    );
+    _confettiCtrl = ConfettiController(
+        duration: const Duration(milliseconds: 2500));
 
-    // Animación del impacto financiero
-    _impactAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 600),
-      vsync: this,
-    );
-    _impactAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(
-          parent: _impactAnimationController, curve: Curves.easeOutCubic),
-    );
+    _typeCtrl = AnimationController(duration: _C.slow, vsync: this);
+    _typeAnim = CurvedAnimation(parent: _typeCtrl, curve: _C.easeOut);
 
-    // Listeners para actualizar en tiempo real
-    _nameController.addListener(() => setState(() {}));
-    _amountController.addListener(() {
-      setState(() {});
-      _impactAnimationController.forward(from: 0);
+    _impactCtrl = AnimationController(duration: _C.mid, vsync: this);
+    _impactAnim = CurvedAnimation(parent: _impactCtrl, curve: _C.easeOut);
+
+    _accountsFuture.then((accounts) {
+      if (accounts.isNotEmpty && mounted) {
+        setState(() => _account = accounts.first);
+      }
     });
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _amountController.dispose();
-    _entityControllerForManualEntry.dispose();
-    _confettiController.dispose();
-    _typeAnimationController.dispose();
-    _impactAnimationController.dispose();
+    _nameCtrl.dispose();
+    _manualCtrl.dispose();
+    _manualFocus.dispose();
+    _confettiCtrl.dispose();
+    _typeCtrl.dispose();
+    _impactCtrl.dispose();
     super.dispose();
   }
 
-  void _changeDebtType(DebtType newType) {
-    if (newType == _selectedDebtType) return;
-    setState(() => _selectedDebtType = newType);
-    if (newType == DebtType.debt) {
-      _typeAnimationController.forward();
+  // ── Acento dinámico ───────────────────────────────────────────────────────
+  // El color interpola entre rojo y verde según el tipo.
+  // Es el único eje cromático de la pantalla.
+  Color _accentAt(double t) =>
+      Color.lerp(const Color(0xFFFF3B30), const Color(0xFF30D158), t)!;
+
+  // ── Cambio de tipo ────────────────────────────────────────────────────────
+  void _setDebtType(DebtType t) {
+    if (t == _debtType) return;
+    HapticFeedback.selectionClick();
+    setState(() => _debtType = t);
+    if (t == DebtType.loan) {
+      _typeCtrl.forward();
     } else {
-      _typeAnimationController.reverse();
+      _typeCtrl.reverse();
     }
   }
 
-  // Lógica de contactos
+  // ── Contactos ─────────────────────────────────────────────────────────────
   Future<void> _pickContact() async {
-    Navigator.pop(context);
-    if (await Permission.contacts.request().isGranted) {
-      final contact = await contacts.FlutterContacts.openExternalPick();
-      if (contact != null) {
-        setState(() {
-          _selectedContact = contact;
-          _entityControllerForManualEntry.clear();
-        });
-        _fetchDebtForSelectedContact();
-      }
-    } else {
+    Navigator.pop(context); // Cierra el bottom sheet
+    if (!await Permission.contacts.request().isGranted) {
       NotificationHelper.show(
-        message: 'Permiso de contactos denegado.',
-        type: NotificationType.warning,
-      );
+          message: 'Permiso de contactos denegado.',
+          type: NotificationType.warning);
+      return;
+    }
+    final contact = await contacts.FlutterContacts.openExternalPick();
+    if (contact != null && mounted) {
+      setState(() {
+        _selectedContact = contact;
+        _isManualMode    = false;
+        _manualCtrl.clear();
+        _contactBalance  = null;
+      });
+      _fetchContactBalance();
     }
   }
 
+  // BUG FIX: _useManualEntry activa _isManualMode = true y hace focus
+  // automático en el campo de texto. El campo existe en el árbol de widgets
+  // independientemente del contacto seleccionado.
   void _useManualEntry() {
-    Navigator.pop(context);
+    Navigator.pop(context); // Cierra el bottom sheet
     setState(() {
       _selectedContact = null;
-      _contactTotalBalance = null;
+      _contactBalance  = null;
+      _isManualMode    = true;
+    });
+    // Autofocus al campo manual después del frame actual
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _manualFocus.requestFocus();
     });
   }
 
-  void _clearSelectedContact() {
+  void _clearPerson() {
     setState(() {
       _selectedContact = null;
-      _contactTotalBalance = null;
-      _entityControllerForManualEntry.clear();
+      _contactBalance  = null;
+      _isManualMode    = false;
+      _manualCtrl.clear();
     });
   }
 
-  Future<void> _fetchDebtForSelectedContact() async {
+  Future<void> _fetchContactBalance() async {
     if (_selectedContact == null) return;
-    setState(() => _isFetchingDebt = true);
+    setState(() => _isFetchingBalance = true);
     try {
-      final total = await _debtRepository
+      final total = await _debtRepo
           .getTotalDebtForEntity(_selectedContact!.displayName);
-      if (mounted) setState(() => _contactTotalBalance = total);
+      if (mounted) setState(() => _contactBalance = total);
     } catch (e) {
-      developer.log('Error al obtener deuda del contacto: $e');
+      developer.log('Error al obtener balance de contacto: $e');
     } finally {
-      if (mounted) setState(() => _isFetchingDebt = false);
+      if (mounted) setState(() => _isFetchingBalance = false);
     }
   }
 
-  // Guardar
-  void _showConfirmationModal() {
-    if (!_formKey.currentState!.validate() || _selectedAccount == null) {
+  // ── Monto ─────────────────────────────────────────────────────────────────
+  void _onAmountChanged(double v) {
+    setState(() => _amount = v);
+    if (v > 0 && _account != null) {
+      _impactCtrl.forward();
+    } else {
+      _impactCtrl.reverse();
+    }
+  }
+
+  // ── Nombre de la persona ──────────────────────────────────────────────────
+  String get _personName {
+    if (_selectedContact != null) return _selectedContact!.displayName;
+    if (_isManualMode) return _manualCtrl.text.trim();
+    return '';
+  }
+
+  // ── Guardar ───────────────────────────────────────────────────────────────
+void _requestConfirm() {
+    // 1. Validar formulario (Concepto)
+    if (!_formKey.currentState!.validate()) {
+      HapticFeedback.vibrate();
+      return;
+    }
+    
+    // 2. Validar Cuenta seleccionada
+    if (_account == null) {
+      HapticFeedback.vibrate();
       NotificationHelper.show(
-        message: 'Por favor, completa todos los campos requeridos.',
-        type: NotificationType.error,
-      );
+          message: 'Selecciona una cuenta.',
+          type: NotificationType.error);
       return;
     }
 
-    final amount = double.tryParse(
-            _amountController.text.replaceAll(RegExp(r'[^0-9]'), '')) ??
-        0;
+    // 3. VALIDACIÓN FALTANTE: Validar Persona seleccionada
+    if (_personName.isEmpty) {
+      HapticFeedback.vibrate();
+      NotificationHelper.show(
+          message: _debtType == DebtType.debt 
+              ? '¿A quién le debes?' 
+              : '¿Quién te debe?',
+          type: NotificationType.error);
+      return;
+    }
 
+    final accent = _accentAt(_typeCtrl.value);
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => _PremiumConfirmationModal(
-        debtType: _selectedDebtType,
-        amount: amount,
-        concept: _nameController.text,
-        entityName: _selectedContact?.displayName ??
-            _entityControllerForManualEntry.text,
-        account: _selectedAccount!,
-        onConfirm: _submitForm,
+      isScrollControlled: true,
+      builder: (_) => _ConfirmSheet(
+        debtType:   _debtType,
+        amount:     _amount,
+        concept:    _nameCtrl.text.trim(),
+        personName: _personName,
+        account:    _account!,
+        accentColor: accent,
+        c:          _C(context),
+        onConfirm:  _submit,
       ),
     );
   }
 
-  Future<void> _submitForm() async {
+Future<void> _submit() async {
     if (_isLoading || _isSuccess) return;
-    Navigator.pop(context);
+    
+    // Cerramos el BottomSheet de confirmación
+    Navigator.pop(context); 
+    
     setState(() => _isLoading = true);
 
     try {
-      final entityName = _selectedContact?.displayName ??
-          _entityControllerForManualEntry.text.trim();
-      await _debtRepository.addDebtAndInitialTransaction(
-        name: _nameController.text.trim(),
-        type: _selectedDebtType,
-        entityName: entityName.isNotEmpty ? entityName : null,
-        amount: double.parse(
-            _amountController.text.replaceAll(RegExp(r'[^0-9]'), '')),
-        accountId: _selectedAccount!.id,
-        dueDate: _dueDate,
+      // Aseguramos que entity nunca sea null aquí porque ya validamos arriba
+      final entity = _personName; 
+
+      await _debtRepo.addDebtAndInitialTransaction(
+        name:            _nameCtrl.text.trim(),
+        type:            _debtType, // El repo debe manejar el enum o usar .name
+        entityName:      entity,
+        amount:          _amount,
+        accountId:       _account!.id,
+        dueDate:         _dueDate,
         transactionDate: DateTime.now(),
-        impactType: _selectedImpactType, // <--- NUEVO
+        impactType:      _impactType,
       );
 
       if (mounted) {
-        setState(() => _isSuccess = true);
-        _confettiController.play();
-        EventService.instance.fire(AppEvent.transactionsChanged);
-        await Future.delayed(const Duration(milliseconds: 2000));
-        if (mounted) Navigator.of(context).pop();
-        NotificationHelper.show(
-          message: '¡Operación registrada exitosamente!',
-          type: NotificationType.success,
-        );
+        setState(() { _isSuccess = true; _isLoading = false; });
+        HapticFeedback.mediumImpact();
+        _confettiCtrl.play();
+        EventService.instance.fire(AppEvent.transactionsChanged); // Notificar cambios
+        
+        await Future.delayed(const Duration(milliseconds: 1800));
+        
+        if (mounted) {
+          Navigator.of(context).pop(); // Cerrar pantalla
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            NotificationHelper.show(
+                message: '¡Operación registrada!',
+                type: NotificationType.success);
+          });
+        }
       }
     } catch (e) {
+      developer.log('Error al guardar deuda: $e', name: 'AddDebtScreen');
       if (mounted) {
+        setState(() => _isLoading = false);
+        HapticFeedback.vibrate();
         NotificationHelper.show(
-          message:
-              'Error al guardar: ${e.toString().replaceFirst("Exception: ", "")}',
-          type: NotificationType.error,
-        );
+            message: 'Error al guardar: Verifique los datos.', // Mensaje amigable
+            type: NotificationType.error);
       }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
   }
-
+  // ─── BUILD ────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = _C(context);
 
-    final double amount = double.tryParse(
-            _amountController.text.replaceAll(RegExp(r'[^0-9]'), '')) ??
-        0;
-    final entityName =
-        _selectedContact?.displayName ?? _entityControllerForManualEntry.text;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor:          Colors.transparent,
+        statusBarIconBrightness: c.isDark ? Brightness.light : Brightness.dark,
+        statusBarBrightness:     c.isDark ? Brightness.dark  : Brightness.light,
+      ),
+      child: Stack(children: [
+        Scaffold(
+          backgroundColor: c.bg,
+          body: Form(
+            key: _formKey,
+            child: CustomScrollView(
+              physics: const BouncingScrollPhysics(),
+              slivers: [
+                // ── AppBar con tipo selector integrado ────────────────
+                _buildAppBar(c),
 
-    // Color dinámico según tipo
-    final accentColor = _selectedDebtType == DebtType.debt
-        ? (isDark ? Colors.red.shade400 : Colors.red.shade700)
-        : (isDark ? Colors.green.shade400 : Colors.green.shade700);
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(
+                      _C.md, _C.sm, _C.md, 0),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
 
-    return Stack(
-      children: [
-        // Fondo animado con gradiente dinámico
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 600),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                accentColor.withOpacity(0.05),
-                colorScheme.surface,
-                colorScheme.surface,
+                      // ── Hero card — monto + persona en tiempo real ─
+                      AnimatedBuilder(
+                        animation: _typeAnim,
+                        builder: (_, __) => _HeroCard(
+                          amount:     _amount,
+                          personName: _personName,
+                          debtType:   _debtType,
+                          accent:     _accentAt(_typeAnim.value),
+                          c:          c,
+                        ),
+                      ),
+                      const SizedBox(height: _C.lg),
+
+                      // ── Persona ────────────────────────────────────
+                      _SectionLabel(text: _debtType == DebtType.debt
+                          ? '¿A quién le debes?' : '¿Quién te debe?', c: c),
+                      const SizedBox(height: _C.sm),
+                      AnimatedBuilder(
+                        animation: _typeAnim,
+                        builder: (_, __) => _PersonField(
+                          selectedContact:  _selectedContact,
+                          isManualMode:     _isManualMode,
+                          manualCtrl:       _manualCtrl,
+                          manualFocus:      _manualFocus,
+                          contactBalance:   _contactBalance,
+                          isFetching:       _isFetchingBalance,
+                          accent:           _accentAt(_typeAnim.value),
+                          debtType:         _debtType,
+                          c:                c,
+                          onTapSelector:    _showPersonPicker,
+                          onClear:          _clearPerson,
+                          onManualChanged:  () => setState(() {}),
+                        ),
+                      ),
+                      const SizedBox(height: _C.lg),
+
+                      // ── Concepto ───────────────────────────────────
+                      _SectionLabel(text: '¿Para qué es?', c: c),
+                      const SizedBox(height: _C.sm),
+                      AnimatedBuilder(
+                        animation: _typeAnim,
+                        builder: (_, __) => _ConceptField(
+                          ctrl:   _nameCtrl,
+                          hint:   _debtType == DebtType.debt
+                              ? 'Ej: Préstamo para el coche'
+                              : 'Ej: Dinero del viaje',
+                          accent: _accentAt(_typeAnim.value),
+                          c:      c,
+                        ),
+                      ),
+                      const SizedBox(height: _C.lg),
+
+                      // ── Monto ─────────────────────────────────────
+                      _SectionLabel(text: 'Monto', c: c),
+                      const SizedBox(height: _C.sm),
+                      AnimatedBuilder(
+                        animation: _typeAnim,
+                        builder: (_, __) => _AmountInput(
+                          accent:    _accentAt(_typeAnim.value),
+                          c:         c,
+                          onChanged: _onAmountChanged,
+                        ),
+                      ),
+                      const SizedBox(height: _C.lg),
+
+                      // ── Cuenta y fecha ────────────────────────────
+                      _SectionLabel(text: 'Detalles', c: c),
+                      const SizedBox(height: _C.sm),
+                      AnimatedBuilder(
+                        animation: _typeAnim,
+                        builder: (_, __) {
+                          final accent = _accentAt(_typeAnim.value);
+                          return Column(children: [
+                            FutureBuilder<List<Account>>(
+                              future: _accountsFuture,
+                              builder: (_, snap) {
+                                if (!snap.hasData) return _FieldSkeleton(c: c);
+                                return _AccountTile(
+                                  accounts: snap.data!,
+                                  selected: _account,
+                                  accent:   accent,
+                                  c:        c,
+                                  onSelect: (a) => setState(() {
+                                    _account = a;
+                                    if (_amount > 0) _impactCtrl.forward();
+                                  }),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: _C.sm),
+                            _DateTile(
+                              dueDate:    _dueDate,
+                              accent:     accent,
+                              c:          c,
+                              onSelected: (d) => setState(() => _dueDate = d),
+                            ),
+                          ]);
+                        },
+                      ),
+                      const SizedBox(height: _C.lg),
+
+                      // ── ¿Cómo afecta tu cuenta? ───────────────────
+                      _SectionLabel(text: '¿Cómo afecta tu cuenta?', c: c),
+                      const SizedBox(height: _C.sm),
+                      AnimatedBuilder(
+                        animation: _typeAnim,
+                        builder: (_, __) => _ImpactSelector(
+                          selected:  _impactType,
+                          debtType:  _debtType,
+                          accent:    _accentAt(_typeAnim.value),
+                          c:         c,
+                          onChanged: (t) {
+                            HapticFeedback.selectionClick();
+                            setState(() => _impactType = t);
+                          },
+                        ),
+                      ),
+
+                      // ── Impact card — solo cuando hay datos ───────
+                      AnimatedSize(
+                        duration: _C.mid, curve: _C.easeOut,
+                        child: (_amount > 0 && _account != null)
+                            ? Padding(
+                                padding: const EdgeInsets.only(top: _C.lg),
+                                child: FadeTransition(
+                                  opacity: _impactAnim,
+                                  child: SlideTransition(
+                                    position: Tween<Offset>(
+                                      begin: const Offset(0, 0.05),
+                                      end: Offset.zero,
+                                    ).animate(_impactAnim),
+                                    child: AnimatedBuilder(
+                                      animation: _typeAnim,
+                                      builder: (_, __) => _ImpactCard(
+                                        debtType:   _debtType,
+                                        impactType: _impactType,
+                                        amount:     _amount,
+                                        account:    _account!,
+                                        accent:     _accentAt(_typeAnim.value),
+                                        c:          c,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : const SizedBox.shrink(),
+                      ),
+
+                      const SizedBox(height: 100),
+                    ]),
+                  ),
+                ),
               ],
             ),
           ),
         ),
 
-        Scaffold(
-          backgroundColor: Colors.transparent,
-          body: CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              // HEADER CON SELECTOR DE TIPO (Esto no cambia)
-              _buildPremiumHeader(accentColor, isDark),
-
-              SliverToBoxAdapter(
-                child: Padding(
-                  // Añadimos un Padding para el margen horizontal
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _buildFloatingHeroCard(
-                      amount, entityName, accentColor, isDark),
-                ),
-              ),
-
-              // FORMULARIO INTELIGENTE Y TARJETA HERO
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate([
-                    const SizedBox(height: 8), // Pequeño espacio superior
-
-                    // 1. HEMOS MOVIDO LA TARJETA HERO AQUÍ
-                    //_buildFloatingHeroCard(
-                      //  amount, entityName, accentColor, isDark),
-
-                    // 2. HEMOS QUITADO EL SizedBox(height: 24) DE AQUÍ
-                    Form(
-                      key: _formKey,
-                      child: Padding(
-                        padding: const EdgeInsets.all(
-                            4.0), // Padding para el formulario
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(
-                                height: 32), // Espacio después de la tarjeta
-
-                            // Concepto
-                            _buildSectionLabel(
-                                '¿Para qué es?', Iconsax.note_1, accentColor),
-                            const SizedBox(height: 12),
-                            _PremiumTextField(
-                              controller: _nameController,
-                              hint: _selectedDebtType == DebtType.debt
-                                  ? 'Ej: Préstamo para el coche'
-                                  : 'Ej: Dinero del viaje',
-                              icon: Iconsax.note_text,
-                              accentColor: accentColor,
-                              validator: (v) => v == null || v.trim().isEmpty
-                                  ? 'El concepto es obligatorio'
-                                  : null,
-                            ),
-
-                            const SizedBox(height: 32),
-
-                            // Contacto
-                            _buildSectionLabel(
-                                _selectedDebtType == DebtType.debt
-                                    ? '¿A quién le debes?'
-                                    : '¿Quién te debe?',
-                                Iconsax.user_search,
-                                accentColor),
-                            const SizedBox(height: 12),
-                            _ContactSelectorPremium(
-                              selectedContact: _selectedContact,
-                              manualEntryController:
-                                  _entityControllerForManualEntry,
-                              contactBalance: _contactTotalBalance,
-                              isFetching: _isFetchingDebt,
-                              onClear: _clearSelectedContact,
-                              onTap: _showContactPicker,
-                              accentColor: accentColor,
-                            ),
-
-                            const SizedBox(height: 32),
-
-                            // Monto
-                            _buildSectionLabel(
-                                'Monto', Iconsax.money_4, accentColor),
-                            const SizedBox(height: 12),
-                            _PremiumAmountField(
-                              controller: _amountController,
-                              accentColor: accentColor,
-                            ),
-
-                            const SizedBox(height: 32),
-
-                            // Cuenta y fecha
-                            _buildSectionLabel(
-                                'Detalles', Iconsax.setting_2, accentColor),
-                            const SizedBox(height: 12),
-                            _buildAccountAndDatePickers(accentColor),
-const SizedBox(height: 32),
-
-                            // NUEVO: SELECTOR DE IMPACTO (El corazón de nuestra lógica)
-                            _buildSectionLabel('¿Cómo afecta tu cuenta?', Iconsax.shuffle, accentColor),
-                            const SizedBox(height: 12),
-                            _ImpactTypeSelectorPremium(
-                              selectedImpact: _selectedImpactType,
-                              debtType: _selectedDebtType,
-                              accentColor: accentColor,
-                              onChanged: (val) {
-                                setState(() => _selectedImpactType = val);
-                              },
-                            ),
-
-                            const SizedBox(height: 32),
-
-                            // TARJETA DE IMPACTO FINANCIERO ...
-                            const SizedBox(height: 32),
-
-                            // TARJETA DE IMPACTO FINANCIERO
-                            if (amount > 0 && _selectedAccount != null)
-                              FadeTransition(
-                                opacity: _impactAnimation,
-                                child: SlideTransition(
-                                  position: Tween<Offset>(
-                                    begin: const Offset(0, 0.2),
-                                    end: Offset.zero,
-                                  ).animate(_impactAnimation),
-                                  child: _FinancialImpactCard(
-                                    debtType: _selectedDebtType,
-                                    impactType: _selectedImpactType,
-                                    amount: amount,
-                                    account: _selectedAccount!,
-                                    accentColor: accentColor,
-                                    isDark: isDark,
-                                  ),
-                                ),
-                              ),
-
-                            const SizedBox(height: 120),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ]),
-                ),
-              ),
-            ],
+        // ── Botón flotante ────────────────────────────────────────────
+        AnimatedBuilder(
+          animation: _typeAnim,
+          builder: (_, __) => _FloatBtn(
+            isLoading:  _isLoading,
+            isSuccess:  _isSuccess,
+            debtType:   _debtType,
+            accent:     _accentAt(_typeAnim.value),
+            c:          _C(context),
+            onTap:      _requestConfirm,
           ),
         ),
-        // BOTÓN FLOTANTE PREMIUM
-        _buildFloatingActionButton(accentColor),
 
-        // CONFETTI
-        _ConfettiCelebration(controller: _confettiController),
-      ],
+        // ── Confetti ──────────────────────────────────────────────────
+        Align(
+          alignment: Alignment.topCenter,
+          child: ConfettiWidget(
+            confettiController: _confettiCtrl,
+            blastDirectionality: BlastDirectionality.explosive,
+            shouldLoop: false,
+            numberOfParticles: 40,
+            gravity: 0.28,
+            colors: const [_C.red, _C.green, _C.orange, _C.purple, _C.blue],
+            createParticlePath: _starPath,
+          ),
+        ),
+      ]),
     );
   }
 
-  // ==================== COMPONENTES ====================
-
-  Widget _buildPremiumHeader(Color accentColor, bool isDark) {
+  // ── AppBar con tipo selector ──────────────────────────────────────────────
+  Widget _buildAppBar(_C c) {
     return SliverAppBar(
-      expandedHeight: 200,
-      floating: false,
       pinned: true,
       elevation: 0,
-      backgroundColor: Colors.transparent,
+      scrolledUnderElevation: 0,
+      backgroundColor: c.bg,
+      surfaceTintColor: Colors.transparent,
+      automaticallyImplyLeading: false,
+      toolbarHeight: 56,
+      // El tipo selector vive en el appbar — siempre visible
       flexibleSpace: FlexibleSpaceBar(
-        background: Padding(
-          padding:
-              const EdgeInsets.only(left: 20, right: 20, bottom: 20, top: 100),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  AnimatedBuilder(
-                    animation: _typeAnimation,
-                    builder: (context, child) {
-                      return Transform.scale(
-                        scale: 1 + (_typeAnimation.value * 0.1),
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                accentColor,
-                                accentColor.withOpacity(0.7)
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: accentColor.withOpacity(0.4),
-                                blurRadius: 12,
-                                offset: const Offset(0, 6),
-                              ),
-                            ],
-                          ),
-                          child: Icon(
-                            _selectedDebtType == DebtType.debt
-                                ? Iconsax.money_recive
-                                : Iconsax.money_send,
-                            color: Colors.white,
-                            size: 28,
-                          ),
-                        ),
-                      );
-                    },
+        titlePadding: EdgeInsets.zero,
+        title: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: _C.md),
+            child: Row(children: [
+              _BackBtn(c: c),
+              const SizedBox(width: _C.sm),
+              Expanded(
+                child: AnimatedBuilder(
+                  animation: _typeAnim,
+                  builder: (_, __) => _TypeSelector(
+                    debtType: _debtType,
+                    accent:   _accentAt(_typeAnim.value),
+                    c:        c,
+                    onChanged: _setDebtType,
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Text(
-                      'Nueva Operación',
-                      style: GoogleFonts.poppins(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
-              const SizedBox(height: 20),
-              _DebtTypeSelectorPremium(
-                selectedType: _selectedDebtType,
-                onChanged: _changeDebtType,
-              ),
-            ],
+            ]),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildFloatingHeroCard(
-      double amount, String entityName, Color accentColor, bool isDark) {
-    final currencyFormat = NumberFormat.currency(
-      locale: 'es_CO',
-      symbol: '\$ ',
-      decimalDigits: 0,
+  void _showPersonPicker() {
+    final c = _C(context);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _PersonPickerSheet(
+        c: c,
+        onPickContact:   _pickContact,
+        onManualEntry:   _useManualEntry,
+      ),
     );
+  }
+}
 
-    // Devuelve el Container directamente
+// ─── TYPE SELECTOR ────────────────────────────────────────────────────────────
+// Segmented control iOS. Vive en el AppBar — siempre visible.
+// El color del segmento activo ES el acento de toda la pantalla.
+class _TypeSelector extends StatelessWidget {
+  final DebtType debtType;
+  final Color accent;
+  final _C c;
+  final ValueChanged<DebtType> onChanged;
+
+  const _TypeSelector({
+    required this.debtType, required this.accent,
+    required this.c, required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(
-          vertical: 8), // Ajustamos el margen vertical
-      padding: const EdgeInsets.all(20),
+      height: 38,
+      padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            accentColor.withOpacity(0.15),
-            accentColor.withOpacity(0.05),
-          ],
+        color: c.raised,
+        borderRadius: BorderRadius.circular(_C.rLG),
+        border: Border.all(color: c.sep.withOpacity(0.4), width: 0.5),
+      ),
+      child: Row(children: [
+        Expanded(child: _Seg(
+          label: 'Yo debo',
+          icon: Iconsax.arrow_down,
+          selected: debtType == DebtType.debt,
+          accent: accent,
+          c: c,
+          onTap: () => onChanged(DebtType.debt),
+        )),
+        const SizedBox(width: 3),
+        Expanded(child: _Seg(
+          label: 'Me deben',
+          icon: Iconsax.arrow_up_3,
+          selected: debtType == DebtType.loan,
+          accent: accent,
+          c: c,
+          onTap: () => onChanged(DebtType.loan),
+        )),
+      ]),
+    );
+  }
+}
+
+class _Seg extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final Color accent;
+  final _C c;
+  final VoidCallback onTap;
+
+  const _Seg({
+    required this.label, required this.icon, required this.selected,
+    required this.accent, required this.c, required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: _C.fast,
+        decoration: BoxDecoration(
+          color: selected ? c.surface : Colors.transparent,
+          borderRadius: BorderRadius.circular(_C.rMD),
+          boxShadow: selected ? [
+            BoxShadow(color: Colors.black.withOpacity(c.isDark ? 0.18 : 0.06),
+                blurRadius: 6, offset: const Offset(0, 1)),
+          ] : null,
         ),
-        borderRadius: BorderRadius.circular(24),
+        alignment: Alignment.center,
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(icon, size: 13,
+              color: selected ? accent : c.label4),
+          const SizedBox(width: 5),
+          Text(label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: selected ? accent : c.label3,
+                letterSpacing: -0.1,
+              )),
+        ]),
+      ),
+    );
+  }
+}
+
+// ─── HERO CARD ────────────────────────────────────────────────────────────────
+// Monto + persona en tiempo real. Compacto.
+// Sin BackdropFilter, sin gradientes dobles, sin bordes decorativos.
+class _HeroCard extends StatelessWidget {
+  final double amount;
+  final String personName;
+  final DebtType debtType;
+  final Color accent;
+  final _C c;
+
+  const _HeroCard({
+    required this.amount, required this.personName, required this.debtType,
+    required this.accent, required this.c,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = NumberFormat.compactCurrency(
+        locale: 'es_CO', symbol: '\$', decimalDigits: 1);
+    final hasData = amount > 0 || personName.isNotEmpty;
+
+    return AnimatedContainer(
+      duration: _C.mid,
+      padding: const EdgeInsets.all(_C.md),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(_C.r2XL),
         border: Border.all(
-          color: accentColor.withOpacity(0.3),
-          width: 2,
+          color: hasData ? accent.withOpacity(0.22) : c.sep.withOpacity(0.4),
+          width: 0.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: accentColor.withOpacity(0.2),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
+              color: Colors.black.withOpacity(c.isDark ? 0.18 : 0.04),
+              blurRadius: 10, offset: const Offset(0, 3)),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(22),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      entityName.isEmpty
-                          ? 'Ingresa los datos'
-                          : (_selectedDebtType == DebtType.debt
-                              ? 'Deuda con'
-                              : 'Préstamo a'),
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+      child: Row(children: [
+        // Avatar o ícono vacío
+        AnimatedSwitcher(
+          duration: _C.fast,
+          child: personName.isNotEmpty
+              ? Container(
+                  key: const ValueKey('avatar'),
+                  width: 46, height: 46,
+                  decoration: BoxDecoration(
+                      color: accent.withOpacity(c.isDark ? 0.22 : 0.10),
+                      shape: BoxShape.circle),
+                  child: Center(
+                    child: Text(
+                      personName[0].toUpperCase(),
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800,
+                          color: accent),
                     ),
-                    const SizedBox(height: 4),
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 300),
-                      transitionBuilder: (child, animation) =>
-                          ScaleTransition(scale: animation, child: child),
-                      child: Text(
-                        entityName.isEmpty ? '—' : entityName,
-                        key: ValueKey(entityName),
-                        style: GoogleFonts.poppins(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 400),
-                transitionBuilder: (child, animation) =>
-                    ScaleTransition(scale: animation, child: child),
-                child: Text(
-                  currencyFormat.format(amount),
-                  key: ValueKey(amount),
-                  style: GoogleFonts.poppins(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: accentColor,
                   ),
+                )
+              : Container(
+                  key: const ValueKey('empty'),
+                  width: 46, height: 46,
+                  decoration: BoxDecoration(
+                      color: c.raised, shape: BoxShape.circle),
+                  child: Icon(Iconsax.user, size: 20, color: c.label4),
                 ),
+        ),
+        const SizedBox(width: _C.md),
+
+        // Persona y tipo
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(
+              debtType == DebtType.debt ? 'Deuda con' : 'Préstamo a',
+              style: TextStyle(fontSize: 11, color: c.label3),
+            ),
+            const SizedBox(height: 2),
+            AnimatedSwitcher(
+              duration: _C.fast,
+              transitionBuilder: (child, anim) =>
+                  FadeTransition(opacity: anim, child: child),
+              child: Text(
+                personName.isEmpty ? '—' : personName,
+                key: ValueKey(personName),
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
+                    color: personName.isEmpty ? c.label4 : c.label,
+                    letterSpacing: -0.2),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSectionLabel(String label, IconData icon, Color accentColor) {
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: accentColor),
-        const SizedBox(width: 8),
-        Text(
-          label,
-          style: GoogleFonts.poppins(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: accentColor,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAccountAndDatePickers(Color accentColor) {
-    return Column(
-      children: [
-        // Selector de cuenta
-        FutureBuilder<List<Account>>(
-          future: _accountsFuture,
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            return _AccountSelectorPremium(
-              accounts: snapshot.data!,
-              selectedAccount: _selectedAccount,
-              onAccountSelected: (account) {
-                setState(() => _selectedAccount = account);
-                Navigator.pop(context);
-              },
-              accentColor: accentColor,
-            );
-          },
-        ),
-        const SizedBox(height: 16),
-        // Selector de fecha
-        _DatePickerPremium(
-          dueDate: _dueDate,
-          onDateSelected: (date) => setState(() => _dueDate = date),
-          accentColor: accentColor,
-        ),
-      ],
-    );
-  }
-
-  void _showContactPicker() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _ContactPickerModal(
-        onPickContact: _pickContact,
-        onManualEntry: _useManualEntry,
-      ),
-    );
-  }
-
-  Widget _buildFloatingActionButton(Color accentColor) {
-    return Positioned(
-      left: 20,
-      right: 20,
-      bottom: 30,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        height: 64,
-        decoration: BoxDecoration(
-          gradient: _isSuccess
-              ? LinearGradient(colors: [Colors.green, Colors.green.shade700])
-              : LinearGradient(
-                  colors: [accentColor, accentColor.withOpacity(0.8)]),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: (_isSuccess ? Colors.green : accentColor).withOpacity(0.4),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
             ),
-          ],
+          ]),
         ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: _isLoading || _isSuccess ? null : _showConfirmationModal,
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              alignment: Alignment.center,
-              child: _isLoading
-                  ? const SizedBox(
-                      height: 28,
-                      width: 28,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 3,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          _isSuccess ? Iconsax.tick_circle : Iconsax.save_2,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          _isSuccess ? '¡Registrado!' : 'Confirmar Operación',
-                          style: GoogleFonts.poppins(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
+
+        // Monto
+        AnimatedSwitcher(
+          duration: _C.mid,
+          transitionBuilder: (child, anim) =>
+              FadeTransition(opacity: anim, child: child),
+          child: Text(
+            amount > 0 ? compact.format(amount) : '—',
+            key: ValueKey(amount > 0),
+            style: TextStyle(
+              fontSize: 26, fontWeight: FontWeight.w800,
+              color: amount > 0 ? accent : c.label4,
+              letterSpacing: -0.8,
             ),
           ),
         ),
-      ).animate().slideY(begin: 2, delay: 400.ms, curve: Curves.easeOutBack),
+      ]),
     );
   }
 }
 
-// ==================== WIDGETS PERSONALIZADOS ====================
-
-// 1. SELECTOR DE TIPO PREMIUM
-class _DebtTypeSelectorPremium extends StatelessWidget {
-  final DebtType selectedType;
-  final Function(DebtType) onChanged;
-
-  const _DebtTypeSelectorPremium({
-    required this.selectedType,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _TypeButton(
-              label: 'Yo Debo',
-              icon: Iconsax.arrow_down,
-              isSelected: selectedType == DebtType.debt,
-              onTap: () => onChanged(DebtType.debt),
-              color: Colors.red,
-            ),
-          ),
-          const SizedBox(width: 4),
-          Expanded(
-            child: _TypeButton(
-              label: 'Me Deben',
-              icon: Iconsax.arrow_up_3,
-              isSelected: selectedType == DebtType.loan,
-              onTap: () => onChanged(DebtType.loan),
-              color: Colors.green,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TypeButton extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool isSelected;
-  final VoidCallback onTap;
-  final Color color;
-
-  const _TypeButton({
-    required this.label,
-    required this.icon,
-    required this.isSelected,
-    required this.onTap,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      child: Material(
-        color: isSelected ? color.withOpacity(0.15) : Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  icon,
-                  size: 20,
-                  color: isSelected
-                      ? color
-                      : Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  label,
-                  style: GoogleFonts.poppins(
-                    fontSize: 15,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                    color: isSelected
-                        ? color
-                        : Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// 2. CAMPO DE TEXTO PREMIUM
-class _PremiumTextField extends StatelessWidget {
-  final TextEditingController controller;
-  final String hint;
-  final IconData icon;
-  final Color accentColor;
-  final String? Function(String?)? validator;
-
-  const _PremiumTextField({
-    required this.controller,
-    required this.hint,
-    required this.icon,
-    required this.accentColor,
-    this.validator,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return TextFormField(
-      controller: controller,
-      style: GoogleFonts.inter(fontSize: 16),
-      decoration: InputDecoration(
-        hintText: hint,
-        prefixIcon: Icon(icon, color: accentColor),
-        filled: true,
-        fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide.none,
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: accentColor, width: 2),
-        ),
-      ),
-      validator: validator,
-    );
-  }
-}
-
-// 3. SELECTOR DE CONTACTO PREMIUM
-class _ContactSelectorPremium extends StatelessWidget {
+// ─── PERSON FIELD ─────────────────────────────────────────────────────────────
+// BUG FIX: Tres estados exclusivos:
+// 1. Sin nadie → tile que abre el picker
+// 2. _isManualMode = true → campo de texto con autofocus
+// 3. _selectedContact != null → tarjeta del contacto con balance
+//
+// El bug original: el campo manual solo aparecía si selectedContact != null.
+// Ahora depende de _isManualMode, que se activa independientemente.
+class _PersonField extends StatelessWidget {
   final contacts.Contact? selectedContact;
-  final TextEditingController manualEntryController;
+  final bool isManualMode;
+  final TextEditingController manualCtrl;
+  final FocusNode manualFocus;
   final double? contactBalance;
   final bool isFetching;
+  final Color accent;
+  final DebtType debtType;
+  final _C c;
+  final VoidCallback onTapSelector;
   final VoidCallback onClear;
-  final VoidCallback onTap;
-  final Color accentColor;
+  final VoidCallback onManualChanged;
 
-  const _ContactSelectorPremium({
-    this.selectedContact,
-    required this.manualEntryController,
-    this.contactBalance,
-    required this.isFetching,
-    required this.onClear,
-    required this.onTap,
-    required this.accentColor,
+  const _PersonField({
+    required this.selectedContact, required this.isManualMode,
+    required this.manualCtrl, required this.manualFocus,
+    required this.contactBalance, required this.isFetching,
+    required this.accent, required this.debtType, required this.c,
+    required this.onTapSelector, required this.onClear,
+    required this.onManualChanged,
   });
 
   @override
   Widget build(BuildContext context) {
-    if (selectedContact == null) {
-      return Material(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                Icon(Iconsax.user_search, color: accentColor),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Text(
-                    'Seleccionar o escribir nombre',
-                    style: GoogleFonts.inter(
-                      fontSize: 15,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-                Icon(
-                  Iconsax.arrow_right_3,
-                  size: 18,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ],
-            ),
-          ),
-        ),
+    // Estado 3: contacto seleccionado
+    if (selectedContact != null) {
+      return _ContactCard(
+        contact: selectedContact!,
+        balance: contactBalance,
+        isFetching: isFetching,
+        accent: accent,
+        c: c,
+        onClear: onClear,
       );
     }
 
-    final currencyFormat = NumberFormat.currency(
-      locale: 'es_CO',
-      symbol: '\$',
-      decimalDigits: 0,
-    );
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            accentColor.withOpacity(0.1),
-            accentColor.withOpacity(0.05),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: accentColor.withOpacity(0.3),
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [accentColor, accentColor.withOpacity(0.7)],
-              ),
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: accentColor.withOpacity(0.3),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Center(
-              child: Text(
-                selectedContact!.displayName[0].toUpperCase(),
-                style: GoogleFonts.poppins(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  selectedContact!.displayName,
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                if (isFetching)
-                  const LinearProgressIndicator()
-                else if (contactBalance != null)
-                  Text(
-                    contactBalance == 0
-                        ? 'Sin deudas pendientes'
-                        : (contactBalance! > 0
-                            ? 'Te debe: ${currencyFormat.format(contactBalance)}'
-                            : 'Le debes: ${currencyFormat.format(contactBalance!.abs())}'),
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      color: contactBalance == 0
-                          ? Theme.of(context).colorScheme.onSurfaceVariant
-                          : (contactBalance! > 0 ? Colors.green : Colors.red),
-                    ),
-                  )
-                else
-                  Text(
-                    'Primer registro con este contacto',
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          IconButton(
-            onPressed: onClear,
-            icon: Icon(Iconsax.close_circle, color: accentColor),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// 4. CAMPO DE MONTO PREMIUM
-class _PremiumAmountField extends StatelessWidget {
-  final TextEditingController controller;
-  final Color accentColor;
-
-  const _PremiumAmountField({
-    required this.controller,
-    required this.accentColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outlineVariant,
-        ),
-      ),
-      child: Column(
-        children: [
-          Text(
-            'Monto de la operación',
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextFormField(
-            controller: controller,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(
-              fontSize: 48,
-              fontWeight: FontWeight.bold,
-              color: accentColor,
-            ),
-            keyboardType: const TextInputType.numberWithOptions(decimal: false),
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              _CurrencyInputFormatter(),
-            ],
-            decoration: InputDecoration(
-              border: InputBorder.none,
-              hintText: '\$ 0',
-              hintStyle: GoogleFonts.poppins(
-                fontSize: 48,
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.2),
-              ),
-            ),
-            validator: (value) {
-              if (value == null || value.isEmpty) return 'Ingresa un monto';
-              final amount =
-                  int.tryParse(value.replaceAll(RegExp(r'[^0-9]'), ''));
-              if (amount == null || amount <= 0) return 'Monto inválido';
-              return null;
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CurrencyInputFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-      TextEditingValue oldValue, TextEditingValue newValue) {
-    if (newValue.text.isEmpty) return newValue.copyWith(text: '');
-
-    final number =
-        int.tryParse(newValue.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
-    final format = NumberFormat.currency(
-      locale: 'es_CO',
-      symbol: '\$',
-      decimalDigits: 0,
-    );
-    final newText = format.format(number);
-
-    return newValue.copyWith(
-      text: newText,
-      selection: TextSelection.collapsed(offset: newText.length),
-    );
-  }
-}
-
-// 5. SELECTOR DE CUENTA PREMIUM
-class _AccountSelectorPremium extends StatelessWidget {
-  final List<Account> accounts;
-  final Account? selectedAccount;
-  final Function(Account) onAccountSelected;
-  final Color accentColor;
-
-  const _AccountSelectorPremium({
-    required this.accounts,
-    required this.selectedAccount,
-    required this.onAccountSelected,
-    required this.accentColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: () => _showAccountPicker(context),
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: [
-              Icon(Iconsax.wallet_3, color: accentColor),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Cuenta afectada',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      selectedAccount?.name ?? 'Seleccionar cuenta',
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                Iconsax.arrow_down_1,
-                size: 18,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showAccountPicker(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 12),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Theme.of(context)
-                    .colorScheme
-                    .onSurfaceVariant
-                    .withOpacity(0.3),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Text(
-                'Selecciona una cuenta',
-                style: GoogleFonts.poppins(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            ...accounts.map((account) {
-              final currencyFormat = NumberFormat.currency(
-                locale: 'es_CO',
-                symbol: '\$',
-                decimalDigits: 0,
-              );
-              return ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: accentColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(account.icon, color: accentColor),
-                ),
-                title: Text(
-                  account.name,
-                  style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-                ),
-                subtitle: Text(
-                  'Saldo: ${currencyFormat.format(account.balance)}',
-                  style: GoogleFonts.inter(fontSize: 13),
-                ),
-                onTap: () => onAccountSelected(account),
-              );
-            }),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// 6. SELECTOR DE FECHA PREMIUM
-class _DatePickerPremium extends StatelessWidget {
-  final DateTime? dueDate;
-  final Function(DateTime) onDateSelected;
-  final Color accentColor;
-
-  const _DatePickerPremium({
-    required this.dueDate,
-    required this.onDateSelected,
-    required this.accentColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: () => _selectDate(context),
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: [
-              Icon(Iconsax.calendar_1, color: accentColor),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Fecha de vencimiento',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      dueDate == null
-                          ? 'Opcional'
-                          : DateFormat('d MMM yyyy', 'es_CO').format(dueDate!),
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                Iconsax.arrow_down_1,
-                size: 18,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _selectDate(BuildContext context) async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: dueDate ?? DateTime.now(),
-      firstDate: DateTime.now(),
-      lastDate: DateTime(2100),
-    );
-    if (picked != null) onDateSelected(picked);
-  }
-}
-
-// 7. TARJETA DE IMPACTO FINANCIERO
-// 7. TARJETA DE IMPACTO FINANCIERO (ACTUALIZADA)
-class _FinancialImpactCard extends StatelessWidget {
-  final DebtType debtType;
-  final DebtImpactType impactType; // <--- NUEVO
-  final double amount;
-  final Account account;
-  final Color accentColor;
-  final bool isDark;
-
-  const _FinancialImpactCard({
-    required this.debtType,
-    required this.impactType, // <--- NUEVO
-    required this.amount,
-    required this.account,
-    required this.accentColor,
-    required this.isDark,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final currencyFormat = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
-
-    // Lógica contable real
-    double projectedBalance = account.balance;
-    if (impactType != DebtImpactType.direct) {
-      projectedBalance = debtType == DebtType.debt
-          ? account.balance + amount // Me prestaron -> Entra dinero
-          : account.balance - amount; // Yo presté -> Sale dinero
+    // Estado 2: modo manual — BUG FIX
+    if (isManualMode) {
+      return _ManualField(
+        ctrl:      manualCtrl,
+        focus:     manualFocus,
+        accent:    accent,
+        c:         c,
+        onClear:   onClear,
+        onChanged: onManualChanged,
+      );
     }
 
-    final isDirect = impactType == DebtImpactType.direct;
-    final impactPercentage = isDirect ? 0.0 : (amount / account.balance * 100).clamp(0, 100);
-    final isHighImpact = impactPercentage > 15 && !isDirect;
-
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors:[accentColor.withOpacity(0.15), accentColor.withOpacity(0.05)],
-        ),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: accentColor.withOpacity(0.3), width: 2),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children:[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: [accentColor, accentColor.withOpacity(0.7)]),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Iconsax.chart_success, color: Colors.white, size: 24),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children:[
-                    Text('Impacto Financiero', style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold)),
-                    Text('Así afectará tu cuenta', style: GoogleFonts.inter(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          if (isHighImpact)
-            Container(
-              padding: const EdgeInsets.all(16),
-              margin: const EdgeInsets.only(bottom: 20),
-              decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.orange.withOpacity(0.3)),
-              ),
-              child: Row(
-                children:[
-                  Icon(Iconsax.info_circle, color: Colors.orange.shade700, size: 20),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      '⚠️ Esta operación representa el ${impactPercentage.toStringAsFixed(1)}% del saldo disponible',
-                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.orange.shade900),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          _ImpactRow(icon: Iconsax.wallet_money, label: 'Saldo actual en ${account.name}', value: currencyFormat.format(account.balance), color: Theme.of(context).colorScheme.primary),
-          const SizedBox(height: 16),
-          
-          if (isDirect)
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: Colors.grey.withOpacity(0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey.withOpacity(0.3))),
-              child: Row(
-                children:[
-                  const Icon(Iconsax.info_circle, color: Colors.grey, size: 20),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text('Como es un pago directo, el saldo de tu cuenta no cambiará.', style: GoogleFonts.inter(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-                  ),
-                ],
-              ),
-            )
-          else ...[
-            _ImpactRow(
-              icon: debtType == DebtType.debt ? Iconsax.arrow_up : Iconsax.arrow_down,
-              label: debtType == DebtType.debt ? 'Entrará a tu cuenta' : 'Saldrá de tu cuenta',
-              value: currencyFormat.format(amount),
-              color: accentColor,
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: projectedBalance >= 0 ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: projectedBalance >= 0 ? Colors.green.withOpacity(0.3) : Colors.red.withOpacity(0.3)),
-              ),
-              child: Row(
-                children:[
-                  Icon(projectedBalance >= 0 ? Iconsax.tick_circle : Iconsax.danger, color: projectedBalance >= 0 ? Colors.green : Colors.red, size: 20),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children:[
-                        Text('Saldo proyectado', style: GoogleFonts.inter(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-                        const SizedBox(height: 4),
-                        Text(currencyFormat.format(projectedBalance), style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold, color: projectedBalance >= 0 ? Colors.green : Colors.red)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+    // Estado 1: vacío — toca para abrir picker
+    return _ScaleBtn(
+      onTap: onTapSelector,
+      child: Container(
+        padding: const EdgeInsets.all(_C.md),
+        decoration: BoxDecoration(
+          color: c.surface,
+          borderRadius: BorderRadius.circular(_C.rXL),
+          border: Border.all(color: c.sep.withOpacity(0.4), width: 0.5),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(c.isDark ? 0.14 : 0.03),
+                blurRadius: 5, offset: const Offset(0, 1)),
           ],
-          const SizedBox(height: 20),
-          Text(
-             impactType == DebtImpactType.restricted 
-                ? '💡 Recuerda: Este dinero estará reservado, no lo gastes libremente.'
-                : (debtType == DebtType.debt
-                    ? '💡 Esta deuda se sumará a tus pasivos totales.'
-                    : '💡 Mantén control de a quién le prestas dinero.'),
-            style: GoogleFonts.inter(fontSize: 13, fontStyle: FontStyle.italic, color: Theme.of(context).colorScheme.onSurfaceVariant),
+        ),
+        child: Row(children: [
+          Container(
+            width: 36, height: 36,
+            decoration: BoxDecoration(
+                color: accent.withOpacity(c.isDark ? 0.18 : 0.09),
+                borderRadius: BorderRadius.circular(_C.rSM + 2)),
+            child: Icon(Iconsax.user_search, size: 16, color: accent),
+          ),
+          const SizedBox(width: _C.md),
+          Expanded(
+            child: Text('Seleccionar o escribir nombre',
+                style: TextStyle(fontSize: 15, color: c.label3)),
+          ),
+          Icon(Iconsax.arrow_right_3, size: 16, color: c.label4),
+        ]),
+      ),
+    );
+  }
+}
+
+// ─── MANUAL FIELD ─────────────────────────────────────────────────────────────
+// Campo de texto simple. Tiene autofocus.
+// Botón "×" a la derecha para volver al estado vacío.
+class _ManualField extends StatefulWidget {
+  final TextEditingController ctrl;
+  final FocusNode focus;
+  final Color accent;
+  final _C c;
+  final VoidCallback onClear;
+  final VoidCallback onChanged;
+
+  const _ManualField({
+    required this.ctrl, required this.focus, required this.accent,
+    required this.c, required this.onClear, required this.onChanged,
+  });
+
+  @override
+  State<_ManualField> createState() => _ManualFieldState();
+}
+
+class _ManualFieldState extends State<_ManualField> {
+  bool _focused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.focus.addListener(() {
+      if (mounted) setState(() => _focused = widget.focus.hasFocus);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.c;
+    return AnimatedContainer(
+      duration: _C.fast,
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(_C.rXL),
+        border: Border.all(
+          color: _focused
+              ? widget.accent.withOpacity(0.55)
+              : c.sep.withOpacity(0.40),
+          width: _focused ? 1.5 : 0.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: _focused
+                ? widget.accent.withOpacity(c.isDark ? 0.10 : 0.06)
+                : Colors.black.withOpacity(c.isDark ? 0.14 : 0.03),
+            blurRadius: _focused ? 12 : 5,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
-    ).animate().fadeIn(duration: 600.ms).slideY(begin: 0.2);
+      child: Row(children: [
+        const SizedBox(width: _C.md),
+        Container(
+          width: 32, height: 32,
+          decoration: BoxDecoration(
+              color: widget.accent.withOpacity(c.isDark ? 0.18 : 0.09),
+              shape: BoxShape.circle),
+          child: Icon(Iconsax.edit_2, size: 15, color: widget.accent),
+        ),
+        Expanded(
+          child: TextFormField(
+            controller: widget.ctrl,
+            focusNode:  widget.focus,
+            textCapitalization: TextCapitalization.words,
+            onChanged:  (_) {
+              HapticFeedback.selectionClick();
+              widget.onChanged();
+            },
+            validator: (v) =>
+                (v == null || v.trim().isEmpty) ? '' : null,
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600,
+                color: c.label),
+            decoration: InputDecoration(
+              hintText: 'Nombre o empresa',
+              hintStyle: TextStyle(fontSize: 15, color: c.label4,
+                  fontWeight: FontWeight.w400),
+              border:         InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(
+                  horizontal: _C.md, vertical: 16),
+              errorStyle: const TextStyle(height: 0, fontSize: 0),
+            ),
+          ),
+        ),
+        // Botón limpiar
+        _ScaleBtn(
+          onTap: widget.onClear,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+                horizontal: _C.md, vertical: _C.md),
+            child: Icon(Icons.cancel_rounded,
+                size: 20, color: c.label4),
+          ),
+        ),
+      ]),
+    );
   }
 }
-class _ImpactRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
 
-  const _ImpactRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
+// ─── CONTACT CARD ─────────────────────────────────────────────────────────────
+// Muestra el contacto seleccionado con su historial de deuda.
+class _ContactCard extends StatelessWidget {
+  final contacts.Contact contact;
+  final double? balance;
+  final bool isFetching;
+  final Color accent;
+  final _C c;
+  final VoidCallback onClear;
+
+  const _ContactCard({
+    required this.contact, required this.balance, required this.isFetching,
+    required this.accent, required this.c, required this.onClear,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
+    final compact = NumberFormat.compactCurrency(
+        locale: 'es_CO', symbol: '\$', decimalDigits: 1);
+
+    String balanceText;
+    Color balanceColor;
+    if (isFetching) {
+      balanceText  = 'Cargando historial…';
+      balanceColor = c.label3;
+    } else if (balance == null || balance == 0) {
+      balanceText  = 'Sin deudas previas';
+      balanceColor = c.label3;
+    } else if (balance! > 0) {
+      balanceText  = 'Te debe ${compact.format(balance)}';
+      balanceColor = _C.green;
+    } else {
+      balanceText  = 'Le debes ${compact.format(balance!.abs())}';
+      balanceColor = _C.red;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(_C.md),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(_C.rXL),
+        border: Border.all(color: accent.withOpacity(0.22), width: 0.5),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(c.isDark ? 0.14 : 0.03),
+              blurRadius: 6, offset: const Offset(0, 1)),
+        ],
+      ),
+      child: Row(children: [
+        // Avatar
         Container(
-          padding: const EdgeInsets.all(10),
+          width: 44, height: 44,
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(10),
+              color: accent.withOpacity(c.isDark ? 0.22 : 0.10),
+              shape: BoxShape.circle),
+          child: Center(
+            child: Text(
+              contact.displayName[0].toUpperCase(),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800,
+                  color: accent),
+            ),
           ),
-          child: Icon(icon, size: 20, color: color),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: _C.md),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                label,
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
+              Text(contact.displayName,
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
+                      color: c.label, letterSpacing: -0.2)),
               const SizedBox(height: 2),
-              Text(
-                value,
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
-              ),
+              isFetching
+                  ? SizedBox(
+                      height: 3,
+                      child: LinearProgressIndicator(
+                        backgroundColor: c.sep,
+                        color: accent,
+                        borderRadius: BorderRadius.circular(2),
+                      ))
+                  : Text(balanceText,
+                      style: TextStyle(fontSize: 12, color: balanceColor,
+                          fontWeight: FontWeight.w500)),
             ],
           ),
         ),
-      ],
+        _ScaleBtn(
+          onTap: onClear,
+          child: Container(
+            width: 32, height: 32,
+            decoration: BoxDecoration(color: c.raised, shape: BoxShape.circle),
+            child: Icon(Icons.close_rounded, size: 15, color: c.label3),
+          ),
+        ),
+      ]),
     );
   }
 }
 
-// 8. MODAL DE CONFIRMACIÓN PREMIUM
-class _PremiumConfirmationModal extends StatelessWidget {
-  final DebtType debtType;
-  final double amount;
-  final String concept;
-  final String entityName;
-  final Account account;
-  final VoidCallback onConfirm;
+// ─── CONCEPT FIELD ────────────────────────────────────────────────────────────
+class _ConceptField extends StatefulWidget {
+  final TextEditingController ctrl;
+  final String hint;
+  final Color accent;
+  final _C c;
 
-  const _PremiumConfirmationModal({
-    required this.debtType,
-    required this.amount,
-    required this.concept,
-    required this.entityName,
-    required this.account,
-    required this.onConfirm,
+  const _ConceptField({
+    required this.ctrl, required this.hint,
+    required this.accent, required this.c,
+  });
+
+  @override
+  State<_ConceptField> createState() => _ConceptFieldState();
+}
+
+class _ConceptFieldState extends State<_ConceptField> {
+  final _focus = FocusNode();
+  bool _focused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(() {
+      if (mounted) setState(() => _focused = _focus.hasFocus);
+    });
+  }
+
+  @override
+  void dispose() { _focus.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.c;
+    return AnimatedContainer(
+      duration: _C.fast,
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(_C.rXL),
+        border: Border.all(
+          color: _focused
+              ? widget.accent.withOpacity(0.55) : c.sep.withOpacity(0.40),
+          width: _focused ? 1.5 : 0.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: _focused
+                ? widget.accent.withOpacity(c.isDark ? 0.10 : 0.06)
+                : Colors.black.withOpacity(c.isDark ? 0.14 : 0.03),
+            blurRadius: _focused ? 12 : 5, offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: TextFormField(
+        controller: widget.ctrl,
+        focusNode:  _focus,
+        textCapitalization: TextCapitalization.sentences,
+        onChanged: (_) => HapticFeedback.selectionClick(),
+        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600,
+            color: c.label),
+        validator: (v) =>
+            (v == null || v.trim().isEmpty) ? '' : null,
+        decoration: InputDecoration(
+          hintText: widget.hint,
+          hintStyle: TextStyle(fontSize: 14, color: c.label4),
+          prefixIcon: Padding(
+            padding: const EdgeInsets.only(left: 4),
+            child: Icon(Iconsax.note_text, size: 18,
+                color: _focused ? widget.accent : c.label4),
+          ),
+          border:         InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+              horizontal: _C.md, vertical: 16),
+          errorStyle: const TextStyle(height: 0, fontSize: 0),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── AMOUNT INPUT ─────────────────────────────────────────────────────────────
+// El monto es el protagonista — 42px w800.
+// Formateador de moneda integrado. Sin widget envolvente decorativo.
+class _AmountInput extends StatefulWidget {
+  final Color accent;
+  final _C c;
+  final ValueChanged<double> onChanged;
+
+  const _AmountInput({
+    required this.accent, required this.c, required this.onChanged,
+  });
+
+  @override
+  State<_AmountInput> createState() => _AmountInputState();
+}
+
+class _AmountInputState extends State<_AmountInput> {
+  final _ctrl  = TextEditingController();
+  final _focus = FocusNode();
+  bool _focused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(() {
+      if (mounted) setState(() => _focused = _focus.hasFocus);
+    });
+  }
+
+  @override
+  void dispose() { _ctrl.dispose(); _focus.dispose(); super.dispose(); }
+
+  double get _value =>
+      double.tryParse(_ctrl.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0.0;
+
+  bool get _hasValue => _value > 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.c;
+    return AnimatedContainer(
+      duration: _C.fast,
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(_C.r2XL),
+        border: Border.all(
+          color: _focused
+              ? widget.accent.withOpacity(0.50) : c.sep.withOpacity(0.40),
+          width: _focused ? 1.5 : 0.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: _focused
+                ? widget.accent.withOpacity(c.isDark ? 0.10 : 0.06)
+                : Colors.black.withOpacity(c.isDark ? 0.14 : 0.03),
+            blurRadius: _focused ? 16 : 6, offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(vertical: _C.lg),
+      child: TextFormField(
+        controller:  _ctrl,
+        focusNode:   _focus,
+        textAlign:   TextAlign.center,
+        keyboardType: const TextInputType.numberWithOptions(decimal: false),
+        inputFormatters: [
+          FilteringTextInputFormatter.digitsOnly,
+          _MoneyFormatter(),
+        ],
+        onChanged: (_) {
+          HapticFeedback.selectionClick();
+          widget.onChanged(_value);
+          setState(() {});
+        },
+        validator: (v) {
+          if (v == null || v.isEmpty) return '';
+          if (_value <= 0) return '';
+          return null;
+        },
+        style: TextStyle(
+          fontSize: 42, fontWeight: FontWeight.w800,
+          color: _hasValue ? widget.accent : c.label4,
+          letterSpacing: -1.5, height: 1.0,
+        ),
+        decoration: InputDecoration(
+          border:         InputBorder.none,
+          hintText:       '\$ 0',
+          hintStyle: TextStyle(
+            fontSize: 42, fontWeight: FontWeight.w800,
+            color: c.label4, letterSpacing: -1.5,
+          ),
+          contentPadding: EdgeInsets.zero,
+          errorStyle:     const TextStyle(height: 0, fontSize: 0),
+        ),
+      ),
+    );
+  }
+}
+
+class _MoneyFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue old, TextEditingValue next) {
+    if (next.text.isEmpty) return next.copyWith(text: '');
+    final n = int.tryParse(next.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+    final fmt = NumberFormat.currency(
+        locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+    final s = fmt.format(n);
+    return next.copyWith(
+        text: s, selection: TextSelection.collapsed(offset: s.length));
+  }
+}
+
+// ─── ACCOUNT TILE ─────────────────────────────────────────────────────────────
+class _AccountTile extends StatelessWidget {
+  final List<Account> accounts;
+  final Account? selected;
+  final Color accent;
+  final _C c;
+  final ValueChanged<Account> onSelect;
+
+  const _AccountTile({
+    required this.accounts, required this.selected,
+    required this.accent, required this.c, required this.onSelect,
   });
 
   @override
   Widget build(BuildContext context) {
-    final currencyFormat = NumberFormat.currency(
-      locale: 'es_CO',
-      symbol: '\$',
-      decimalDigits: 0,
-    );
-
-    final accentColor = debtType == DebtType.debt ? Colors.red : Colors.green;
-
-    return Container(
-      padding: const EdgeInsets.all(28),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+    return _ScaleBtn(
+      onTap: () => _pick(context),
+      child: Container(
+        padding: const EdgeInsets.all(_C.md),
+        decoration: BoxDecoration(
+          color: c.surface,
+          borderRadius: BorderRadius.circular(_C.rXL),
+          border: Border.all(
+            color: selected != null
+                ? accent.withOpacity(0.22) : c.sep.withOpacity(0.40),
+            width: 0.5,
+          ),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(c.isDark ? 0.14 : 0.03),
+                blurRadius: 5, offset: const Offset(0, 1)),
+          ],
+        ),
+        child: Row(children: [
+          Container(
+            width: 34, height: 34,
+            decoration: BoxDecoration(
+                color: accent.withOpacity(c.isDark ? 0.18 : 0.09),
+                borderRadius: BorderRadius.circular(_C.rSM)),
+            child: Icon(Iconsax.wallet_3, size: 16, color: accent),
+          ),
+          const SizedBox(width: _C.md),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Cuenta afectada',
+                  style: TextStyle(fontSize: 10, color: c.label3,
+                      fontWeight: FontWeight.w600, letterSpacing: 0.1)),
+              const SizedBox(height: 2),
+              Text(selected?.name ?? 'Seleccionar cuenta',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
+                      color: selected != null ? c.label : c.label4,
+                      letterSpacing: -0.2)),
+            ]),
+          ),
+          Icon(Icons.keyboard_arrow_down_rounded,
+              size: 20, color: c.label3),
+        ]),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
+    );
+  }
+
+  void _pick(BuildContext context) {
+    final c = _C(context);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _AccountSheet(
+          accounts: accounts, accent: accent, c: c, onSelect: onSelect),
+    );
+  }
+}
+
+// ─── DATE TILE ────────────────────────────────────────────────────────────────
+class _DateTile extends StatelessWidget {
+  final DateTime? dueDate;
+  final Color accent;
+  final _C c;
+  final ValueChanged<DateTime> onSelected;
+
+  const _DateTile({
+    required this.dueDate, required this.accent,
+    required this.c, required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _ScaleBtn(
+      onTap: () async {
+        final picked = await showDatePicker(
+          context: context,
+          initialDate: dueDate ?? DateTime.now().add(const Duration(days: 30)),
+          firstDate: DateTime.now(),
+          lastDate: DateTime(2100),
+        );
+        if (picked != null) onSelected(picked);
+      },
+      child: Container(
+        padding: const EdgeInsets.all(_C.md),
+        decoration: BoxDecoration(
+          color: c.surface,
+          borderRadius: BorderRadius.circular(_C.rXL),
+          border: Border.all(
+            color: dueDate != null
+                ? accent.withOpacity(0.22) : c.sep.withOpacity(0.40),
+            width: 0.5,
+          ),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(c.isDark ? 0.14 : 0.03),
+                blurRadius: 5, offset: const Offset(0, 1)),
+          ],
+        ),
+        child: Row(children: [
           Container(
-            padding: const EdgeInsets.all(16),
+            width: 34, height: 34,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [accentColor, accentColor.withOpacity(0.7)],
+                color: dueDate != null
+                    ? accent.withOpacity(c.isDark ? 0.18 : 0.09)
+                    : c.raised,
+                borderRadius: BorderRadius.circular(_C.rSM)),
+            child: Icon(Iconsax.calendar_1, size: 16,
+                color: dueDate != null ? accent : c.label4),
+          ),
+          const SizedBox(width: _C.md),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Vencimiento',
+                  style: TextStyle(fontSize: 10, color: c.label3,
+                      fontWeight: FontWeight.w600, letterSpacing: 0.1)),
+              const SizedBox(height: 2),
+              Text(
+                dueDate == null
+                    ? 'Sin fecha límite'
+                    : DateFormat('d MMM yyyy', 'es_CO').format(dueDate!),
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
+                    color: dueDate != null ? c.label : c.label4,
+                    letterSpacing: -0.2),
               ),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              debtType == DebtType.debt
-                  ? Iconsax.money_recive
-                  : Iconsax.money_send,
-              color: Colors.white,
-              size: 32,
-            ),
+            ]),
           ),
-          const SizedBox(height: 24),
-          Text(
-            '¿Confirmar Operación?',
-            style: GoogleFonts.poppins(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              children: [
-                _ConfirmRow(
-                    'Tipo', debtType == DebtType.debt ? 'Yo Debo' : 'Me Deben'),
-                const Divider(height: 24),
-                _ConfirmRow('Monto', currencyFormat.format(amount)),
-                const Divider(height: 24),
-                _ConfirmRow('Concepto', concept),
-                const Divider(height: 24),
-                _ConfirmRow('Persona', entityName),
-                const Divider(height: 24),
-                _ConfirmRow('Cuenta', account.name),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: const Text('Cancelar'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                flex: 2,
-                child: FilledButton.icon(
-                  onPressed: onConfirm,
-                  icon: const Icon(Iconsax.tick_circle),
-                  label: const Text('Confirmar'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: accentColor,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
+          if (dueDate != null)
+            Icon(Icons.keyboard_arrow_down_rounded,
+                size: 20, color: c.label3)
+          else
+            Icon(Icons.add_rounded, size: 20, color: c.label4),
+        ]),
       ),
     );
   }
 }
 
-class _ConfirmRow extends StatelessWidget {
+// ─── IMPACT SELECTOR ─────────────────────────────────────────────────────────
+// Tres opciones. Cada una es una fila compacta.
+// La seleccionada muestra el borde del acento — sin escala, sin shadow extra.
+// Información suficiente para decidir. Sin texto redundante.
+class _ImpactSelector extends StatelessWidget {
+  final DebtImpactType selected;
+  final DebtType debtType;
+  final Color accent;
+  final _C c;
+  final ValueChanged<DebtImpactType> onChanged;
+
+  const _ImpactSelector({
+    required this.selected, required this.debtType, required this.accent,
+    required this.c, required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final opts = [
+      (
+        type: DebtImpactType.liquid,
+        icon: Iconsax.wallet_add_1,
+        title: debtType == DebtType.debt
+            ? 'Entró a mi cuenta' : 'Salió de mi cuenta',
+        sub: 'Afecta el saldo disponible',
+      ),
+      (
+        type: DebtImpactType.restricted,
+        icon: Iconsax.lock_1,
+        title: 'Propósito fijo',
+        sub: 'El dinero tiene un destino reservado',
+      ),
+      (
+        type: DebtImpactType.direct,
+        icon: Iconsax.cards,
+        title: debtType == DebtType.debt
+            ? 'Alguien pagó por mí' : 'Pagué por alguien',
+        sub: 'El dinero no pasó por mis cuentas',
+      ),
+    ];
+
+    return Column(
+      children: opts.asMap().entries.map((e) {
+        final i   = e.key;
+        final opt = e.value;
+        final sel = selected == opt.type;
+
+        return Padding(
+          padding: EdgeInsets.only(bottom: i < opts.length - 1 ? _C.sm : 0),
+          child: _ScaleBtn(
+            onTap: () => onChanged(opt.type),
+            child: AnimatedContainer(
+              duration: _C.fast,
+              padding: const EdgeInsets.all(_C.md),
+              decoration: BoxDecoration(
+                color: sel
+                    ? accent.withOpacity(c.isDark ? 0.12 : 0.06)
+                    : c.surface,
+                borderRadius: BorderRadius.circular(_C.rXL),
+                border: Border.all(
+                  color: sel
+                      ? accent.withOpacity(c.isDark ? 0.45 : 0.30)
+                      : c.sep.withOpacity(0.40),
+                  width: sel ? 1.2 : 0.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black.withOpacity(c.isDark ? 0.14 : 0.03),
+                      blurRadius: 5, offset: const Offset(0, 1)),
+                ],
+              ),
+              child: Row(children: [
+                Container(
+                  width: 36, height: 36,
+                  decoration: BoxDecoration(
+                    color: sel
+                        ? accent.withOpacity(c.isDark ? 0.20 : 0.10)
+                        : c.raised,
+                    borderRadius: BorderRadius.circular(_C.rSM + 2),
+                  ),
+                  child: Icon(opt.icon, size: 16,
+                      color: sel ? accent : c.label3),
+                ),
+                const SizedBox(width: _C.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(opt.title,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: sel ? FontWeight.w700 : FontWeight.w600,
+                            color: sel ? accent : c.label,
+                            letterSpacing: -0.1,
+                          )),
+                      const SizedBox(height: 2),
+                      Text(opt.sub,
+                          style: TextStyle(fontSize: 12, color: c.label3)),
+                    ],
+                  ),
+                ),
+                if (sel)
+                  Icon(Iconsax.tick_circle, size: 18, color: accent),
+              ]),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
+
+// ─── IMPACT CARD ─────────────────────────────────────────────────────────────
+// Aparece solo cuando hay monto + cuenta.
+// Sin gradiente decorativo, sin border doble, sin header "Impacto Financiero"
+// con gradiente de ícono. Los datos hablan solos.
+class _ImpactCard extends StatelessWidget {
+  final DebtType debtType;
+  final DebtImpactType impactType;
+  final double amount;
+  final Account account;
+  final Color accent;
+  final _C c;
+
+  const _ImpactCard({
+    required this.debtType, required this.impactType, required this.amount,
+    required this.account, required this.accent, required this.c,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = NumberFormat.compactCurrency(
+        locale: 'es_CO', symbol: '\$', decimalDigits: 1);
+
+    final isDirect = impactType == DebtImpactType.direct;
+    final projected = isDirect
+        ? account.balance
+        : (debtType == DebtType.debt
+            ? account.balance + amount
+            : account.balance - amount);
+    final impactPct = account.balance > 0
+        ? (amount / account.balance * 100).clamp(0.0, 100.0) : 0.0;
+    final isHighImpact = impactPct > 15 && !isDirect;
+
+    return Container(
+      padding: const EdgeInsets.all(_C.md),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(_C.rXL),
+        border: Border.all(color: accent.withOpacity(0.18), width: 0.5),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(c.isDark ? 0.14 : 0.03),
+              blurRadius: 8, offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Header
+        Row(children: [
+          Container(
+            width: 34, height: 34,
+            decoration: BoxDecoration(
+                color: accent.withOpacity(c.isDark ? 0.18 : 0.09),
+                borderRadius: BorderRadius.circular(_C.rSM)),
+            child: Icon(Iconsax.chart_success, size: 16, color: accent),
+          ),
+          const SizedBox(width: _C.md),
+          Text('Impacto en ${account.name}',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
+                  color: c.label, letterSpacing: -0.1)),
+        ]),
+
+        const SizedBox(height: _C.md),
+        Container(height: 0.5, color: c.sep.withOpacity(0.5)),
+        const SizedBox(height: _C.md),
+
+        // Saldo actual
+        _ImpactRow(
+          label: 'Saldo actual',
+          value: compact.format(account.balance),
+          color: c.label3,
+          valueColor: c.label,
+          c: c,
+        ),
+
+        if (!isDirect) ...[
+          const SizedBox(height: _C.sm),
+          _ImpactRow(
+            label: debtType == DebtType.debt ? 'Entrará' : 'Saldrá',
+            value: compact.format(amount),
+            color: c.label3,
+            valueColor: accent,
+            c: c,
+          ),
+          const SizedBox(height: _C.sm),
+          Container(height: 0.5, color: c.sep.withOpacity(0.5)),
+          const SizedBox(height: _C.sm),
+          _ImpactRow(
+            label: 'Saldo proyectado',
+            value: compact.format(projected),
+            color: c.label3,
+            valueColor: projected >= 0 ? _C.green : _C.red,
+            bold: true,
+            c: c,
+          ),
+        ] else ...[
+          const SizedBox(height: _C.sm),
+          Row(children: [
+            Icon(Iconsax.info_circle, size: 14, color: c.label3),
+            const SizedBox(width: _C.sm),
+            Expanded(
+              child: Text('El saldo de esta cuenta no cambiará.',
+                  style: TextStyle(fontSize: 12, color: c.label3)),
+            ),
+          ]),
+        ],
+
+        // Advertencia de alto impacto
+        if (isHighImpact) ...[
+          const SizedBox(height: _C.sm),
+          Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: _C.md, vertical: _C.sm),
+            decoration: BoxDecoration(
+              color: _C.orange.withOpacity(c.isDark ? 0.14 : 0.07),
+              borderRadius: BorderRadius.circular(_C.rMD),
+              border: Border.all(
+                  color: _C.orange.withOpacity(0.25), width: 0.5),
+            ),
+            child: Row(children: [
+              Icon(Iconsax.warning_2, size: 14, color: _C.orange),
+              const SizedBox(width: _C.sm),
+              Expanded(
+                child: Text(
+                  'Esta operación representa el '
+                  '${impactPct.toStringAsFixed(1)}% de tu saldo disponible.',
+                  style: TextStyle(fontSize: 12, color: _C.orange,
+                      fontWeight: FontWeight.w500),
+                ),
+              ),
+            ]),
+          ),
+        ],
+      ]),
+    );
+  }
+}
+
+class _ImpactRow extends StatelessWidget {
   final String label;
   final String value;
+  final Color color;
+  final Color valueColor;
+  final bool bold;
+  final _C c;
 
-  const _ConfirmRow(this.label, this.value);
+  const _ImpactRow({
+    required this.label, required this.value,
+    required this.color, required this.valueColor,
+    this.bold = false, required this.c,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 14,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-        Text(
-          value,
-          style: GoogleFonts.poppins(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        Text(label,
+            style: TextStyle(fontSize: 13, color: color)),
+        Text(value,
+            style: TextStyle(
+              fontSize: bold ? 16 : 14,
+              fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
+              color: valueColor,
+              letterSpacing: -0.2,
+            )),
       ],
     );
   }
 }
 
-// 9. MODAL DE SELECTOR DE CONTACTO
-class _ContactPickerModal extends StatelessWidget {
+// ─── FLOATING BUTTON ─────────────────────────────────────────────────────────
+// ─── FLOATING BUTTON (CORREGIDO) ─────────────────────────────────────────────
+class _FloatBtn extends StatefulWidget {
+  final bool isLoading;
+  final bool isSuccess;
+  final DebtType debtType;
+  final Color accent;
+  final _C c;
+  final VoidCallback onTap;
+
+  const _FloatBtn({
+    required this.isLoading, required this.isSuccess, required this.debtType,
+    required this.accent, required this.c, required this.onTap,
+  });
+
+  @override
+  State<_FloatBtn> createState() => _FloatBtnState();
+}
+
+class _FloatBtnState extends State<_FloatBtn> {
+  bool _p = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.c;
+    final color = widget.isSuccess ? _C.green : widget.accent;
+
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+            _C.md, _C.md, _C.md,
+            _C.lg + MediaQuery.of(context).padding.bottom),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // FIX: Usamos el ancho real disponible (constraints.maxWidth)
+            // en lugar de double.infinity para que la animación funcione.
+            final fullWidth = constraints.maxWidth;
+
+            return GestureDetector(
+              onTapDown:   (widget.isLoading || widget.isSuccess)
+                  ? null : (_) => setState(() => _p = true),
+              onTapUp:     (widget.isLoading || widget.isSuccess)
+                  ? null : (_) { setState(() => _p = false); widget.onTap(); },
+              onTapCancel: () => setState(() => _p = false),
+              child: AnimatedScale(
+                scale: _p ? 0.97 : 1.0,
+                duration: const Duration(milliseconds: 80),
+                child: AnimatedContainer(
+                  duration: _C.mid,
+                  curve:  _C.easeOut,
+                  // AQUÍ ESTABA EL ERROR: Cambiamos double.infinity por fullWidth
+                  width:  widget.isLoading ? 60 : fullWidth,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: widget.isLoading ? c.label4 : color,
+                    borderRadius: BorderRadius.circular(
+                        widget.isLoading ? 30 : _C.rXL),
+                    boxShadow: widget.isLoading ? null : [
+                      BoxShadow(
+                        color: color.withOpacity(_p ? 0.18 : 0.38),
+                        blurRadius: _p ? 8 : 20,
+                        offset: Offset(0, _p ? 2 : 7),
+                      ),
+                    ],
+                  ),
+                  alignment: Alignment.center,
+                  child: AnimatedSwitcher(
+                    duration: _C.fast,
+                    child: widget.isLoading
+                        ? const SizedBox(
+                            key: ValueKey('load'),
+                            width: 22, height: 22,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2.5, color: Colors.white))
+                        : widget.isSuccess
+                            ? const Icon(Iconsax.tick_circle,
+                                key: ValueKey('ok'),
+                                color: Colors.white, size: 26)
+                            : Row(
+                                key: const ValueKey('idle'),
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    widget.debtType == DebtType.debt
+                                        ? Iconsax.money_recive
+                                        : Iconsax.money_send,
+                                    color: Colors.white, size: 20,
+                                  ),
+                                  const SizedBox(width: _C.sm + 2),
+                                  const Text('Confirmar operación',
+                                      style: TextStyle(
+                                        color: Colors.white, fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: -0.2,
+                                      )),
+                                ],
+                              ),
+                  ),
+                ),
+              ),
+            );
+          }
+        ),
+      ),
+    );
+  }
+}
+// ─── PERSON PICKER SHEET ──────────────────────────────────────────────────────
+class _PersonPickerSheet extends StatelessWidget {
+  final _C c;
   final VoidCallback onPickContact;
   final VoidCallback onManualEntry;
 
-  const _ContactPickerModal({
-    required this.onPickContact,
-    required this.onManualEntry,
+  const _PersonPickerSheet({
+    required this.c, required this.onPickContact, required this.onManualEntry,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.fromLTRB(
+          _C.md, _C.md, _C.md,
+          _C.lg + MediaQuery.of(context).padding.bottom),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        color: c.surface,
+        borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(_C.r2XL)),
+        border: Border(top: BorderSide(color: c.sep.withOpacity(0.3), width: 0.5)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Seleccionar Contacto',
-            style: GoogleFonts.poppins(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 20),
-          ListTile(
-            leading: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                Iconsax.user_search,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-            ),
-            title: const Text('Desde la agenda'),
-            subtitle: const Text('Buscar en tus contactos'),
-            onTap: onPickContact,
-          ),
-          const SizedBox(height: 12),
-          ListTile(
-            leading: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.secondaryContainer,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                Iconsax.edit,
-                color: Theme.of(context).colorScheme.secondary,
-              ),
-            ),
-            title: const Text('Escribir manualmente'),
-            subtitle: const Text('Ingresar nombre o entidad'),
-            onTap: onManualEntry,
-          ),
-          const SizedBox(height: 12),
-        ],
-      ),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        // Handle
+        Container(width: 36, height: 4,
+            margin: const EdgeInsets.only(bottom: _C.lg),
+            decoration: BoxDecoration(
+                color: c.sep, borderRadius: BorderRadius.circular(2))),
+
+        Text('¿Quién es?',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700,
+                color: c.label, letterSpacing: -0.3)),
+        const SizedBox(height: _C.lg),
+
+        _SheetOption(
+          icon: Iconsax.user_search,
+          title: 'Desde la agenda',
+          subtitle: 'Buscar entre tus contactos',
+          c: c,
+          onTap: onPickContact,
+        ),
+        const SizedBox(height: _C.sm),
+        _SheetOption(
+          icon: Iconsax.edit_2,
+          title: 'Escribir manualmente',
+          subtitle: 'Ingresar nombre o entidad',
+          c: c,
+          onTap: onManualEntry,
+        ),
+      ]),
     );
   }
 }
 
-// 10. CONFETTI CELEBRATION
-class _ConfettiCelebration extends StatelessWidget {
-  final ConfettiController controller;
-  const _ConfettiCelebration({required this.controller});
+class _SheetOption extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final _C c;
+  final VoidCallback onTap;
 
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.topCenter,
-      child: ConfettiWidget(
-        confettiController: controller,
-        blastDirectionality: BlastDirectionality.explosive,
-        shouldLoop: false,
-        numberOfParticles: 30,
-        gravity: 0.3,
-        colors: const [
-          Colors.green,
-          Colors.blue,
-          Colors.pink,
-          Colors.orange,
-          Colors.purple,
-        ],
-      ),
-    );
-  }
-}
-
-// NUEVO: SELECTOR DE IMPACTO FINANCIERO PREMIUM
-class _ImpactTypeSelectorPremium extends StatelessWidget {
-  final DebtImpactType selectedImpact;
-  final DebtType debtType;
-  final Color accentColor;
-  final Function(DebtImpactType) onChanged;
-
-  const _ImpactTypeSelectorPremium({
-    required this.selectedImpact,
-    required this.debtType,
-    required this.accentColor,
-    required this.onChanged,
+  const _SheetOption({
+    required this.icon, required this.title, required this.subtitle,
+    required this.c, required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children:[
-        _buildImpactOption(
-          context: context,
-          type: DebtImpactType.liquid,
-          title: debtType == DebtType.debt ? 'Entró a mi cuenta' : 'Salió de mi cuenta',
-          subtitle: 'Afecta mi saldo disponible',
-          icon: Iconsax.wallet_add_1,
+    return _ScaleBtn(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(_C.md),
+        decoration: BoxDecoration(
+          color: c.raised,
+          borderRadius: BorderRadius.circular(_C.rXL),
+          border: Border.all(color: c.sep.withOpacity(0.3), width: 0.5),
         ),
-        const SizedBox(height: 12),
-        _buildImpactOption(
-          context: context,
-          type: DebtImpactType.restricted,
-          title: 'Tiene un propósito fijo',
-          subtitle: 'Es para una meta o pago reservado',
-          icon: Iconsax.lock_1,
-        ),
-        const SizedBox(height: 12),
-        _buildImpactOption(
-          context: context,
-          type: DebtImpactType.direct,
-          title: debtType == DebtType.debt ? 'Alguien pagó por mí' : 'Pagué por alguien más',
-          subtitle: 'El dinero nunca tocó mis cuentas',
-          icon: Iconsax.cards,
-        ),
-      ],
+        child: Row(children: [
+          Container(
+            width: 40, height: 40,
+            decoration: BoxDecoration(
+                color: c.surface, borderRadius: BorderRadius.circular(_C.rMD)),
+            child: Icon(icon, size: 18, color: c.label2),
+          ),
+          const SizedBox(width: _C.md),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title,
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
+                      color: c.label, letterSpacing: -0.2)),
+              Text(subtitle,
+                  style: TextStyle(fontSize: 12, color: c.label3)),
+            ]),
+          ),
+          Icon(Iconsax.arrow_right_3, size: 16, color: c.label4),
+        ]),
+      ),
     );
   }
+}
 
-  Widget _buildImpactOption({
-    required BuildContext context,
-    required DebtImpactType type,
-    required String title,
-    required String subtitle,
-    required IconData icon,
-  }) {
-    final isSelected = selectedImpact == type;
-    
-    return Material(
-      color: isSelected ? accentColor.withOpacity(0.1) : Theme.of(context).colorScheme.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: () => onChanged(type),
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: isSelected ? accentColor.withOpacity(0.5) : Colors.transparent,
-              width: 1.5,
+// ─── ACCOUNT SHEET ────────────────────────────────────────────────────────────
+class _AccountSheet extends StatelessWidget {
+  final List<Account> accounts;
+  final Color accent;
+  final _C c;
+  final ValueChanged<Account> onSelect;
+
+  const _AccountSheet({
+    required this.accounts, required this.accent,
+    required this.c, required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = NumberFormat.compactCurrency(
+        locale: 'es_CO', symbol: '\$', decimalDigits: 1);
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+          _C.md, _C.md, _C.md,
+          _C.lg + MediaQuery.of(context).padding.bottom),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(_C.r2XL)),
+      ),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(width: 36, height: 4,
+            margin: const EdgeInsets.only(bottom: _C.lg),
+            decoration: BoxDecoration(
+                color: c.sep, borderRadius: BorderRadius.circular(2))),
+        Text('Selecciona una cuenta',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700,
+                color: c.label, letterSpacing: -0.3)),
+        const SizedBox(height: _C.lg),
+        ...accounts.map((acc) => Padding(
+          padding: const EdgeInsets.only(bottom: _C.sm),
+          child: _ScaleBtn(
+            onTap: () { HapticFeedback.selectionClick(); onSelect(acc); },
+            child: Container(
+              padding: const EdgeInsets.all(_C.md),
+              decoration: BoxDecoration(
+                color: c.raised,
+                borderRadius: BorderRadius.circular(_C.rXL),
+                border: Border.all(color: c.sep.withOpacity(0.3), width: 0.5),
+              ),
+              child: Row(children: [
+                Container(
+                  width: 36, height: 36,
+                  decoration: BoxDecoration(
+                      color: accent.withOpacity(c.isDark ? 0.18 : 0.09),
+                      borderRadius: BorderRadius.circular(_C.rSM)),
+                  child: Icon(acc.icon, size: 16, color: accent),
+                ),
+                const SizedBox(width: _C.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(acc.name,
+                          style: TextStyle(fontSize: 14,
+                              fontWeight: FontWeight.w700, color: c.label,
+                              letterSpacing: -0.2)),
+                      Text(compact.format(acc.balance),
+                          style: TextStyle(fontSize: 12, color: c.label3)),
+                    ],
+                  ),
+                ),
+              ]),
             ),
-            borderRadius: BorderRadius.circular(16),
           ),
-          child: Row(
-            children:[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: isSelected ? accentColor.withOpacity(0.2) : Theme.of(context).colorScheme.surface,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: isSelected ? accentColor : Theme.of(context).colorScheme.onSurfaceVariant),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children:[
-                    Text(
-                      title,
-                      style: GoogleFonts.poppins(
-                        fontSize: 15,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                        color: isSelected ? accentColor : null,
-                      ),
-                    ),
-                    Text(
-                      subtitle,
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (isSelected)
-                Icon(Iconsax.tick_circle, color: accentColor)
-            ],
+        )),
+      ]),
+    );
+  }
+}
+
+// ─── CONFIRMATION SHEET ───────────────────────────────────────────────────────
+// Resumen de la operación antes de confirmar.
+// Lista de filas label/valor. Sin decoración que compita.
+class _ConfirmSheet extends StatelessWidget {
+  final DebtType debtType;
+  final double amount;
+  final String concept;
+  final String personName;
+  final Account account;
+  final Color accentColor;
+  final _C c;
+  final VoidCallback onConfirm;
+
+  const _ConfirmSheet({
+    required this.debtType, required this.amount, required this.concept,
+    required this.personName, required this.account, required this.accentColor,
+    required this.c, required this.onConfirm,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = NumberFormat.compactCurrency(
+        locale: 'es_CO', symbol: '\$', decimalDigits: 1);
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+          _C.md, _C.md, _C.md,
+          _C.lg + MediaQuery.of(context).padding.bottom),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(_C.r2XL)),
+        border: Border(top: BorderSide(color: c.sep.withOpacity(0.3), width: 0.5)),
+      ),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(width: 36, height: 4,
+            margin: const EdgeInsets.only(bottom: _C.lg),
+            decoration: BoxDecoration(
+                color: c.sep, borderRadius: BorderRadius.circular(2))),
+
+        // Ícono y título
+        Container(
+          width: 52, height: 52,
+          decoration: BoxDecoration(
+              color: accentColor.withOpacity(c.isDark ? 0.18 : 0.10),
+              shape: BoxShape.circle),
+          child: Icon(
+            debtType == DebtType.debt
+                ? Iconsax.money_recive : Iconsax.money_send,
+            size: 24, color: accentColor,
           ),
         ),
-      ),
-    ).animate(target: isSelected ? 1 : 0).scale(begin: const Offset(1, 1), end: const Offset(1.02, 1.02), duration: 200.ms);
+        const SizedBox(height: _C.md),
+        Text('¿Confirmar operación?',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700,
+                color: c.label, letterSpacing: -0.3)),
+        const SizedBox(height: _C.lg),
+
+        // Resumen
+        Container(
+          padding: const EdgeInsets.all(_C.md),
+          decoration: BoxDecoration(
+            color: c.raised,
+            borderRadius: BorderRadius.circular(_C.rXL),
+            border: Border.all(color: c.sep.withOpacity(0.3), width: 0.5),
+          ),
+          child: Column(children: [
+            _Row('Tipo', debtType == DebtType.debt ? 'Yo debo' : 'Me deben', c),
+            _Divider(c: c),
+            _Row('Monto', compact.format(amount), c),
+            _Divider(c: c),
+            _Row('Concepto', concept, c),
+            if (personName.isNotEmpty) ...[
+              _Divider(c: c),
+              _Row('Persona', personName, c),
+            ],
+            _Divider(c: c),
+            _Row('Cuenta', account.name, c),
+          ]),
+        ),
+
+        const SizedBox(height: _C.lg),
+
+        // Botones
+        Row(children: [
+          Expanded(
+            child: _ScaleBtn(
+              onTap: () => Navigator.pop(context),
+              child: Container(
+                height: 52,
+                decoration: BoxDecoration(
+                    color: c.raised,
+                    borderRadius: BorderRadius.circular(_C.rXL),
+                    border: Border.all(
+                        color: c.sep.withOpacity(0.4), width: 0.5)),
+                alignment: Alignment.center,
+                child: Text('Cancelar',
+                    style: TextStyle(fontSize: 15,
+                        fontWeight: FontWeight.w600, color: c.label2)),
+              ),
+            ),
+          ),
+          const SizedBox(width: _C.md),
+          Expanded(
+            flex: 2,
+            child: _ScaleBtn(
+              onTap: onConfirm,
+              child: Container(
+                height: 52,
+                decoration: BoxDecoration(
+                    color: accentColor,
+                    borderRadius: BorderRadius.circular(_C.rXL),
+                    boxShadow: [
+                      BoxShadow(
+                          color: accentColor.withOpacity(0.35),
+                          blurRadius: 14, offset: const Offset(0, 5)),
+                    ]),
+                alignment: Alignment.center,
+                child: const Text('Confirmar',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
+                        color: Colors.white, letterSpacing: -0.1)),
+              ),
+            ),
+          ),
+        ]),
+      ]),
+    );
   }
+}
+
+class _Row extends StatelessWidget {
+  final String label;
+  final String value;
+  final _C c;
+  const _Row(this.label, this.value, this.c);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: _C.sm + 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+              style: TextStyle(fontSize: 13, color: c.label3)),
+          Text(value,
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
+                  color: c.label, letterSpacing: -0.1)),
+        ],
+      ),
+    );
+  }
+}
+
+class _Divider extends StatelessWidget {
+  final _C c;
+  const _Divider({required this.c});
+
+  @override
+  Widget build(BuildContext context) =>
+      Container(height: 0.5, color: c.sep.withOpacity(0.5));
+}
+
+// ─── UTILS ────────────────────────────────────────────────────────────────────
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  final _C c;
+  const _SectionLabel({required this.text, required this.c});
+
+  @override
+  Widget build(BuildContext context) => Text(text,
+      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+          color: c.label3, letterSpacing: 0.1));
+}
+
+class _BackBtn extends StatelessWidget {
+  final _C c;
+  const _BackBtn({required this.c});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () { HapticFeedback.lightImpact(); Navigator.of(context).pop(); },
+      child: Container(
+        width: 34, height: 34,
+        decoration: BoxDecoration(color: c.raised, shape: BoxShape.circle),
+        child: Icon(Icons.arrow_back_ios_new_rounded, size: 15, color: c.label),
+      ),
+    );
+  }
+}
+
+class _FieldSkeleton extends StatelessWidget {
+  final _C c;
+  const _FieldSkeleton({required this.c});
+
+  @override
+  Widget build(BuildContext context) => Container(
+      height: 56,
+      decoration: BoxDecoration(
+          color: c.surface, borderRadius: BorderRadius.circular(_C.rXL)),
+      alignment: Alignment.center,
+      child: SizedBox(width: 18, height: 18,
+          child: CircularProgressIndicator(strokeWidth: 2, color: c.label4)));
+}
+
+class _ScaleBtn extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onTap;
+  const _ScaleBtn({required this.child, required this.onTap});
+
+  @override
+  State<_ScaleBtn> createState() => _ScaleBtnState();
+}
+
+class _ScaleBtnState extends State<_ScaleBtn> {
+  bool _p = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown:   (_) => setState(() => _p = true),
+      onTapUp:     (_) { setState(() => _p = false); widget.onTap(); },
+      onTapCancel: () => setState(() => _p = false),
+      child: AnimatedScale(
+          scale: _p ? 0.95 : 1.0,
+          duration: const Duration(milliseconds: 80),
+          child: widget.child),
+    );
+  }
+}
+
+Path _starPath(Size size) {
+  double r(double deg) => deg * (math.pi / 180);
+  final hw = size.width / 2;
+  final path = Path();
+  path.moveTo(size.width, hw);
+  for (double s = 0; s < r(360); s += r(72)) {
+    path.lineTo(hw + hw * math.cos(s), hw + hw * math.sin(s));
+    path.lineTo(hw + (hw / 2.5) * math.cos(s + r(36)),
+        hw + (hw / 2.5) * math.sin(s + r(36)));
+  }
+  path.close();
+  return path;
 }
