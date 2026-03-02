@@ -21,6 +21,7 @@ import 'package:sasper/screens/challenges_screen.dart';
 import 'package:sasper/screens/debts_screen.dart';
 import 'package:sasper/screens/goals_screen.dart';
 import 'package:sasper/screens/recurring_transactions_screen.dart';
+import 'package:sasper/screens/free_trials_screen.dart'; // Asegúrate de que la ruta sea correcta
 
 // ── Tokens ────────────────────────────────────────────────────────────────────
 class _T {
@@ -112,6 +113,14 @@ class _PlanningHubScreenState extends State<PlanningHubScreen>
           title: 'Presupuestos',
           subtitle: 'Límites mensuales por categoría',
           destination: const BudgetsScreen(),
+        ),
+        const _Item(
+          icon: Iconsax.timer_1,
+          iconColor: Color(0xFFC9A96E), // Color Gold Premium
+          title: 'Pruebas Gratuitas',
+          subtitle: 'Rastrea y cancela a tiempo',
+          badge: 'IA', // Opcional: para resaltar que tiene análisis
+          destination: FreeTrialsScreen(),
         ),
         _Item(
           icon: Iconsax.receipt_2_1,
@@ -252,8 +261,9 @@ class _HeaderDelegate extends SliverPersistentHeaderDelegate {
     required this.backgroundColor,
   });
 
-  @override double get minExtent => statusBarHeight + 52;
-  @override double get maxExtent => statusBarHeight + 120;
+  // Aumentamos ligeramente y redondeamos para evitar errores de coma flotante
+  @override double get minExtent => (statusBarHeight + 54.0).roundToDouble();
+  @override double get maxExtent => (statusBarHeight + 122.0).roundToDouble();
 
   @override
   bool shouldRebuild(covariant _HeaderDelegate old) =>
@@ -262,51 +272,66 @@ class _HeaderDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   Widget build(BuildContext ctx, double shrinkOffset, bool overlaps) {
-    final t = (shrinkOffset / (maxExtent - minExtent)).clamp(0.0, 1.0);
+    // 1. Cálculo del factor de encogimiento con clamp de seguridad
+    final double t = (shrinkOffset / (maxExtent - minExtent)).clamp(0.0, 1.0);
     final theme = Theme.of(ctx);
     final onSurface = theme.colorScheme.onSurface;
 
-    // Tamaño del título interpolado
-    final titleSize = lerpDouble(32, 20, t)!;
+    // 2. Valores interpolados redondeados para estabilidad
+    final titleSize = (lerpDouble(32, 20, t)!).roundToDouble();
     final subtitleOpacity = (1 - t * 2).clamp(0.0, 1.0);
 
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          color: backgroundColor.withOpacity(t > 0.3 ? 0.92 : 0),
-          padding: EdgeInsets.only(
-            top: statusBarHeight + 12,
-            left: _T.h + 4,
-            right: _T.h,
-            bottom: 10,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              // Subtítulo — desaparece al colapsar
-              Opacity(
-                opacity: subtitleOpacity,
-                child: Text(
-                  'PLANIFICACIÓN',
-                  style: _T.label(10, w: FontWeight.w700, c: onSurface.withOpacity(0.35)),
-                ),
+    // SOLUCIÓN: LayoutBuilder asegura que el alto del hijo coincida 
+    // EXACTAMENTE con la restricción del SliverPersistentHeader.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final currentHeight = constraints.maxHeight;
+
+        return ClipRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            child: Container(
+              // Forzamos la altura a lo que el padre (Sliver) asignó exactamente
+              height: currentHeight,
+              width: double.infinity,
+              color: backgroundColor.withOpacity(t > 0.3 ? 0.92 : 0),
+              padding: EdgeInsets.only(
+                top: statusBarHeight + 12,
+                left: _T.h + 4,
+                right: _T.h,
+                bottom: 10,
               ),
-              const SizedBox(height: 2),
-              // Título principal — se comprime
-              Text(
-                'Centro',
-                style: _T.title(titleSize, c: onSurface),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  // Usamos un condicional simple para evitar renderizar 
+                  // espacio innecesario cuando está colapsado
+                  if (t < 0.5)
+                    Opacity(
+                      opacity: subtitleOpacity,
+                      child: Text(
+                        'PLANIFICACIÓN',
+                        style: _T.label(10, w: FontWeight.w700, c: onSurface.withOpacity(0.35)),
+                      ),
+                    ),
+                  
+                  // Pequeño ajuste de espacio redondeado
+                  SizedBox(height: (2 * (1 - t)).roundToDouble()),
+                  
+                  Text(
+                    'Centro',
+                    style: _T.title(titleSize, c: onSurface),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      }
     );
   }
 }
-
 // ─────────────────────────────────────────────────────────────────────────────
 // SECTION BLOCK — grupo de ítems estilo iOS Settings
 // ─────────────────────────────────────────────────────────────────────────────

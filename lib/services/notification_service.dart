@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:intl/intl.dart';
 import 'package:sasper/data/recurring_repository.dart';
 import 'package:sasper/main.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -99,41 +100,40 @@ class NotificationService {
   }
 
   // --- INICIALIZACIÓN RÁPIDA (Al arrancar la app) ---
-  Future<void> initializeQuick() async {
-    developer.log('🚀 Iniciando configuración de notificaciones...', name: 'NotificationService');
+Future<void> initializeQuick() async {
+  developer.log('🚀 Iniciando configuración de notificaciones...', name: 'NotificationService');
 
-    // 1. Configurar Zonas Horarias (CRÍTICO para alarmas exactas)
-    try {
-      tz.initializeTimeZones();
-      final timezoneInfo = await FlutterTimezone.getLocalTimezone();
-      final String timeZoneName = timezoneInfo.identifier;
-      tz.setLocalLocation(tz.getLocation(timeZoneName));
-      developer.log('🌍 Zona horaria detectada: $timeZoneName', name: 'NotificationService');
-    } catch (e) {
-      developer.log('⚠️ Fallo zona horaria (usando UTC): $e', name: 'NotificationService');
-      tz.setLocalLocation(tz.getLocation('UTC'));
-    }
-
-    // 2. Configurar Plugin
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const iosInit = DarwinInitializationSettings(
-      requestAlertPermission: false,
-      requestBadgePermission: false,
-      requestSoundPermission: false,
-    );
-    
-    final settings = InitializationSettings(android: androidInit, iOS: iosInit);
-    
-    await _localNotifier.initialize(
-      settings,
-      onDidReceiveNotificationResponse: onDidReceiveNotificationResponse,
-      onDidReceiveBackgroundNotificationResponse: onDidReceiveBackgroundNotificationResponse,
-    );
-
-    await _createAndroidChannels();
-    _setupMessageListeners();
+  // 1. Configurar Zonas Horarias
+  try {
+    tz.initializeTimeZones();
+    final timezoneInfo = await FlutterTimezone.getLocalTimezone();
+    tz.setLocalLocation(tz.getLocation(timezoneInfo.identifier));
+    developer.log('🌍 Zona horaria detectada: ${timezoneInfo.identifier}', name: 'NotificationService');
+  } catch (e) {
+    developer.log('⚠️ Fallo zona horaria: $e', name: 'NotificationService');
+    tz.setLocalLocation(tz.getLocation('UTC'));
   }
 
+  // 2. Configurar Plugin
+  const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+  const iosInit = DarwinInitializationSettings(
+    requestAlertPermission: false,
+    requestBadgePermission: false,
+    requestSoundPermission: false,
+  );
+  
+  final settings = InitializationSettings(android: androidInit, iOS: iosInit);
+  
+  await _localNotifier.initialize(
+    settings,
+    onDidReceiveNotificationResponse: onDidReceiveNotificationResponse,
+    onDidReceiveBackgroundNotificationResponse: onDidReceiveBackgroundNotificationResponse,
+  );
+
+  // 3. Crear canales (Aquí se llamará al método que corregiremos abajo)
+  await _createAndroidChannels();
+  _setupMessageListeners();
+}
   // --- INICIALIZACIÓN TARDÍA (Permisos y Token) ---
   Future<void> initializeLate() async {
     // 1. Pedir permisos de sistema (Android 13+ / iOS)
@@ -185,29 +185,43 @@ class NotificationService {
     _firebaseMessaging.onTokenRefresh.listen((token) => _saveTokenToSupabase(token));
   }
 
-  Future<void> _createAndroidChannels() async {
-    final androidImpl = _localNotifier.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
-    if (androidImpl == null) return;
+Future<void> _createAndroidChannels() async {
+  final androidImpl = _localNotifier.resolvePlatformSpecificImplementation<
+      AndroidFlutterLocalNotificationsPlugin>();
+  
+  if (androidImpl == null) return;
 
-    await androidImpl.createNotificationChannel(
-      const AndroidNotificationChannel(
-        'recurring_payments_channel',
-        'Recordatorios de Pagos',
-        description: 'Notificaciones sobre gastos fijos.',
-        importance: Importance.max,
-        playSound: true,
-      ),
-    );
-    await androidImpl.createNotificationChannel(
-      const AndroidNotificationChannel(
-        'test_channel',
-        'Pruebas',
-        importance: Importance.max,
-      ),
-    );
-  }
+  // Canal para Gastos Fijos
+  await androidImpl.createNotificationChannel(
+    const AndroidNotificationChannel(
+      'recurring_payments_channel',
+      'Recordatorios de Pagos',
+      description: 'Notificaciones sobre gastos fijos.',
+      importance: Importance.max,
+      playSound: true,
+    ),
+  );
 
+  // --- NUEVO: Canal para Pruebas Gratuitas ---
+  await androidImpl.createNotificationChannel(
+    const AndroidNotificationChannel(
+      'free_trials_channel',
+      'Pruebas Gratuitas',
+      description: 'Alertas para cancelar suscripciones a tiempo.',
+      importance: Importance.max,
+      playSound: true,
+    ),
+  );
+
+  // Canal de Pruebas
+  await androidImpl.createNotificationChannel(
+    const AndroidNotificationChannel(
+      'test_channel',
+      'Pruebas',
+      importance: Importance.max,
+    ),
+  );
+}
   Future<void> _saveTokenToSupabase(String token) async {
     final uid = _supabase.auth.currentUser?.id;
     if (uid == null) return;
@@ -302,6 +316,67 @@ class NotificationService {
     }
   }
 
+Future<void> scheduleFreeTrialReminder({
+  required String id,
+  required String serviceName,
+  required DateTime endDate,
+  required double price, 
+  required TimeOfDay notificationTime,
+}) async {
+  final now = DateTime.now();
+  
+  // 1. Calculamos qué día será "3 días antes"
+  final reminderDay = endDate.subtract(const Duration(days: 3));
+  
+  // 2. Combinamos ese día con la hora que eligió el usuario
+  DateTime reminderDateTime = DateTime(
+    reminderDay.year,
+    reminderDay.month,
+    reminderDay.day,
+    notificationTime.hour,
+    notificationTime.minute,
+  );
+
+  // 3. Lógica para pruebas urgentes (que vencen en menos de 3 días)
+  if (reminderDateTime.isBefore(now)) {
+    if (endDate.isAfter(now)) {
+      // Notificamos en 1 minuto si la fecha ya pasó pero la prueba sigue activa
+      reminderDateTime = now.add(const Duration(minutes: 1));
+      developer.log('⚠️ Aviso urgente programado en 1 min.', name: 'NotificationService');
+    } else {
+      // Si la prueba ya venció en el mundo real, no hacemos nada
+      return;
+    }
+  }
+
+  final baseId = id.hashCode & 0x7FFFFFFF;
+  final fmt = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+
+  // 4. Programamos la notificación
+  await _localNotifier.zonedSchedule(
+    baseId,
+    '⏰ ¡Prueba por finalizar!',
+    'Tu prueba de $serviceName termina pronto. Cancela hoy para evitar el cobro de ${fmt.format(price)}.',
+    tz.TZDateTime.from(reminderDateTime, tz.local),
+    const NotificationDetails(
+      android: AndroidNotificationDetails(
+        'free_trials_channel',
+        'Pruebas Gratuitas',
+        importance: Importance.max,
+        priority: Priority.high,
+        playSound: true, // Nos aseguramos de que suene
+      ),
+      iOS: DarwinNotificationDetails(presentAlert: true, presentSound: true),
+    ),
+    androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+  );
+  
+  developer.log('🔔 Recordatorio programado para $serviceName a las ${reminderDateTime.hour}:${reminderDateTime.minute}', name: 'NotificationService');
+}
+// Método para cancelar si el usuario marca "Ya cancelé"
+Future<void> cancelTrialReminder(String id) async {
+  await _localNotifier.cancel(id.hashCode & 0x7FFFFFFF);
+}
   /// Lógica central para calcular y programar las notificaciones.
   /// ESTRATEGIA: Doble aviso por cada mes (previo + final)
   /// Programa notificaciones para los próximos 12 meses a partir de AHORA
