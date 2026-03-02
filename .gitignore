@@ -50,6 +50,7 @@ app.*.map.json
 # Archivo de secretos locales
 /finanzas_backend/.env
 /.env
+.env
 
 # Archivos de caché de Python
 /finanzas_backend/__pycache__/
@@ -60,3 +61,10 @@ app.*.map.json
 /.flutter-plugins
 /.flutter-plugins-dependencies
 /.packages
+
+# Secretos y Llaves (Añadir al final de tu .gitignore)
+.env
+*.env
+serviceAccountKey.json
+*.json
+!secrets.example.json
