@@ -11,6 +11,12 @@ import 'package:sasper/data/dashboard_repository.dart';
 import 'package:sasper/models/dashboard_data_model.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart'; 
 
+import 'package:sasper/data/account_repository.dart';
+import 'package:sasper/data/recurring_repository.dart';
+import 'package:sasper/data/category_repository.dart'; // Si tienes categorías dinámicas
+import 'package:sasper/models/account_model.dart';
+import 'package:sasper/models/category_model.dart';
+
 class _T {
   static const Color bg = Color(0xFF0A0A0F);
   static const Color surface = Color(0xFF16161E);
@@ -87,6 +93,7 @@ class FreeTrialsScreen extends StatelessWidget {
                           availableBalance: availableBalance, // 👈 Pasamos el saldo a la tarjeta
                           onEdit: () => _showTrialSheet(context, editItem: trials[index]),
                           onDelete: () => _confirmDelete(context, trials[index]),
+                          onConvert: () => _showConvertToRecurringSheet(context, trials[index]),
                         ).animate().fadeIn(delay: (index * 50).ms).slideX(begin: 0.05),
                         childCount: trials.length,
                       ),
@@ -121,6 +128,169 @@ class FreeTrialsScreen extends StatelessWidget {
             child: const Text('Eliminar', style: TextStyle(color: _T.danger))
           ),
         ],
+      ),
+    );
+  }
+
+  // --- CONVERTIR A GASTO FIJO ---
+  void _showConvertToRecurringSheet(BuildContext context, Map<String, dynamic> trial) {
+    // Datos pre-llenados desde la prueba
+    final name = trial['service_name'];
+    final amount = (trial['future_price'] as num).toDouble();
+    final frequency = trial['frequency'] ?? 'mensual'; // Valor por defecto
+    
+    // Controladores para selección
+    Account? selectedAccount;
+    String selectedCategory = 'Suscripciones'; // Valor por defecto o el primero de la lista
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Container(
+          padding: const EdgeInsets.all(24),
+          decoration: const BoxDecoration(
+            color: _T.surface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                const Icon(Iconsax.repeat, color: _T.accent, size: 24),
+                const SizedBox(width: 12),
+                const Text('Convertir a Gasto Fijo', 
+                  style: TextStyle(color: _T.textPrimary, fontWeight: FontWeight.bold, fontSize: 18)),
+              ]),
+              const SizedBox(height: 8),
+              Text('Convertir "$name" en un pago recurrente automático.', 
+                style: const TextStyle(color: _T.textSecondary, fontSize: 13)),
+              
+              const SizedBox(height: 24),
+
+              // 1. Selector de Cuenta (Obligatorio)
+              const Text('¿De qué cuenta se paga?', style: TextStyle(color: _T.textSecondary, fontSize: 12, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              FutureBuilder<List<Account>>(
+                future: AccountRepository.instance.getAccounts(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) return const LinearProgressIndicator(color: _T.accent);
+                  
+                  final accounts = snapshot.data!;
+                  if (selectedAccount == null && accounts.isNotEmpty) {
+                    // Auto-seleccionar la primera cuenta
+                    selectedAccount = accounts.first;
+                  }
+
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white.withOpacity(0.1)),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<Account>(
+                        value: selectedAccount,
+                        isExpanded: true,
+                        dropdownColor: _T.surface,
+                        style: const TextStyle(color: Colors.white),
+                        items: accounts.map((acc) => DropdownMenuItem(
+                          value: acc,
+                          child: Row(children: [
+                            Icon(acc.icon, size: 16, color: _T.textSecondary),
+                            const SizedBox(width: 8),
+                            Text(acc.name),
+                          ]),
+                        )).toList(),
+                        onChanged: (val) => setSheetState(() => selectedAccount = val),
+                      ),
+                    ),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 16),
+
+              // 2. Selector de Categoría (Simplificado)
+              const Text('Categoría', style: TextStyle(color: _T.textSecondary, fontSize: 12, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              // Aquí podrías usar tu CategoryRepository si quieres, por ahora uso un dropdown simple
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: selectedCategory,
+                    isExpanded: true,
+                    dropdownColor: _T.surface,
+                    style: const TextStyle(color: Colors.white),
+                    items: ['Suscripciones', 'Entretenimiento', 'Educación', 'Software', 'Servicios']
+                        .map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                    onChanged: (val) => setSheetState(() => selectedCategory = val!),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 32),
+
+              // Botón de Acción
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _T.success, // Verde para indicar "Aprobado"
+                  minimumSize: const Size(double.infinity, 54),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                onPressed: () async {
+                  if (selectedAccount == null) return;
+                  HapticFeedback.heavyImpact();
+                  
+                  try {
+                    // 1. Crear el Gasto Fijo
+                    await RecurringRepository.instance.addRecurringTransaction(
+                      description: name,
+                      amount: amount,
+                      type: 'Gasto',
+                      category: selectedCategory,
+                      accountId: selectedAccount!.id,
+                      frequency: frequency, // Heredamos la frecuencia de la prueba
+                      interval: 1,
+                      startDate: DateTime.now(), // Empieza hoy
+                    );
+
+                    // 2. Borrar la Prueba Gratuita (Ya no es necesaria)
+                    await FreeTrialRepository.instance.deleteTrial(trial['id']);
+                    
+                    // 3. Limpiar notificaciones
+                    await NotificationService.instance.cancelTrialReminder(trial['id']);
+                    // Refrescar ambos widgets para asegurar sincronía
+                    await widget_service.WidgetService.updateNextPaymentWidget();
+                    await widget_service.WidgetService.updateUpcomingPaymentsWidget();
+
+                    if (context.mounted) {
+                      Navigator.pop(ctx); // Cerrar sheet
+                      NotificationHelper.show(
+                        message: '¡$name es ahora un gasto fijo!', 
+                        type: NotificationType.success
+                      );
+                    }
+                  } catch (e) {
+                    NotificationHelper.show(message: 'Error al convertir', type: NotificationType.error);
+                  }
+                },
+                child: const Text('Confirmar y Convertir', 
+                  style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16)),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -325,6 +495,7 @@ class FreeTrialsScreen extends StatelessWidget {
 
 class _TrialCard extends StatelessWidget {
   final Map<String, dynamic> data;
+  final VoidCallback onConvert;
   final NumberFormat fmt;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
@@ -335,7 +506,8 @@ class _TrialCard extends StatelessWidget {
     required this.fmt, 
     required this.onEdit, 
     required this.onDelete,
-    required this.availableBalance, // 👈 Se inyecta aquí
+    required this.availableBalance,
+    required this.onConvert, // 👈 Se inyecta aquí
   });
 
   @override
@@ -384,10 +556,25 @@ class _TrialCard extends StatelessWidget {
                   icon: const Icon(Icons.more_vert, color: _T.textSecondary),
                   color: _T.surface,
                   onSelected: (val) {
+                     if (val == 'convert') { // 👈 NUEVA OPCIÓN
+                      // Necesitamos llamar a la función que está en el widget padre.
+                      // Opción A: Pasar la función por callback
+                      // Opción B (Rápida): Si _showConvertToRecurringSheet está en el estado, 
+                      // pasar el context y buscarlo, pero mejor pasemos un callback nuevo.
+                      onConvert(); 
+                    }
                     if (val == 'edit') onEdit();
                     if (val == 'delete') onDelete();
                   },
                   itemBuilder: (ctx) =>[
+                    const PopupMenuItem(
+                      value: 'convert', 
+                      child: Row(children: [
+                        Icon(Iconsax.repeat, color: _T.success, size: 18),
+                        SizedBox(width: 10),
+                        Text('Convertir a Gasto Fijo', style: TextStyle(color: _T.success)),
+                      ])
+                    ),
                     const PopupMenuItem(value: 'edit', child: Text('Editar', style: TextStyle(color: Colors.white))),
                     const PopupMenuItem(value: 'delete', child: Text('Eliminar', style: TextStyle(color: _T.danger))),
                   ],

@@ -190,6 +190,14 @@ class RecurringRepository {
         name: 'RecurringRepository',
       );
 
+      // Después de crear el recurrente, pedimos al widget que se refresque
+      try {
+        await widget_service.WidgetService.updateNextPaymentWidget();
+        await widget_service.WidgetService.updateUpcomingPaymentsWidget();
+      } catch (e) {
+        developer.log('⚠️ [Repo] Error actualizando widgets tras crear recurrente: $e', name: 'RecurringRepository');
+      }
+
       return RecurringTransaction.fromMap(response);
     } catch (e, stackTrace) {
       developer.log(
