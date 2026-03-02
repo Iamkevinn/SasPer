@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:sasper/data/free_trial_repository.dart';
 import 'package:sasper/services/notification_service.dart';
+import 'package:sasper/services/widget_service.dart' as widget_service;
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 
@@ -104,8 +105,9 @@ class FreeTrialsScreen extends StatelessWidget {
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
           TextButton(
             onPressed: () async {
-              await FreeTrialRepository.instance.deleteTrial(item['id']);
-              Navigator.pop(ctx);
+              await FreeTrialRepository.instance.deleteTrial(item['id']);              // refrescar widgets
+              await widget_service.WidgetService.updateNextPaymentWidget();
+              await widget_service.WidgetService.updateUpcomingPaymentsWidget();              Navigator.pop(ctx);
               NotificationHelper.show(message: 'Prueba eliminada', type: NotificationType.info);
             }, 
             child: const Text('Eliminar', style: TextStyle(color: _T.danger))
@@ -218,6 +220,9 @@ class FreeTrialsScreen extends StatelessWidget {
     price: price,
     notificationTime: selectedTime,
   );
+  // refrescar widgets
+  await widget_service.WidgetService.updateNextPaymentWidget();
+  await widget_service.WidgetService.updateUpcomingPaymentsWidget();
 } else {
     // Actualizar en BD
     await FreeTrialRepository.instance.updateTrial(
@@ -236,6 +241,9 @@ class FreeTrialsScreen extends StatelessWidget {
       price: price,
       notificationTime: selectedTime,
     );
+    // refrescar widgets
+    await widget_service.WidgetService.updateNextPaymentWidget();
+    await widget_service.WidgetService.updateUpcomingPaymentsWidget();
   }
   Navigator.pop(ctx);
 },
@@ -335,6 +343,9 @@ class _TrialCard extends StatelessWidget {
   final isCancelled = data['is_cancelled'] ?? false;
   
   await FreeTrialRepository.instance.toggleCancel(data['id'], isCancelled);
+  // refrescar widgets porque el registro cambió de estado
+  await widget_service.WidgetService.updateNextPaymentWidget();
+  await widget_service.WidgetService.updateUpcomingPaymentsWidget();
   
   if (!isCancelled) { 
     // Si se acaba de marcar como cancelado (isCancelled era false)

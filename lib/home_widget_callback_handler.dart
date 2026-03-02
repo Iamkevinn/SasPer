@@ -40,10 +40,16 @@ void homeWidgetBackgroundCallback(Uri? uri) async {
   }
 
   // ====================================================================
-  // EXTRAER widgetId y action
+  // EXTRAER widgetId y action (puede venir en path o en query)
   // ====================================================================
   final widgetIdParam = uri.queryParameters['widgetId'];
-  final action = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : '';
+  String action;
+  if (uri.pathSegments.isNotEmpty) {
+    action = uri.pathSegments.first;
+  } else {
+    // algunos intents (como el botón de recarga) envían la acción como query param
+    action = uri.queryParameters['action'] ?? '';
+  }
 
   developer.log(
     '🎯 Procesando → Action: "$action" | WidgetId: ${widgetIdParam ?? "null"}',
@@ -70,7 +76,14 @@ void homeWidgetBackgroundCallback(Uri? uri) async {
       break;
 
     case 'widget': // Dashboard y otros widgets financieros
-      await widget_service.handleWidgetAction(action);
+      if (action == 'refresh_next_payment' || action == 'refresh') {
+        // La recarga manual del boton debe actualizar ambos widgets, no sólo el próximo pago
+        await widget_service.WidgetService.updateNextPaymentWidget();
+        await widget_service.WidgetService.updateUpcomingPaymentsWidget();
+        developer.log('✅ Widgets financieros recargados (next + upcoming)', name: 'WidgetCallback');
+      } else {
+        await widget_service.handleWidgetAction(action);
+      }
       break;
       
     default:

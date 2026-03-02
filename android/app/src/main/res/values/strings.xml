@@ -105,6 +105,7 @@
     <!-- Acciones y estado vacío -->
     <string name="mark_as_paid">Marcar como pagado</string>
     <string name="snooze_payment_description">Posponer recordatorio</string>
+    <string name="refresh_payment_description">Recargar datos del pago</string>
     <string name="view_payment_details">Ver detalles</string>
     <string name="no_pending_payments_title">¡Todo al día!</string>
     <string name="no_pending_payments_message">No tienes pagos pendientes</string>

@@ -25,6 +25,7 @@ import java.time.format.DateTimeParseException
 class NextPaymentWidgetProvider : HomeWidgetProvider() {
 
     private val ACTION_MARK_AS_PAID = "com.example.sasper.ACTION_MARK_AS_PAID"
+    private val ACTION_REFRESH_PAYMENT = "com.example.sasper.ACTION_REFRESH_PAYMENT"
 
     override fun onUpdate(
         context: Context,
@@ -176,6 +177,18 @@ class NextPaymentWidgetProvider : HomeWidgetProvider() {
         )
         views.setOnClickPendingIntent(R.id.mark_as_paid_button, markAsPaidPendingIntent)
         println("    [DETAIL] 'Mark as Paid' button setup complete.")
+
+        // ── Botón "Recargar" ──────────────────────────────────────────────────
+        val refreshIntent = Intent(context, NextPaymentWidgetProvider::class.java).apply {
+            action = ACTION_REFRESH_PAYMENT
+            data = Uri.parse("home_widget://widget?action=refresh_next_payment")
+        }
+        val refreshPendingIntent = PendingIntent.getBroadcast(
+            context, 100 + widgetId, refreshIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        views.setOnClickPendingIntent(R.id.refresh_button, refreshPendingIntent)
+        println("    [DETAIL] 'Refresh' button setup complete.")
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -185,6 +198,17 @@ class NextPaymentWidgetProvider : HomeWidgetProvider() {
             println("✅ [WIDGET_ACTION] Botón 'Marcar como Pagado' presionado para el pago ID: $paymentId")
             val backgroundIntent = Intent(context, HomeWidgetBackgroundService::class.java).apply {
                 data = Uri.parse("home_widget://mark_as_paid?paymentId=$paymentId")
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(backgroundIntent)
+            } else {
+                context.startService(backgroundIntent)
+            }
+        } else if (intent.action == ACTION_REFRESH_PAYMENT) {
+            println("✅ [WIDGET_ACTION] Botón 'Recargar' presionado")
+            val backgroundIntent = Intent(context, HomeWidgetBackgroundService::class.java).apply {
+                // Enviamos la misma URI que utiliza el botón (host widget + query)
+                data = Uri.parse("home_widget://widget?action=refresh_next_payment")
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(backgroundIntent)

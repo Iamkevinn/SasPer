@@ -44,7 +44,7 @@ const String _logName = 'WidgetService';
       // Basado en tu código, parece que una actualización general es lo correcto.
       
       // Asumimos que la acción principal es refrescar todos los datos
-      if (action == 'refresh' || action == 'updateAll') { // O cualquier acción que uses
+      if (action == 'refresh' || action == 'updateAll' || action == 'refresh_next_payment') { // O cualquier acción que uses
           await WidgetService.updateFinancialHealthWidget();
           await WidgetService.updateMonthlyComparisonWidget();
           await WidgetService.updateGoalsWidget();

@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'package:sasper/models/recurring_transaction_model.dart';
+import 'package:sasper/services/widget_service.dart' as widget_service;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:developer' as developer;
 
@@ -32,6 +33,9 @@ class RecurringRepository {
     try {
       await client.rpc('process_recurring_payment', params: {'recurring_id': recurringId});
       developer.log('✅ [Repo] Pago procesado para $recurringId', name: 'RecurringRepository');
+      // luego de cambiar la base, actualizamos widgets relacionados
+      await widget_service.WidgetService.updateNextPaymentWidget();
+      await widget_service.WidgetService.updateUpcomingPaymentsWidget();
     } catch (e) {
       developer.log('🔥 [Repo] Error procesando pago: $e', name: 'RecurringRepository');
       throw Exception('No se pudo registrar el pago.');
@@ -43,6 +47,8 @@ class RecurringRepository {
     try {
       await client.rpc('skip_recurring_payment', params: {'recurring_id': recurringId});
       developer.log('✅ [Repo] Pago omitido para $recurringId', name: 'RecurringRepository');
+      await widget_service.WidgetService.updateNextPaymentWidget();
+      await widget_service.WidgetService.updateUpcomingPaymentsWidget();
     } catch (e) {
       developer.log('🔥 [Repo] Error omitiendo pago: $e', name: 'RecurringRepository');
       throw Exception('No se pudo omitir el pago.');
@@ -57,6 +63,8 @@ class RecurringRepository {
         'new_date': newDate.toIso8601String(),
       });
       developer.log('✅ [Repo] Pago pospuesto para $recurringId', name: 'RecurringRepository');
+      await widget_service.WidgetService.updateNextPaymentWidget();
+      await widget_service.WidgetService.updateUpcomingPaymentsWidget();
     } catch (e) {
       developer.log('🔥 [Repo] Error posponiendo pago: $e', name: 'RecurringRepository');
       throw Exception('No se pudo posponer el pago.');

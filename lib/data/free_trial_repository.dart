@@ -1,3 +1,4 @@
+import 'package:sasper/services/widget_service.dart' as widget_service;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class FreeTrialRepository {
@@ -20,6 +21,10 @@ Future<Map<String, dynamic>> addTrial(String name, DateTime date, double price, 
     'notification_time': time, // Guardamos ej: "14:30"
   }).select().single(); // 👈 IMPORTANTE: Esto hace que devuelva el objeto creado
   
+  // actualizar widgets tras modificar datos
+  await widget_service.WidgetService.updateNextPaymentWidget();
+  await widget_service.WidgetService.updateUpcomingPaymentsWidget();
+
   return response;
 }
 
@@ -31,13 +36,18 @@ Future<Map<String, dynamic>> addTrial(String name, DateTime date, double price, 
       'notification_time': time,
 
     }).eq('id', id);
+  await widget_service.WidgetService.updateNextPaymentWidget();
+  await widget_service.WidgetService.updateUpcomingPaymentsWidget();
   }
 
   Future<void> toggleCancel(String id, bool currentState) async {
     await _client.from('free_trials').update({'is_cancelled': !currentState}).eq('id', id);
+  await widget_service.WidgetService.updateNextPaymentWidget();
+  await widget_service.WidgetService.updateUpcomingPaymentsWidget();
   }
 
   Future<void> deleteTrial(String id) async {
     await _client.from('free_trials').delete().eq('id', id);
-  }
+  await widget_service.WidgetService.updateNextPaymentWidget();
+  await widget_service.WidgetService.updateUpcomingPaymentsWidget();  }
 }

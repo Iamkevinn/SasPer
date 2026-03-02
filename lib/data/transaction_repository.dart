@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:sasper/models/transaction_models.dart';
+import 'package:sasper/services/widget_service.dart' as widget_service;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sasper/models/enums/transaction_mood_enum.dart';
 import 'dart:developer' as developer;
@@ -131,7 +132,38 @@ Future<void> payInstallment({
   }).eq('id', originalTransaction.id);
 
   developer.log('✅ Cuota pagada y avanzada', name: 'TransactionRepository');
+
+  // widgets también deben refrescarse porque el listado de pagos cambió
+  try {
+    await widget_service.WidgetService.updateNextPaymentWidget();
+    await widget_service.WidgetService.updateUpcomingPaymentsWidget();
+  } catch (e) {
+    developer.log('⚠️ Error actualizando widgets tras pago de cuota: $e', name: 'TransactionRepository');
+  }
 }
+
+  /// Actualiza el progreso de las cuotas (Útil para editar o finalizar anticipadamente)
+  Future<void> updateInstallmentProgress({
+    required int transactionId,
+    required int currentInstallment,
+    required int totalInstallments,
+  }) async {
+    try {
+      await client.from('transactions').update({
+        'installments_current': currentInstallment,
+        'installments_total': totalInstallments,
+      }).eq('id', transactionId);
+      
+      developer.log('✅ Progreso de cuotas actualizado para ID: $transactionId', name: 'TransactionRepository');
+      
+      // Refrescar widgets tras cambiar las cuotas
+      await widget_service.WidgetService.updateNextPaymentWidget();
+      await widget_service.WidgetService.updateUpcomingPaymentsWidget();
+    } catch (e) {
+      developer.log('🔥 Error al actualizar progreso de cuotas: $e', name: 'TransactionRepository');
+      throw Exception('No se pudo actualizar el progreso de la cuota.');
+    }
+  }
 
   /// Actualiza una transacción existente.
   Future<void> updateTransaction({
@@ -161,6 +193,10 @@ Future<void> payInstallment({
         'p_new_transaction_date': transactionDate.toIso8601String(),
       });
       developer.log('✅ [Repo] Transacción $transactionId actualizada con éxito vía RPC.', name: 'TransactionRepository');
+      
+      // Refrescar widgets tras actualizar una transacción (por si es cuota)
+      await widget_service.WidgetService.updateNextPaymentWidget();
+      await widget_service.WidgetService.updateUpcomingPaymentsWidget();
     } catch (e) {
       developer.log('🔥 Error al actualizar transacción vía RPC: $e', name: 'TransactionRepository');
       throw Exception('No se pudo actualizar la transacción.');
@@ -171,6 +207,11 @@ Future<void> payInstallment({
   Future<void> deleteTransaction(int transactionId) async {
     try {
       await client.from('transactions').delete().eq('id', transactionId);
+      developer.log('✅ Transacción eliminada: $transactionId', name: 'TransactionRepository');
+      
+      // Refrescar widgets tras eliminar una transacción
+      await widget_service.WidgetService.updateNextPaymentWidget();
+      await widget_service.WidgetService.updateUpcomingPaymentsWidget();
     } catch (e) {
       developer.log('🔥 Error al eliminar transacción: $e', name: 'TransactionRepository');
       throw Exception('No se pudo eliminar la transacción.');

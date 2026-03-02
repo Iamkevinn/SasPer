@@ -22,6 +22,7 @@ import 'package:sasper/screens/debts_screen.dart';
 import 'package:sasper/screens/goals_screen.dart';
 import 'package:sasper/screens/recurring_transactions_screen.dart';
 import 'package:sasper/screens/free_trials_screen.dart'; // Asegúrate de que la ruta sea correcta
+import 'package:sasper/screens/pending_payments_screen.dart';
 
 // ── Tokens ────────────────────────────────────────────────────────────────────
 class _T {
@@ -135,6 +136,14 @@ class _PlanningHubScreenState extends State<PlanningHubScreen>
           title: 'Gastos Fijos',
           subtitle: 'Automatiza ingresos y egresos',
           destination: const RecurringTransactionsScreen(),
+        ),
+         // ─── NUEVO ACCESO: PAGOS PENDIENTES ───
+        const _Item(
+          icon: Iconsax.task_square,
+          iconColor: Color(0xFF5856D6), // iOS Indigo
+          title: 'Pagos Pendientes',
+          subtitle: 'Confirma tus cuotas y suscripciones',
+          destination: PendingPaymentsScreen(),
         ),
       ],
     ),
