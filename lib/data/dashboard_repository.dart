@@ -24,6 +24,7 @@ class DashboardRepository {
   DashboardData? _lastKnownData;
   bool _isFetching = false;
   Timer? _realtimeDebounceTimer;
+  DashboardData? get currentData => _lastKnownData; 
 
   DashboardRepository._privateConstructor();
   static final DashboardRepository instance = DashboardRepository._privateConstructor();
@@ -157,6 +158,7 @@ class DashboardRepository {
       };
 
       DashboardData fullData = partialData.copyWithDetails(detailsDataMap);
+      _lastKnownData = fullData; 
 
       if (!_dashboardDataController.isClosed) {
         _dashboardDataController.add(fullData);

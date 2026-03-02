@@ -46,11 +46,14 @@ class DashboardData extends Equatable {
   final double availableBalance; // Disponible Real (Operativo)
   final double totalDebt;       // Pasivos Totales
   
-  // --- 👇 NUEVAS VARIABLES DE DESGLOSE ---
+  // --- VARIABLES DE DESGLOSE ---
   final double savingsBalance;   // Dinero en Metas (Voluntario)
   final double obligatedBalance; // Dinero de Préstamos Restringidos (Obligatorio)
   final double netWorth;         // Patrimonio Neto (Activos - Pasivos)
-  // ---------------------------------------
+  
+  // --- 👇 NUEVA VARIABLE PARA PRUEBAS GRATUITAS ---
+  final double monthlyIncome;    // Ingresos del mes actual
+  // ----------------------------------------------
 
   final String fullName;
   final double healthScore;
@@ -64,16 +67,16 @@ class DashboardData extends Equatable {
   final List<CategorySpending> categorySpendingSummary;
   final double monthlyProjection;
 
-  // Getter auxiliar para compatibilidad si usabas restrictedBalance antes
   double get restrictedBalance => savingsBalance + obligatedBalance;
 
   const DashboardData({
     required this.totalBalance,
     required this.availableBalance,
-    required this.savingsBalance,   // NUEVO
-    required this.obligatedBalance, // NUEVO
-    required this.netWorth,         // NUEVO
+    required this.savingsBalance,
+    required this.obligatedBalance,
+    required this.netWorth,
     required this.totalDebt,
+    this.monthlyIncome = 0.0, // 👈 Inicializamos
     required this.fullName,
     required this.healthScore,
     required this.alerts,
@@ -95,10 +98,11 @@ class DashboardData extends Equatable {
       totalBalance: tBalance,
       availableBalance: tBalance,
       
-      savingsBalance: 0.0,    // Inicializar en 0
-      obligatedBalance: 0.0,  // Inicializar en 0
-      netWorth: tBalance,     // Inicialmente Patrimonio = Activos (asumiendo deuda 0)
+      savingsBalance: 0.0,
+      obligatedBalance: 0.0,
+      netWorth: tBalance,
       totalDebt: 0.0,
+      monthlyIncome: (map['monthly_income'] as num?)?.toDouble() ?? 0.0, // 👈 Leemos del mapa inicial
       
       healthScore: (map['health_score'] as num?)?.toDouble() ?? 0.0,
       monthlyProjection: (map['monthly_projection'] as num?)?.toDouble() ?? 0.0,
@@ -122,12 +126,13 @@ class DashboardData extends Equatable {
       fullName: fullName,
       totalBalance: totalBalance,
       
-      // Mapeamos los nuevos campos
       availableBalance: (map['available_balance'] as num?)?.toDouble() ?? availableBalance,
       savingsBalance: (map['savings_balance'] as num?)?.toDouble() ?? savingsBalance,
       obligatedBalance: (map['obligated_balance'] as num?)?.toDouble() ?? obligatedBalance,
       netWorth: (map['net_worth'] as num?)?.toDouble() ?? netWorth,
       totalDebt: (map['total_debt'] as num?)?.toDouble() ?? totalDebt,
+      
+      monthlyIncome: monthlyIncome, // 👈 Mantenemos el valor que ya teníamos (o lo actualizamos si viniera en map)
       
       healthScore: (map['health_score'] as num?)?.toDouble() ?? healthScore,
       monthlyProjection: (map['monthly_projection'] as num?)?.toDouble() ?? monthlyProjection,
@@ -163,6 +168,7 @@ class DashboardData extends Equatable {
       obligatedBalance: 0.0,
       netWorth: 0.0,
       totalDebt: 0.0,
+      monthlyIncome: 0.0, // 👈
       fullName: 'Cargando...',
       healthScore: 0.0,
       monthlyProjection: 0.0,
@@ -180,10 +186,11 @@ class DashboardData extends Equatable {
   DashboardData copyWith({
     double? totalBalance,
     double? availableBalance,
-    double? savingsBalance,   // NUEVO
-    double? obligatedBalance, // NUEVO
-    double? netWorth,         // NUEVO
+    double? savingsBalance,
+    double? obligatedBalance,
+    double? netWorth,
     double? totalDebt,
+    double? monthlyIncome, // 👈
     String? fullName,
     double? healthScore,
     List<DashboardAlert>? alerts,
@@ -203,6 +210,7 @@ class DashboardData extends Equatable {
       obligatedBalance: obligatedBalance ?? this.obligatedBalance,
       netWorth: netWorth ?? this.netWorth,
       totalDebt: totalDebt ?? this.totalDebt,
+      monthlyIncome: monthlyIncome ?? this.monthlyIncome, // 👈
       fullName: fullName ?? this.fullName,
       healthScore: healthScore ?? this.healthScore,
       alerts: alerts ?? this.alerts,
@@ -225,6 +233,7 @@ class DashboardData extends Equatable {
         obligatedBalance,
         netWorth,
         totalDebt,
+        monthlyIncome, // 👈
         fullName,
         healthScore,
         alerts,
