@@ -1,212 +1,241 @@
-import 'dart:ui' as ui;
-import 'package:confetti/confetti.dart';
+// lib/screens/add_budget_screen.dart
+// ─────────────────────────────────────────────────────────────────────────────
+// SASPER · Nuevo Presupuesto — Apple-first redesign
+//
+// Eliminado:
+// · SliverAppBar.large + FlexibleSpaceBar + LinearGradient → header blur sticky
+// · _HeroSummaryCardDelegate SliverPersistentHeader 90px fijo → preview inline
+// · _pulseController 1500ms repeat en ícono de categoría → eliminado
+// · _confettiController + _ConfettiCelebration → HapticFeedback + pop inmediato
+// · _successAnimController + Transform.scale botón → _SaveBtn patrón
+// · AnimatedContainer morphing (width:64/infinity) → _SaveBtn patrón
+// · LinearGradient + BoxShadow en botón → _kBlue sólido
+// · .animate().slideY(begin:2, delay:500ms) en botón → visible inmediatamente
+// · Future.delayed(800ms) artificial → eliminado
+// · _isSuccess + Future.delayed(1800ms) → pop inmediato + NotificationHelper
+// · _showHelpDialog() AlertDialog Material → eliminado
+// · _buildSectionHeader × 3 con subtítulos obvios → _GroupLabel 11px uppercase
+// · _AIInsightCard emojis + suggestedMin/Max falsos (avgSpending * 0.14/0.20)
+//   → _InsightCard con solo datos reales: % del historial de la categoría
+// · _FinancialHealthBar values hardcoded 0.9/0.6/0.3 → valor real calculado
+// · _ImpactPreviewCard duplica el insight → unificada con _InsightCard
+// · _PeriodicityPill LinearGradient + Border + BoxShadow → _SegmentedControl
+// · _buildCustomDateSelector InkWell + LinearGradient → GestureDetector limpio
+// · _buildCategorySelector InkWell + LinearGradient + Border variable → limpio
+// · _CategoryTile RadialGradient + Border.all(width:2) → borderRadius + color
+// · GridView 4 columnas en sheet → lista vertical con promedio histórico inline
+// · _isDataLoading oculta TODO el formulario → formulario inmediato, skeleton
+// · _amountController text:'0' → text:'' (campo empieza vacío)
+// · GoogleFonts.poppins + .inter → _T tokens DM Sans
+// ─────────────────────────────────────────────────────────────────────────────
+
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
+import 'dart:developer' as developer;
+
 import 'package:sasper/data/budget_repository.dart';
 import 'package:sasper/data/category_repository.dart';
+import 'package:sasper/data/analysis_repository.dart';
 import 'package:sasper/models/category_model.dart';
+import 'package:sasper/models/analysis_models.dart';
 import 'package:sasper/services/event_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import 'dart:developer' as developer;
-import 'package:sasper/data/analysis_repository.dart'; // <-- CAMBIO: Añadir importación
-import 'package:sasper/models/analysis_models.dart';
-
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 
+// ── Enums ───────────────────────────────────────────────────────────────────
 enum Periodicity { weekly, monthly, custom }
 
-enum FinancialHealth { critical, medium, high }
+// ── Tokens ──────────────────────────────────────────────────────────────────
+class _T {
+  static TextStyle display(double s,
+          {Color? c, FontWeight w = FontWeight.w700}) =>
+      GoogleFonts.dmSans(
+          fontSize: s, fontWeight: w, color: c,
+          letterSpacing: -0.4, height: 1.1);
+
+  static TextStyle label(double s,
+          {Color? c, FontWeight w = FontWeight.w500}) =>
+      GoogleFonts.dmSans(fontSize: s, fontWeight: w, color: c);
+
+  static TextStyle mono(double s,
+          {Color? c, FontWeight w = FontWeight.w600}) =>
+      GoogleFonts.dmMono(fontSize: s, fontWeight: w, color: c);
+}
+
+// ── Paleta iOS ───────────────────────────────────────────────────────────────
+const _kBlue   = Color(0xFF0A84FF);
+const _kGreen  = Color(0xFF30D158);
+const _kRed    = Color(0xFFFF453A);
+const _kOrange = Color(0xFFFF9F0A);
+
+// ── Formato moneda ───────────────────────────────────────────────────────────
+final _fmt = NumberFormat.currency(
+    locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+
+String _fmtShort(double v) {
+  if (v >= 1000000) return '\$${(v / 1000000).toStringAsFixed(1)}M';
+  if (v >= 1000)    return '\$${(v / 1000).toStringAsFixed(0)}K';
+  return '\$${v.toStringAsFixed(0)}';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCREEN
+// ─────────────────────────────────────────────────────────────────────────────
 
 class AddBudgetScreen extends StatefulWidget {
   const AddBudgetScreen({super.key});
-
-  @override
-  State<AddBudgetScreen> createState() => _AddBudgetScreenState();
+  @override State<AddBudgetScreen> createState() => _AddBudgetScreenState();
 }
 
 class _AddBudgetScreenState extends State<AddBudgetScreen>
-    with TickerProviderStateMixin {
-  final BudgetRepository _budgetRepository = BudgetRepository.instance;
-  final CategoryRepository _categoryRepository = CategoryRepository.instance;
-  final _formKey = GlobalKey<FormState>();
-  final _amountController = TextEditingController(text: '0');
-  late ConfettiController _confettiController;
-  late AnimationController _successAnimController;
-  late AnimationController _pulseController;
-  final AnalysisRepository _analysisRepository = AnalysisRepository.instance;
+    with SingleTickerProviderStateMixin {
+  final _budgetRepo   = BudgetRepository.instance;
+  final _categoryRepo = CategoryRepository.instance;
+  final _analysisRepo = AnalysisRepository.instance;
+  final _formKey      = GlobalKey<FormState>();
+  final _amountCtrl   = TextEditingController();   // empieza vacío — no '0'
 
-  Category? _selectedCategory;
-  Periodicity _selectedPeriodicity = Periodicity.monthly;
-  DateTime _startDate = DateTime.now();
-  DateTime _endDate = DateTime.now();
-  bool _isLoading = false;
-  bool _isSuccess = false;
+  Category?   _selectedCategory;
+  Periodicity _periodicity = Periodicity.monthly;
+  DateTime    _startDate   = DateTime.now();
+  DateTime    _endDate     = DateTime.now();
+  bool        _loading     = false;
 
-  // --- VARIABLES DE ESTADO PARA DATOS REALES ---
-  AnalysisData?
-      _analysisData; // <-- NUEVO: Almacenará todos los datos de análisis
-  double _realHistoricalAvgForCategory =
-      0.0; // <-- NUEVO: Promedio para la categoría seleccionada
-  bool _isDataLoading =
-      true; // <-- NUEVO: Para controlar el estado de carga inicial
+  // Datos reales de análisis
+  AnalysisData? _analysisData;
+  bool          _analysisLoading = true;
+  double        _categoryHistAvg = 0.0;
 
+  // Categorías
   late Future<List<Category>> _categoriesFuture;
+
+  // Fade-in único
+  late final AnimationController _fadeCtrl = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 280));
+  late final Animation<double> _fadeAnim =
+      CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
 
   @override
   void initState() {
     super.initState();
-    _categoriesFuture = _categoryRepository.getExpenseCategories();
-    _confettiController =
-        ConfettiController(duration: const Duration(milliseconds: 2));
-    _successAnimController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..repeat(reverse: true);
-    _loadAnalysisData();
-    _calculateDatesForPeriodicity(Periodicity.monthly);
-    _amountController.addListener(() => setState(() {}));
-  }
-
-  // <-- NUEVO: Método para cargar los datos de análisis una sola vez -->
-  Future<void> _loadAnalysisData() async {
-    // Llama al método que ya tienes, que es súper eficiente.
-    final data = await _analysisRepository.fetchAllAnalysisData();
-    if (mounted) {
-      setState(() {
-        _analysisData = data;
-        _isDataLoading = false;
-      });
-    }
-  }
-
-  // <-- CAMBIO: Modificamos el método que se ejecuta al seleccionar una categoría -->
-  void _onCategorySelected(Category category) {
-    HapticFeedback.mediumImpact();
-
-    // Cerramos el selector
-    Navigator.pop(context);
-
-    // Buscamos el promedio en los datos que ya tenemos cargados
-    double foundAverage = 0.0;
-    if (_analysisData != null) {
-      final categoryAverage = _analysisData!.categoryAverages.firstWhere(
-        (avg) => avg.categoryName == category.name,
-        orElse: () =>
-            const CategoryAverageResult(categoryName: '', averageAmount: 0),
-      );
-      foundAverage = categoryAverage.averageAmount;
-    }
-
-    setState(() {
-      _selectedCategory = category;
-      _realHistoricalAvgForCategory = foundAverage;
-    });
+    _fadeCtrl.forward();
+    _categoriesFuture = _categoryRepo.getExpenseCategories();
+    _calculateDates(Periodicity.monthly);
+    _loadAnalysis();
+    _amountCtrl.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
-    _amountController.dispose();
-    _confettiController.dispose();
-    _successAnimController.dispose();
-    _pulseController.dispose();
+    _amountCtrl.dispose();
+    _fadeCtrl.dispose();
     super.dispose();
   }
 
-  void _calculateDatesForPeriodicity(Periodicity period) {
+  // ── Datos reales ──────────────────────────────────────────────────────────
+
+  Future<void> _loadAnalysis() async {
+    final data = await _analysisRepo.fetchAllAnalysisData();
+    if (mounted) setState(() { _analysisData = data; _analysisLoading = false; });
+  }
+
+  void _onCategorySelected(Category cat) {
+    HapticFeedback.selectionClick();
+    Navigator.pop(context);
+
+    double avg = 0.0;
+    if (_analysisData != null) {
+      final r = _analysisData!.categoryAverages.firstWhere(
+        (a) => a.categoryName == cat.name,
+        orElse: () => const CategoryAverageResult(
+            categoryName: '', averageAmount: 0),
+      );
+      avg = r.averageAmount;
+    }
+
+    setState(() {
+      _selectedCategory  = cat;
+      _categoryHistAvg   = avg;
+    });
+  }
+
+  // ── Fechas ────────────────────────────────────────────────────────────────
+
+  void _calculateDates(Periodicity p) {
     final now = DateTime.now();
     setState(() {
-      _selectedPeriodicity = period;
-      if (period == Periodicity.weekly) {
-        _startDate = now.subtract(Duration(days: now.weekday - 1));
-        _endDate = now.add(Duration(days: DateTime.daysPerWeek - now.weekday));
-      } else if (period == Periodicity.monthly) {
-        _startDate = DateTime(now.year, now.month, 1);
-        _endDate = DateTime(now.year, now.month + 1, 0);
+      _periodicity = p;
+      switch (p) {
+        case Periodicity.weekly:
+          _startDate = now.subtract(Duration(days: now.weekday - 1));
+          _endDate   = now.add(Duration(days: 7 - now.weekday));
+        case Periodicity.monthly:
+          _startDate = DateTime(now.year, now.month, 1);
+          _endDate   = DateTime(now.year, now.month + 1, 0);
+        case Periodicity.custom:
+          break; // fechas se seleccionan con datepicker
       }
     });
   }
 
-  Future<void> _selectDateRange() async {
+  Future<void> _pickDateRange() async {
     final picked = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2101),
-      initialDateRange: DateTimeRange(start: _startDate, end: _endDate),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            dialogBackgroundColor: Colors.transparent,
-          ),
-          child: child!,
-        );
-      },
+      context:            context,
+      firstDate:          DateTime(2020),
+      lastDate:           DateTime(2101),
+      initialDateRange:   DateTimeRange(start: _startDate, end: _endDate),
     );
     if (picked != null) {
-      HapticFeedback.mediumImpact();
-      setState(() {
-        _startDate = picked.start;
-        _endDate = picked.end;
-      });
+      HapticFeedback.selectionClick();
+      setState(() { _startDate = picked.start; _endDate = picked.end; });
     }
   }
 
-  Future<void> _saveBudget() async {
-    HapticFeedback.mediumImpact();
+  // ── Save ──────────────────────────────────────────────────────────────────
 
-    if (!_formKey.currentState!.validate()) {
-      HapticFeedback.heavyImpact();
-      return;
-    }
+  Future<void> _save() async {
+    FocusScope.of(context).unfocus();
+
     if (_selectedCategory == null) {
       HapticFeedback.heavyImpact();
       NotificationHelper.show(
-          message: 'Por favor, selecciona una categoría.',
+          message: 'Selecciona una categoría primero.',
           type: NotificationType.error);
       return;
     }
+    if (!_formKey.currentState!.validate()) {
+      HapticFeedback.heavyImpact(); return;
+    }
 
-    setState(() => _isLoading = true);
+    setState(() => _loading = true);
 
     try {
-      await Future.delayed(
-          const Duration(milliseconds: 800)); // Simular guardado
+      final amount = double.parse(
+          _amountCtrl.text.replaceAll(RegExp(r'[^0-9]'), ''));
 
-      await _budgetRepository.addBudget(
+      await _budgetRepo.addBudget(
         categoryName: _selectedCategory!.name,
-        amount: double.parse(
-            _amountController.text.replaceAll(RegExp(r'[^0-9]'), '')),
-        startDate: _startDate,
-        endDate: _endDate,
-        periodicity: _selectedPeriodicity.name,
+        amount:       amount,
+        startDate:    _startDate,
+        endDate:      _endDate,
+        periodicity:  _periodicity.name,
       );
 
       if (mounted) {
-        setState(() => _isSuccess = true);
         HapticFeedback.heavyImpact();
-        _successAnimController.forward();
-        _confettiController.play();
         EventService.instance.fire(AppEvent.budgetsChanged);
-
-        await Future.delayed(const Duration(milliseconds: 1800));
-        if (mounted) Navigator.of(context).pop(true);
-
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          NotificationHelper.show(
-              message: '¡Presupuesto creado con éxito! 🎉',
-              type: NotificationType.success);
-        });
+        Navigator.of(context).pop(true);
+        NotificationHelper.show(
+            message: 'Presupuesto creado',
+            type: NotificationType.success);
       }
     } catch (e) {
-      developer.log('🔥 FALLO AL CREAR PRESUPUESTO: $e',
-          name: 'AddBudgetScreen');
+      developer.log('Error al crear presupuesto: $e', name: 'AddBudgetScreen');
       if (mounted) {
         HapticFeedback.heavyImpact();
         NotificationHelper.show(
@@ -214,1141 +243,865 @@ class _AddBudgetScreenState extends State<AddBudgetScreen>
             type: NotificationType.error);
       }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
-  // 🤖 IA: Cálculo de salud financiera
-FinancialHealth _calculateFinancialHealth(double amount, double averageMonthlyFlow) { // <-- CAMBIO: Añadimos un parámetro
-  // Prevenimos una división por cero si el usuario no tiene historial.
-  if (averageMonthlyFlow <= 0) {
-    return FinancialHealth.high; // Un presupuesto sin historial de gastos es "saludable" por defecto.
+  // ── Category sheet ────────────────────────────────────────────────────────
+
+  void _openCategorySheet(List<Category> cats) {
+    HapticFeedback.mediumImpact();
+    showModalBottomSheet(
+      context:            context,
+      isScrollControlled: true,
+      backgroundColor:    Colors.transparent,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        maxChildSize:     0.92,
+        expand:           false,
+        builder: (_, ctrl) => _CategorySheet(
+          categories:          cats,
+          scrollController:    ctrl,
+          analysisData:        _analysisData,
+          onCategorySelected:  _onCategorySelected,
+        ),
+      ),
+    );
   }
-  
-  final percentage = (amount / averageMonthlyFlow) * 100; // <-- CAMBIO: Usamos el parámetro con datos reales
-  
-  if (percentage > 40) return FinancialHealth.critical;
-  if (percentage > 20) return FinancialHealth.medium;
-  return FinancialHealth.high;
-}
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // BUILD
+  // ─────────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
-    final double amount = double.tryParse(
-            _amountController.text.replaceAll(RegExp(r'[^0-9]'), '')) ??
-        0;
-    final double realAvgMonthlySpending =
+    final theme   = Theme.of(context);
+    final onSurf  = theme.colorScheme.onSurface;
+    final statusH = MediaQuery.of(context).padding.top;
+    final bottomP = MediaQuery.of(context).viewInsets.bottom;
+    final amount  = double.tryParse(
+        _amountCtrl.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0.0;
+    final avgSpending =
         _analysisData?.monthlyAverage.averageSpending ?? 0.0;
+    final dateF = DateFormat('d MMM', 'es_CO');
 
-    return Stack(
-      children: [
-        Scaffold(
-          extendBodyBehindAppBar: true,
-          body: CustomScrollView(
-            slivers: [
-              _buildGlassAppBar(),
-              SliverPersistentHeader(
-                pinned: true,
-                delegate: _HeroSummaryCardDelegate(
-                  category: _selectedCategory,
-                  amount: amount,
-                  periodicity: _selectedPeriodicity,
-                  startDate: _startDate,
-                  endDate: _endDate,
-                  pulseController: _pulseController,
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: _isDataLoading
-                    ? const Center(child: Padding(padding: EdgeInsets.all(40.0), child: CircularProgressIndicator())) // <-- NUEVO: Loader inicial
-                : Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 24),
-
-                        // 🤖 IA INSIGHT CARD
-                        _AIInsightCard(
-                          amount: amount,
-                          // Usamos el gasto promedio real como base para el análisis
-                          avgIncome: realAvgMonthlySpending > 0
-                              ? realAvgMonthlySpending
-                              : 1.0, // <-- DATO REAL
-                          historicalAvg: _realHistoricalAvgForCategory,
-                        ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.2),
-
-                        const SizedBox(height: 32),
-                        _buildSectionHeader('Periodicidad',
-                            'Elige la frecuencia de tu presupuesto.'),
-                        const SizedBox(height: 16),
-                        _buildPeriodicitySelector(),
-
-                        AnimatedSize(
-                          duration: const Duration(milliseconds: 400),
-                          curve: Curves.easeOutCubic,
-                          child: _selectedPeriodicity == Periodicity.custom
-                              ? _buildCustomDateSelector()
-                                  .animate()
-                                  .fadeIn(duration: 300.ms)
-                                  .slideY(begin: -0.1)
-                              : const SizedBox.shrink(),
-                        ),
-
-                        const SizedBox(height: 32),
-                        _buildSectionHeader('Categoría',
-                            'Selecciona la categoría a presupuestar.'),
-                        const SizedBox(height: 16),
-                        _buildCategorySelector(),
-
-                        const SizedBox(height: 32),
-                        _buildSectionHeader(
-                            'Monto', 'Define el límite para este período.'),
-                        const SizedBox(height: 16),
-                        _AmountInputField(controller: _amountController),
-
-                        const SizedBox(height: 24),
-
-                        // 🎯 BARRA DE PROGRESO INTELIGENTE
-                        _FinancialHealthBar(
-                          amount: amount,
-                          health: _calculateFinancialHealth(amount,realAvgMonthlySpending),
-                        ).animate().fadeIn(delay: 300.ms),
-
-                        const SizedBox(height: 32),
-                        _ImpactPreviewCard(
-                          amount: amount,
-                          avgSpending: _realHistoricalAvgForCategory,
-                        ),
-
-                        const SizedBox(height: 140),
-                      ],
-                    ),
-                  ),
-                ),
-              )
-            ],
-          ),
-        ),
-        _buildAdaptiveSaveButton(),
-        _ConfettiCelebration(
-          controller: _confettiController,
-          category: _selectedCategory,
-        ),
-      ],
-    );
-  }
-
-  // --- GLASSMORPHISM APP BAR ---
-  Widget _buildGlassAppBar() {
-    return SliverAppBar.large(
-      expandedHeight: 120,
-      floating: false,
-      pinned: true,
-      backgroundColor: Colors.transparent,
-      flexibleSpace: ClipRRect(
-        child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Theme.of(context).colorScheme.surface.withOpacity(0.7),
-                  Theme.of(context).colorScheme.surface.withOpacity(0.5),
-                ],
+    return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      resizeToAvoidBottomInset: true,
+      body: FadeTransition(
+        opacity: _fadeAnim,
+        child: Column(children: [
+          // ── Header blur sticky ─────────────────────────────────────────
+          ClipRect(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+              child: Container(
+                color: theme.scaffoldBackgroundColor.withOpacity(0.93),
+                padding: EdgeInsets.only(
+                    top: statusH + 10, left: 8,
+                    right: 20, bottom: 14),
+                child: Row(children: [
+                  _BackBtn(),
+                  const SizedBox(width: 4),
+                  Expanded(child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('SASPER',
+                          style: _T.label(10,
+                              w: FontWeight.w700,
+                              c: onSurf.withOpacity(0.35))),
+                      Text('Nuevo presupuesto',
+                          style: _T.display(28, c: onSurf)),
+                    ],
+                  )),
+                ]),
               ),
             ),
-            child: FlexibleSpaceBar(
-              title: Text(
-                'Nuevo Presupuesto',
-                style: GoogleFonts.poppins(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 24,
-                ),
+          ),
+
+          // ── Preview compacto del presupuesto ──────────────────────────
+          // Visible solo cuando hay categoría seleccionada.
+          // Sin SliverPersistentHeader, sin pulsación, sin gradientes.
+          AnimatedSize(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOut,
+            child: _selectedCategory != null
+                ? _BudgetPreview(
+                    category:  _selectedCategory!,
+                    amount:    amount,
+                    period:    _periodicity,
+                    startDate: _startDate,
+                    endDate:   _endDate,
+                  )
+                : const SizedBox.shrink(),
+          ),
+
+          // ── Scroll ────────────────────────────────────────────────────
+          Expanded(
+            child: ListView(
+              physics: const BouncingScrollPhysics(),
+              padding: EdgeInsets.only(
+                left: 20, right: 20, top: 24,
+                bottom: bottomP > 0 ? bottomP + 100 : 120,
               ),
-              centerTitle: false,
-              titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
-            ),
-          ),
-        ),
-      ),
-      actions: [
-        IconButton(
-          icon: const Icon(Iconsax.info_circle),
-          onPressed: () {
-            HapticFeedback.lightImpact();
-            _showHelpDialog();
-          },
-          tooltip: '¿Qué es un presupuesto?',
-        )
-      ],
-    );
-  }
-
-  void _showHelpDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('💡 Presupuestos Inteligentes',
-            style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
-        content: Text(
-          'Un presupuesto es tu aliado para mantener el control financiero. '
-          'La IA de Sasper analiza tus patrones y te sugiere montos saludables basados en tus ingresos.',
-          style: GoogleFonts.inter(),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Entendido'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionHeader(String title, String subtitle) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title,
-            style:
-                GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 4),
-        Text(subtitle,
-            style: GoogleFonts.inter(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                fontSize: 14)),
-      ],
-    );
-  }
-
-  Widget _buildPeriodicitySelector() {
-    return Row(
-      children: Periodicity.values.map((period) {
-        return Expanded(
-          child: _PeriodicityPill(
-            label: period.name
-                .replaceFirst(period.name[0], period.name[0].toUpperCase()),
-            icon: period == Periodicity.weekly
-                ? Iconsax.calendar_1
-                : period == Periodicity.monthly
-                    ? Iconsax.calendar
-                    : Iconsax.setting_4,
-            isSelected: _selectedPeriodicity == period,
-            onTap: () {
-              HapticFeedback.selectionClick();
-              _calculateDatesForPeriodicity(period);
-            },
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildCustomDateSelector() {
-    final dateFormat = DateFormat.yMMMd('es_CO');
-    return Padding(
-      padding: const EdgeInsets.only(top: 16.0),
-      child: InkWell(
-        onTap: _selectDateRange,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            gradient: LinearGradient(
-              colors: [
-                Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
-                Theme.of(context).colorScheme.surfaceContainer,
-              ],
-            ),
-            border: Border.all(
-              color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
-            ),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Icon(Iconsax.calendar_edit, size: 24),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Text(
-                    '${dateFormat.format(_startDate)} - ${dateFormat.format(_endDate)}',
-                    style: GoogleFonts.inter(
-                        fontWeight: FontWeight.w600, fontSize: 15),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ),
-              Icon(Iconsax.arrow_right_3,
-                  color: Theme.of(context).colorScheme.primary),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCategorySelector() {
-    return FutureBuilder<List<Category>>(
-      future: _categoriesFuture,
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        return InkWell(
-          onTap: () {
-            HapticFeedback.mediumImpact();
-            _showCategoryPicker(snapshot.data ?? []);
-          },
-          borderRadius: BorderRadius.circular(20),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              gradient: LinearGradient(
-                colors: [
-                  (_selectedCategory?.colorAsObject ??
-                          Theme.of(context).colorScheme.primary)
-                      .withOpacity(0.05),
-                  Theme.of(context).colorScheme.surfaceContainer,
-                ],
-              ),
-              border: Border.all(
-                color: _selectedCategory?.colorAsObject.withOpacity(0.3) ??
-                    Theme.of(context).colorScheme.outline.withOpacity(0.2),
-                width: 1.5,
-              ),
-            ),
-            child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: (_selectedCategory?.colorAsObject ??
-                            Theme.of(context).colorScheme.primary)
-                        .withOpacity(0.1),
-                  ),
-                  child: Icon(
-                    _selectedCategory?.icon ?? Iconsax.category,
-                    color: _selectedCategory?.colorAsObject ??
-                        Theme.of(context).colorScheme.primary,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Text(
-                    _selectedCategory?.name ?? 'Selecciona una categoría',
-                    style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: _selectedCategory != null
-                            ? FontWeight.w600
-                            : FontWeight.normal),
-                  ),
-                ),
-                Icon(Iconsax.arrow_down_1,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
+                Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
 
-  void _showCategoryPicker(List<Category> categories) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.6,
-          maxChildSize: 0.9,
-          expand: false,
-          builder: (_, controller) {
-            return _CategoryPickerSheet(
-              categories: categories,
-              scrollController: controller,
-              // Usamos el nuevo método centralizado
-              onCategorySelected: _onCategorySelected,
-            );
-          },
-        );
-      },
-    );
-  }
+                      // ── Periodicidad ─────────────────────────────────
+                      _GroupLabel('PERIODICIDAD'),
+                      const SizedBox(height: 10),
+                      _PeriodicityControl(
+                        selected:  _periodicity,
+                        onChanged: (p) {
+                          HapticFeedback.selectionClick();
+                          _calculateDates(p);
+                        },
+                      ),
 
-  // 🚀 BOTÓN ADAPTIVO CON ANIMACIONES AVANZADAS
-  Widget _buildAdaptiveSaveButton() {
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
-        child: AnimatedBuilder(
-          animation: _successAnimController,
-          builder: (context, child) {
-            return Transform.scale(
-              scale:
-                  _isSuccess ? 1.0 + (_successAnimController.value * 0.1) : 1.0,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 400),
-                curve: Curves.easeOutCubic,
-                width: _isLoading ? 64 : double.infinity,
-                height: 64,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(_isLoading ? 32 : 20),
-                  gradient: LinearGradient(
-                    colors: _isSuccess
-                        ? [Colors.green.shade400, Colors.green.shade600]
-                        : [
-                            Theme.of(context).colorScheme.primary,
-                            Theme.of(context)
-                                .colorScheme
-                                .primary
-                                .withOpacity(0.8),
-                          ],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: (_isSuccess
-                              ? Colors.green
-                              : Theme.of(context).colorScheme.primary)
-                          .withOpacity(0.4),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: (_isLoading || _isSuccess) ? null : _saveBudget,
-                    borderRadius: BorderRadius.circular(_isLoading ? 32 : 20),
-                    child: Center(
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 300),
-                        child: _isLoading
-                            ? const SizedBox(
-                                height: 28,
-                                width: 28,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 3,
+                      // Selector de fechas custom
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 220),
+                        curve: Curves.easeOut,
+                        child: _periodicity == Periodicity.custom
+                            ? Padding(
+                                padding: const EdgeInsets.only(top: 10),
+                                child: _DateRangeTile(
+                                  startDate: _startDate,
+                                  endDate:   _endDate,
+                                  onTap:     _pickDateRange,
                                 ),
                               )
-                            : _isSuccess
-                                ? const Icon(Iconsax.tick_circle5,
-                                    color: Colors.white, size: 32)
-                                : Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Icon(Iconsax.save_2,
-                                          color: Colors.white, size: 24),
-                                      const SizedBox(width: 12),
-                                      Text(
-                                        'Crear Presupuesto',
-                                        style: GoogleFonts.poppins(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                            : const SizedBox.shrink(),
                       ),
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
-      ),
-    ).animate().slideY(
-        begin: 2,
-        end: 0,
-        delay: 500.ms,
-        duration: 600.ms,
-        curve: Curves.easeOutCubic);
-  }
-}
+                      const SizedBox(height: 28),
 
-// =============================================================================
-// 🤖 WIDGETS INTELIGENTES CON IA
-// =============================================================================
+                      // ── Categoría ─────────────────────────────────────
+                      _GroupLabel('CATEGORÍA'),
+                      const SizedBox(height: 10),
+                      FutureBuilder<List<Category>>(
+                        future: _categoriesFuture,
+                        builder: (ctx, snap) {
+                          if (!snap.hasData) {
+                            return _SkeletonTile();
+                          }
+                          return _CategoryTrigger(
+                            category: _selectedCategory,
+                            histAvg:  _categoryHistAvg,
+                            onTap:    () =>
+                                _openCategorySheet(snap.data!),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 28),
 
-class _AIInsightCard extends StatelessWidget {
-  final double amount;
-  final double avgIncome;
-  final double historicalAvg;
+                      // ── Monto ─────────────────────────────────────────
+                      _GroupLabel('LÍMITE DEL PERÍODO'),
+                      const SizedBox(height: 10),
+                      _AmountField(controller: _amountCtrl),
+                      const SizedBox(height: 28),
 
-  const _AIInsightCard({
-    required this.amount,
-    required this.avgIncome,
-    required this.historicalAvg,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final percentage = (amount / avgIncome) * 100;
-    final suggestedMin = avgIncome * 0.14;
-    final suggestedMax = avgIncome * 0.20;
-
-    String message;
-    IconData icon;
-    Color color;
-
-    if (amount == 0) {
-      message =
-          '💡 La IA sugiere: Entre ${NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0).format(suggestedMin)} y ${NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0).format(suggestedMax)} es saludable para tus ingresos';
-      icon = Iconsax.lamp_on5;
-      color = Theme.of(context).colorScheme.primary;
-    } else if (percentage > 40) {
-      message =
-          '⚠️ Este presupuesto representa el ${percentage.toStringAsFixed(0)}% de tus ingresos. Considera reducirlo para mantener balance';
-      icon = Iconsax.warning_25;
-      color = Colors.orange;
-    } else if (percentage > 25) {
-      message =
-          '👍 Presupuesto moderado (${percentage.toStringAsFixed(0)}% de ingresos). Estás construyendo estabilidad financiera';
-      icon = Iconsax.shield_tick5;
-      color = Colors.blue;
-    } else {
-      message =
-          '🚀 ¡Excelente decisión! Este presupuesto te acerca a tus metas de independencia financiera';
-      icon = Iconsax.medal_star5;
-      color = Colors.green;
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            color.withOpacity(0.08),
-            color.withOpacity(0.03),
-          ],
-        ),
-        border: Border.all(color: color.withOpacity(0.2), width: 1.5),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: color.withOpacity(0.15),
-            ),
-            child: Icon(icon, color: color, size: 24),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Análisis de IA',
-                  style: GoogleFonts.poppins(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: color,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  message,
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    height: 1.5,
-                    color: Theme.of(context).colorScheme.onSurface,
+                      // ── Insight — solo con categoría + monto reales ──
+                      // Nunca muestra datos inventados.
+                      // Aparece cuando: hay categoría + amount > 0.
+                      // Si no hay historial de la categoría, muestra
+                      // el % sobre el gasto mensual total (también real).
+                      if (_selectedCategory != null && amount > 0)
+                        _InsightSection(
+                          amount:      amount,
+                          histAvg:     _categoryHistAvg,
+                          monthlyAvg:  avgSpending,
+                          isLoading:   _analysisLoading,
+                          categoryName: _selectedCategory!.name,
+                        ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
-        ],
+
+          // ── Botón guardar sticky ───────────────────────────────────────
+          _SaveBtn(loading: _loading, onTap: _save),
+        ]),
       ),
     );
   }
 }
 
-class _FinancialHealthBar extends StatelessWidget {
-  final double amount;
-  final FinancialHealth health;
+// ─────────────────────────────────────────────────────────────────────────────
+// BUDGET PREVIEW — preview compacto sin pulsación
+// ─────────────────────────────────────────────────────────────────────────────
 
-  const _FinancialHealthBar({
-    required this.amount,
-    required this.health,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    Color healthColor;
-    String healthLabel;
-
-    switch (health) {
-      case FinancialHealth.critical:
-        healthColor = Colors.red;
-        healthLabel = 'Crítico';
-        break;
-      case FinancialHealth.medium:
-        healthColor = Colors.orange;
-        healthLabel = 'Moderado';
-        break;
-      case FinancialHealth.high:
-        healthColor = Colors.green;
-        healthLabel = 'Saludable';
-        break;
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Salud Financiera',
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: healthColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: healthColor.withOpacity(0.3)),
-              ),
-              child: Text(
-                healthLabel,
-                style: GoogleFonts.inter(
-                  color: healthColor,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: LinearProgressIndicator(
-            value: health == FinancialHealth.high
-                ? 0.9
-                : health == FinancialHealth.medium
-                    ? 0.6
-                    : 0.3,
-            minHeight: 12,
-            backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
-            valueColor: AlwaysStoppedAnimation<Color>(healthColor),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// =============================================================================
-// HERO CARD CON GLASSMORPHISM
-// =============================================================================
-
-class _HeroSummaryCardDelegate extends SliverPersistentHeaderDelegate {
-  final Category? category;
-  final double amount;
-  final Periodicity periodicity;
-  final DateTime startDate;
-  final DateTime endDate;
-  final AnimationController pulseController;
-
-  _HeroSummaryCardDelegate({
+class _BudgetPreview extends StatelessWidget {
+  final Category  category;
+  final double    amount;
+  final Periodicity period;
+  final DateTime  startDate, endDate;
+  const _BudgetPreview({
     required this.category,
     required this.amount,
-    required this.periodicity,
+    required this.period,
     required this.startDate,
     required this.endDate,
-    required this.pulseController,
-  });
-
-  @override
-  Widget build(
-      BuildContext context, double shrinkOffset, bool overlapsContent) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final currencyFormat =
-        NumberFormat.currency(locale: 'es_CO', symbol: '\$ ', decimalDigits: 0);
-    final dateFormat = DateFormat('d MMM', 'es_CO');
-
-    return ClipRRect(
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                colorScheme.surface.withOpacity(0.9),
-                colorScheme.surface.withOpacity(0.7),
-              ],
-            ),
-            border: Border(
-              bottom: BorderSide(
-                color: colorScheme.outlineVariant.withOpacity(0.3),
-                width: 1,
-              ),
-            ),
-          ),
-          child: Row(
-            children: [
-              AnimatedBuilder(
-                animation: pulseController,
-                builder: (context, child) {
-                  return Transform.scale(
-                    scale: 1.0 + (pulseController.value * 0.05),
-                    child: Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: RadialGradient(
-                          colors: [
-                            (category?.colorAsObject ?? colorScheme.primary)
-                                .withOpacity(0.2),
-                            (category?.colorAsObject ?? colorScheme.primary)
-                                .withOpacity(0.05),
-                          ],
-                        ),
-                        border: Border.all(
-                          color:
-                              (category?.colorAsObject ?? colorScheme.primary)
-                                  .withOpacity(0.3),
-                          width: 2,
-                        ),
-                      ),
-                      child: Icon(
-                        category?.icon ?? Iconsax.category_2,
-                        size: 32,
-                        color: category?.colorAsObject ?? colorScheme.primary,
-                      ),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      currencyFormat.format(amount),
-                      style: GoogleFonts.poppins(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${periodicity.name.toUpperCase()} • ${dateFormat.format(startDate)} - ${dateFormat.format(endDate)}',
-                      style: GoogleFonts.inter(
-                        color: colorScheme.onSurfaceVariant,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    )
-                  ],
-                ),
-              )
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  @override
-  double get maxExtent => 90.0;
-
-  @override
-  double get minExtent => 90.0;
-
-  @override
-  bool shouldRebuild(covariant SliverPersistentHeaderDelegate oldDelegate) =>
-      true;
-}
-
-// =============================================================================
-// PILLS CON MICROINTERACCIONES
-// =============================================================================
-
-class _PeriodicityPill extends StatefulWidget {
-  final String label;
-  final IconData icon;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _PeriodicityPill({
-    required this.label,
-    required this.icon,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  State<_PeriodicityPill> createState() => _PeriodicityPillState();
-}
-
-class _PeriodicityPillState extends State<_PeriodicityPill>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _bounceController;
-  late Animation<double> _bounceAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _bounceController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 200),
-    );
-    _bounceAnimation = Tween<double>(begin: 1.0, end: 0.92).animate(
-      CurvedAnimation(parent: _bounceController, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _bounceController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4.0),
-      child: GestureDetector(
-        onTapDown: (_) => _bounceController.forward(),
-        onTapUp: (_) {
-          _bounceController.reverse();
-          widget.onTap();
-        },
-        onTapCancel: () => _bounceController.reverse(),
-        child: AnimatedBuilder(
-          animation: _bounceAnimation,
-          builder: (context, child) {
-            return Transform.scale(
-              scale: _bounceAnimation.value,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeOutCubic,
-                padding: const EdgeInsets.symmetric(vertical: 18),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  gradient: widget.isSelected
-                      ? LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            colorScheme.primaryContainer,
-                            colorScheme.primaryContainer.withOpacity(0.7),
-                          ],
-                        )
-                      : null,
-                  color:
-                      widget.isSelected ? null : colorScheme.surfaceContainer,
-                  border: Border.all(
-                    color: widget.isSelected
-                        ? colorScheme.primary.withOpacity(0.5)
-                        : colorScheme.outlineVariant.withOpacity(0.3),
-                    width: widget.isSelected ? 2 : 1,
-                  ),
-                  boxShadow: widget.isSelected
-                      ? [
-                          BoxShadow(
-                            color: colorScheme.primary.withOpacity(0.2),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Column(
-                  children: [
-                    Icon(
-                      widget.icon,
-                      color: widget.isSelected
-                          ? colorScheme.primary
-                          : colorScheme.onSurfaceVariant,
-                      size: 28,
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      widget.label,
-                      style: GoogleFonts.inter(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                        color: widget.isSelected
-                            ? colorScheme.primary
-                            : colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-// =============================================================================
-// AMOUNT INPUT
-// =============================================================================
-
-class _AmountInputField extends StatelessWidget {
-  final TextEditingController controller;
-  const _AmountInputField({required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return TextFormField(
-      controller: controller,
-      textAlign: TextAlign.center,
-      style: GoogleFonts.poppins(
-        fontSize: 56,
-        fontWeight: FontWeight.bold,
-        color: colorScheme.primary,
-        letterSpacing: -2,
-      ),
-      keyboardType: const TextInputType.numberWithOptions(decimal: false),
-      inputFormatters: [
-        FilteringTextInputFormatter.digitsOnly,
-        _CurrencyInputFormatter()
-      ],
-      decoration: InputDecoration(
-        border: InputBorder.none,
-        hintText: '\$ 0',
-        hintStyle: GoogleFonts.poppins(
-          fontSize: 56,
-          fontWeight: FontWeight.bold,
-          color: colorScheme.onSurface.withOpacity(0.15),
-          letterSpacing: -2,
-        ),
-      ),
-      validator: (value) {
-        if (value == null || value.isEmpty) return 'Ingresa un monto';
-        final amount = int.tryParse(value.replaceAll(RegExp(r'[^0-9]'), ''));
-        if (amount == null || amount <= 0) return 'Ingresa un monto válido';
-        return null;
-      },
-      onChanged: (_) => HapticFeedback.selectionClick(),
-    );
-  }
-}
-
-class _CurrencyInputFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-      TextEditingValue oldValue, TextEditingValue newValue) {
-    if (newValue.text.isEmpty) return newValue.copyWith(text: '');
-
-    final number =
-        int.tryParse(newValue.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
-    final format =
-        NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
-    final newText = format.format(number);
-
-    return newValue.copyWith(
-      text: newText,
-      selection: TextSelection.collapsed(offset: newText.length),
-    );
-  }
-}
-
-// =============================================================================
-// IMPACT PREVIEW
-// =============================================================================
-
-class _ImpactPreviewCard extends StatelessWidget {
-  final double amount;
-  final double avgSpending;
-  const _ImpactPreviewCard({
-    required this.amount,
-    required this.avgSpending,
   });
 
   @override
   Widget build(BuildContext context) {
-    final percentage = avgSpending > 0 ? (amount / avgSpending) * 100 : 0;
-    final isHigh = percentage > 120;
-    final isLow = percentage < 80;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final onSurf = Theme.of(context).colorScheme.onSurface;
+    final bg     = isDark
+        ? Colors.white.withOpacity(0.06)
+        : Colors.black.withOpacity(0.03);
+    final dateF  = DateFormat('d MMM', 'es_CO');
+    final color  = category.colorAsObject;
 
-    String message;
-    IconData icon;
-    Color color;
-
-    if (amount == 0) {
-      message = 'Define un monto para ver el impacto en tus finanzas';
-      icon = Iconsax.chart_215;
-      color = Theme.of(context).colorScheme.primary;
-    } else if (isHigh) {
-      message =
-          'Este presupuesto es un ${percentage.toStringAsFixed(0)}% más alto que tu promedio histórico. Mantén el control 💪';
-      icon = Iconsax.warning_25;
-      color = Colors.orange;
-    } else if (isLow) {
-      message =
-          '¡Excelente! Estás ${(100 - percentage).toStringAsFixed(0)}% por debajo de tu promedio. Sigue así 🎯';
-      icon = Iconsax.trend_down5;
-      color = Colors.green;
-    } else {
-      message =
-          'Este monto está alineado con tus patrones de gasto. ¡Buen objetivo! 👍';
-      icon = Iconsax.chart_success5;
-      color = Colors.blue;
-    }
+    final periodLabel = switch (period) {
+      Periodicity.weekly  => 'Semanal',
+      Periodicity.monthly => 'Mensual',
+      Periodicity.custom  => 'Personalizado',
+    };
 
     return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: LinearGradient(
-          colors: [
-            color.withOpacity(0.08),
-            color.withOpacity(0.03),
+      color: bg,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: Row(children: [
+        // Ícono sin gradiente ni borde animado
+        Container(
+          width: 38, height: 38,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(11),
+          ),
+          child: Center(child: Icon(category.icon, size: 17, color: color)),
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(category.name,
+                style: _T.label(13, w: FontWeight.w700, c: onSurf)),
+            const SizedBox(height: 1),
+            Text(
+              '$periodLabel · ${dateF.format(startDate)} – ${dateF.format(endDate)}',
+              style: _T.label(11, c: onSurf.withOpacity(0.42))),
           ],
+        )),
+        // Monto — si es 0 muestra placeholder
+        Text(
+          amount > 0 ? _fmt.format(amount) : '—',
+          style: _T.mono(16,
+              c: amount > 0 ? onSurf : onSurf.withOpacity(0.25)),
         ),
-        border: Border.all(
-          color: color.withOpacity(0.2),
-          width: 1.5,
-        ),
-      ),
+      ]),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PERIODICITY CONTROL — segmented control iOS patrón establecido en la app
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _PeriodicityControl extends StatelessWidget {
+  final Periodicity selected;
+  final ValueChanged<Periodicity> onChanged;
+  const _PeriodicityControl({required this.selected, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark  = Theme.of(context).brightness == Brightness.dark;
+    final onSurf  = Theme.of(context).colorScheme.onSurface;
+    final bg      = isDark
+        ? Colors.white.withOpacity(0.10)
+        : Colors.black.withOpacity(0.06);
+    final pillBg  = isDark ? const Color(0xFF2C2C2E) : Colors.white;
+
+    const labels = ['Semanal', 'Mensual', 'Personaliz.'];
+    const values = [Periodicity.weekly, Periodicity.monthly, Periodicity.custom];
+
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+          color: bg, borderRadius: BorderRadius.circular(12)),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: color.withOpacity(0.15),
-            ),
-            child: Icon(icon, color: color, size: 24),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Impacto Proyectado',
-                  style: GoogleFonts.poppins(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: color,
-                  ),
+        children: List.generate(3, (i) {
+          final isSel = selected == values[i];
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => onChanged(values[i]),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(vertical: 9),
+                decoration: BoxDecoration(
+                  color: isSel ? pillBg : Colors.transparent,
+                  borderRadius: BorderRadius.circular(9),
+                  boxShadow: isSel && !isDark
+                      ? [BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 6, offset: const Offset(0, 2))]
+                      : null,
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  message,
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    height: 1.5,
-                  ),
-                ),
-              ],
+                child: Center(child: Text(labels[i],
+                    style: _T.label(13,
+                        w: isSel ? FontWeight.w700 : FontWeight.w500,
+                        c: isSel
+                            ? onSurf
+                            : onSurf.withOpacity(0.45)))),
+              ),
             ),
-          ),
-        ],
+          );
+        }),
       ),
     );
   }
 }
 
-// =============================================================================
-// CATEGORY PICKER SHEET
-// =============================================================================
+// ─────────────────────────────────────────────────────────────────────────────
+// DATE RANGE TILE — selector de rango personalizado
+// ─────────────────────────────────────────────────────────────────────────────
 
-class _CategoryPickerSheet extends StatelessWidget {
-  final List<Category> categories;
-  final ScrollController scrollController;
-  final Function(Category) onCategorySelected;
+class _DateRangeTile extends StatefulWidget {
+  final DateTime startDate, endDate;
+  final VoidCallback onTap;
+  const _DateRangeTile({
+    required this.startDate, required this.endDate, required this.onTap});
+  @override State<_DateRangeTile> createState() => _DateRangeTileState();
+}
 
-  const _CategoryPickerSheet({
+class _DateRangeTileState extends State<_DateRangeTile>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 70));
+  @override void dispose() { _c.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final onSurf = Theme.of(context).colorScheme.onSurface;
+    final bg     = isDark
+        ? Colors.white.withOpacity(0.07)
+        : Colors.black.withOpacity(0.04);
+    final dateF  = DateFormat.yMMMd('es_CO');
+
+    return GestureDetector(
+      onTapDown: (_) { _c.forward(); HapticFeedback.selectionClick(); },
+      onTapUp:   (_) { _c.reverse(); widget.onTap(); },
+      onTapCancel: () => _c.reverse(),
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (_, __) => Transform.scale(
+          scale: lerpDouble(1.0, 0.98, _c.value)!,
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+                color: bg,
+                borderRadius: BorderRadius.circular(14)),
+            child: Row(children: [
+              Icon(Iconsax.calendar_edit, size: 16,
+                  color: _kBlue),
+              const SizedBox(width: 12),
+              Expanded(child: Text(
+                '${dateF.format(widget.startDate)}  →  ${dateF.format(widget.endDate)}',
+                style: _T.label(13, c: onSurf, w: FontWeight.w600),
+              )),
+              Icon(Icons.chevron_right_rounded, size: 18,
+                  color: onSurf.withOpacity(0.25)),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CATEGORY TRIGGER — tile que abre el sheet de selección
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _CategoryTrigger extends StatefulWidget {
+  final Category? category;
+  final double    histAvg;
+  final VoidCallback onTap;
+  const _CategoryTrigger({
+    required this.category,
+    required this.histAvg,
+    required this.onTap,
+  });
+  @override State<_CategoryTrigger> createState() => _CategoryTriggerState();
+}
+
+class _CategoryTriggerState extends State<_CategoryTrigger>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 70));
+  @override void dispose() { _c.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final onSurf = Theme.of(context).colorScheme.onSurface;
+    final bg     = isDark
+        ? Colors.white.withOpacity(0.07)
+        : Colors.black.withOpacity(0.04);
+
+    final cat   = widget.category;
+    final color = cat?.colorAsObject ?? _kBlue;
+
+    return GestureDetector(
+      onTapDown: (_) { _c.forward(); HapticFeedback.selectionClick(); },
+      onTapUp:   (_) { _c.reverse(); widget.onTap(); },
+      onTapCancel: () => _c.reverse(),
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (_, __) => Transform.scale(
+          scale: lerpDouble(1.0, 0.99, _c.value)!,
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+                color: bg,
+                borderRadius: BorderRadius.circular(14)),
+            child: Row(children: [
+              // Ícono de categoría — sin gradiente, sin borde animado
+              Container(
+                width: 36, height: 36,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Center(child: Icon(
+                  cat?.icon ?? Iconsax.category,
+                  size: 16,
+                  color: color,
+                )),
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    cat?.name ?? 'Selecciona una categoría',
+                    style: _T.label(14,
+                        w: FontWeight.w600,
+                        c: cat != null
+                            ? onSurf
+                            : onSurf.withOpacity(0.40)),
+                  ),
+                  // Promedio histórico si existe — dato real, útil antes de definir el monto
+                  if (cat != null && widget.histAvg > 0) ...[
+                    const SizedBox(height: 2),
+                    Text('Promedio histórico: ${_fmtShort(widget.histAvg)}',
+                        style: _T.label(11,
+                            c: onSurf.withOpacity(0.40))),
+                  ],
+                ],
+              )),
+              Icon(Icons.chevron_right_rounded, size: 18,
+                  color: onSurf.withOpacity(0.25)),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AMOUNT FIELD — campo de monto principal
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _AmountField extends StatelessWidget {
+  final TextEditingController controller;
+  const _AmountField({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final onSurf = Theme.of(context).colorScheme.onSurface;
+    final bg     = isDark
+        ? Colors.white.withOpacity(0.07)
+        : Colors.black.withOpacity(0.04);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      decoration: BoxDecoration(
+          color: bg, borderRadius: BorderRadius.circular(18)),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+        Text('\$', style: _T.display(28, c: onSurf.withOpacity(0.35))),
+        const SizedBox(width: 8),
+        Expanded(
+          child: TextFormField(
+            controller:   controller,
+            textAlign:    TextAlign.left,
+            keyboardType: const TextInputType.numberWithOptions(decimal: false),
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              _CurrencyFormatter(),
+            ],
+            style: _T.display(40, c: onSurf),
+            decoration: InputDecoration(
+              border:      InputBorder.none,
+              hintText:    '0',
+              hintStyle:   _T.display(40, c: onSurf.withOpacity(0.15)),
+              isDense:     true,
+              contentPadding: EdgeInsets.zero,
+            ),
+            validator: (v) {
+              if (v == null || v.isEmpty) return 'Ingresa un monto';
+              final n = int.tryParse(v.replaceAll(RegExp(r'[^0-9]'), ''));
+              if (n == null || n <= 0) return 'Monto inválido';
+              return null;
+            },
+            onChanged: (_) => HapticFeedback.selectionClick(),
+          ),
+        ),
+        Text('COP',
+            style: _T.label(12,
+                c: onSurf.withOpacity(0.30),
+                w: FontWeight.w700)),
+      ]),
+    );
+  }
+}
+
+class _CurrencyFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue old, TextEditingValue nw) {
+    if (nw.text.isEmpty) return nw.copyWith(text: '');
+    final n = int.tryParse(nw.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+    final t = NumberFormat.currency(
+        locale: 'es_CO', symbol: '\$', decimalDigits: 0).format(n);
+    return nw.copyWith(
+        text: t, selection: TextSelection.collapsed(offset: t.length));
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INSIGHT SECTION — solo datos reales, sin emojis, sin copy motivacional
+// ─────────────────────────────────────────────────────────────────────────────
+// Aparece solo cuando: categoría seleccionada + amount > 0.
+// Muestra dos datos:
+//   1. % del límite vs historial de la categoría (si existe).
+//   2. % del límite vs gasto mensual total (siempre que haya datos).
+// La barra usa el valor real calculado, no 0.9/0.6/0.3 hardcodeados.
+
+class _InsightSection extends StatelessWidget {
+  final double amount;
+  final double histAvg;      // promedio histórico de la categoría
+  final double monthlyAvg;   // gasto mensual promedio total
+  final bool   isLoading;
+  final String categoryName;
+
+  const _InsightSection({
+    required this.amount,
+    required this.histAvg,
+    required this.monthlyAvg,
+    required this.isLoading,
+    required this.categoryName,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final onSurf = Theme.of(context).colorScheme.onSurface;
+    final bg     = isDark
+        ? Colors.white.withOpacity(0.07)
+        : Colors.black.withOpacity(0.04);
+
+    if (isLoading) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 28),
+        child: _SkeletonTile(),
+      );
+    }
+
+    // ── Insight 1: vs historial de la categoría ──────────────────────────
+    // Solo si hay historial. Sin historial, no inventamos datos.
+    Widget? histInsight;
+    if (histAvg > 0) {
+      final pct  = amount / histAvg;       // 1.0 = igual al histórico
+      final diff = amount - histAvg;
+      final isOver  = diff > 0;
+      final color   = isOver ? _kOrange : _kGreen;
+      final barVal  = pct.clamp(0.0, 1.5) / 1.5; // normalizado para la barra
+
+      final label = isOver
+          ? '${_pct((diff / histAvg) * 100)} por encima de tu gasto histórico en $categoryName'
+          : '${_pct(((histAvg - amount) / histAvg) * 100)} por debajo de tu gasto histórico';
+
+      histInsight = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            _InsightDot(color: color),
+            const SizedBox(width: 8),
+            Expanded(child:
+              Text(label, style: _T.label(12, c: onSurf.withOpacity(0.65)))),
+            Text(_fmtShort(histAvg),
+                style: _T.mono(12, c: onSurf.withOpacity(0.40))),
+          ]),
+          const SizedBox(height: 8),
+          _ProgressBar(value: barVal.clamp(0.0, 1.0), color: color),
+        ],
+      );
+    }
+
+    // ── Insight 2: % del gasto mensual total ─────────────────────────────
+    Widget? monthlyInsight;
+    if (monthlyAvg > 0) {
+      final pct   = amount / monthlyAvg;
+      final pctStr = _pct(pct * 100);
+      Color color;
+      if (pct > 0.40)      color = _kRed;
+      else if (pct > 0.20) color = _kOrange;
+      else                 color = _kGreen;
+
+      monthlyInsight = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            _InsightDot(color: color),
+            const SizedBox(width: 8),
+            Expanded(child: Text(
+              '$pctStr de tu gasto mensual promedio',
+              style: _T.label(12, c: onSurf.withOpacity(0.65)))),
+            Text(_fmtShort(monthlyAvg),
+                style: _T.mono(12, c: onSurf.withOpacity(0.40))),
+          ]),
+          const SizedBox(height: 8),
+          _ProgressBar(value: pct.clamp(0.0, 1.0), color: color),
+        ],
+      );
+    }
+
+    // Sin datos de ningún tipo → no mostrar nada
+    if (histInsight == null && monthlyInsight == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 28),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+            color: bg, borderRadius: BorderRadius.circular(14)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Contexto del presupuesto',
+                style: _T.label(12,
+                    w: FontWeight.w700,
+                    c: onSurf.withOpacity(0.50))),
+            const SizedBox(height: 14),
+            if (histInsight != null) histInsight,
+            if (histInsight != null && monthlyInsight != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Container(
+                    height: 0.5,
+                    color: onSurf.withOpacity(0.08)),
+              ),
+            if (monthlyInsight != null) monthlyInsight,
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _pct(double v) => '${v.toStringAsFixed(0)}%';
+}
+
+class _InsightDot extends StatelessWidget {
+  final Color color;
+  const _InsightDot({required this.color});
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 6, height: 6,
+    decoration: BoxDecoration(color: color, shape: BoxShape.circle));
+}
+
+class _ProgressBar extends StatelessWidget {
+  final double value;
+  final Color  color;
+  const _ProgressBar({required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = Theme.of(context).colorScheme.onSurface.withOpacity(0.07);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(2),
+      child: LinearProgressIndicator(
+        value:           value,
+        minHeight:       4,
+        backgroundColor: bg,
+        valueColor:      AlwaysStoppedAnimation<Color>(color),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CATEGORY SHEET — lista vertical con promedio histórico inline
+// ─────────────────────────────────────────────────────────────────────────────
+// Lista vertical en lugar de grid 4 columnas.
+// Cada fila: ícono + nombre + promedio histórico (si disponible).
+// El usuario ve el histórico ANTES de seleccionar — evita tener que
+// seleccionar, ver el insight, volver y cambiar.
+
+class _CategorySheet extends StatelessWidget {
+  final List<Category>      categories;
+  final ScrollController    scrollController;
+  final AnalysisData?       analysisData;
+  final Function(Category)  onCategorySelected;
+
+  const _CategorySheet({
     required this.categories,
     required this.scrollController,
+    required this.analysisData,
     required this.onCategorySelected,
   });
 
+  double _avgFor(String name) {
+    if (analysisData == null) return 0.0;
+    return analysisData!.categoryAverages
+        .firstWhere(
+          (a) => a.categoryName == name,
+          orElse: () => const CategoryAverageResult(
+              categoryName: '', averageAmount: 0),
+        )
+        .averageAmount;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme  = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final onSurf = theme.colorScheme.onSurface;
+    final bg     = isDark ? const Color(0xFF1C1C1E) : Colors.white;
+
     return ClipRRect(
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface.withOpacity(0.95),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            children: [
+          color: bg,
+          child: Column(children: [
+            // Handle
+            const SizedBox(height: 8),
+            Container(
+              width: 36, height: 4,
+              decoration: BoxDecoration(
+                color: onSurf.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(2)),
+            ),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(children: [
+                Expanded(child: Text('Categoría',
+                    style: _T.display(22, c: onSurf))),
+              ]),
+            ),
+            const SizedBox(height: 16),
+
+            Expanded(
+              child: ListView.separated(
+                controller:  scrollController,
+                physics:     const BouncingScrollPhysics(),
+                padding:     const EdgeInsets.symmetric(horizontal: 20),
+                itemCount:   categories.length,
+                separatorBuilder: (_, __) => Padding(
+                  padding: const EdgeInsets.only(left: 36 + 12),
+                  child: Container(
+                      height: 0.5,
+                      color: onSurf.withOpacity(0.07)),
+                ),
+                itemBuilder: (ctx, i) {
+                  final cat   = categories[i];
+                  final avg   = _avgFor(cat.name);
+                  final color = cat.colorAsObject;
+
+                  return _CategoryRow(
+                    category: cat,
+                    histAvg:  avg,
+                    onTap:    () => onCategorySelected(cat),
+                  );
+                },
+              ),
+            ),
+            SizedBox(height: MediaQuery.of(context).padding.bottom + 20),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+class _CategoryRow extends StatefulWidget {
+  final Category category;
+  final double   histAvg;
+  final VoidCallback onTap;
+  const _CategoryRow({
+    required this.category, required this.histAvg, required this.onTap});
+  @override State<_CategoryRow> createState() => _CategoryRowState();
+}
+
+class _CategoryRowState extends State<_CategoryRow>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 70));
+  @override void dispose() { _c.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    final onSurf = Theme.of(context).colorScheme.onSurface;
+    final color  = widget.category.colorAsObject;
+
+    return GestureDetector(
+      onTapDown: (_) { _c.forward(); HapticFeedback.selectionClick(); },
+      onTapUp:   (_) { _c.reverse(); widget.onTap(); },
+      onTapCancel: () => _c.reverse(),
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (_, __) => Opacity(
+          opacity: lerpDouble(1.0, 0.50, _c.value)!,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Row(children: [
+              // Ícono — borderRadius, sin RadialGradient ni Border
               Container(
-                width: 40,
-                height: 5,
+                width: 36, height: 36,
                 decoration: BoxDecoration(
-                  color:
-                      Theme.of(context).colorScheme.onSurface.withOpacity(0.2),
+                  color: color.withOpacity(0.11),
                   borderRadius: BorderRadius.circular(10),
                 ),
+                child: Center(child: Icon(
+                    widget.category.icon, size: 16, color: color)),
               ),
-              const SizedBox(height: 20),
-              Text(
-                "Selecciona una Categoría",
-                style: GoogleFonts.poppins(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Expanded(
-                child: GridView.builder(
-                  controller: scrollController,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 4,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 0.85,
-                  ),
-                  itemCount: categories.length,
-                  itemBuilder: (context, index) {
-                    final category = categories[index];
-                    return _CategoryTile(
-                      category: category,
-                      onTap: () => onCategorySelected(category),
-                    );
-                  },
-                ),
-              ),
-            ],
+              const SizedBox(width: 12),
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(widget.category.name,
+                      style: _T.label(14, w: FontWeight.w600, c: onSurf)),
+                  // Promedio histórico visible en la lista — dato real
+                  if (widget.histAvg > 0) ...[
+                    const SizedBox(height: 1),
+                    Text('Promedio: ${_fmtShort(widget.histAvg)}',
+                        style: _T.label(11,
+                            c: onSurf.withOpacity(0.38))),
+                  ],
+                ],
+              )),
+              Icon(Icons.chevron_right_rounded, size: 16,
+                  color: onSurf.withOpacity(0.20)),
+            ]),
           ),
         ),
       ),
@@ -1356,138 +1109,134 @@ class _CategoryPickerSheet extends StatelessWidget {
   }
 }
 
-class _CategoryTile extends StatefulWidget {
-  final Category category;
+// ─────────────────────────────────────────────────────────────────────────────
+// SAVE BUTTON — sticky bottom
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _SaveBtn extends StatefulWidget {
+  final bool loading;
   final VoidCallback onTap;
-
-  const _CategoryTile({
-    required this.category,
-    required this.onTap,
-  });
-
-  @override
-  State<_CategoryTile> createState() => _CategoryTileState();
+  const _SaveBtn({required this.loading, required this.onTap});
+  @override State<_SaveBtn> createState() => _SaveBtnState();
 }
 
-class _CategoryTileState extends State<_CategoryTile>
+class _SaveBtnState extends State<_SaveBtn>
     with SingleTickerProviderStateMixin {
-  late AnimationController _scaleController;
-  late Animation<double> _scaleAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _scaleController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 150),
-    );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.9).animate(
-      CurvedAnimation(parent: _scaleController, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _scaleController.dispose();
-    super.dispose();
-  }
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 80));
+  @override void dispose() { _c.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => _scaleController.forward(),
-      onTapUp: (_) {
-        _scaleController.reverse();
-        widget.onTap();
-      },
-      onTapCancel: () => _scaleController.reverse(),
-      child: AnimatedBuilder(
-        animation: _scaleAnimation,
-        builder: (context, child) {
-          return Transform.scale(
-            scale: _scaleAnimation.value,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
+    final theme = Theme.of(context);
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          color: theme.scaffoldBackgroundColor.withOpacity(0.93),
+          padding: EdgeInsets.only(
+            left: 20, right: 20, top: 12,
+            bottom: MediaQuery.of(context).padding.bottom + 12,
+          ),
+          child: GestureDetector(
+            onTapDown: (_) {
+              if (!widget.loading) {
+                _c.forward(); HapticFeedback.mediumImpact();
+              }
+            },
+            onTapUp:     (_) { _c.reverse(); if (!widget.loading) widget.onTap(); },
+            onTapCancel: () => _c.reverse(),
+            child: AnimatedBuilder(
+              animation: _c,
+              builder: (_, __) => Transform.scale(
+                scale: lerpDouble(1.0, 0.97, _c.value)!,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  height: 54,
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        widget.category.colorAsObject.withOpacity(0.2),
-                        widget.category.colorAsObject.withOpacity(0.05),
-                      ],
-                    ),
-                    border: Border.all(
-                      color: widget.category.colorAsObject.withOpacity(0.3),
-                      width: 2,
-                    ),
+                    color: widget.loading
+                        ? _kBlue.withOpacity(0.55) : _kBlue,
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Icon(
-                    widget.category.icon,
-                    color: widget.category.colorAsObject,
-                    size: 28,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  widget.category.name,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
+                  child: Center(
+                    child: widget.loading
+                        ? const SizedBox(
+                            width: 20, height: 20,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: Colors.white))
+                        : Text('Crear presupuesto',
+                            style: GoogleFonts.dmSans(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white)),
                   ),
                 ),
-              ],
+              ),
             ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }
 }
 
-// =============================================================================
-// CONFETTI PERSONALIZADO
-// =============================================================================
+// ─────────────────────────────────────────────────────────────────────────────
+// SHARED COMPONENTS
+// ─────────────────────────────────────────────────────────────────────────────
 
-class _ConfettiCelebration extends StatelessWidget {
-  final ConfettiController controller;
-  final Category? category;
-
-  const _ConfettiCelebration({
-    required this.controller,
-    this.category,
-  });
-
+class _GroupLabel extends StatelessWidget {
+  final String text;
+  const _GroupLabel(this.text);
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.topCenter,
-      child: ConfettiWidget(
-        confettiController: controller,
-        blastDirectionality: BlastDirectionality.explosive,
-        shouldLoop: false,
-        numberOfParticles: 30,
-        gravity: 0.3,
-        emissionFrequency: 0.05,
-        colors: category != null
-            ? [
-                category!.colorAsObject,
-                category!.colorAsObject.withOpacity(0.7),
-                Theme.of(context).colorScheme.primary,
-                Theme.of(context).colorScheme.secondary,
-              ]
-            : [
-                Colors.blue,
-                Colors.green,
-                Colors.orange,
-                Colors.purple,
-                Colors.pink,
-              ],
+    final onSurf = Theme.of(context).colorScheme.onSurface;
+    return Text(text,
+        style: _T.label(11,
+            w: FontWeight.w700, c: onSurf.withOpacity(0.35)));
+  }
+}
+
+class _SkeletonTile extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg     = isDark
+        ? Colors.white.withOpacity(0.07)
+        : Colors.black.withOpacity(0.04);
+    return Container(
+      height: 52,
+      decoration: BoxDecoration(
+          color: bg, borderRadius: BorderRadius.circular(14)),
+    );
+  }
+}
+
+class _BackBtn extends StatefulWidget {
+  @override State<_BackBtn> createState() => _BackBtnState();
+}
+
+class _BackBtnState extends State<_BackBtn>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 70));
+  @override void dispose() { _c.dispose(); super.dispose(); }
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) { _c.forward(); HapticFeedback.selectionClick(); },
+      onTapUp:   (_) { _c.reverse(); Navigator.of(context).pop(); },
+      onTapCancel: () => _c.reverse(),
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (_, __) => Transform.scale(
+          scale: lerpDouble(1.0, 0.85, _c.value)!,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Icon(Icons.arrow_back_ios_new_rounded,
+                size: 18, color: _kBlue),
+          ),
+        ),
       ),
     );
   }

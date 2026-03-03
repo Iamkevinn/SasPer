@@ -84,41 +84,26 @@ const _typeIcons = <String, IconData>{
 };
 
 // Datos de cada tipo — solo los que son informativos y reales
-const _typeData = <String, ({String description, String tip, int risk, int liquidity, double returns})>{
+const _typeData = <String, ({String description, String tip})>{
   'Efectivo': (
     description: 'Liquidez inmediata para gastos diarios',
     tip:         'Ideal para emergencias y gastos cotidianos.',
-    risk:        0,
-    liquidity:   100,
-    returns:     0.0,
   ),
   'Cuenta Bancaria': (
     description: 'Centro de operaciones financieras',
     tip:         'Perfecta como cuenta principal para recibir ingresos.',
-    risk:        0,
-    liquidity:   95,
-    returns:     0.5,
   ),
   'Tarjeta de Crédito': (
     description: 'Compras a plazos con control de intereses',
     tip:         'Configura los días de corte y pago para evitar intereses.',
-    risk:        60,
-    liquidity:   90,
-    returns:     -18.5,
   ),
   'Ahorros': (
     description: 'Fondo de emergencia y metas a largo plazo',
     tip:         'Mantén 3-6 meses de gastos como reserva mínima.',
-    risk:        5,
-    liquidity:   70,
-    returns:     3.2,
   ),
   'Inversión': (
     description: 'Crecimiento de patrimonio a mediano plazo',
     tip:         'Rendimiento potencial del 6.8% anual según el mercado.',
-    risk:        45,
-    liquidity:   40,
-    returns:     6.8,
   ),
 };
 
@@ -590,19 +575,6 @@ class _TypeDetail extends StatelessWidget {
     final onSurf = Theme.of(context).colorScheme.onSurface;
     final data   = _typeData[type]!;
 
-    final retStr = data.returns > 0
-        ? '+${data.returns}% anual'
-        : data.returns < 0
-            ? '${data.returns}% anual'
-            : 'Sin rendimiento';
-    final retColor = data.returns > 0
-        ? _kGreen
-        : data.returns < 0 ? _kRed : onSurf.withOpacity(0.42);
-
-    final riskStr   = data.risk < 20 ? 'Bajo'
-                    : data.risk < 50 ? 'Medio' : 'Alto';
-    final riskColor = data.risk < 20 ? _kGreen
-                    : data.risk < 50 ? _kOrange : _kRed;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
@@ -627,20 +599,6 @@ class _TypeDetail extends StatelessWidget {
             ]),
           ),
           const SizedBox(height: 10),
-
-          // Métricas — 3 inline sin borders, solo texto con color
-          Row(children: [
-            _InlineMetric(label: 'Retorno', value: retStr, color: retColor),
-            _Dot(),
-            _InlineMetric(
-                label: 'Liquidez',
-                value: '${data.liquidity}%',
-                color: data.liquidity > 80
-                    ? _kGreen
-                    : data.liquidity > 50 ? _kOrange : _kRed),
-            _Dot(),
-            _InlineMetric(label: 'Riesgo', value: riskStr, color: riskColor),
-          ]),
         ],
       ),
     );
@@ -773,21 +731,6 @@ class _InsightCard extends StatelessWidget {
 
     final data     = _typeData[accountType]!;
     final color    = _typeColors[accountType]!;
-    final returns  = data.returns;
-    final annualReturn = balance * (returns / 100);
-    final isPositive = returns >= 0;
-
-    // Proyección a 12 meses — el dato más útil antes de crear la cuenta
-    final projLabel = isPositive ? 'Retorno proyectado (12m)' : 'Costo proyectado (12m)';
-    final projValue = annualReturn.abs();
-    final projColor = isPositive ? _kGreen : _kRed;
-
-    final riskStr   = data.risk == 0 ? 'Sin riesgo'
-                    : data.risk < 20 ? 'Riesgo bajo'
-                    : data.risk < 50 ? 'Riesgo medio' : 'Riesgo alto';
-    final riskColor = data.risk == 0 ? _kGreen
-                    : data.risk < 20 ? _kGreen
-                    : data.risk < 50 ? _kOrange : _kRed;
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -814,20 +757,9 @@ class _InsightCard extends StatelessWidget {
 
           // Dos métricas lado a lado
           Row(children: [
-            Expanded(child: _InsightMetric(
-              label: projLabel,
-              value: _formatCOP(projValue),
-              color: projColor,
-            )),
             Container(
                 width: 0.5, height: 40,
                 color: onSurf.withOpacity(0.08)),
-            Expanded(child: _InsightMetric(
-              label: 'Nivel de riesgo',
-              value: riskStr,
-              color: riskColor,
-              align: TextAlign.right,
-            )),
           ]),
 
           // Tip del tipo — una línea concisa
