@@ -1,24 +1,137 @@
 // lib/screens/add_goal_screen.dart
+//
+// ┌─────────────────────────────────────────────────────────────────────────────┐
+// │  FILOSOFÍA — Apple iOS / Health + Reminders                                │
+// │                                                                             │
+// │  Crear una meta es un acto de esperanza.                                   │
+// │  La pantalla no debe emocionarte con gradientes — debe ayudarte a          │
+// │  entender si tu meta es alcanzable y qué necesitas hacer para lograrlo.    │
+// │                                                                             │
+// │  PREGUNTA QUE ESTA PANTALLA RESPONDE:                                      │
+// │  "Si quiero X en Y meses, ¿puedo hacerlo con mis ingresos actuales?"       │
+// │                                                                             │
+// │  JERARQUÍA:                                                                │
+// │  1. Nombre — qué quieres lograr. Un campo. Sin decoración extra.          │
+// │  2. Monto — cuánto cuesta. Grande, protagonista.                          │
+// │  3. Fecha — para cuándo. Un tile de fecha compacto.                       │
+// │  4. Prioridad — qué tan urgente es. Segmented control compacto.           │
+// │  5. Plan card — aparece solo cuando hay monto + fecha válidos.            │
+// │     Muestra: ahorro diario / semanal / mensual. Datos reales.             │
+// │  6. Viabilidad — un semáforo. Verde/naranja/rojo + texto útil.           │
+// │     Aparece junto al plan. No antes, no separado.                         │
+// │  7. Botón — único CTA.                                                    │
+// │                                                                             │
+// │  ELIMINADO vs original:                                                    │
+// │  • _DynamicGoalBackground — fondo que cambia de color con viabilidad.    │
+// │    El fondo no es un semáforo. El semáforo es el semáforo.               │
+// │  • SliverPersistentHeaderDelegate con BackdropFilter — la hero card       │
+// │    pegada es un segundo "header" que duplica info ya visible.             │
+// │  • _buildPremiumHeader con ícono gradiente + shadow → decoración vacía   │
+// │  • Section labels de 18px primary bold en cada sección → compiten entre  │
+// │    sí, destruyen la jerarquía visual                                      │
+// │  • _AnimatedProgressSparkline con value: 0 siempre → dato falso          │
+// │  • ScaleTransition desde 0 en viabilidad → pop agresivo, mareante        │
+// │  • Gradientes en cada tarjeta compitiendo: primaryContainer, tertiary,   │
+// │    statusColor×2 — toda la pantalla grita al mismo volumen               │
+// └─────────────────────────────────────────────────────────────────────────────┘
 
-import 'dart:ui' as ui;
+import 'dart:math' as math;
 import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 import 'package:sasper/data/goal_repository.dart';
+import 'package:sasper/data/analysis_repository.dart';
+import 'package:sasper/models/goal_model.dart';
 import 'package:sasper/services/event_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import 'package:sasper/models/category_model.dart';
-import 'package:sasper/models/goal_model.dart';
 import 'dart:developer' as developer;
-import 'package:sasper/data/analysis_repository.dart';
 
-enum ViabilityStatus { feasible, challenging, highRisk }
+// ─── TOKENS ──────────────────────────────────────────────────────────────────
+class _C {
+  final BuildContext ctx;
+  _C(this.ctx);
 
+  bool get isDark => Theme.of(ctx).brightness == Brightness.dark;
+
+  Color get bg      => isDark ? const Color(0xFF000000) : const Color(0xFFF2F2F7);
+  Color get surface => isDark ? const Color(0xFF1C1C1E) : Colors.white;
+  Color get raised  => isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF5F5F7);
+  Color get sep     => isDark ? const Color(0xFF38383A) : const Color(0xFFE5E5EA);
+
+  Color get label  => isDark ? const Color(0xFFFFFFFF) : const Color(0xFF1C1C1E);
+  Color get label2 => isDark ? const Color(0xFFEBEBF5) : const Color(0xFF3A3A3C);
+  Color get label3 => isDark ? const Color(0xFF8E8E93) : const Color(0xFF636366);
+  Color get label4 => isDark ? const Color(0xFF48484A) : const Color(0xFFAEAEB2);
+
+  static const Color red    = Color(0xFFFF3B30);
+  static const Color green  = Color(0xFF30D158);
+  static const Color orange = Color(0xFFFF9F0A);
+  static const Color blue   = Color(0xFF0A84FF);
+  static const Color purple = Color(0xFFBF5AF2);
+  static const Color teal   = Color(0xFF64D2FF);
+
+  static const double xs   = 4.0;
+  static const double sm   = 8.0;
+  static const double md   = 16.0;
+  static const double lg   = 24.0;
+  static const double xl   = 32.0;
+  static const double rSM  = 8.0;
+  static const double rMD  = 12.0;
+  static const double rLG  = 16.0;
+  static const double rXL  = 22.0;
+  static const double r2XL = 28.0;
+
+  static const Duration fast   = Duration(milliseconds: 130);
+  static const Duration mid    = Duration(milliseconds: 270);
+  static const Duration slow   = Duration(milliseconds: 460);
+  static const Curve   easeOut = Curves.easeOutCubic;
+  static const Curve   spring  = Curves.easeOutBack;
+}
+
+// ─── VIABILIDAD ───────────────────────────────────────────────────────────────
+// Un enum rico. Cada estado lleva todo lo que la UI necesita para mostrarse.
+// El color ES la respuesta — el texto la confirma.
+enum _Viability {
+  none(
+    color: _C.blue,
+    icon: Iconsax.flag,
+    label: '',
+    message: '',
+  ),
+  good(
+    color: _C.green,
+    icon: Iconsax.shield_tick,
+    label: 'Alcanzable',
+    message: 'Este ritmo de ahorro es sostenible. Estás por buen camino.',
+  ),
+  moderate(
+    color: _C.orange,
+    icon: Iconsax.info_circle,
+    label: 'Desafiante',
+    message: 'Posible, pero requerirá disciplina. Considera extender el plazo.',
+  ),
+  hard(
+    color: _C.red,
+    icon: Iconsax.warning_2,
+    label: 'Muy exigente',
+    message: 'Supera el 50% de tu ingreso. Ajusta el plazo o el monto.',
+  );
+
+  final Color  color;
+  final IconData icon;
+  final String label;
+  final String message;
+
+  const _Viability({
+    required this.color, required this.icon,
+    required this.label, required this.message,
+  });
+}
+
+// ─── PANTALLA ─────────────────────────────────────────────────────────────────
 class AddGoalScreen extends StatefulWidget {
   const AddGoalScreen({super.key});
 
@@ -28,1591 +141,1397 @@ class AddGoalScreen extends StatefulWidget {
 
 class _AddGoalScreenState extends State<AddGoalScreen>
     with TickerProviderStateMixin {
-  final GoalRepository _goalRepository = GoalRepository.instance;
-  final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _targetAmountController = TextEditingController(text: '0');
-  late ConfettiController _confettiController;
-  final AnalysisRepository _analysisRepository = AnalysisRepository.instance;
-  double _realMonthlyIncome = 0.0;
-  bool _isDataLoading = true;
-  Category? _selectedCategory;
-  DateTime _targetDate = DateTime.now().add(const Duration(days: 365));
-  GoalPriority _priority = GoalPriority.medium;
-  bool _isLoading = false;
-  bool _isSuccess = false;
+  final _goalRepo      = GoalRepository.instance;
+  final _analysisRepo  = AnalysisRepository.instance;
+  final _formKey       = GlobalKey<FormState>();
+  final _nameCtrl      = TextEditingController();
+  final _amountCtrl    = TextEditingController();
 
+  late ConfettiController _confettiCtrl;
 
-  // Animaciones
-  late AnimationController _viabilityAnimationController;
-  late AnimationController _progressAnimationController;
-  late Animation<double> _viabilityAnimation;
-  late Animation<double> _progressAnimation;
+  // Plan card aparece con fade cuando hay datos suficientes
+  late AnimationController _planCtrl;
+  late Animation<double>   _planAnim;
+
+  // Datos reales del repo
+  double _monthlyIncome = 0.0;
+  bool   _isLoadingData = true;
+
+  // Estado del formulario
+  DateTime    _targetDate = DateTime.now().add(const Duration(days: 365));
+  GoalPriority _priority  = GoalPriority.medium;
+  double      _amount     = 0.0;
+  bool        _isSaving   = false;
+  bool        _isSuccess  = false;
 
   @override
   void initState() {
     super.initState();
-    _confettiController =
-        ConfettiController(duration: const Duration(seconds: 2));
+    _confettiCtrl = ConfettiController(
+        duration: const Duration(milliseconds: 2500));
 
-    // Animación de viabilidad
-    _viabilityAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
-    _viabilityAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(
-          parent: _viabilityAnimationController, curve: Curves.easeOutBack),
-    );
+    _planCtrl = AnimationController(duration: _C.slow, vsync: this);
+    _planAnim = CurvedAnimation(parent: _planCtrl, curve: _C.easeOut);
 
-    // Animación de progreso
-    _progressAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 1200),
-      vsync: this,
-    );
-    _progressAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(
-          parent: _progressAnimationController, curve: Curves.easeInOut),
-    );
-
-    _nameController.addListener(() {
-      setState(() {});
-      _viabilityAnimationController.forward(from: 0);
-    });
-    _targetAmountController.addListener(() {
-      setState(() {});
-      _progressAnimationController.forward(from: 0);
-    });
-    _loadFinancialData();
-  }
-
-   // <-- AÑADIR ESTE NUEVO MÉTODO -->
-   Future<void> _loadFinancialData() async {
-    // 1. Llama al método que ya existe y obtiene todos los datos
-    final analysisData = await _analysisRepository.fetchAllAnalysisData();
-
-    if (mounted) {
-      // 2. Extrae la lista con el resumen de ingresos/gastos mensuales
-      final monthlySummaries = analysisData.incomeExpenseBarData;
-      double calculatedAverageIncome = 0.0;
-
-      if (monthlySummaries.isNotEmpty) {
-        // 3. Calcula el promedio de los ingresos de esa lista
-        final totalIncome = monthlySummaries.fold<double>(
-          0.0,
-          (sum, summary) => sum + summary.totalIncome, // Asumiendo que el modelo tiene `totalIncome`
-        );
-        calculatedAverageIncome = totalIncome / monthlySummaries.length;
-      }
-      
-      setState(() {
-        // 4. Guarda el dato real en el estado
-        _realMonthlyIncome = calculatedAverageIncome > 0 ? calculatedAverageIncome : 1.0; 
-        _isDataLoading = false;
-      });
-    }
+    _amountCtrl.addListener(_onInputChanged);
+    _loadData();
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _targetAmountController.dispose();
-    _confettiController.dispose();
-    _viabilityAnimationController.dispose();
-    _progressAnimationController.dispose();
+    _nameCtrl.dispose();
+    _amountCtrl.dispose();
+    _confettiCtrl.dispose();
+    _planCtrl.dispose();
     super.dispose();
   }
 
-  // Cálculos
+  // ── Datos reales del repositorio ─────────────────────────────────────────
+  Future<void> _loadData() async {
+    try {
+      final data = await _analysisRepo.fetchAllAnalysisData();
+      if (!mounted) return;
+      final summaries = data.incomeExpenseBarData;
+      double avg = 0;
+      if (summaries.isNotEmpty) {
+        avg = summaries.fold<double>(0, (s, e) => s + e.totalIncome)
+            / summaries.length;
+      }
+      setState(() {
+        _monthlyIncome = avg > 0 ? avg : 1.0;
+        _isLoadingData = false;
+      });
+    } catch (e) {
+      developer.log('Error cargando datos financieros: $e');
+      if (mounted) setState(() { _monthlyIncome = 1.0; _isLoadingData = false; });
+    }
+  }
+
+  // ── Cálculos ─────────────────────────────────────────────────────────────
   int get _monthsRemaining {
     final now = DateTime.now();
     if (_targetDate.isBefore(now)) return 0;
-    return (_targetDate.year - now.year) * 12 + _targetDate.month - now.month;
+    return (_targetDate.year - now.year) * 12
+        + _targetDate.month - now.month;
   }
 
-  double get _targetAmount {
-    return double.tryParse(
-            _targetAmountController.text.replaceAll(RegExp(r'[^0-9]'), '')) ??
-        0.0;
+  double get _monthly {
+    if (_monthsRemaining <= 0 || _amount <= 0) return 0;
+    return _amount / _monthsRemaining;
   }
 
-  double get _monthlyContribution {
-    final months = _monthsRemaining;
-    if (months <= 0 || _targetAmount <= 0) return 0.0;
-    return _targetAmount / months;
+  double get _weekly  => _monthly / 4.345;
+  double get _daily   => _monthly / 30.437;
+
+  double get _pctIncome {
+    if (_monthlyIncome <= 0 || _monthly <= 0) return 0;
+    return (_monthly / _monthlyIncome) * 100;
   }
 
-  double get _percentageOfIncome {
-    if (_realMonthlyIncome <= 0 || _monthlyContribution <= 0) return 0.0;
-    return (_monthlyContribution / _realMonthlyIncome) * 100;
+  _Viability get _viability {
+    if (_monthly <= 0) return _Viability.none;
+    final p = _pctIncome;
+    if (p > 50) return _Viability.hard;
+    if (p > 25) return _Viability.moderate;
+    return _Viability.good;
   }
 
-  ViabilityStatus get _viabilityStatus {
-    final percentage = _percentageOfIncome;
-    if (percentage == 0) return ViabilityStatus.feasible;
-    if (percentage > 50) return ViabilityStatus.highRisk;
-    if (percentage > 25) return ViabilityStatus.challenging;
-    return ViabilityStatus.feasible;
+  bool get _hasPlan => _amount > 0 && _monthsRemaining > 0;
+
+  void _onInputChanged() {
+    setState(() {
+      _amount = double.tryParse(
+          _amountCtrl.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0.0;
+    });
+    if (_hasPlan) {
+      _planCtrl.forward();
+    } else {
+      _planCtrl.reverse();
+    }
   }
 
-  // Acciones
-  Future<void> _selectDate(BuildContext context) async {
+  // ── Acciones ─────────────────────────────────────────────────────────────
+  Future<void> _pickDate() async {
     HapticFeedback.lightImpact();
+    FocusScope.of(context).unfocus();
     final picked = await showDatePicker(
       context: context,
       initialDate: _targetDate,
       firstDate: DateTime.now().add(const Duration(days: 1)),
       lastDate: DateTime(2101),
       locale: const Locale('es'),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            dialogBackgroundColor: Theme.of(context).colorScheme.surface,
-          ),
-          child: child!,
-        );
-      },
     );
-    if (picked != null) {
-      HapticFeedback.mediumImpact();
+    if (picked != null && mounted) {
+      HapticFeedback.selectionClick();
       setState(() => _targetDate = picked);
+      _onInputChanged(); // recalcular plan
     }
   }
 
-  void _showConfirmationModal() {
+  void _requestConfirm() {
     if (!_formKey.currentState!.validate()) {
       HapticFeedback.heavyImpact();
       return;
     }
-
-    HapticFeedback.lightImpact();
+    FocusScope.of(context).unfocus();
+    final c = _C(context);
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => _PremiumConfirmModal(
-        goalName: _nameController.text,
-        targetAmount: _targetAmount,
-        targetDate: _targetDate,
-        monthlyContribution: _monthlyContribution,
-        viabilityStatus: _viabilityStatus,
-        percentageOfIncome: _percentageOfIncome,
-        onConfirm: _saveGoal,
+      builder: (_) => _ConfirmSheet(
+        name:     _nameCtrl.text.trim(),
+        amount:   _amount,
+        date:     _targetDate,
+        monthly:  _monthly,
+        priority: _priority,
+        c:        c,
+        onConfirm: _save,
       ),
     );
   }
 
-  Future<void> _saveGoal() async {
-    if (_isLoading || _isSuccess) return;
-    Navigator.pop(context);
-    setState(() => _isLoading = true);
+  Future<void> _save() async {
+    if (_isSaving || _isSuccess) return;
+    setState(() => _isSaving = true);
 
     try {
-       // --- CORRECCIÓN 1: Calcular el Timeframe Automáticamente ---
-      // El usuario elige fecha, nosotros determinamos si es Corto, Medio o Largo.
-      GoalTimeframe calculatedTimeframe;
       final months = _monthsRemaining;
+      final timeframe = months <= 12
+          ? GoalTimeframe.short
+          : months <= 36
+              ? GoalTimeframe.medium
+              : GoalTimeframe.long;
 
-      if (months <= 12) {
-        calculatedTimeframe = GoalTimeframe.short; // Menos de 1 año
-      } else if (months <= 36) {
-        calculatedTimeframe = GoalTimeframe.medium; // 1 a 3 años
-      } else {
-        calculatedTimeframe = GoalTimeframe.long; // Más de 3 años
-      }
-
-      await _goalRepository.addGoal(
-        name: _nameController.text.trim(),
-        targetAmount: _targetAmount,
-        targetDate: _targetDate,
-        priority: _priority,
-        categoryId: _selectedCategory?.id,
-        // Envíamos el calculado, NUNCA 'custom' si la BD no lo soporta
-        timeframe: calculatedTimeframe, 
+      await _goalRepo.addGoal(
+        name:         _nameCtrl.text.trim(),
+        targetAmount: _amount,
+        targetDate:   _targetDate,
+        priority:     _priority,
+        timeframe:    timeframe,
       );
 
       if (mounted) {
-        HapticFeedback.heavyImpact();
-        setState(() => _isSuccess = true);
-        _confettiController.play();
+        setState(() { _isSuccess = true; _isSaving = false; });
+        HapticFeedback.lightImpact();
+        _confettiCtrl.play();
         EventService.instance.fire(AppEvent.goalCreated);
 
-        await Future.delayed(const Duration(milliseconds: 2000));
-        if (mounted) Navigator.of(context).pop(true);
-
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          NotificationHelper.show(
-            message: '¡Tu futuro acaba de mejorar! 🎯',
-            type: NotificationType.success,
-          );
-        });
+        await Future.delayed(const Duration(milliseconds: 1800));
+        if (mounted) {
+          Navigator.of(context).pop(true);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            NotificationHelper.show(
+              message: 'Meta creada correctamente.',
+              type: NotificationType.success,
+            );
+          });
+        }
       }
     } catch (e) {
-      developer.log('🔥 FALLO AL CREAR META: $e', name: 'AddGoalScreen');
+      developer.log('Error al crear meta: $e');
       if (mounted) {
+        setState(() => _isSaving = false);
         HapticFeedback.heavyImpact();
         NotificationHelper.show(
           message: 'Error al crear la meta.',
           type: NotificationType.error,
         );
       }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
   }
 
+  // ─── BUILD ────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = _C(context);
 
-    // AÑADIMOS UN LOADER PARA LA CARGA INICIAL DE DATOS
-    if (_isDataLoading) {
-      // Usamos un Stack para que el fondo se muestre mientras carga
-      return Stack(
-        children: [
-          _DynamicGoalBackground(goalName: '', viabilityStatus: ViabilityStatus.feasible),
-          const Scaffold(
-            backgroundColor: Colors.transparent,
-            body: Center(child: CircularProgressIndicator()),
+    // Estado de carga inicial — limpio, sin fondo decorativo
+    if (_isLoadingData) {
+      return Scaffold(
+        backgroundColor: c.bg,
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 24, height: 24,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: c.label3),
+              ),
+              const SizedBox(height: _C.md),
+              Text('Cargando datos financieros…',
+                  style: TextStyle(fontSize: 13, color: c.label3)),
+            ],
           ),
-        ],
+        ),
       );
     }
 
-    return Stack(
-      children: [
-        // Fondo dinámico
-        _DynamicGoalBackground(
-          goalName: _nameController.text,
-          viabilityStatus: _viabilityStatus,
-        ),
-
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor:          Colors.transparent,
+        statusBarIconBrightness: c.isDark ? Brightness.light : Brightness.dark,
+        statusBarBrightness:     c.isDark ? Brightness.dark  : Brightness.light,
+      ),
+      child: Stack(children: [
         Scaffold(
-          backgroundColor: Colors.transparent,
-          body: CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              // HEADER
-              _buildPremiumHeader(),
+          backgroundColor: c.bg,
+          body: Form(
+            key: _formKey,
+            child: CustomScrollView(
+              physics: const BouncingScrollPhysics(),
+              slivers: [
+                // ── AppBar limpio ─────────────────────────────────────
+                SliverAppBar(
+                  pinned: true,
+                  elevation: 0,
+                  scrolledUnderElevation: 0,
+                  backgroundColor: c.bg,
+                  surfaceTintColor: Colors.transparent,
+                  automaticallyImplyLeading: false,
+                  leading: _BackBtn(c: c),
+                  title: Text('Nueva meta',
+                      style: TextStyle(
+                        fontSize: 17, fontWeight: FontWeight.w600,
+                        color: c.label, letterSpacing: -0.3,
+                      )),
+                ),
 
-              // HERO CARD FLOTANTE
-              _buildFloatingHeroCard(colorScheme, isDark),
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(
+                      _C.md, _C.sm, _C.md, 0),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
 
-              // CONTENIDO
-              SliverPadding(
-                padding: const EdgeInsets.all(20),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate([
-                    Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 24),
+                      // ── Hero — nombre + monto en tiempo real ────────
+                      _HeroCard(
+                          name:   _nameCtrl.text,
+                          amount: _amount,
+                          months: _monthsRemaining,
+                          v:      _viability,
+                          c:      c),
+                      const SizedBox(height: _C.lg),
 
-                          // Definición de meta
-                          _buildSectionLabel(
-                              'Define tu meta', Iconsax.flag, colorScheme),
-                          const SizedBox(height: 16),
-                          _buildGoalDefinition(colorScheme),
+                      // ── Nombre ────────────────────────────────────
+                      _SectionLabel(text: '¿Qué quieres lograr?', c: c),
+                      const SizedBox(height: _C.sm),
+                      _NameField(ctrl: _nameCtrl, c: c),
+                      const SizedBox(height: _C.lg),
 
-                          const SizedBox(height: 32),
+                      // ── Monto ─────────────────────────────────────
+                      _SectionLabel(text: 'Monto objetivo', c: c),
+                      const SizedBox(height: _C.sm),
+                      _AmountInput(ctrl: _amountCtrl, c: c),
+                      const SizedBox(height: _C.lg),
 
-                          // Monto objetivo
-                          _buildSectionLabel(
-                              'Monto objetivo', Iconsax.dollar_circle, colorScheme),
-                          const SizedBox(height: 16),
-                          _PremiumAmountField(
-                            controller: _targetAmountController,
-                            colorScheme: colorScheme,
-                          ),
+                      // ── Fecha + Prioridad ─────────────────────────
+                      _SectionLabel(text: 'Plazo y prioridad', c: c),
+                      const SizedBox(height: _C.sm),
+                      _DateTile(
+                        date:      _targetDate,
+                        months:    _monthsRemaining,
+                        c:         c,
+                        onTap:     _pickDate,
+                      ),
+                      const SizedBox(height: _C.sm),
+                      _PrioritySelector(
+                        priority:  _priority,
+                        c:         c,
+                        onChanged: (p) {
+                          HapticFeedback.selectionClick();
+                          setState(() => _priority = p);
+                        },
+                      ),
 
-                          const SizedBox(height: 32),
-
-                          // Plazo y prioridad
-                          _buildSectionLabel(
-                              'Plazo y prioridad', Iconsax.calendar_1, colorScheme),
-                          const SizedBox(height: 16),
-                          _buildTimeframeSection(colorScheme),
-
-                          const SizedBox(height: 32),
-
-                          // Plan de ahorro sugerido
-                          if (_monthlyContribution > 0) ...[
-                            _buildSectionLabel('Plan de ahorro sugerido',
-                                Iconsax.chart_success, colorScheme),
-                            const SizedBox(height: 16),
-                            AnimatedBuilder(
-                              animation: _progressAnimation,
-                              child: _SavingsPlanPremium(
-                                monthlyContribution: _monthlyContribution,
-                                targetAmount: _targetAmount,
-                                monthsRemaining: _monthsRemaining,
-                              ),
-                              builder: (context, child) {
-                                return FadeTransition(
-                                  opacity: _progressAnimation,
+                      // ── Plan card — solo cuando hay datos ─────────
+                      // AnimatedSize para entrada/salida suave sin saltos
+                      AnimatedSize(
+                        duration: _C.mid,
+                        curve:    _C.easeOut,
+                        child: _hasPlan
+                            ? Padding(
+                                padding: const EdgeInsets.only(top: _C.lg),
+                                child: FadeTransition(
+                                  opacity: _planAnim,
                                   child: SlideTransition(
                                     position: Tween<Offset>(
-                                      begin: const Offset(0, 0.2),
-                                      end: Offset.zero,
-                                    ).animate(_progressAnimation),
-                                    child: child,
+                                      begin: const Offset(0, 0.04),
+                                      end:   Offset.zero,
+                                    ).animate(_planAnim),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        _SectionLabel(
+                                            text: 'Tu plan de ahorro', c: c),
+                                        const SizedBox(height: _C.sm),
+                                        _PlanCard(
+                                          daily:   _daily,
+                                          weekly:  _weekly,
+                                          monthly: _monthly,
+                                          c:       c,
+                                        ),
+                                        const SizedBox(height: _C.sm),
+                                        // Viabilidad — parte del plan, no sección aparte
+                                        _ViabilityRow(
+                                          v:          _viability,
+                                          pctIncome:  _pctIncome,
+                                          c:          c,
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 32),
-                          ],
-
-                          // Viabilidad AI
-                          if (_monthlyContribution > 0)
-                            AnimatedBuilder(
-                              animation: _viabilityAnimation,
-                              child: _ViabilityAIIndicator(
-                                viabilityStatus: _viabilityStatus,
-                                percentageOfIncome: _percentageOfIncome,
-                                monthlyContribution: _monthlyContribution,
-                              ),
-                              builder: (context, child) {
-                                return ScaleTransition(
-                                  scale: _viabilityAnimation,
-                                  child: child,
-                                );
-                              },
-                            ),
-
-                          const SizedBox(height: 120),
-                        ],
+                                ),
+                              )
+                            : const SizedBox.shrink(),
                       ),
-                    ),
-                  ]),
+
+                      const SizedBox(height: 100),
+                    ]),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
 
-        // BOTÓN FLOTANTE
-        _buildFloatingActionButton(colorScheme),
+        // ── Botón flotante ────────────────────────────────────────────
+        _FloatBtn(
+          isSaving:  _isSaving,
+          isSuccess: _isSuccess,
+          c:         _C(context),
+          onTap:     _requestConfirm,
+        ),
 
-        // CONFETTI
-        _ConfettiCelebration(controller: _confettiController),
-      ],
+        // ── Confetti ──────────────────────────────────────────────────
+        Align(
+          alignment: Alignment.topCenter,
+          child: ConfettiWidget(
+            confettiController: _confettiCtrl,
+            blastDirectionality: BlastDirectionality.explosive,
+            shouldLoop: false,
+            numberOfParticles: 44,
+            gravity: 0.26,
+            colors: const [
+              _C.blue, _C.green, _C.orange, _C.purple, _C.red, _C.teal,
+            ],
+            createParticlePath: _starPath,
+          ),
+        ),
+      ]),
     );
   }
+}
 
-  // ==================== COMPONENTES ====================
+// ─── HERO CARD ────────────────────────────────────────────────────────────────
+// Nombre + monto + meses en una tarjeta compacta.
+// El badge de viabilidad aparece solo cuando hay datos.
+// Sin BackdropFilter, sin gradiente, sin border doble.
+class _HeroCard extends StatelessWidget {
+  final String    name;
+  final double    amount;
+  final int       months;
+  final _Viability v;
+  final _C        c;
 
-  Widget _buildPremiumHeader() {
-    return SliverAppBar(
-      expandedHeight: 120,
-      floating: false,
-      pinned: true,
-      elevation: 0,
-      backgroundColor: Colors.transparent,
-      flexibleSpace: FlexibleSpaceBar(
-        background: Padding(
-          padding: const EdgeInsets.only(left: 20, right: 20, top: 80),
+  const _HeroCard({
+    required this.name, required this.amount, required this.months,
+    required this.v, required this.c,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = NumberFormat.compactCurrency(
+        locale: 'es_CO', symbol: '\$', decimalDigits: 1);
+    final hasData = amount > 0 || name.isNotEmpty;
+
+    return AnimatedContainer(
+      duration: _C.mid,
+      padding: const EdgeInsets.all(_C.md),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(_C.r2XL),
+        border: Border.all(
+          color: hasData
+              ? _C.blue.withOpacity(0.18) : c.sep.withOpacity(0.40),
+          width: 0.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(c.isDark ? 0.18 : 0.04),
+              blurRadius: 10, offset: const Offset(0, 3)),
+        ],
+      ),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Ícono de meta
+        Container(
+          width: 46, height: 46,
+          decoration: BoxDecoration(
+            color: _C.blue.withOpacity(c.isDark ? 0.20 : 0.10),
+            borderRadius: BorderRadius.circular(_C.rMD),
+          ),
+          child: const Icon(Iconsax.flag, size: 20, color: _C.blue),
+        ),
+        const SizedBox(width: _C.md),
+
+        // Nombre y monto
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Theme.of(context).colorScheme.primary,
-                          Theme.of(context).colorScheme.tertiary,
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .primary
-                              .withOpacity(0.3),
-                          blurRadius: 12,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: Icon(
-                      Iconsax.flag,
-                      color: Colors.white,
-                      size: 28,
+              AnimatedSwitcher(
+                duration: _C.fast,
+                transitionBuilder: (child, anim) =>
+                    FadeTransition(opacity: anim, child: child),
+                child: Text(
+                  name.isEmpty ? 'Define tu meta' : name,
+                  key: ValueKey(name.isEmpty),
+                  style: TextStyle(
+                    fontSize: 15, fontWeight: FontWeight.w700,
+                    color: name.isEmpty ? c.label4 : c.label,
+                    letterSpacing: -0.2,
+                  ),
+                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Row(children: [
+                AnimatedSwitcher(
+                  duration: _C.fast,
+                  child: Text(
+                    amount > 0 ? compact.format(amount) : '—',
+                    key: ValueKey(amount > 0),
+                    style: TextStyle(
+                      fontSize: 24, fontWeight: FontWeight.w800,
+                      color: amount > 0 ? _C.blue : c.label4,
+                      letterSpacing: -0.8,
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Text(
-                      'Nueva Meta',
-                      style: GoogleFonts.poppins(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                ),
+                if (months > 0) ...[
+                  const SizedBox(width: _C.sm),
+                  Text(
+                    'en $months meses',
+                    style: TextStyle(fontSize: 12, color: c.label3),
                   ),
                 ],
-              ),
+              ]),
             ],
           ),
         ),
-      ),
-    );
-  }
 
-  Widget _buildFloatingHeroCard(ColorScheme colorScheme, bool isDark) {
-    return SliverPersistentHeader(
-      pinned: true,
-      delegate: _HeroCardDelegate(
-        minHeight: 140,
-        maxHeight: 140,
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                colorScheme.primary.withOpacity(0.15),
-                colorScheme.tertiary.withOpacity(0.05),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(
-              color: colorScheme.primary.withOpacity(0.3),
-              width: 2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: colorScheme.primary.withOpacity(0.2),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(26),
-            child: BackdropFilter(
-              filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 300),
-                          child: Text(
-                            _nameController.text.isEmpty
-                                ? 'Tu próxima meta'
-                                : _nameController.text,
-                            key: ValueKey(_nameController.text),
-                            style: GoogleFonts.poppins(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-                      _ViabilityBadgeMini(status: _viabilityStatus),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Expanded(
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 400),
-                          transitionBuilder: (child, animation) =>
-                              ScaleTransition(scale: animation, child: child),
-                          child: Text(
-                            NumberFormat.currency(
-                              locale: 'es_CO',
-                              symbol: '\$',
-                              decimalDigits: 0,
-                            ).format(_targetAmount),
-                            key: ValueKey(_targetAmount),
-                            style: GoogleFonts.poppins(
-                              fontSize: 36,
-                              fontWeight: FontWeight.bold,
-                              color: colorScheme.primary,
-                            ),
-                          ),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Text(
-                          'en $_monthsRemaining meses',
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSectionLabel(String label, IconData icon, ColorScheme colorScheme) {
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: colorScheme.primary),
-        const SizedBox(width: 8),
-        Text(
-          label,
-          style: GoogleFonts.poppins(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: colorScheme.primary,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildGoalDefinition(ColorScheme colorScheme) {
-    return _PremiumTextField(
-      controller: _nameController,
-      hint: 'Ej: Viaje a Japón, Auto nuevo',
-      icon: Iconsax.flag,
-      colorScheme: colorScheme,
-      validator: (value) =>
-          (value == null || value.trim().isEmpty) ? 'El nombre es obligatorio' : null,
-    );
-  }
-
-  Widget _buildTimeframeSection(ColorScheme colorScheme) {
-    return Column(
-      children: [
-        // Selector de fecha
-        Material(
-          color: colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(20),
-          child: InkWell(
-            onTap: () => _selectDate(context),
-            borderRadius: BorderRadius.circular(20),
+        // Badge viabilidad — solo cuando hay plan
+        if (v != _Viability.none)
+          AnimatedSwitcher(
+            duration: _C.mid,
             child: Container(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  Icon(Iconsax.calendar_1, color: colorScheme.primary),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Fecha límite',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          DateFormat('d MMMM yyyy', 'es_CO').format(_targetDate),
-                          style: GoogleFonts.poppins(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Icon(Iconsax.arrow_right_3,
-                      size: 18, color: colorScheme.onSurfaceVariant),
-                ],
+              key: ValueKey(v),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: _C.sm + 2, vertical: _C.xs + 2),
+              decoration: BoxDecoration(
+                color: v.color.withOpacity(c.isDark ? 0.18 : 0.09),
+                borderRadius: BorderRadius.circular(_C.rMD),
+                border: Border.all(
+                    color: v.color.withOpacity(0.25), width: 0.5),
               ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(v.icon, size: 12, color: v.color),
+                const SizedBox(width: 4),
+                Text(v.label,
+                    style: TextStyle(
+                      fontSize: 11, fontWeight: FontWeight.w700,
+                      color: v.color,
+                    )),
+              ]),
             ),
           ),
-        ),
-
-        const SizedBox(height: 16),
-
-        // Selector de prioridad
-        Container(
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            children: GoalPriority.values.map((p) {
-              return Expanded(
-                child: _PriorityButton(
-                  priority: p,
-                  isSelected: _priority == p,
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    setState(() => _priority = p);
-                  },
-                  colorScheme: colorScheme,
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFloatingActionButton(ColorScheme colorScheme) {
-    return Positioned(
-      left: 20,
-      right: 20,
-      bottom: 30,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        height: 64,
-        decoration: BoxDecoration(
-          gradient: _isSuccess
-              ? LinearGradient(colors: [Colors.green, Colors.green.shade700])
-              : LinearGradient(
-                  colors: [colorScheme.primary, colorScheme.tertiary],
-                ),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color:
-                  (_isSuccess ? Colors.green : colorScheme.primary).withOpacity(0.4),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: _isLoading || _isSuccess ? null : _showConfirmationModal,
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              alignment: Alignment.center,
-              child: _isLoading
-                  ? const SizedBox(
-                      height: 28,
-                      width: 28,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 3,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          _isSuccess ? Iconsax.tick_circle : Iconsax.add_square,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          _isSuccess ? '¡Meta Creada!' : 'Crear Meta',
-                          style: GoogleFonts.poppins(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-            ),
-          ),
-        ),
-      ).animate().slideY(begin: 2, delay: 400.ms, curve: Curves.easeOutBack),
+      ]),
     );
   }
 }
 
-// ==================== WIDGETS PERSONALIZADOS ====================
+// ─── NAME FIELD ───────────────────────────────────────────────────────────────
+class _NameField extends StatefulWidget {
+  final TextEditingController ctrl;
+  final _C c;
+  const _NameField({required this.ctrl, required this.c});
 
-// 1. FONDO DINÁMICO
-class _DynamicGoalBackground extends StatelessWidget {
-  final String goalName;
-  final ViabilityStatus viabilityStatus;
+  @override
+  State<_NameField> createState() => _NameFieldState();
+}
 
-  const _DynamicGoalBackground({
-    required this.goalName,
-    required this.viabilityStatus,
-  });
+class _NameFieldState extends State<_NameField> {
+  final _focus  = FocusNode();
+  bool _focused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(() {
+      if (mounted) setState(() => _focused = _focus.hasFocus);
+    });
+  }
+
+  @override
+  void dispose() { _focus.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    Color primaryColor;
-    switch (viabilityStatus) {
-      case ViabilityStatus.feasible:
-        primaryColor = Colors.green;
-        break;
-      case ViabilityStatus.challenging:
-        primaryColor = Colors.orange;
-        break;
-      case ViabilityStatus.highRisk:
-        primaryColor = Colors.red;
-        break;
-    }
-
+    final c = widget.c;
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 800),
+      duration: _C.fast,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            primaryColor.withOpacity(isDark ? 0.08 : 0.05),
-            Theme.of(context).colorScheme.surface,
-            Theme.of(context).colorScheme.surface,
-          ],
+        color: c.surface,
+        borderRadius: BorderRadius.circular(_C.rXL),
+        border: Border.all(
+          color: _focused
+              ? _C.blue.withOpacity(0.55) : c.sep.withOpacity(0.40),
+          width: _focused ? 1.5 : 0.5,
         ),
-      ),
-    );
-  }
-}
-
-// 2. CAMPO DE TEXTO PREMIUM
-class _PremiumTextField extends StatelessWidget {
-  final TextEditingController controller;
-  final String hint;
-  final IconData icon;
-  final ColorScheme colorScheme;
-  final String? Function(String?)? validator;
-
-  const _PremiumTextField({
-    required this.controller,
-    required this.hint,
-    required this.icon,
-    required this.colorScheme,
-    this.validator,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return TextFormField(
-      controller: controller,
-      style: GoogleFonts.inter(fontSize: 16),
-      decoration: InputDecoration(
-        hintText: hint,
-        prefixIcon: Icon(icon, color: colorScheme.primary),
-        filled: true,
-        fillColor: colorScheme.surfaceContainerHighest,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(20),
-          borderSide: BorderSide.none,
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(20),
-          borderSide: BorderSide(color: colorScheme.primary, width: 2),
-        ),
-      ),
-      validator: validator,
-    );
-  }
-}
-
-// 3. CAMPO DE MONTO PREMIUM
-class _PremiumAmountField extends StatelessWidget {
-  final TextEditingController controller;
-  final ColorScheme colorScheme;
-
-  const _PremiumAmountField({
-    required this.controller,
-    required this.colorScheme,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
-      child: Column(
-        children: [
-          Text(
-            'Monto que quieres ahorrar',
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: controller,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(
-              fontSize: 48,
-              fontWeight: FontWeight.bold,
-              color: colorScheme.primary,
-            ),
-            keyboardType: const TextInputType.numberWithOptions(decimal: false),
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              _CurrencyInputFormatter(),
-            ],
-            decoration: InputDecoration(
-              border: InputBorder.none,
-              hintText: '\$ 0',
-              hintStyle: GoogleFonts.poppins(
-                fontSize: 48,
-                fontWeight: FontWeight.bold,
-                color: colorScheme.onSurface.withOpacity(0.2),
-              ),
-            ),
-            validator: (value) {
-              if (value == null || value.isEmpty) return 'Ingresa un monto';
-              final amount =
-                  int.tryParse(value.replaceAll(RegExp(r'[^0-9]'), ''));
-              if (amount == null || amount <= 0) return 'Monto inválido';
-              return null;
-            },
+        boxShadow: [
+          BoxShadow(
+            color: _focused
+                ? _C.blue.withOpacity(c.isDark ? 0.10 : 0.06)
+                : Colors.black.withOpacity(c.isDark ? 0.14 : 0.03),
+            blurRadius: _focused ? 12 : 5,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
+      child: TextFormField(
+        controller:          widget.ctrl,
+        focusNode:           _focus,
+        textCapitalization:  TextCapitalization.sentences,
+        onChanged:           (_) => HapticFeedback.selectionClick(),
+        style: TextStyle(
+            fontSize: 16, fontWeight: FontWeight.w600, color: c.label),
+        validator: (v) =>
+            (v == null || v.trim().isEmpty) ? '' : null,
+        decoration: InputDecoration(
+          hintText: 'Ej: Viaje a Japón, Auto nuevo…',
+          hintStyle: TextStyle(
+              fontSize: 15, color: c.label4, fontWeight: FontWeight.w400),
+          prefixIcon: Padding(
+            padding: const EdgeInsets.only(left: 4),
+            child: Icon(Iconsax.flag, size: 18,
+                color: _focused ? _C.blue : c.label4),
+          ),
+          border:         InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+              horizontal: _C.md, vertical: 16),
+          errorStyle: const TextStyle(height: 0, fontSize: 0),
+        ),
+      ),
     );
   }
 }
 
-class _CurrencyInputFormatter extends TextInputFormatter {
+// ─── AMOUNT INPUT ─────────────────────────────────────────────────────────────
+// El número es el protagonista — 42px w800.
+// El controller viene del padre para sobrevivir rebuilds.
+class _AmountInput extends StatefulWidget {
+  final TextEditingController ctrl;
+  final _C c;
+  const _AmountInput({required this.ctrl, required this.c});
+
+  @override
+  State<_AmountInput> createState() => _AmountInputState();
+}
+
+class _AmountInputState extends State<_AmountInput> {
+  final _focus  = FocusNode();
+  bool _focused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(() {
+      if (mounted) setState(() => _focused = _focus.hasFocus);
+    });
+  }
+
+  @override
+  void dispose() { _focus.dispose(); super.dispose(); }
+
+  bool get _hasValue =>
+      (double.tryParse(
+              widget.ctrl.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0) > 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.c;
+    return AnimatedContainer(
+      duration: _C.fast,
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(_C.r2XL),
+        border: Border.all(
+          color: _focused
+              ? _C.blue.withOpacity(0.50) : c.sep.withOpacity(0.40),
+          width: _focused ? 1.5 : 0.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: _focused
+                ? _C.blue.withOpacity(c.isDark ? 0.10 : 0.06)
+                : Colors.black.withOpacity(c.isDark ? 0.14 : 0.03),
+            blurRadius: _focused ? 16 : 6, offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(vertical: _C.lg),
+      child: TextFormField(
+        controller:   widget.ctrl,
+        focusNode:    _focus,
+        textAlign:    TextAlign.center,
+        keyboardType: const TextInputType.numberWithOptions(decimal: false),
+        inputFormatters: [
+          FilteringTextInputFormatter.digitsOnly,
+          _MoneyFmt(),
+        ],
+        onChanged: (_) {
+          HapticFeedback.selectionClick();
+          setState(() {});
+        },
+        validator: (v) {
+          if (v == null || v.isEmpty) return '';
+          final n = int.tryParse(v.replaceAll(RegExp(r'[^0-9]'), ''));
+          if (n == null || n <= 0) return '';
+          return null;
+        },
+        style: TextStyle(
+          fontSize: 42, fontWeight: FontWeight.w800,
+          color: _hasValue ? _C.blue : c.label4,
+          letterSpacing: -1.5, height: 1.0,
+        ),
+        decoration: InputDecoration(
+          border:         InputBorder.none,
+          hintText:       '\$ 0',
+          hintStyle: TextStyle(
+            fontSize: 42, fontWeight: FontWeight.w800,
+            color: c.label4, letterSpacing: -1.5,
+          ),
+          contentPadding: EdgeInsets.zero,
+          errorStyle:     const TextStyle(height: 0, fontSize: 0),
+        ),
+      ),
+    );
+  }
+}
+
+class _MoneyFmt extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
-      TextEditingValue oldValue, TextEditingValue newValue) {
-    if (newValue.text.isEmpty) return newValue.copyWith(text: '');
-
-    final number =
-        int.tryParse(newValue.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
-    final format = NumberFormat.currency(
-      locale: 'es_CO',
-      symbol: '\$',
-      decimalDigits: 0,
-    );
-    final newText = format.format(number);
-
-    return newValue.copyWith(
-      text: newText,
-      selection: TextSelection.collapsed(offset: newText.length),
-    );
+      TextEditingValue old, TextEditingValue next) {
+    if (next.text.isEmpty) return next.copyWith(text: '');
+    final n = int.tryParse(next.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+    final s = NumberFormat.currency(
+        locale: 'es_CO', symbol: '\$', decimalDigits: 0).format(n);
+    return next.copyWith(
+        text: s, selection: TextSelection.collapsed(offset: s.length));
   }
 }
 
-// 4. BOTÓN DE PRIORIDAD
-class _PriorityButton extends StatelessWidget {
-  final GoalPriority priority;
-  final bool isSelected;
+// ─── DATE TILE ────────────────────────────────────────────────────────────────
+// Un tile que muestra fecha formateada + "X meses" como subtítulo.
+// El subtítulo es el dato más útil — cambia en tiempo real al elegir fecha.
+class _DateTile extends StatelessWidget {
+  final DateTime date;
+  final int      months;
+  final _C       c;
   final VoidCallback onTap;
-  final ColorScheme colorScheme;
 
-  const _PriorityButton({
-    required this.priority,
-    required this.isSelected,
-    required this.onTap,
-    required this.colorScheme,
+  const _DateTile({
+    required this.date, required this.months,
+    required this.c, required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      child: Material(
-        color: isSelected
-            ? colorScheme.primary.withOpacity(0.15)
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            child: Text(
-              priority.name.toUpperCase(),
-              textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(
-                fontSize: 13,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                color: isSelected
-                    ? colorScheme.primary
-                    : colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
+    // Etiqueta contextual del plazo
+    final String timeframeHint = months <= 0
+        ? 'Fecha inválida'
+        : months <= 12  ? 'Meta corto plazo (<1 año)'
+        : months <= 36  ? 'Meta medio plazo (1-3 años)'
+                        : 'Meta largo plazo (>3 años)';
 
-// 5. PLAN DE AHORRO PREMIUM
-class _SavingsPlanPremium extends StatelessWidget {
-  final double monthlyContribution;
-  final double targetAmount;
-  final int monthsRemaining;
-
-  const _SavingsPlanPremium({
-    required this.monthlyContribution,
-    required this.targetAmount,
-    required this.monthsRemaining,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final currencyFormat = NumberFormat.currency(
-      locale: 'es_CO',
-      symbol: '\$',
-      decimalDigits: 0,
-    );
-
-    final weekly = monthlyContribution / 4.345;
-    final daily = monthlyContribution / 30.437;
-
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colorScheme.primaryContainer.withOpacity(0.5),
-            colorScheme.tertiaryContainer.withOpacity(0.3),
+    return _ScaleBtn(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(_C.md),
+        decoration: BoxDecoration(
+          color: c.surface,
+          borderRadius: BorderRadius.circular(_C.rXL),
+          border: Border.all(color: c.sep.withOpacity(0.40), width: 0.5),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withOpacity(c.isDark ? 0.14 : 0.03),
+                blurRadius: 5, offset: const Offset(0, 1)),
           ],
         ),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: colorScheme.primary.withOpacity(0.3),
-          width: 2,
-        ),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [colorScheme.primary, colorScheme.tertiary],
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Iconsax.wallet_money,
-                    color: Colors.white, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Deberás ahorrar',
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(
-                child: _ContributionCard(
-                  label: 'Diario',
-                  amount: daily,
-                  format: currencyFormat,
-                  icon: Iconsax.calendar_1,
-                  colorScheme: colorScheme,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _ContributionCard(
-                  label: 'Semanal',
-                  amount: weekly,
-                  format: currencyFormat,
-                  icon: Iconsax.calendar,
-                  colorScheme: colorScheme,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _ContributionCard(
-                  label: 'Mensual',
-                  amount: monthlyContribution,
-                  format: currencyFormat,
-                  icon: Iconsax.calendar_tick,
-                  colorScheme: colorScheme,
-                  isHighlighted: true,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          // Barra de progreso hacia la meta
-          _AnimatedProgressSparkline(
-            targetAmount: targetAmount,
-            monthsRemaining: monthsRemaining,
-            monthlyContribution: monthlyContribution,
-            colorScheme: colorScheme,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ContributionCard extends StatelessWidget {
-  final String label;
-  final double amount;
-  final NumberFormat format;
-  final IconData icon;
-  final ColorScheme colorScheme;
-  final bool isHighlighted;
-
-  const _ContributionCard({
-    required this.label,
-    required this.amount,
-    required this.format,
-    required this.icon,
-    required this.colorScheme,
-    this.isHighlighted = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isHighlighted
-            ? colorScheme.primary.withOpacity(0.15)
-            : colorScheme.surface.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(16),
-        border: isHighlighted
-            ? Border.all(color: colorScheme.primary, width: 2)
-            : null,
-      ),
-      child: Column(
-        children: [
-          Icon(
-            icon,
-            size: 20,
-            color: isHighlighted ? colorScheme.primary : colorScheme.onSurfaceVariant,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: GoogleFonts.inter(
-              fontSize: 11,
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            format.format(amount),
-            style: GoogleFonts.poppins(
-              fontSize: isHighlighted ? 16 : 14,
-              fontWeight: FontWeight.bold,
-              color: isHighlighted ? colorScheme.primary : colorScheme.onSurface,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// 6. SPARKLINE DE PROGRESO ANIMADO
-class _AnimatedProgressSparkline extends StatelessWidget {
-  final double targetAmount;
-  final int monthsRemaining;
-  final double monthlyContribution;
-  final ColorScheme colorScheme;
-
-  const _AnimatedProgressSparkline({
-    required this.targetAmount,
-    required this.monthsRemaining,
-    required this.monthlyContribution,
-    required this.colorScheme,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Proyección de ahorro',
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-            Text(
-              '$monthsRemaining meses',
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: colorScheme.primary,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: LinearProgressIndicator(
-            value: 0,
-            minHeight: 8,
-            backgroundColor: colorScheme.surfaceContainerHighest,
-            valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Inicio',
-              style: GoogleFonts.inter(
-                fontSize: 11,
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-            Text(
-              NumberFormat.compactCurrency(
-                locale: 'es_CO',
-                symbol: '\$',
-                decimalDigits: 0,
-              ).format(targetAmount),
-              style: GoogleFonts.poppins(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: colorScheme.primary,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-// 7. INDICADOR DE VIABILIDAD AI
-class _ViabilityAIIndicator extends StatelessWidget {
-  final ViabilityStatus viabilityStatus;
-  final double percentageOfIncome;
-  final double monthlyContribution;
-
-  const _ViabilityAIIndicator({
-    required this.viabilityStatus,
-    required this.percentageOfIncome,
-    required this.monthlyContribution,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    Color statusColor;
-    IconData statusIcon;
-    String statusTitle;
-    String statusMessage;
-
-    switch (viabilityStatus) {
-      case ViabilityStatus.feasible:
-        statusColor = Colors.green;
-        statusIcon = Iconsax.tick_circle;
-        statusTitle = '¡Excelente plan!';
-        statusMessage =
-            'Este ahorro representa solo el ${percentageOfIncome.toStringAsFixed(1)}% de tu ingreso. Es un nivel muy saludable y sostenible. ✅';
-        break;
-      case ViabilityStatus.challenging:
-        statusColor = Colors.orange;
-        statusIcon = Iconsax.info_circle;
-        statusTitle = 'Plan desafiante';
-        statusMessage =
-            'Deberás ahorrar el ${percentageOfIncome.toStringAsFixed(1)}% de tu ingreso mensual. Es posible, pero requerirá disciplina. Considera ajustar el plazo si lo necesitas.';
-        break;
-      case ViabilityStatus.highRisk:
-        statusColor = Colors.red;
-        statusIcon = Iconsax.danger;
-        statusTitle = 'Alto compromiso requerido';
-        statusMessage =
-            '⚠️ Este plan requiere ahorrar el ${percentageOfIncome.toStringAsFixed(1)}% de tu ingreso. Te recomendamos extender el plazo o reducir el monto para que sea más alcanzable.';
-        break;
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            statusColor.withOpacity(0.15),
-            statusColor.withOpacity(0.05),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: statusColor.withOpacity(0.4),
-          width: 2,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [statusColor, statusColor.withOpacity(0.7)],
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: statusColor.withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Icon(statusIcon, color: Colors.white, size: 24),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Análisis de Viabilidad',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    Text(
-                      statusTitle,
-                      style: GoogleFonts.poppins(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            statusMessage,
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              height: 1.5,
-            ),
-          ),
-          const SizedBox(height: 16),
-          // Barra de porcentaje
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Porcentaje de tu ingreso',
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  Text(
-                    '${percentageOfIncome.toStringAsFixed(1)}%',
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: statusColor,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: LinearProgressIndicator(
-                  value: (percentageOfIncome / 100).clamp(0.0, 1.0),
-                  minHeight: 8,
-                  backgroundColor: colorScheme.surfaceContainerHighest,
-                  valueColor: AlwaysStoppedAnimation<Color>(statusColor),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// 8. BADGE DE VIABILIDAD MINI
-class _ViabilityBadgeMini extends StatelessWidget {
-  final ViabilityStatus status;
-
-  const _ViabilityBadgeMini({required this.status});
-
-  @override
-  Widget build(BuildContext context) {
-    Color statusColor;
-    IconData statusIcon;
-
-    switch (status) {
-      case ViabilityStatus.feasible:
-        statusColor = Colors.green;
-        statusIcon = Iconsax.tick_circle;
-        break;
-      case ViabilityStatus.challenging:
-        statusColor = Colors.orange;
-        statusIcon = Iconsax.info_circle;
-        break;
-      case ViabilityStatus.highRisk:
-        statusColor = Colors.red;
-        statusIcon = Iconsax.danger;
-        break;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: statusColor.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: statusColor.withOpacity(0.3)),
-      ),
-      child: Icon(statusIcon, size: 16, color: statusColor),
-    );
-  }
-}
-
-// 9. MODAL DE CONFIRMACIÓN PREMIUM
-class _PremiumConfirmModal extends StatelessWidget {
-  final String goalName;
-  final double targetAmount;
-  final DateTime targetDate;
-  final double monthlyContribution;
-  final ViabilityStatus viabilityStatus;
-  final double percentageOfIncome;
-  final VoidCallback onConfirm;
-
-  const _PremiumConfirmModal({
-    required this.goalName,
-    required this.targetAmount,
-    required this.targetDate,
-    required this.monthlyContribution,
-    required this.viabilityStatus,
-    required this.percentageOfIncome,
-    required this.onConfirm,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final currencyFormat = NumberFormat.currency(
-      locale: 'es_CO',
-      symbol: '\$',
-      decimalDigits: 0,
-    );
-
-    return Container(
-      padding: const EdgeInsets.all(28),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
+        child: Row(children: [
           Container(
-            padding: const EdgeInsets.all(16),
+            width: 36, height: 36,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [colorScheme.primary, colorScheme.tertiary],
-              ),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Iconsax.flag, color: Colors.white, size: 32),
+                color: _C.blue.withOpacity(c.isDark ? 0.18 : 0.09),
+                borderRadius: BorderRadius.circular(_C.rSM)),
+            child: const Icon(Iconsax.calendar_1, size: 16, color: _C.blue),
           ),
-          const SizedBox(height: 24),
-          Text(
-            '¿Crear esta meta?',
-            style: GoogleFonts.poppins(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(20),
-            ),
+          const SizedBox(width: _C.md),
+          Expanded(
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _ConfirmRow('Meta', goalName),
-                const Divider(height: 24),
-                _ConfirmRow('Monto', currencyFormat.format(targetAmount)),
-                const Divider(height: 24),
-                _ConfirmRow(
-                    'Fecha', DateFormat('d MMM yyyy', 'es_CO').format(targetDate)),
-                const Divider(height: 24),
-                _ConfirmRow(
-                    'Ahorro mensual', currencyFormat.format(monthlyContribution)),
+                Text(
+                  DateFormat('d MMMM yyyy', 'es_CO').format(date),
+                  style: TextStyle(
+                    fontSize: 15, fontWeight: FontWeight.w700,
+                    color: c.label, letterSpacing: -0.2,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  months > 0 ? '$months meses · $timeframeHint' : timeframeHint,
+                  style: TextStyle(fontSize: 11, color: c.label3),
+                ),
               ],
             ),
           ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: const Text('Cancelar'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                flex: 2,
-                child: FilledButton.icon(
-                  onPressed: onConfirm,
-                  icon: const Icon(Iconsax.tick_circle),
-                  label: const Text('Confirmar'),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
+          Icon(Icons.keyboard_arrow_down_rounded,
+              size: 20, color: c.label3),
+        ]),
       ),
     );
   }
 }
 
-class _ConfirmRow extends StatelessWidget {
-  final String label;
-  final String value;
+// ─── PRIORITY SELECTOR ───────────────────────────────────────────────────────
+// Segmented control iOS. Los tres niveles con su color semántico.
+// El color del seleccionado comunica la urgencia sin texto adicional.
+class _PrioritySelector extends StatelessWidget {
+  final GoalPriority priority;
+  final _C c;
+  final ValueChanged<GoalPriority> onChanged;
 
-  const _ConfirmRow(this.label, this.value);
+  const _PrioritySelector({
+    required this.priority, required this.c, required this.onChanged,
+  });
+
+  static const _opts = [
+    (p: GoalPriority.low,    label: 'Baja',   color: _C.green),
+    (p: GoalPriority.medium, label: 'Media',  color: _C.orange),
+    (p: GoalPriority.high,   label: 'Alta',   color: _C.red),
+  ];
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 14,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-        Flexible(
-          child: Text(
-            value,
-            style: GoogleFonts.poppins(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
+    return Container(
+      height: 46,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: c.raised,
+        borderRadius: BorderRadius.circular(_C.rXL),
+        border: Border.all(color: c.sep.withOpacity(0.40), width: 0.5),
+      ),
+      child: Row(
+        children: _opts.asMap().entries.map((e) {
+          final i   = e.key;
+          final opt = e.value;
+          final sel = priority == opt.p;
+          return Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(right: i < _opts.length - 1 ? 3 : 0),
+              child: GestureDetector(
+                onTap: () => onChanged(opt.p),
+                child: AnimatedContainer(
+                  duration: _C.fast,
+                  decoration: BoxDecoration(
+                    color: sel
+                        ? opt.color.withOpacity(c.isDark ? 0.22 : 0.12)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(_C.rMD),
+                    border: Border.all(
+                      color: sel
+                          ? opt.color.withOpacity(c.isDark ? 0.50 : 0.35)
+                          : Colors.transparent,
+                      width: sel ? 1.0 : 0,
+                    ),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    opt.label,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
+                      color: sel ? opt.color : c.label3,
+                    ),
+                  ),
+                ),
+              ),
             ),
-            textAlign: TextAlign.end,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// 10. CONFETTI CELEBRATION
-class _ConfettiCelebration extends StatelessWidget {
-  final ConfettiController controller;
-  const _ConfettiCelebration({required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.topCenter,
-      child: ConfettiWidget(
-        confettiController: controller,
-        blastDirectionality: BlastDirectionality.explosive,
-        shouldLoop: false,
-        numberOfParticles: 40,
-        gravity: 0.3,
-        colors: const [
-          Colors.green,
-          Colors.blue,
-          Colors.pink,
-          Colors.orange,
-          Colors.purple,
-          Colors.amber,
-        ],
+          );
+        }).toList(),
       ),
     );
   }
 }
 
-// 11. HERO CARD DELEGATE
-class _HeroCardDelegate extends SliverPersistentHeaderDelegate {
-  final double minHeight;
-  final double maxHeight;
-  final Widget child;
+// ─── PLAN CARD ────────────────────────────────────────────────────────────────
+// La información más valiosa de la pantalla:
+// ¿Cuánto tengo que ahorrar al día, semana y mes?
+//
+// Tres métricas en una fila. La mensual es la principal (más grande).
+// Sin gradientes, sin bordes dobles. El dato habla solo.
+class _PlanCard extends StatelessWidget {
+  final double daily;
+  final double weekly;
+  final double monthly;
+  final _C c;
 
-  _HeroCardDelegate({
-    required this.minHeight,
-    required this.maxHeight,
-    required this.child,
+  const _PlanCard({
+    required this.daily, required this.weekly,
+    required this.monthly, required this.c,
   });
 
   @override
-  Widget build(
-      BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return child;
+  Widget build(BuildContext context) {
+    final compact = NumberFormat.compactCurrency(
+        locale: 'es_CO', symbol: '\$', decimalDigits: 1);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(_C.rXL),
+        border: Border.all(color: c.sep.withOpacity(0.40), width: 0.5),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(c.isDark ? 0.14 : 0.03),
+              blurRadius: 8, offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Column(children: [
+        // Header
+        Padding(
+          padding: const EdgeInsets.fromLTRB(_C.md, _C.md, _C.md, 0),
+          child: Row(children: [
+            Container(
+              width: 30, height: 30,
+              decoration: BoxDecoration(
+                color: _C.blue.withOpacity(c.isDark ? 0.18 : 0.09),
+                borderRadius: BorderRadius.circular(_C.rSM),
+              ),
+              child: const Icon(Iconsax.wallet_money, size: 14, color: _C.blue),
+            ),
+            const SizedBox(width: _C.sm + 2),
+            Text('Necesitas ahorrar',
+                style: TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w700,
+                  color: c.label, letterSpacing: -0.1,
+                )),
+          ]),
+        ),
+
+        const SizedBox(height: _C.md),
+        Container(height: 0.5,
+            margin: const EdgeInsets.symmetric(horizontal: _C.md),
+            color: c.sep.withOpacity(0.5)),
+
+        // Tres métricas
+        Padding(
+          padding: const EdgeInsets.all(_C.md),
+          child: Row(children: [
+            Expanded(child: _PlanMetric(
+              label: 'Diario',
+              value: compact.format(daily),
+              isMain: false, c: c,
+            )),
+            Container(width: 0.5, height: 44, color: c.sep),
+            Expanded(child: _PlanMetric(
+              label: 'Semanal',
+              value: compact.format(weekly),
+              isMain: false, c: c,
+            )),
+            Container(width: 0.5, height: 44, color: c.sep),
+            Expanded(child: _PlanMetric(
+              label: 'Mensual',
+              value: compact.format(monthly),
+              isMain: true, c: c,
+            )),
+          ]),
+        ),
+      ]),
+    );
   }
+}
+
+class _PlanMetric extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool   isMain;
+  final _C     c;
+
+  const _PlanMetric({
+    required this.label, required this.value,
+    required this.isMain, required this.c,
+  });
 
   @override
-  double get maxExtent => maxHeight;
+  Widget build(BuildContext context) {
+    return Column(children: [
+      Text(label,
+          style: TextStyle(
+            fontSize: 10, color: c.label3,
+            fontWeight: FontWeight.w600, letterSpacing: 0.1,
+          )),
+      const SizedBox(height: 4),
+      Text(value,
+          style: TextStyle(
+            fontSize: isMain ? 17 : 14,
+            fontWeight: isMain ? FontWeight.w800 : FontWeight.w600,
+            color: isMain ? _C.blue : c.label2,
+            letterSpacing: -0.3,
+          )),
+    ]);
+  }
+}
+
+// ─── VIABILITY ROW ────────────────────────────────────────────────────────────
+// El semáforo de viabilidad. Vive DEBAJO del plan card — son la misma unidad.
+// No es una tarjeta grande con gradiente. Es una línea de contexto.
+// Si es verde: reafirma. Si es naranja/rojo: sugiere acción concreta.
+class _ViabilityRow extends StatelessWidget {
+  final _Viability v;
+  final double     pctIncome;
+  final _C         c;
+
+  const _ViabilityRow({
+    required this.v, required this.pctIncome, required this.c,
+  });
 
   @override
-  double get minExtent => minHeight;
+  Widget build(BuildContext context) {
+    if (v == _Viability.none) return const SizedBox.shrink();
+
+    final pctText = pctIncome > 0
+        ? '${pctIncome.toStringAsFixed(1)}% de tu ingreso mensual'
+        : '';
+
+    return AnimatedSwitcher(
+      duration: _C.mid,
+      child: Container(
+        key: ValueKey(v),
+        padding: const EdgeInsets.all(_C.md),
+        decoration: BoxDecoration(
+          color: v.color.withOpacity(c.isDark ? 0.10 : 0.05),
+          borderRadius: BorderRadius.circular(_C.rXL),
+          border: Border.all(
+              color: v.color.withOpacity(0.20), width: 0.5),
+        ),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // Ícono semáforo
+          Container(
+            width: 32, height: 32,
+            decoration: BoxDecoration(
+              color: v.color.withOpacity(c.isDark ? 0.20 : 0.10),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(v.icon, size: 15, color: v.color),
+          ),
+          const SizedBox(width: _C.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Título + porcentaje en la misma línea
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(v.label,
+                        style: TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w700,
+                          color: v.color, letterSpacing: -0.1,
+                        )),
+                    if (pctText.isNotEmpty)
+                      Text(pctText,
+                          style: TextStyle(
+                            fontSize: 11, color: v.color,
+                            fontWeight: FontWeight.w600,
+                          )),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(v.message,
+                    style: TextStyle(
+                      fontSize: 12, color: c.label3, height: 1.4,
+                    )),
+                // Barra de porcentaje — solo si hay dato real
+                if (pctIncome > 0) ...[
+                  const SizedBox(height: _C.sm),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: (pctIncome / 100).clamp(0.0, 1.0),
+                      minHeight: 4,
+                      backgroundColor:
+                          v.color.withOpacity(c.isDark ? 0.15 : 0.10),
+                      valueColor: AlwaysStoppedAnimation<Color>(v.color),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+// ─── CONFIRMATION SHEET ───────────────────────────────────────────────────────
+// Resumen limpio antes de guardar.
+// Sin ícono con gradiente circular en el header.
+// Sin FilledButton.icon (usa _ScaleBtn propio para consistencia).
+class _ConfirmSheet extends StatelessWidget {
+  final String      name;
+  final double      amount;
+  final DateTime    date;
+  final double      monthly;
+  final GoalPriority priority;
+  final _C          c;
+  final VoidCallback onConfirm;
+
+  const _ConfirmSheet({
+    required this.name, required this.amount, required this.date,
+    required this.monthly, required this.priority,
+    required this.c, required this.onConfirm,
+  });
 
   @override
-  bool shouldRebuild(covariant SliverPersistentHeaderDelegate oldDelegate) =>
-      true;
+  Widget build(BuildContext context) {
+    final compact = NumberFormat.compactCurrency(
+        locale: 'es_CO', symbol: '\$', decimalDigits: 1);
+    final priorityLabel = switch (priority) {
+      GoalPriority.low    => 'Baja',
+      GoalPriority.medium => 'Media',
+      GoalPriority.high   => 'Alta',
+      _                   => '—',
+    };
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+          _C.md, _C.md, _C.md,
+          _C.lg + MediaQuery.of(context).padding.bottom),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(_C.r2XL)),
+        border: Border(
+            top: BorderSide(color: c.sep.withOpacity(0.3), width: 0.5)),
+      ),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        // Handle
+        Container(
+          width: 36, height: 4,
+          margin: const EdgeInsets.only(bottom: _C.lg),
+          decoration: BoxDecoration(
+              color: c.sep, borderRadius: BorderRadius.circular(2)),
+        ),
+
+        // Ícono simple — sin gradiente
+        Container(
+          width: 52, height: 52,
+          decoration: BoxDecoration(
+            color: _C.blue.withOpacity(c.isDark ? 0.18 : 0.10),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Iconsax.flag, size: 24, color: _C.blue),
+        ),
+        const SizedBox(height: _C.md),
+        Text('¿Crear esta meta?',
+            style: TextStyle(
+              fontSize: 18, fontWeight: FontWeight.w700,
+              color: c.label, letterSpacing: -0.3,
+            )),
+        const SizedBox(height: _C.lg),
+
+        // Resumen
+        Container(
+          padding: const EdgeInsets.all(_C.md),
+          decoration: BoxDecoration(
+            color: c.raised,
+            borderRadius: BorderRadius.circular(_C.rXL),
+            border: Border.all(color: c.sep.withOpacity(0.3), width: 0.5),
+          ),
+          child: Column(children: [
+            _Row('Meta',            name,                          c),
+            _Div(c: c),
+            _Row('Monto',           compact.format(amount),        c),
+            _Div(c: c),
+            _Row('Fecha límite',
+                DateFormat('d MMM yyyy', 'es_CO').format(date),    c),
+            _Div(c: c),
+            _Row('Ahorro mensual',  compact.format(monthly),       c),
+            _Div(c: c),
+            _Row('Prioridad',       priorityLabel,                 c),
+          ]),
+        ),
+
+        const SizedBox(height: _C.lg),
+
+        // Botones
+        Row(children: [
+          Expanded(
+            child: _ScaleBtn(
+              onTap: () => Navigator.pop(context),
+              child: Container(
+                height: 52,
+                decoration: BoxDecoration(
+                    color: c.raised,
+                    borderRadius: BorderRadius.circular(_C.rXL),
+                    border: Border.all(
+                        color: c.sep.withOpacity(0.4), width: 0.5)),
+                alignment: Alignment.center,
+                child: Text('Cancelar',
+                    style: TextStyle(fontSize: 15,
+                        fontWeight: FontWeight.w600, color: c.label2)),
+              ),
+            ),
+          ),
+          const SizedBox(width: _C.md),
+          Expanded(
+            flex: 2,
+            child: _ScaleBtn(
+              onTap: () {
+                FocusScope.of(context).unfocus();
+                Navigator.of(context).pop();
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  onConfirm();
+                });
+              },
+              child: Container(
+                height: 52,
+                decoration: BoxDecoration(
+                    color: _C.blue,
+                    borderRadius: BorderRadius.circular(_C.rXL),
+                    boxShadow: [
+                      BoxShadow(
+                          color: _C.blue.withOpacity(0.35),
+                          blurRadius: 14,
+                          offset: const Offset(0, 5)),
+                    ]),
+                alignment: Alignment.center,
+                child: const Text('Crear meta',
+                    style: TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w700,
+                      color: Colors.white, letterSpacing: -0.1,
+                    )),
+              ),
+            ),
+          ),
+        ]),
+      ]),
+    );
+  }
+}
+
+// ─── FLOAT BUTTON ─────────────────────────────────────────────────────────────
+class _FloatBtn extends StatefulWidget {
+  final bool       isSaving;
+  final bool       isSuccess;
+  final _C         c;
+  final VoidCallback onTap;
+
+  const _FloatBtn({
+    required this.isSaving, required this.isSuccess,
+    required this.c, required this.onTap,
+  });
+
+  @override
+  State<_FloatBtn> createState() => _FloatBtnState();
+}
+
+class _FloatBtnState extends State<_FloatBtn> {
+  bool _p = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final c     = widget.c;
+    final color = widget.isSuccess ? _C.green : _C.blue;
+
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+            _C.md, _C.md, _C.md,
+            _C.lg + MediaQuery.of(context).padding.bottom),
+        child: GestureDetector(
+          onTapDown:   (widget.isSaving || widget.isSuccess)
+              ? null : (_) => setState(() => _p = true),
+          onTapUp:     (widget.isSaving || widget.isSuccess)
+              ? null : (_) { setState(() => _p = false); widget.onTap(); },
+          onTapCancel: () => setState(() => _p = false),
+          child: AnimatedScale(
+            scale: _p ? 0.97 : 1.0,
+            duration: const Duration(milliseconds: 80),
+            child: AnimatedContainer(
+              duration: _C.mid, curve: _C.easeOut,
+              width:  widget.isSaving ? 60 : double.infinity,
+              height: 60,
+              decoration: BoxDecoration(
+                color: widget.isSaving ? c.label4 : color,
+                borderRadius: BorderRadius.circular(
+                    widget.isSaving ? 30 : _C.rXL),
+                boxShadow: widget.isSaving ? null : [
+                  BoxShadow(
+                    color: color.withOpacity(_p ? 0.18 : 0.38),
+                    blurRadius: _p ? 8 : 20,
+                    offset: Offset(0, _p ? 2 : 7),
+                  ),
+                ],
+              ),
+              alignment: Alignment.center,
+              child: AnimatedSwitcher(
+                duration: _C.fast,
+                child: widget.isSaving
+                    ? const SizedBox(
+                        key: ValueKey('load'),
+                        width: 22, height: 22,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2.5, color: Colors.white))
+                    : widget.isSuccess
+                        ? const Icon(Iconsax.tick_circle,
+                            key: ValueKey('ok'),
+                            color: Colors.white, size: 26)
+                        : Row(
+                            key: const ValueKey('idle'),
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: const [
+                              Icon(Iconsax.flag, color: Colors.white, size: 20),
+                              SizedBox(width: 10),
+                              Text('Crear meta',
+                                  style: TextStyle(
+                                    color: Colors.white, fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: -0.2,
+                                  )),
+                            ],
+                          ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── UTILS ────────────────────────────────────────────────────────────────────
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  final _C c;
+  const _SectionLabel({required this.text, required this.c});
+
+  @override
+  Widget build(BuildContext context) => Text(text,
+      style: TextStyle(
+        fontSize: 13, fontWeight: FontWeight.w600,
+        color: c.label3, letterSpacing: 0.1,
+      ));
+}
+
+class _BackBtn extends StatelessWidget {
+  final _C c;
+  const _BackBtn({required this.c});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () { HapticFeedback.lightImpact(); Navigator.of(context).pop(); },
+      child: Container(
+        margin: const EdgeInsets.all(8),
+        decoration: BoxDecoration(color: c.raised, shape: BoxShape.circle),
+        child: Icon(Icons.arrow_back_ios_new_rounded,
+            size: 15, color: c.label),
+      ),
+    );
+  }
+}
+
+class _Row extends StatelessWidget {
+  final String label;
+  final String value;
+  final _C c;
+  const _Row(this.label, this.value, this.c);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: _C.sm + 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+              style: TextStyle(fontSize: 13, color: c.label3)),
+          Flexible(
+            child: Text(value,
+                textAlign: TextAlign.end,
+                style: TextStyle(
+                  fontSize: 14, fontWeight: FontWeight.w700,
+                  color: c.label, letterSpacing: -0.1,
+                )),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Div extends StatelessWidget {
+  final _C c;
+  const _Div({required this.c});
+
+  @override
+  Widget build(BuildContext context) =>
+      Container(height: 0.5, color: c.sep.withOpacity(0.5));
+}
+
+class _ScaleBtn extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onTap;
+  const _ScaleBtn({required this.child, required this.onTap});
+
+  @override
+  State<_ScaleBtn> createState() => _ScaleBtnState();
+}
+
+class _ScaleBtnState extends State<_ScaleBtn> {
+  bool _p = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown:   (_) => setState(() => _p = true),
+      onTapUp:     (_) { setState(() => _p = false); widget.onTap(); },
+      onTapCancel: () => setState(() => _p = false),
+      child: AnimatedScale(
+          scale: _p ? 0.95 : 1.0,
+          duration: const Duration(milliseconds: 80),
+          child: widget.child),
+    );
+  }
+}
+
+Path _starPath(Size size) {
+  double r(double deg) => deg * (math.pi / 180);
+  final hw = size.width / 2;
+  final path = Path();
+  path.moveTo(size.width, hw);
+  for (double s = 0; s < r(360); s += r(72)) {
+    path.lineTo(hw + hw * math.cos(s), hw + hw * math.sin(s));
+    path.lineTo(hw + (hw / 2.5) * math.cos(s + r(36)),
+        hw + (hw / 2.5) * math.sin(s + r(36)));
+  }
+  path.close();
+  return path;
 }

@@ -114,19 +114,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_medium_info" />
         </receiver>
-
-        <receiver
-            android:name=".ManifestationWidgetProvider"
-            android:exported="true"
-            android:enabled="true"
-            android:label="Manifestación">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/manifestation_widget_info" />
-        </receiver>
         
         <receiver
             android:name=".ManifestationVisionWidget"

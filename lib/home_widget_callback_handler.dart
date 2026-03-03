@@ -67,7 +67,7 @@ void homeWidgetBackgroundCallback(Uri? uri) async {
 
     // ESTE ES EL CASE QUE FALTABA O ESTABA MAL CONFIGURADO
     case 'simple_manifestation_widget':
-      await SimpleManifestationWidgetService.handleWidgetAction(action, widgetIdParam);
+      await ManifestationWidgetService.handleWidgetAction(action, widgetIdParam);
       break;
 
     // Este es para el WIDGET VISION

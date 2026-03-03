@@ -300,10 +300,18 @@ class ManifestationWidgetService {
 
   static Future<void> _updateWidget({String? specificWidgetId}) async {
     try {
-      await HomeWidget.updateWidget(
-        androidName: _widgetName,
-        iOSName: _widgetName,
-      );
+      // Nombres de todos los providers que deben ser actualizados
+      const List<String> widgetProviders = [
+        'ManifestationVisionWidget',
+        'ManifestationWidgetProvider',
+      ];
+
+      for (final providerName in widgetProviders) {
+        await HomeWidget.updateWidget(
+          androidName: providerName,
+          iOSName: providerName,
+        );
+      }
     } catch (e) {
       developer.log('Error al actualizar widget: $e', name: 'WidgetService');
     }
@@ -343,11 +351,19 @@ static Future<void> handleWidgetAction(String action,
     // 🔥 EL PASO MÁGICO: Avisarle a Android que los datos cambiaron
     // Esto se ejecuta al final de CUALQUIER acción válida (next, refresh, etc)
     try {
-      await HomeWidget.updateWidget(
-        name: 'ManifestationVisionWidget',
-        androidName: 'ManifestationVisionWidget',
-      );
-      developer.log('✅ Orden de repintado enviada a Android', name: 'ManifestationWidget');
+      // Nombres de todos los providers que deben ser actualizados
+      const List<String> widgetProviders = [
+        'ManifestationVisionWidget',
+        'ManifestationWidgetProvider', // Provider del widget simple
+      ];
+
+      for (final providerName in widgetProviders) {
+        await HomeWidget.updateWidget(
+          name: providerName,
+          androidName: providerName,
+        );
+      }
+      developer.log('✅ Orden de repintado enviada a Android para ${widgetProviders.join(', ')}', name: 'ManifestationWidget');
     } catch (e) {
       developer.log('⚠️ Error al repintar el widget: $e', name: 'ManifestationWidget');
     }
