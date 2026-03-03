@@ -312,7 +312,7 @@ class ManifestationWidgetService {
   // ===============================================================
   //        FUNCIÓN PARA EL CALLBACK UNIFICADO DESDE BACKGROUND
   // ===============================================================
-  static Future<void> handleWidgetAction(String action,
+static Future<void> handleWidgetAction(String action,
       [String? widgetId]) async {
     developer.log(
         '🎯 handleWidgetAction llamado: action=$action, widgetId=$widgetId',
@@ -337,6 +337,19 @@ class ManifestationWidgetService {
       default:
         debugPrint(
             'Acción desconocida de ManifestationWidget: $action (widgetId=$widgetId)');
+        return; // Salimos temprano si no es una acción válida
+    }
+
+    // 🔥 EL PASO MÁGICO: Avisarle a Android que los datos cambiaron
+    // Esto se ejecuta al final de CUALQUIER acción válida (next, refresh, etc)
+    try {
+      await HomeWidget.updateWidget(
+        name: 'ManifestationVisionWidget',
+        androidName: 'ManifestationVisionWidget',
+      );
+      developer.log('✅ Orden de repintado enviada a Android', name: 'ManifestationWidget');
+    } catch (e) {
+      developer.log('⚠️ Error al repintar el widget: $e', name: 'ManifestationWidget');
     }
   }
 }

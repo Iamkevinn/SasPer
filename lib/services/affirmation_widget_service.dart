@@ -445,7 +445,7 @@ class AffirmationWidgetService {
   }
 
   /// Maneja acciones desde el callback nativo
-  static Future<void> handleWidgetAction(String action, [String? widgetId]) async {
+  static Future<void> handleWidgetAction(String action,[String? widgetId]) async {
     developer.log(
       '🎯 handleWidgetAction: action=$action, widgetId=$widgetId',
       name: 'AffirmationWidget',
@@ -475,6 +475,18 @@ class AffirmationWidgetService {
           'Acción desconocida de AffirmationWidget: $action (widgetId=$widgetId)',
           name: 'AffirmationWidget',
         );
+        return; // 👈 Salimos para no enviar orden de repintado innecesaria
+    }
+
+    // 🔥 EL PASO MÁGICO: Avisarle a Android que los datos cambiaron
+    try {
+      await HomeWidget.updateWidget(
+        name: 'AffirmationFocusWidget', // 👈 Nombre exacto de tu clase Kotlin
+        androidName: 'AffirmationFocusWidget',
+      );
+      developer.log('✅ Orden de repintado enviada a Android', name: 'AffirmationWidget');
+    } catch (e) {
+      developer.log('⚠️ Error al repintar el widget: $e', name: 'AffirmationWidget');
     }
   }
 }

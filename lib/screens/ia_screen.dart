@@ -130,20 +130,6 @@ class _AiFinancialAnalysisScreenState extends State<AiFinancialAnalysisScreen>
   final _savingsAdv = 12.0;
   final _monthsAdv  = 4;
 
-  late final _recs = <_Rec>[
-    const _Rec(title: 'Reducir gastos fijos',
-        description: 'Al bajar 5% en recurrentes liberarás más capital',
-        projectedImpact: 200000, impactUnit: '/mes',
-        icon: Iconsax.money_remove, color: _kOrange),
-    const _Rec(title: 'Automatizar inversiones',
-        description: 'Invierte excedentes automáticamente cada mes',
-        projectedImpact: 8, impactUnit: '% anual',
-        icon: Iconsax.chart_success, color: _kGreen),
-    const _Rec(title: 'Optimizar deudas',
-        description: 'Consolida deudas de alta tasa en un solo préstamo',
-        projectedImpact: 150000, impactUnit: '/año',
-        icon: Iconsax.receipt_discount, color: _kBlue),
-  ];
 
   late final _insights = <_Insight>[
     _Insight(title: 'Riesgo de sobregiro',
@@ -266,13 +252,6 @@ class _AiFinancialAnalysisScreenState extends State<AiFinancialAnalysisScreen>
           ctrl: _loadingCtrl,
           message: _loadingMessages[_loadingStep]),
       _AiState.success => _SuccessView(
-          health:      _health,
-          score:       _score,
-          savingsAdv:  _savingsAdv,
-          monthsAdv:   _monthsAdv,
-          scoreCtrl:   _scoreCtrl,
-          insights:    _insights,
-          recs:        _recs,
           result:      _result,
           onRecTap:    _openRecDetail,
         ),
@@ -517,20 +496,12 @@ class _LoadingView extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _SuccessView extends StatelessWidget {
-  final _Health health;
-  final double score, savingsAdv;
-  final int monthsAdv;
-  final AnimationController scoreCtrl;
-  final List<_Insight> insights;
-  final List<_Rec> recs;
+
   final String? result;
   final void Function(_Rec) onRecTap;
 
   const _SuccessView({
-    required this.health, required this.score,
-    required this.savingsAdv, required this.monthsAdv,
-    required this.scoreCtrl, required this.insights,
-    required this.recs, required this.result,
+  required this.result,
     required this.onRecTap,
   });
 
@@ -540,63 +511,6 @@ class _SuccessView extends StatelessWidget {
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(0, 8, 0, 100),
       children: [
-        // Hero — score ring
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: _T.h),
-          child: _ScoreCard(
-            health: health, score: score,
-            savingsAdv: savingsAdv, monthsAdv: monthsAdv,
-            ctrl: scoreCtrl,
-          ),
-        ),
-        const SizedBox(height: 28),
-
-        // Métricas rápidas
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: _T.h),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _SectionLabel('ESTE MES'),
-              const SizedBox(height: 10),
-              _MetricsRow(),
-            ],
-          ),
-        ),
-        const SizedBox(height: 28),
-
-        // Alertas e insights
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: _T.h),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _SectionLabel('ALERTAS'),
-              const SizedBox(height: 10),
-              ...insights.asMap().entries.map((e) =>
-                _InsightTile(insight: e.value,
-                    delay: 80 * e.key)),
-            ],
-          ),
-        ),
-        const SizedBox(height: 28),
-
-        // Recomendaciones
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: _T.h),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _SectionLabel('RECOMENDACIONES'),
-              const SizedBox(height: 10),
-              ...recs.asMap().entries.map((e) =>
-                _RecTile(rec: e.value,
-                    delay: 80 * e.key,
-                    onTap: () => onRecTap(e.value))),
-            ],
-          ),
-        ),
-
         // Markdown análisis detallado
         if (result != null) ...[
           const SizedBox(height: 28),
@@ -613,233 +527,6 @@ class _SuccessView extends StatelessWidget {
 // ── Score card ────────────────────────────────────────────────────────────────
 // Surface limpia. El número es el protagonista.
 // Sin LinearGradient, sin border coloreado, sin boxShadow enorme.
-
-class _ScoreCard extends StatelessWidget {
-  final _Health health;
-  final double score, savingsAdv;
-  final int monthsAdv;
-  final AnimationController ctrl;
-  const _ScoreCard({
-    required this.health, required this.score,
-    required this.savingsAdv, required this.monthsAdv,
-    required this.ctrl,
-  });
-
-  Color get _color => switch (health) {
-    _Health.excellent => _kGreen,
-    _Health.good      => _kBlue,
-    _Health.fair      => _kOrange,
-    _Health.poor      => _kOrange,
-    _Health.critical  => _kRed,
-  };
-
-  String get _label => switch (health) {
-    _Health.excellent => 'Excelente',
-    _Health.good      => 'Buena',
-    _Health.fair      => 'Regular',
-    _Health.poor      => 'Mejorable',
-    _Health.critical  => 'Crítica',
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final onSurf = Theme.of(context).colorScheme.onSurface;
-    final bg     = isDark
-        ? Colors.white.withOpacity(0.07)
-        : Colors.black.withOpacity(0.04);
-
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-          color: bg, borderRadius: BorderRadius.circular(22)),
-      child: Row(children: [
-        // Score ring
-        AnimatedBuilder(
-          animation: ctrl,
-          builder: (_, __) => SizedBox(
-            width: 90, height: 90,
-            child: Stack(alignment: Alignment.center, children: [
-              CircularProgressIndicator(
-                value: ctrl.value * (score / 100),
-                strokeWidth: 6,
-                backgroundColor: onSurf.withOpacity(0.08),
-                valueColor: AlwaysStoppedAnimation<Color>(_color),
-                strokeCap: StrokeCap.round,
-              ),
-              Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                Text(
-                  '${(score * ctrl.value).toInt()}',
-                  style: _T.display(28, c: _color)),
-                Text(_label,
-                    style: _T.label(10,
-                        c: onSurf.withOpacity(0.42))),
-              ]),
-            ]),
-          ),
-        ),
-        const SizedBox(width: 20),
-        Expanded(child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Salud financiera',
-                style: _T.label(12,
-                    c: onSurf.withOpacity(0.40))),
-            const SizedBox(height: 4),
-            Text('Ahorro mejoró\n${savingsAdv.toStringAsFixed(0)}% este mes',
-                style: _T.display(17, c: onSurf)),
-            const SizedBox(height: 8),
-            Row(children: [
-              Icon(Iconsax.flash_15,
-                  size: 13, color: _color),
-              const SizedBox(width: 5),
-              Expanded(child: Text(
-                '$monthsAdv  meses antes a tu objetivo',
-                style: _T.label(12,
-                    c: onSurf.withOpacity(0.48)))),
-            ]),
-          ],
-        )),
-      ]),
-    );
-  }
-}
-
-// ── Métricas rápidas ──────────────────────────────────────────────────────────
-// Sin border, sin color de fondo colorido. Número protagonista.
-
-class _MetricsRow extends StatelessWidget {
-  static const _data = <(String, String, String, Color)>[
-    ('Ingresos', '\$3.2M', '+12%', _kGreen),
-    ('Gastos',   '\$2.1M', '-5%',  _kBlue),
-    ('Ahorro',   '\$1.1M', '+34%', _kPurple),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final onSurf = Theme.of(context).colorScheme.onSurface;
-    final bg     = isDark
-        ? Colors.white.withOpacity(0.07)
-        : Colors.black.withOpacity(0.04);
-
-    return Row(children: _data.indexed.map((e) {
-      final (i, (label, value, trend, color)) = e;
-      final isLast = i == _data.length - 1;
-      return Expanded(
-        child: Container(
-          margin: EdgeInsets.only(right: isLast ? 0 : 10),
-          padding: const EdgeInsets.symmetric(
-              vertical: 14, horizontal: 12),
-          decoration: BoxDecoration(
-              color: bg, borderRadius: BorderRadius.circular(14)),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label,
-                  style: _T.label(11,
-                      c: onSurf.withOpacity(0.40))),
-              const SizedBox(height: 4),
-              Text(value,
-                  style: _T.mono(16, c: onSurf)),
-              const SizedBox(height: 4),
-              Text(trend,
-                  style: _T.label(11,
-                      c: color, w: FontWeight.w700)),
-            ],
-          ),
-        ),
-      );
-    }).toList());
-  }
-}
-
-// ── Insight tile ──────────────────────────────────────────────────────────────
-// Surface con accent sutil. Sin border coloreado.
-
-class _InsightTile extends StatefulWidget {
-  final _Insight insight;
-  final int delay;
-  const _InsightTile({required this.insight, this.delay = 0});
-  @override
-  State<_InsightTile> createState() => _InsightTileState();
-}
-
-class _InsightTileState extends State<_InsightTile>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 70));
-  @override void dispose() { _c.dispose(); super.dispose(); }
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark  = Theme.of(context).brightness == Brightness.dark;
-    final onSurf  = Theme.of(context).colorScheme.onSurface;
-    final ins     = widget.insight;
-    final bg      = isDark
-        ? ins.color.withOpacity(0.09)
-        : ins.color.withOpacity(0.06);
-
-    return GestureDetector(
-      onTapDown: (_) {
-        _c.forward(); HapticFeedback.selectionClick(); },
-      onTapUp: (_) {
-        _c.reverse(); ins.onAction?.call(); },
-      onTapCancel: () => _c.reverse(),
-      child: AnimatedBuilder(
-        animation: _c,
-        builder: (_, __) => Transform.scale(
-          scale: lerpDouble(1.0, 0.985, _c.value)!,
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-                color: bg, borderRadius: BorderRadius.circular(_T.r)),
-            child: Row(children: [
-              Container(
-                width: 40, height: 40,
-                decoration: BoxDecoration(
-                  color: ins.color.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Center(child: Icon(ins.icon,
-                    color: ins.color, size: 18)),
-              ),
-              const SizedBox(width: 12),
-              Expanded(child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(children: [
-                    Expanded(child: Text(ins.title,
-                        style: _T.label(14,
-                            w: FontWeight.w700, c: onSurf))),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: ins.color.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(ins.impact,
-                          style: _T.label(10,
-                              c: ins.color,
-                              w: FontWeight.w700)),
-                    ),
-                  ]),
-                  const SizedBox(height: 3),
-                  Text(ins.description,
-                      style: _T.label(13,
-                          c: onSurf.withOpacity(0.48),
-                          w: FontWeight.w400)),
-                ],
-              )),
-            ]),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 // ── Rec tile ──────────────────────────────────────────────────────────────────
 

@@ -259,29 +259,37 @@ class SimpleManifestationWidgetService  {
   }
 
   // 🔥 CORRECCIÓN DEFINITIVA: Sistema de marcado temporal
-   static Future<void> _updateWidget({String? specificWidgetId}) async {
+// 🔥 CORRECCIÓN DEFINITIVA: Sistema de marcado temporal y repintado
+  static Future<void> _updateWidget({String? specificWidgetId}) async {
     try {
-
-      await HomeWidget.updateWidget(
-        name: _widgetName,
+      // 1. Guardar un timestamp siempre fuerza a Kotlin a repintar el widget
+      await HomeWidget.saveWidgetData<int>(
+        'force_update_timestamp', 
+        DateTime.now().millisecondsSinceEpoch
       );
+
+      // 2. Enviar la orden a Android
+      await HomeWidget.updateWidget(
+        name: 'ManifestationVisionWidget', // 👈 ASEGÚRATE QUE SEA EL NOMBRE DE KOTLIN
+        androidName: 'ManifestationVisionWidget',
+      );
+      
+      developer.log('✅ Widget actualizado en Android', name: 'SimpleWidget');
     } catch (e) {
-      developer.log('Error al actualizar widget: $e', name: 'WidgetService');
+      developer.log('🔥 Error al actualizar widget: $e', name: 'SimpleWidget');
     }
   }
-
   // ===============================================================
   //        FUNCIÓN PARA EL CALLBACK UNIFICADO DESDE BACKGROUND
   // ===============================================================
-  static Future<void> handleWidgetAction(String action,
-      [String? widgetId]) async {
+ static Future<void> handleWidgetAction(String action, [String? widgetId]) async {
     developer.log(
         '🎯 handleWidgetAction llamado: action=$action, widgetId=$widgetId',
         name: 'ManifestationWidget');
 
     switch (action) {
       case 'initialize':
-          await initializeWidget(widgetId: widgetId);
+        await initializeWidget(widgetId: widgetId);
         break;
       case 'next':
         await showNextManifestation(widgetId: widgetId);
@@ -294,12 +302,16 @@ class SimpleManifestationWidgetService  {
         developer.log('Visualize action called on simple widget.', name: 'SimpleWidget');
         break;
       case 'refresh':
-        await initializeWidget(widgetId: widgetId);
+        // Descargamos de Supabase de nuevo
+        await initializeWidget(widgetId: widgetId); 
         break;
       default:
-        debugPrint(
-            'Acción desconocida de ManifestationWidget: $action (widgetId=$widgetId)');
+        debugPrint('Acción desconocida: $action');
+        return; // Salir si la acción no existe
     }
+
+    // 🔥 EL PASO MÁGICO: Sin importar qué botón tocaste, ¡avísale a Kotlin!
+    await _updateWidget(specificWidgetId: widgetId);
   }
 }
 
