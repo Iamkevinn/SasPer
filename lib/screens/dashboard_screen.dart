@@ -32,6 +32,7 @@ import 'package:sasper/screens/can_i_afford_it_screen.dart';
 import 'package:sasper/screens/goals_screen.dart';
 import 'package:sasper/screens/ia_screen.dart';
 import 'package:sasper/screens/manifestations_screen.dart';
+import 'package:sasper/screens/recurring_transactions_screen.dart';
 import 'package:sasper/screens/transactions_screen.dart';
 import 'package:sasper/services/widgets/widget_orchestrator.dart';
 import 'package:sasper/widgets/dashboard/active_challenges_widget.dart';
@@ -173,7 +174,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   reduceMotion: _reduceMotion,
                   onAiTap: () => _go(const AiFinancialAnalysisScreen()),
                   onSimulateTap: () => _go(_AiAnalysisFullScreen(dashboardData: data)),
-                  onAddTap: () => _go(const TransactionsScreen()),
+                  onAddTap: () => _go(const RecurringTransactionsScreen()),
                   onGoalsTap: () => _go(const GoalsScreen()),
                   onManifestTap: () => _go(const ManifestationsScreen()),
                   onAffordTap: () => _go(const CanIAffordItScreen()),
@@ -766,8 +767,8 @@ class _QuickBar extends StatelessWidget {
       child: Row(
         children: [
           _QuickChip(
-            icon: Iconsax.add_circle,
-            label: 'Agregar',
+            icon: Iconsax.repeat,
+            label: 'Gastos Fijos',
             color: _D.teal,
             surface: surface,
             onSurface: onSurface,
