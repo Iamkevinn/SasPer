@@ -588,16 +588,20 @@ class _MonthlySummaryCard extends StatelessWidget {
       {required this.items, required this.isExpense, required this.c});
 
   double get _monthly => items.fold<double>(0, (sum, item) {
-        final m = switch (item.frequency) {
-          'daily'     => 30.0,
-          'weekly'    => 4.33,
-          'biweekly'  => 2.17,
-          'monthly'   => 1.0,
-          'quarterly' => 1 / 3.0,
-          'yearly'    => 1 / 12.0,
-          _           => 1.0,
+        // Convertimos cualquier frecuencia a su equivalente mensual (1.0 = 1 mes)
+        final double factorMensual = switch (item.frequency.toLowerCase()) {
+          'diario'       => 30.41,       // (365 días / 12 meses)
+          'semanal'      => 4.33,        // (52 semanas / 12 meses)
+          'quincenal'    => 2.16,        // (26 quincenas / 12 meses) o 'quincenal'
+          'mensual'     => 1.0,
+          'bimestral'   => 0.5,         // Bimestral: se paga cada 2 meses (0.5 veces al mes)
+          'trimestral'   => 1 / 3,       // Trimestral: cada 3 meses
+          'semestral' => 1 / 6,      // Semestral: cada 6 meses
+          'anual'      => 1 / 12,      // Anual: cada 12 meses
+          _             => 1.0,         // Por defecto mensual si no se reconoce
         };
-        return sum + (item.amount * m);
+        
+        return sum + (item.amount * factorMensual);
       });
 
   @override
