@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:developer' as developer;
 import 'dart:async';
 import 'package:sasper/models/goal_model.dart';
+import 'package:sasper/services/widget_service.dart';
 
 class GoalRepository {
   // --- PATRÓN DE INICIALIZACIÓN PEREZOSA ---
@@ -233,6 +234,7 @@ class GoalRepository {
       if (!_streamController.isClosed) {
         _streamController.add(goals);
         developer.log('✅ [Repo] ${goals.length} metas enviadas al stream.', name: 'GoalRepository');
+        WidgetService.updateGoalsWidget(); // Notificar al widget
       }
     } catch (e) {
       developer.log('🔥 [Repo] Error obteniendo metas: $e', name: 'GoalRepository');

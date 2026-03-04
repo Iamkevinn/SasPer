@@ -326,5 +326,6 @@
     <string name="next_manifestation">Siguiente manifestación</string>
     <string name="previous_manifestation">Anterior manifestación</string>
     <string name="refresh">Actualizar</string>
+    <string name="refresh_widget">Actualizar</string>
 
 </resources>

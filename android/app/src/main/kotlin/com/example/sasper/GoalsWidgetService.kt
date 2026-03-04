@@ -14,6 +14,7 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 import java.util.Locale
+import androidx.annotation.Keep
 
 class GoalsWidgetService : RemoteViewsService() {
     override fun onGetViewFactory(intent: Intent): RemoteViewsFactory {
@@ -27,7 +28,7 @@ class GoalsListFactory(private val context: Context) : RemoteViewsService.Remote
     private val currencyFormat: NumberFormat = NumberFormat.getCurrencyInstance(Locale("es", "CO")).apply {
         maximumFractionDigits = 0
     }
-
+@Keep // <--- 🔥 ESTA ES LA SOLUCIÓN MÁGICA 🔥
     data class Goal(
         val id: String,
         val name: String,
