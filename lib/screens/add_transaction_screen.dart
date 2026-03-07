@@ -27,7 +27,6 @@ import 'package:sasper/models/category_model.dart';
 import 'package:sasper/services/event_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:developer' as developer;
 import 'package:sasper/screens/place_search_screen.dart';
 import 'package:geolocator/geolocator.dart';
@@ -50,33 +49,11 @@ class _C {
   Color get label3 => isDark ? const Color(0xFF8E8E93) : const Color(0xFF636366);
   Color get label4 => isDark ? const Color(0xFF48484A) : const Color(0xFFAEAEB2);
 
-  static const Color red    = Color(0xFFFF3B30);
-  static const Color green  = Color(0xFF30D158);
-  static const Color orange = Color(0xFFFF9F0A);
-  static const Color blue   = Color(0xFF0A84FF);
-  static const Color purple = Color(0xFFBF5AF2);
-
-  static const double xs   = 4.0;
-  static const double sm   = 8.0;
-  static const double md   = 16.0;
-  static const double lg   = 24.0;
-  static const double xl   = 32.0;
-  static const double rSM  = 8.0;
-  static const double rMD  = 12.0;
-  static const double rLG  = 16.0;
-  static const double rXL  = 22.0;
-  static const double r2XL = 28.0;
-
-  static const Duration fast   = Duration(milliseconds: 140);
-  static const Duration mid    = Duration(milliseconds: 260);
-  static const Duration slow   = Duration(milliseconds: 420);
-  static const Curve   easeOut = Curves.easeOutCubic;
 }
 
 
 abstract class _T {
   static const Color bg             = Color(0xFF0A0A0F);
-  static const Color surface        = Color(0xFF111118);
   static const Color surfaceRaised  = Color(0xFF181820);
   static const Color surfaceHighest = Color(0xFF1E1E28);
   static const Color border         = Color(0xFF252530);
@@ -87,7 +64,6 @@ abstract class _T {
   static const Color textTertiary  = Color(0xFF3C3A48);
 
   static const Color accent    = Color(0xFFC9A96E);
-  static const Color accentDim = Color(0xFF6B5535);
 
   static const Color expenseColor = Color(0xFFE05555);
   static const Color expenseDim   = Color(0xFF3A1515);
@@ -100,19 +76,15 @@ abstract class _T {
   static const double md  = 16;
   static const double lg  = 24;
   static const double xl  = 32;
-  static const double xxl = 48;
 
   static const double rSM = 8;
   static const double rMD = 14;
-  static const double rLG = 20;
-  static const double rXL = 28;
 
   static const Duration fast = Duration(milliseconds: 160);
   static const Duration mid  = Duration(milliseconds: 300);
   static const Duration slow = Duration(milliseconds: 480);
 
   static const Curve curve    = Curves.easeInOutCubic;
-  static const Curve curveOut = Curves.easeOutCubic;
 }
 
 // ─── PANTALLA PRINCIPAL ───────────────────────────────────────────────────────
@@ -273,7 +245,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
 
   bool  get _isExpense   => _transactionType == 'Gasto';
   Color get _typeColor   => _isExpense ? _T.expenseColor : _T.incomeColor;
-  Color get _typeDimColor => _isExpense ? _T.expenseDim : _T.incomeDim;
 
   // ── ACCIONES ──────────────────────────────────────────────────────────────
 
@@ -755,7 +726,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
 
   // Widget para seleccionar cuotas
 Widget _buildInstallmentSection() {
-  final c = _C(context);
   final interest = _isInterestFree ? 0.0 : _calculateInterestCost();
   final commonInstallments = [1, 2, 3, 6, 12, 18, 24, 36, 48];
 

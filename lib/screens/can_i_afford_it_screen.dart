@@ -29,7 +29,6 @@
 // └─────────────────────────────────────────────────────────────────────────────┘
 
 import 'dart:math' as math;
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax/iconsax.dart';
@@ -39,7 +38,6 @@ import 'package:sasper/data/budget_repository.dart';
 import 'package:sasper/data/category_repository.dart';
 import 'package:sasper/data/simulation_repository.dart';
 import 'package:sasper/models/category_model.dart';
-import 'package:sasper/models/simulation_models.dart';
 import 'package:sasper/screens/simulation_result_screen.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
@@ -68,10 +66,8 @@ class _C {
   static const Color green  = Color(0xFF30D158);
   static const Color orange = Color(0xFFFF9F0A);
   static const Color blue   = Color(0xFF0A84FF);
-  static const Color indigo = Color(0xFF5E5CE6);
 
   // Layout
-  static const double xs   = 4.0;
   static const double sm   = 8.0;
   static const double md   = 16.0;
   static const double lg   = 24.0;

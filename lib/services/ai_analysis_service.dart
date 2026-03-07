@@ -9,7 +9,6 @@ import 'package:sasper/config/app_config.dart';
 import 'package:sasper/models/goal_model.dart';
 import 'package:sasper/models/simulation_models.dart';
 import 'package:sasper/data/dashboard_repository.dart'; // 👈 IMPORTANTE
-import 'package:sasper/data/free_trial_repository.dart'; // 👈 IMPORTANTE
 
 class AiAnalysisService {
   final http.Client _httpClient;

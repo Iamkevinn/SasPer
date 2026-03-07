@@ -17,15 +17,12 @@ import 'package:sasper/screens/analysis_screen.dart';
 
 // ── Design Tokens ──────────────────────────────────────────────────────────
 class _T {
-  static const bg         = Color(0xFF1C1C1E);   // iOS system grouped background
   static const surface    = Color(0xFF2C2C2E);   // iOS secondary grouped background
   static const border     = Color(0xFF3A3A3C);   // separator
   static const labelPri   = Color(0xFFFFFFFF);
   static const labelSec   = Color(0xFF8E8E93);   // iOS secondary label
   static const labelTer   = Color(0xFF48484A);   // iOS tertiary label
   static const tint       = Color(0xFF30D158);   // iOS green system tint
-  static const tintBlue   = Color(0xFF0A84FF);
-  static const radius     = 20.0;
   static const cardPad    = EdgeInsets.all(20.0);
 }
 

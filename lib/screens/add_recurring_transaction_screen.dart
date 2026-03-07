@@ -21,7 +21,6 @@
 // │  Trimestral / Semestral / Anual                                            │
 // └─────────────────────────────────────────────────────────────────────────────┘
 
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax/iconsax.dart';
@@ -32,6 +31,9 @@ import 'package:sasper/models/account_model.dart';
 import 'package:sasper/services/notification_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
+import 'package:sasper/data/category_repository.dart';
+import 'package:sasper/models/category_model.dart';
+
 import 'dart:developer' as developer;
 
 // ─── TOKENS ──────────────────────────────────────────────────────────────────
@@ -54,23 +56,18 @@ class _C {
   static const Color red    = Color(0xFFFF3B30);
   static const Color green  = Color(0xFF30D158);
   static const Color orange = Color(0xFFFF9F0A);
-  static const Color blue   = Color(0xFF0A84FF);
-  static const Color purple = Color(0xFFBF5AF2);
 
   static const double xs   = 4.0;
   static const double sm   = 8.0;
   static const double md   = 16.0;
-  static const double lg   = 24.0;
   static const double xl   = 32.0;
   static const double rSM  = 8.0;
   static const double rMD  = 12.0;
   static const double rLG  = 16.0;
   static const double rXL  = 22.0;
-  static const double r2XL = 28.0;
 
   static const Duration fast   = Duration(milliseconds: 140);
   static const Duration mid    = Duration(milliseconds: 260);
-  static const Duration slow   = Duration(milliseconds: 420);
   static const Curve   easeOut = Curves.easeOutCubic;
 }
 
@@ -124,6 +121,7 @@ class _AddRecurringTransactionScreenState
     with SingleTickerProviderStateMixin {
   final RecurringRepository _repository = RecurringRepository.instance;
   final AccountRepository   _accountRepo = AccountRepository.instance;
+  final CategoryRepository  _categoryRepo = CategoryRepository.instance;
 
   final _formKey              = GlobalKey<FormState>();
   final _descriptionCtrl      = TextEditingController();
@@ -136,10 +134,12 @@ class _AddRecurringTransactionScreenState
   String     _frequencyId     = 'mensual';
   String?    _selectedAccId;
   Account?   _selectedAcc;
+  Category?  _selectedCategory;
   DateTime   _startDate       = DateTime.now();
   TimeOfDay  _notifTime       = const TimeOfDay(hour: 9, minute: 0);
 
   late Future<List<Account>> _accountsFuture;
+  late Future<List<Category>> _categoriesFuture;  
 
   // Controlador para la animación de cambio de tipo (Gasto ↔ Ingreso)
   late AnimationController _typeCtrl;
@@ -147,10 +147,6 @@ class _AddRecurringTransactionScreenState
 
   // Colores semánticos del tipo actual
   Color get _typeColor => _type == 'Gasto' ? _C.red : _C.green;
-  Color get _typeColorDim {
-    final c = _C(context);
-    return _typeColor.withOpacity(c.isDark ? 0.18 : 0.09);
-  }
 
   // ── Cálculo de impacto ────────────────────────────────────────────────────
   double get _rawAmount =>
@@ -170,6 +166,7 @@ class _AddRecurringTransactionScreenState
   void initState() {
     super.initState();
     _accountsFuture = _accountRepo.getAccounts();
+    _categoriesFuture = _categoryRepo.getCategories(); 
     _accountsFuture.then((accounts) {
       if (mounted && accounts.isNotEmpty) {
         setState(() {
@@ -199,7 +196,10 @@ class _AddRecurringTransactionScreenState
   void _setType(String t) {
     if (t == _type) return;
     HapticFeedback.selectionClick();
-    setState(() => _type = t);
+    setState(() {
+      _type = t;
+      _selectedCategory = null; // 👈 Limpiamos categoría al cambiar de Gasto a Ingreso
+    });
     t == 'Gasto' ? _typeCtrl.forward() : _typeCtrl.reverse();
   }
 
@@ -242,7 +242,7 @@ class _AddRecurringTransactionScreenState
 
   // ── Guardar ───────────────────────────────────────────────────────────────
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate() || _selectedAccId == null) {
+    if (!_formKey.currentState!.validate() || _selectedAccId == null || _selectedCategory == null) {
       HapticFeedback.vibrate();
       NotificationHelper.show(
         message: 'Completa todos los campos requeridos.',
@@ -267,7 +267,7 @@ class _AddRecurringTransactionScreenState
         description: _descriptionCtrl.text.trim(),
         amount:      double.parse(_amountCtrl.text.replaceAll(',', '.')),
         type:        _type,
-        category:    'Gastos Fijos',
+        category:    _selectedCategory!.name,
         accountId:   _selectedAccId!,
         frequency:   repoFrequency,
         interval:    1,
@@ -395,7 +395,96 @@ class _AddRecurringTransactionScreenState
                     ),
 
                     const SizedBox(height: _C.md),
+                    // 👈 NUEVO: Selector de Categorías ───────────────────────────
+                    _FormSection(
+                      label: _selectedCategory != null
+                          ? 'Categoría  ·  ${_selectedCategory!.name}'
+                          : 'Categoría',
+                      c: c,
+                      child: FutureBuilder<List<Category>>(
+                        future: _categoriesFuture,
+                        builder: (context, snap) {
+                          if (snap.connectionState == ConnectionState.waiting) {
+                            return _FieldSkeleton(c: c);
+                          }
+                          
+                          final allCategories = snap.data ?? [];
+                          final targetType = _type == 'Gasto' ? CategoryType.expense : CategoryType.income;
+                          final filtered = allCategories.where((cat) => cat.type == targetType).toList();
 
+                          if (filtered.isEmpty) {
+                            return Container(
+                              padding: const EdgeInsets.all(_C.md),
+                              decoration: BoxDecoration(
+                                color: c.surface,
+                                borderRadius: BorderRadius.circular(_C.rXL),
+                                border: Border.all(color: c.sep.withOpacity(0.4), width: 0.5),
+                              ),
+                              child: Text('No tienes categorías creadas para este tipo.',
+                                style: TextStyle(color: c.label3, fontSize: 13)),
+                            );
+                          }
+
+                          // Componente tipo Wrap estilo "Píldoras" (Chips)
+                          return Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(_C.sm),
+                            decoration: BoxDecoration(
+                              color: c.surface,
+                              borderRadius: BorderRadius.circular(_C.rXL),
+                              border: Border.all(color: c.sep.withOpacity(0.4), width: 0.5),
+                            ),
+                            child: Wrap(
+                              spacing: _C.xs,
+                              runSpacing: _C.xs,
+                              children: filtered.map((cat) {
+                                final isSelected = _selectedCategory?.id == cat.id;
+                                final catColor = cat.colorAsObject;
+
+                                return GestureDetector(
+                                  onTap: () {
+                                    HapticFeedback.selectionClick();
+                                    setState(() {
+                                      _selectedCategory = isSelected ? null : cat;
+                                    });
+                                  },
+                                  child: AnimatedContainer(
+                                    duration: _C.fast,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: isSelected ? catColor.withOpacity(0.15) : c.raised,
+                                      borderRadius: BorderRadius.circular(_C.rSM + 4),
+                                      border: Border.all(
+                                        color: isSelected ? catColor.withOpacity(0.6) : c.sep.withOpacity(0.4),
+                                        width: isSelected ? 1.5 : 0.5,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        if (isSelected) ...[
+                                          Icon(cat.icon ?? Iconsax.category, size: 14, color: catColor),
+                                          const SizedBox(width: 4),
+                                        ],
+                                        Text(
+                                          cat.name,
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                                            color: isSelected ? catColor : c.label2,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: _C.md),
                     // Campo de monto — con proyección contextual en tiempo real
                     _FormSection(
                       label: 'Monto',

@@ -33,7 +33,6 @@ import 'package:sasper/screens/goals_screen.dart';
 import 'package:sasper/screens/ia_screen.dart';
 import 'package:sasper/screens/manifestations_screen.dart';
 import 'package:sasper/screens/recurring_transactions_screen.dart';
-import 'package:sasper/screens/transactions_screen.dart';
 import 'package:sasper/services/widgets/widget_orchestrator.dart';
 import 'package:sasper/widgets/dashboard/active_challenges_widget.dart';
 import 'package:sasper/widgets/dashboard/category_spending_chart.dart';
@@ -42,14 +41,11 @@ import 'package:sasper/widgets/dashboard/category_spending_chart.dart';
 class _D {
   // Colores semánticos — se adaptan al tema del sistema
   static const teal    = Color(0xFF00C896);   // acento principal
-  static const tealDim = Color(0xFF00C896);
   static const gold    = Color(0xFFFFCC00);   // metas / manifestaciones
-  static const rose    = Color(0xFFFF6B6B);   // alertas
 
   // Espaciado
   static const h  = 20.0;   // horizontal gutter
   static const r  = 24.0;   // radio base de tarjetas
-  static const r2 = 16.0;   // radio secundario
 
   // Tipografía — DM Sans para UI, Playfair para números grandes
   static TextStyle display(double size, {Color? color}) => GoogleFonts.playfairDisplay(
@@ -1174,8 +1170,11 @@ class _AiAnalysisFullScreenState extends State<_AiAnalysisFullScreen> {
     _debounce?.cancel();
     _debounce = Timer(200.ms, () {
       setState(() {
-        if (type == 'expense') _expenseChange = v;
-        else _savingsChange = v;
+        if (type == 'expense') {
+          _expenseChange = v;
+        } else {
+          _savingsChange = v;
+        }
       });
     });
   }

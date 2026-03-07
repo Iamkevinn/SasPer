@@ -21,7 +21,6 @@ abstract class _Tokens {
   static const Color borderSubtle = Color(0xFF1E1E2A);
 
   static const Color primary = Color(0xFFE8D5B7); // champagne dorado
-  static const Color primaryDim = Color(0xFF8A7A62);
   static const Color accent = Color(0xFFC9A96E); // oro cálido
 
   static const Color textPrimary = Color(0xFFF5F0E8);
@@ -34,7 +33,6 @@ abstract class _Tokens {
   static const double spaceMD = 16;
   static const double spaceLG = 24;
   static const double spaceXL = 32;
-  static const double space2XL = 48;
 
   // Radios de borde
   static const double radiusSM = 10;
@@ -44,17 +42,11 @@ abstract class _Tokens {
 
   // Tipografía
   static const String fontDisplay = 'Georgia'; // serif elegante
-  static const String fontBody = '.SF Pro Display'; // SF en iOS, fallback nativo
 
   // Duraciones de animación
   static const Duration durationFast = Duration(milliseconds: 180);
-  static const Duration durationMedium = Duration(milliseconds: 320);
   static const Duration durationSlow = Duration(milliseconds: 500);
   static const Duration durationXSlow = Duration(milliseconds: 800);
-
-  // Curvas de animación estilo Apple
-  static const Curve curveApple = Curves.easeInOutCubic;
-  static final Curve curveSpring = Curves.elasticOut;
 }
 
 // ─── PANTALLA PRINCIPAL ────────────────────────────────────────────────────────
@@ -752,26 +744,6 @@ class _CardMenu extends StatelessWidget {
         if (value == 'edit') onEdit();
         if (value == 'delete') onDelete();
       },
-      // Botón del menú — píldora frosted glass
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.35),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.12),
-              width: 0.5,
-            ),
-          ),
-          child: const Icon(
-            Icons.more_horiz_rounded,
-            color: Colors.white,
-            size: 18,
-          ),
-        ),
-      ),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(_Tokens.radiusMD),
         side: const BorderSide(color: _Tokens.border, width: 0.5),
@@ -794,6 +766,26 @@ class _CardMenu extends StatelessWidget {
           color: const Color(0xFFE05555),
         ),
       ],
+      // Botón del menú — píldora frosted glass
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.35),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.12),
+              width: 0.5,
+            ),
+          ),
+          child: const Icon(
+            Icons.more_horiz_rounded,
+            color: Colors.white,
+            size: 18,
+          ),
+        ),
+      ),
     );
   }
 

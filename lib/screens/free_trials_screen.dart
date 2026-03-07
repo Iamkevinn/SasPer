@@ -13,9 +13,7 @@ import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 
 import 'package:sasper/data/account_repository.dart';
 import 'package:sasper/data/recurring_repository.dart';
-import 'package:sasper/data/category_repository.dart'; // Si tienes categorías dinámicas
 import 'package:sasper/models/account_model.dart';
-import 'package:sasper/models/category_model.dart';
 
 class _T {
   static const Color bg = Color(0xFF0A0A0F);

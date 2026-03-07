@@ -24,7 +24,6 @@
 // · _buildCategorySelector InkWell + LinearGradient + Border variable → limpio
 // · _CategoryTile RadialGradient + Border.all(width:2) → borderRadius + color
 // · GridView 4 columnas en sheet → lista vertical con promedio histórico inline
-// · _isDataLoading oculta TODO el formulario → formulario inmediato, skeleton
 // · _amountController text:'0' → text:'' (campo empieza vacío)
 // · GoogleFonts.poppins + .inter → _T tokens DM Sans
 // ─────────────────────────────────────────────────────────────────────────────
@@ -858,9 +857,13 @@ class _InsightSection extends StatelessWidget {
       final pct   = amount / monthlyAvg;
       final pctStr = _pct(pct * 100);
       Color color;
-      if (pct > 0.40)      color = _kRed;
-      else if (pct > 0.20) color = _kOrange;
-      else                 color = _kGreen;
+      if (pct > 0.40) {
+        color = _kRed;
+      } else if (pct > 0.20) {
+        color = _kOrange;
+      } else {
+        color = _kGreen;
+      }
 
       monthlyInsight = Column(
         crossAxisAlignment: CrossAxisAlignment.start,

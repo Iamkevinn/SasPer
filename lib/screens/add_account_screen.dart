@@ -689,11 +689,14 @@ class _BalanceField extends StatelessWidget {
                 contentPadding: EdgeInsets.zero,
               ),
               validator: (v) {
-                if (v == null || v.isEmpty)
+                if (v == null || v.isEmpty) {
                   return 'El saldo es obligatorio';
+                }
                 if (double.tryParse(
                         v.replaceAll(RegExp(r'[^0-9.]'), '')) ==
-                    null) return 'Saldo inválido';
+                    null) {
+                  return 'Saldo inválido';
+                }
                 return null;
               },
             ),

@@ -3,7 +3,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:iconsax/iconsax.dart'; // Asegúrate de tener Iconsax para el botón de cierre
 import 'package:sasper/models/insight_model.dart';
 
 class InsightCard extends StatelessWidget {

@@ -313,8 +313,9 @@ class _RegisterScreenState extends State<RegisterScreen>
                               FocusScope.of(context)
                                   .requestFocus(_emailFocus),
                           validator: (v) {
-                            if (v == null || v.isEmpty)
+                            if (v == null || v.isEmpty) {
                               return 'Usuario requerido';
+                            }
                             if (v.contains(' ')) return 'Sin espacios';
                             return null;
                           },
@@ -367,11 +368,13 @@ class _RegisterScreenState extends State<RegisterScreen>
                               color: onSurf.withOpacity(0.40)),
                           ),
                           validator: (v) {
-                            if (v == null || v.isEmpty)
+                            if (v == null || v.isEmpty) {
                               return 'Contraseña requerida';
+                            }
                             if (!_hasMinLength || !_hasUppercase ||
-                                !_hasLowercase || !_hasSpecialChar)
+                                !_hasLowercase || !_hasSpecialChar) {
                               return 'Cumple todos los requisitos';
+                            }
                             return null;
                           },
                         ),

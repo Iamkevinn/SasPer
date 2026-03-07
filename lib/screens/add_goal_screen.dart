@@ -77,10 +77,8 @@ class _C {
   static const double sm   = 8.0;
   static const double md   = 16.0;
   static const double lg   = 24.0;
-  static const double xl   = 32.0;
   static const double rSM  = 8.0;
   static const double rMD  = 12.0;
-  static const double rLG  = 16.0;
   static const double rXL  = 22.0;
   static const double r2XL = 28.0;
 
@@ -88,7 +86,6 @@ class _C {
   static const Duration mid    = Duration(milliseconds: 270);
   static const Duration slow   = Duration(milliseconds: 460);
   static const Curve   easeOut = Curves.easeOutCubic;
-  static const Curve   spring  = Curves.easeOutBack;
 }
 
 // ─── VIABILIDAD ───────────────────────────────────────────────────────────────

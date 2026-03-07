@@ -64,7 +64,6 @@ const _kBlue   = Color(0xFF0A84FF);
 const _kGreen  = Color(0xFF30D158);
 const _kOrange = Color(0xFFFF9F0A);
 const _kPurple = Color(0xFFBF5AF2);
-const _kRed    = Color(0xFFFF453A);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SCREEN
@@ -98,7 +97,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     // Necesitamos los tres datos listos
     if (_cachedProfile == null ||
         _cachedAchievements == null ||
-        _cachedUnlocked == null) return;
+        _cachedUnlocked == null) {
+      return;
+    }
 
     setState(() {
       _isSharing         = true;

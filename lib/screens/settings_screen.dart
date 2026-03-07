@@ -121,9 +121,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: _ConfirmLogoutSheet(onConfirm: () async {
           try { await _auth.signOut(); }
           catch (e) {
-            if (mounted) NotificationHelper.show(
+            if (mounted) {
+              NotificationHelper.show(
                 message: 'Error al cerrar sesión.',
                 type: NotificationType.error);
+            }
           }
         }),
       ),

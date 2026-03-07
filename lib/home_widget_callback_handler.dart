@@ -1,6 +1,5 @@
 // lib/home_widget_callback_handler.dart
 import 'dart:developer' as developer;
-import 'package:sasper/services/simple_manifestation_widget_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sasper/config/app_config.dart';

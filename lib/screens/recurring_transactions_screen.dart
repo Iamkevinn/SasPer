@@ -24,7 +24,8 @@ import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:sasper/services/notification_service.dart';
 import 'package:sasper/main.dart';
-import 'dart:developer' as developer;
+import 'package:sasper/data/category_repository.dart';
+import 'package:sasper/models/category_model.dart'; 
 
 // ─── TOKENS DINÁMICOS ────────────────────────────────────────────────────────
 // Resueltos en tiempo de ejecución según el tema activo del sistema.
@@ -67,7 +68,6 @@ class _C {
   Color get accentBg  => accent.withOpacity(isDark ? 0.18 : 0.09);
 
   // Espaciado
-  static const double xs  = 4.0;
   static const double sm  = 8.0;
   static const double md  = 16.0;
   static const double lg  = 24.0;
@@ -80,7 +80,6 @@ class _C {
   static const double rXL = 22.0;
 
   // Animaciones
-  static const Duration fast   = Duration(milliseconds: 150);
   static const Duration mid    = Duration(milliseconds: 280);
   static const Duration slow   = Duration(milliseconds: 440);
   static const Curve curveOut  = Curves.easeOutCubic;
@@ -100,12 +99,14 @@ class _RecurringTransactionsScreenState
     with TickerProviderStateMixin {
   final RecurringRepository _repository = RecurringRepository.instance;
   late final Stream<List<RecurringTransaction>> _stream;
+  late final Future<List<Category>> _categoriesFuture;
   late final TabController _tabController;
 
   @override
   void initState() {
     super.initState();
     _stream = _repository.getRecurringTransactionsStream();
+    _categoriesFuture = CategoryRepository.instance.getCategories();
     _tabController = TabController(length: 2, vsync: this);
   }
 
@@ -243,48 +244,57 @@ class _RecurringTransactionsScreenState
         body: NestedScrollView(
           headerSliverBuilder: (context, innerBoxIsScrolled) =>
               [_buildAppBar(c, innerBoxIsScrolled)],
-          body: StreamBuilder<List<RecurringTransaction>>(
-            stream: _stream,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return _SkeletonLoader(c: c);
-              }
-              if (snapshot.hasError) {
-                return _ErrorState(
-                    error: '${snapshot.error}', c: c,
-                    onRetry: _repository.refreshData);
-              }
-              final items = snapshot.data ?? [];
-              if (items.isEmpty) {
-                return _EmptyState(c: c, onAdd: _navigateToAdd);
-              }
+          body: FutureBuilder<List<Category>>( // 👈 NUEVO: Envolvemos en FutureBuilder de Categorías
+            future: _categoriesFuture,
+            builder: (context, catSnapshot) {
+              final categories = catSnapshot.data ??[];
+              
+              return StreamBuilder<List<RecurringTransaction>>(
+                stream: _stream,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return _SkeletonLoader(c: c);
+                  }
+                  if (snapshot.hasError) {
+                    return _ErrorState(
+                        error: '${snapshot.error}', c: c,
+                        onRetry: _repository.refreshData);
+                  }
+                  final items = snapshot.data ??[];
+                  if (items.isEmpty) {
+                    return _EmptyState(c: c, onAdd: _navigateToAdd);
+                  }
 
-              return TabBarView(
-                controller: _tabController,
-                children: [
-                  _RecurringList(
-                    key: const ValueKey('expenses'),
-                    items: items.where((i) => i.type == 'Gasto').toList(),
-                    isExpense: true, c: c,
-                    repository: _repository,
-                    onEdit: _navigateToEdit,
-                    onDelete: _handleDelete,
-                    onAdd: _navigateToAdd,
-                    onRefresh: _repository.refreshData,
-                  ),
-                  _RecurringList(
-                    key: const ValueKey('incomes'),
-                    items: items.where((i) => i.type == 'Ingreso').toList(),
-                    isExpense: false, c: c,
-                    repository: _repository,
-                    onEdit: _navigateToEdit,
-                    onDelete: _handleDelete,
-                    onAdd: _navigateToAdd,
-                    onRefresh: _repository.refreshData,
-                  ),
-                ],
+                  return TabBarView(
+                    controller: _tabController,
+                    children:[
+                      _RecurringList(
+                        key: const ValueKey('expenses'),
+                        items: items.where((i) => i.type == 'Gasto').toList(),
+                        categories: categories, // 👈 Pasamos las categorías
+                        isExpense: true, c: c,
+                        repository: _repository,
+                        onEdit: _navigateToEdit,
+                        onDelete: _handleDelete,
+                        onAdd: _navigateToAdd,
+                        onRefresh: _repository.refreshData,
+                      ),
+                      _RecurringList(
+                        key: const ValueKey('incomes'),
+                        items: items.where((i) => i.type == 'Ingreso').toList(),
+                        categories: categories, // 👈 Pasamos las categorías
+                        isExpense: false, c: c,
+                        repository: _repository,
+                        onEdit: _navigateToEdit,
+                        onDelete: _handleDelete,
+                        onAdd: _navigateToAdd,
+                        onRefresh: _repository.refreshData,
+                      ),
+                    ],
+                  );
+                },
               );
-            },
+            }
           ),
         ),
       ),
@@ -437,6 +447,7 @@ class _PremiumTabBar extends StatelessWidget {
 // ─── LISTA DE RECURRENTES ────────────────────────────────────────────────────
 class _RecurringList extends StatelessWidget {
   final List<RecurringTransaction> items;
+  final List<Category> categories; 
   final bool isExpense;
   final _C c;
   final RecurringRepository repository;
@@ -450,6 +461,7 @@ class _RecurringList extends StatelessWidget {
     required this.items, required this.isExpense, required this.c,
     required this.repository, required this.onEdit, required this.onDelete,
     required this.onAdd, required this.onRefresh,
+    required this.categories, // 👈 NUEVO: Recibimos las categorías
   });
 
   DateTime _day(RecurringTransaction t) =>
@@ -518,7 +530,7 @@ class _RecurringList extends StatelessWidget {
                 (_, i) => _FadeSlide(
                   delay: 60 + i * 45,
                   child: _PaymentCard(
-                    item: overdue[i], c: c, repository: repository,
+                    item: overdue[i], categories: categories, c: c, repository: repository, // 👈 Pasamos categorías
                     onEdit: () => onEdit(overdue[i]),
                     onDelete: () => onDelete(overdue[i]),
                   ),
@@ -539,9 +551,8 @@ class _RecurringList extends StatelessWidget {
                 (_, i) => _FadeSlide(
                   delay: 70 + i * 45,
                   child: _PaymentCard(
-                    item: dueToday[i], c: c, repository: repository,
-                    onEdit: () => onEdit(dueToday[i]),
-                    onDelete: () => onDelete(dueToday[i]),
+                    item: dueToday[i], categories: categories, c: c, repository: repository, // 👈 Pasamos categorías
+                    onEdit: () => onEdit(dueToday[i]), onDelete: () => onDelete(dueToday[i]),
                   ),
                 ),
                 childCount: dueToday.length,
@@ -562,9 +573,8 @@ class _RecurringList extends StatelessWidget {
                   (_, i) => _FadeSlide(
                     delay: 80 + i * 45,
                     child: _PaymentCard(
-                      item: upcoming[i], c: c, repository: repository,
-                      onEdit: () => onEdit(upcoming[i]),
-                      onDelete: () => onDelete(upcoming[i]),
+                      item: upcoming[i], categories: categories, c: c, repository: repository, // 👈 Pasamos categorías
+                      onEdit: () => onEdit(upcoming[i]), onDelete: () => onDelete(upcoming[i]),
                     ),
                   ),
                   childCount: upcoming.length,
@@ -758,13 +768,14 @@ class _SectionLabel extends StatelessWidget {
 // ─── TARJETA DE PAGO ─────────────────────────────────────────────────────────
 class _PaymentCard extends StatefulWidget {
   final RecurringTransaction item;
+  final List<Category> categories; 
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final RecurringRepository repository;
   final _C c;
 
   const _PaymentCard({
-    required this.item, required this.onEdit, required this.onDelete,
+    required this.item, required this.categories, required this.onEdit, required this.onDelete,
     required this.repository, required this.c,
   });
 
@@ -878,11 +889,30 @@ class _PaymentCardState extends State<_PaymentCard>
     }
   }
 
+  // LÓGICA PARA BUSCAR EL COLOR Y EL ÍCONO DE LA CATEGORÍA 👈 NUEVO
+  Category? _findCategory() {
+    try {
+      final typeEnum = _isExpense ? CategoryType.expense : CategoryType.income;
+      return widget.categories.firstWhere((cat) => cat.name == widget.item.category && cat.type == typeEnum);
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final fmt = NumberFormat.currency(
         locale: 'es_CO', symbol: '\$', decimalDigits: 0);
     final color = _isExpense ? _C.expense : _C.income;
+
+    // --- DISEÑO DINÁMICO ---
+    final cat = _findCategory();
+    // Si la categoría existe, usamos su color para el ícono y el botón, si no, el default (Rojo/Verde)
+    final catColor = cat != null ? cat.colorAsObject : (_isExpense ? _C.expense : _C.income);
+    final catIcon = cat?.icon ?? (_isExpense ? Iconsax.receipt_minus : Iconsax.receipt_add);
+    
+    // El texto del monto siempre en Rojo/Verde para claridad financiera
+    final amountColor = _isExpense ? _C.expense : _C.income;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(_C.md, 0, _C.md, _C.sm + 4),
@@ -914,17 +944,14 @@ class _PaymentCardState extends State<_PaymentCard>
                   child: Row(
                     children: [
                       // Ícono
+                      // Ícono (AHORA DINÁMICO) 👈
                       Container(
                         width: 48, height: 48,
                         decoration: BoxDecoration(
-                          color: color.withOpacity(c.isDark ? 0.18 : 0.1),
+                          color: catColor.withOpacity(c.isDark ? 0.18 : 0.1),
                           borderRadius: BorderRadius.circular(_C.rMD),
                         ),
-                        child: Icon(
-                          _isExpense
-                              ? Iconsax.receipt_minus
-                              : Iconsax.receipt_add,
-                          color: color, size: 22),
+                        child: Icon(catIcon, color: catColor, size: 22),
                       ),
                       const SizedBox(width: _C.md),
 
@@ -1017,7 +1044,7 @@ class _PaymentCardState extends State<_PaymentCard>
                           label: _isExpense
                               ? 'Pagar ahora'
                               : 'Registrar ingreso',
-                          color: color,
+                          color: catColor,
                           onTap: _pay,
                         ),
                       ),

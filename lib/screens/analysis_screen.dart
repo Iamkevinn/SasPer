@@ -12,7 +12,6 @@
 
 import 'dart:async';
 import 'dart:developer' as developer;
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
@@ -72,7 +71,6 @@ class _C {
   static const Color purple  = Color(0xFFBF5AF2);
 
   // Espaciado
-  static const double xs  = 4.0;
   static const double sm  = 8.0;
   static const double md  = 16.0;
   static const double lg  = 24.0;

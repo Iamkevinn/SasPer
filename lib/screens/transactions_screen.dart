@@ -43,7 +43,6 @@ class _T {
 const _kBlue   = Color(0xFF0A84FF);
 const _kGreen  = Color(0xFF30D158);
 const _kRed    = Color(0xFFFF453A);
-const _kOrange = Color(0xFFFF9F0A);
 
 // ── Filtros de tiempo ─────────────────────────────────────────────────────────
 enum _TimeFilter { today, week, month, all }

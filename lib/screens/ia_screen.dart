@@ -52,8 +52,6 @@ class _T {
 const _kBlue   = Color(0xFF0A84FF);
 const _kGreen  = Color(0xFF30D158);
 const _kRed    = Color(0xFFFF453A);
-const _kOrange = Color(0xFFFF9F0A);
-const _kPurple = Color(0xFFBF5AF2);
 
 final _fmt = NumberFormat.currency(
     locale: 'es_CO', symbol: '\$', decimalDigits: 0);
