@@ -64,26 +64,31 @@ class GoalsListFactory(private val context: Context) : RemoteViewsService.Remote
         val goal = goals[position]
         val views = RemoteViews(context.packageName, R.layout.widget_goal_item_layout)
 
+        // 1. Título, porcentaje y barra de progreso
         views.setTextViewText(R.id.goal_name, goal.name)
         views.setTextViewText(R.id.goal_percentage, "${goal.progress}%")
-        // --- [CORRECCIÓN] Se reemplazó "/" por "." ---
         views.setProgressBar(R.id.goal_progress_bar, 100, goal.progress, false)
-        views.setTextViewText(R.id.goal_current_amount, currencyFormat.format(goal.current_amount))
-        // --- [CORRECCIÓN] Se reemplazó "/" por "." ---
-        views.setTextViewText(R.id.goal_target_amount, "de ${currencyFormat.format(goal.target_amount)}")
 
+        // 2. Construimos el subtítulo unificado (Estilo iOS: limpio y en una sola línea)
+        val currentStr = currencyFormat.format(goal.current_amount)
+        val targetStr = currencyFormat.format(goal.target_amount)
+        var subtitleText = "$currentStr de $targetStr"
+
+        // 3. Si hay fecha límite, la añadimos al final de forma elegante
         if (!goal.deadline.isNullOrEmpty()) {
             try {
                 val dueDate = ZonedDateTime.parse(goal.deadline)
                 val formatter = DateTimeFormatter.ofPattern("MMM yyyy", Locale("es", "ES"))
-                views.setTextViewText(R.id.goal_status_text, "Meta para ${formatter.format(dueDate)}")
+                subtitleText += " • ${formatter.format(dueDate)}"
             } catch (e: DateTimeParseException) {
-                views.setTextViewText(R.id.goal_status_text, "")
+                // Ignorar error de fecha si viene mal formateada
             }
-        } else {
-            views.setTextViewText(R.id.goal_status_text, "Sin fecha límite")
         }
 
+        // 4. Asignamos todo al único TextView que dejamos en el diseño
+        views.setTextViewText(R.id.goal_current_amount, subtitleText)
+
+        // 5. Configurar el intent para abrir la meta al tocar
         val fillInIntent = Intent().apply {
             val extras = Bundle()
             extras.putString("goal_id", goal.id)

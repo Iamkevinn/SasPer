@@ -4,16 +4,16 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
-    android:theme="@style/Theme.AppWidget"> <!-- [CORRECCIÓN] Tema añadido -->
+    android:theme="@style/Theme.AppWidget">
 
     <LinearLayout
         android:id="@+id/widget_content"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:padding="20dp">
+        android:padding="16dp">
 
-        <!-- HEADER -->
+        <!-- HEADER MINIMALISTA (Estilo iOS Eyebrow) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -21,90 +21,82 @@
             android:gravity="center_vertical"
             android:paddingBottom="12dp">
 
-            <FrameLayout
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:background="@drawable/widget_goal_header_icon_bg">
-
-                <ImageView
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:layout_gravity="center"
-                    android:src="@drawable/ic_goals"
-                    android:tint="?attr/colorOnPrimaryContainer"
-                    android:contentDescription="@string/goals_widget_icon_description" />
-            </FrameLayout>
-
+            <!-- Texto compacto y elegante -->
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:layout_marginStart="12dp"
                 android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="OBJETIVOS"
+                    android:textColor="?attr/colorPrimary"
+                    android:fontFamily="sans-serif-black"
+                    android:textSize="10sp"
+                    android:letterSpacing="0.1" />
 
                 <TextView
                     android:id="@+id/widget_title"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/widget_title_goals"
+                    android:text="Metas Activas"
                     android:textColor="?attr/colorOnSurface"
                     android:fontFamily="sans-serif-medium"
-                    android:textSize="18sp" />
-
-                <TextView
-                    android:id="@+id/widget_subtitle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:textColor="?attr/colorOnSurfaceVariant"
-                    android:fontFamily="sans-serif"
-                    android:textSize="12sp"
-                    android:alpha="0.7"
-                    tools:text="3 metas activas" />
+                    android:textSize="18sp"
+                    android:layout_marginTop="2dp"/>
             </LinearLayout>
 
-            <ImageButton
-                android:id="@+id/refresh_button"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_marginEnd="8dp"
-                android:background="@android:color/transparent"
-                android:src="@drawable/ic_refresh"
-                android:contentDescription="@string/refresh_widget" />
+            <!-- Controles agrupados y sutiles -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:background="@drawable/widget_goal_item_background"
+                android:padding="4dp">
 
-            <ImageButton
-                android:id="@+id/add_goal_button"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:background="@drawable/widget_add_goal_button"
-                android:src="@drawable/ic_add"
-                android:tint="?attr/colorPrimary"
-                android:contentDescription="@string/add_goal" />
+                <ImageButton
+                    android:id="@+id/refresh_button"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:src="@drawable/ic_refresh"
+                    android:tint="?attr/colorOnSurfaceVariant"
+                    android:padding="4dp"
+                    android:contentDescription="@string/refresh_widget" />
+
+                <ImageButton
+                    android:id="@+id/add_goal_button"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:src="@drawable/ic_add"
+                    android:tint="?attr/colorPrimary"
+                    android:layout_marginStart="4dp"
+                    android:padding="4dp"
+                    android:contentDescription="@string/add_goal" />
+            </LinearLayout>
         </LinearLayout>
 
-        <!-- [CORRECCIÓN] Reemplazado <View> por <FrameLayout> -->
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="?attr/colorOutlineVariant"
-            android:alpha="0.5"
-            android:layout_marginBottom="16dp" />
-
-        <!-- LISTA DE METAS -->
+        <!-- LISTA DE METAS (Ocupa el resto del espacio) -->
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1">
 
+            <!-- El ListView usará tarjetas separadas -->
             <ListView
                 android:id="@+id/goals_list_view"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:divider="@android:color/transparent"
-                android:dividerHeight="8dp"
-                android:scrollbars="none" />
+                android:dividerHeight="10dp"
+                android:scrollbars="none"
+                android:clipToPadding="false"
+                android:paddingBottom="8dp"/>
 
-            <!-- ESTADO VACÍO -->
+            <!-- ESTADO VACÍO ELEGANTE -->
             <LinearLayout
                 android:id="@+id/empty_view"
                 android:layout_width="match_parent"
@@ -112,36 +104,26 @@
                 android:orientation="vertical"
                 android:gravity="center"
                 android:visibility="gone"
+                android:background="@drawable/widget_goal_item_background"
                 tools:visibility="visible">
                 
                 <ImageView
-                    android:layout_width="60dp"
-                    android:layout_height="60dp"
-                    android:src="@drawable/ic_goal_empty"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:src="@drawable/ic_add"
                     android:tint="?attr/colorOnSurfaceVariant"
-                    android:alpha="0.6"
+                    android:alpha="0.4"
                     android:contentDescription="@null" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:text="@string/no_active_goals"
-                    android:textColor="?attr/colorOnSurface"
+                    android:layout_marginTop="8dp"
+                    android:text="Toca para añadir una meta"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:fontFamily="sans-serif-medium"
-                    android:textSize="16sp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="@string/add_goal"
-                    android:textColor="?attr/colorPrimary"
-                    android:fontFamily="sans-serif-medium"
-                    android:textSize="14sp"
-                    android:background="@drawable/widget_button_background"
-                    android:paddingHorizontal="20dp"
-                    android:paddingVertical="10dp"/>
+                    android:textSize="13sp"
+                    android:alpha="0.7"/>
             </LinearLayout>
         </FrameLayout>
     </LinearLayout>
