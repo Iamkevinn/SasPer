@@ -1,6 +1,5 @@
 // lib/screens/edit_recurring_transaction_screen.dart
 
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax/iconsax.dart';
@@ -40,7 +39,6 @@ class _C {
   static const double xs   = 4.0;
   static const double sm   = 8.0;
   static const double md   = 16.0;
-  static const double lg   = 24.0;
   static const double xl   = 32.0;
   static const double rSM  = 8.0;
   static const double rMD  = 12.0;

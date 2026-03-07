@@ -31,7 +31,7 @@ class PlaceSearchScreen extends StatefulWidget {
 
 class _PlaceSearchScreenState extends State<PlaceSearchScreen> {
   final TextEditingController _controller = TextEditingController();
-  List<PlacePrediction> _predictions = [];
+  List<PlacePrediction> _predictions =[];
   bool _isLoading = false;
   String? _errorMessage;
   Timer? _debounce;
@@ -44,10 +44,13 @@ class _PlaceSearchScreenState extends State<PlaceSearchScreen> {
       // Usamos un debounce para no hacer una llamada a la API en cada tecla presionada
       if (_debounce?.isActive ?? false) _debounce!.cancel();
       _debounce = Timer(const Duration(milliseconds: 600), () {
+        // Validación extra: si ya salimos de la pantalla, no hacer nada
+        if (!mounted) return; 
+        
         if (_controller.text.isNotEmpty) {
           _fetchPredictions(_controller.text);
         } else {
-          setState(() => _predictions = []);
+          setState(() => _predictions =[]);
         }
       });
     });
@@ -62,6 +65,8 @@ class _PlaceSearchScreenState extends State<PlaceSearchScreen> {
 
   /// Hace la llamada a la API de Google Place Autocomplete
   Future<void> _fetchPredictions(String input) async {
+    if (!mounted) return;
+    
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -73,6 +78,10 @@ class _PlaceSearchScreenState extends State<PlaceSearchScreen> {
 
     try {
       final response = await http.get(url);
+      
+      // 👈 PROTECCIÓN CLAVE: Si el usuario cerró la pantalla mientras esperábamos la red, salimos
+      if (!mounted) return; 
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['status'] == 'OK') {
@@ -82,7 +91,6 @@ class _PlaceSearchScreenState extends State<PlaceSearchScreen> {
                 .toList();
           });
         } else {
-          // ¡AQUÍ CAPTURAREMOS EL ERROR REAL DE GOOGLE!
           setState(() {
             _errorMessage = data['error_message'] ?? data['status'];
           });
@@ -91,20 +99,32 @@ class _PlaceSearchScreenState extends State<PlaceSearchScreen> {
         setState(() => _errorMessage = "Error de red: ${response.statusCode}");
       }
     } catch (e) {
-      setState(() => _errorMessage = "Error: ${e.toString()}");
+      // 👈 PROTECCIÓN CLAVE: Validar mounted también en el catch
+      if (mounted) {
+        setState(() => _errorMessage = "Error: ${e.toString()}");
+      }
     } finally {
-      setState(() => _isLoading = false);
+      // 👈 PROTECCIÓN CLAVE: Validar mounted también en el finally
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   /// Obtiene los detalles (lat/lng) de un lugar seleccionado
   Future<void> _getPlaceDetails(String placeId) async {
+    if (!mounted) return;
+
     final apiKey = AppConfig.googlePlacesApiKey;
     final url = Uri.parse(
         'https://maps.googleapis.com/maps/api/place/details/json?place_id=$placeId&key=$apiKey&sessiontoken=$_sessionToken&fields=geometry,name,formatted_address');
     
     try {
       final response = await http.get(url);
+      
+      // 👈 PROTECCIÓN CLAVE
+      if (!mounted) return; 
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['status'] == 'OK') {
@@ -114,7 +134,7 @@ class _PlaceSearchScreenState extends State<PlaceSearchScreen> {
             'lat': location['lat'],
             'lng': location['lng'],
           };
-          if (mounted) Navigator.pop(context, result);
+          Navigator.pop(context, result);
         } else {
            setState(() => _errorMessage = data['error_message'] ?? data['status']);
         }
@@ -122,7 +142,10 @@ class _PlaceSearchScreenState extends State<PlaceSearchScreen> {
          setState(() => _errorMessage = "Error de red: ${response.statusCode}");
       }
     } catch (e) {
-       setState(() => _errorMessage = "Error: ${e.toString()}");
+      // 👈 PROTECCIÓN CLAVE
+       if (mounted) {
+         setState(() => _errorMessage = "Error: ${e.toString()}");
+       }
     }
   }
 
@@ -133,7 +156,7 @@ class _PlaceSearchScreenState extends State<PlaceSearchScreen> {
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
-          children: [
+          children:[
             TextField(
               controller: _controller,
               autofocus: true,
