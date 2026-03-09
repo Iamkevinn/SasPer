@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <!-- Un fondo negro muy transparente (como cristal oscuro) -->
+    <solid android:color="#40000000" />
+    <!-- Un borde fino y blanco para dar el efecto de luz del cristal -->
+    <stroke android:width="0.5dp" android:color="#4DFFFFFF" />
+</shape>

@@ -246,7 +246,7 @@ class ManifestationVisionWidget : AppWidgetProvider() {
 
         val visualizeUri = Uri.parse("app://manifestation_widget/visualize?widgetId=$appWidgetId")
         val visualizeIntent = HomeWidgetBackgroundIntent.getBroadcast(context, visualizeUri)
-        views.setOnClickPendingIntent(R.id.btn_visualize, visualizeIntent)
+        views.setOnClickPendingIntent(R.id.manifestation_image, visualizeIntent)
 
         val openAppIntent = HomeWidgetLaunchIntent.getActivity(
             context, 
