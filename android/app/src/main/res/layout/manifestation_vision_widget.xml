@@ -14,7 +14,7 @@
         android:contentDescription="@string/manifestation_image_description"
         android:src="@drawable/placeholder_manifestation" />
 
-    <!-- 2. GRADIENTE DE LEGIBILIDAD (Corregido: Usamos FrameLayout en vez de View) -->
+    <!-- 2. GRADIENTE DE LEGIBILIDAD -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -64,13 +64,11 @@
                 android:textColor="#99FFFFFF"
                 android:fontFamily="sans-serif" />
 
-            <!-- Espaciador horizontal (Corregido: Usamos FrameLayout en vez de View) -->
             <FrameLayout 
                 android:layout_width="0dp" 
                 android:layout_height="0dp" 
                 android:layout_weight="1" />
 
-            <!-- Micro Controles Superiores -->
             <ImageButton
                 android:id="@+id/btn_refresh"
                 android:layout_width="26dp"
@@ -91,13 +89,12 @@
                 android:tint="#FFFFFF" />
         </LinearLayout>
 
-        <!-- Espacio flexible central (Corregido: Usamos FrameLayout en vez de View) -->
         <FrameLayout 
             android:layout_width="match_parent" 
             android:layout_height="0dp" 
             android:layout_weight="1" />
 
-        <!-- BOTTOM CONTENT (Textos y Navegación) -->
+        <!-- BOTTOM CONTENT (Textos y Controles) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -154,26 +151,41 @@
                     android:visibility="gone" />
             </LinearLayout>
 
-            <!-- Controles a la derecha -->
+            <!-- CONTROLES A LA DERECHA (ESTILO APPLE) -->
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
+                android:gravity="center_vertical"
                 android:layout_marginStart="12dp">
 
+                <!-- Flecha Anterior -->
                 <ImageButton
                     android:id="@+id/btn_previous"
-                    android:layout_width="34dp"
-                    android:layout_height="34dp"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
                     android:background="@drawable/glass_button_bg"
                     android:src="@drawable/ic_chevron_left"
                     android:tint="#FFFFFF" />
 
+                <!-- BOTÓN PRINCIPAL: MANIFESTAR (Más grande, dorado) -->
+                <ImageButton
+                    android:id="@+id/btn_visualize"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_marginStart="8dp"
+                    android:layout_marginEnd="8dp"
+                    android:background="@drawable/glass_button_bg"
+                    android:src="@drawable/ic_sparkle"
+                    android:scaleType="centerInside"
+                    android:padding="12dp"
+                    android:tint="#FFD700" />
+
+                <!-- Flecha Siguiente -->
                 <ImageButton
                     android:id="@+id/btn_next"
-                    android:layout_width="34dp"
-                    android:layout_height="34dp"
-                    android:layout_marginStart="8dp"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
                     android:background="@drawable/glass_button_bg"
                     android:src="@drawable/ic_chevron_right"
                     android:tint="#FFFFFF" />
@@ -181,15 +193,16 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- EFECTO DE DESTELLO AL VISUALIZAR -->
+    <!-- EFECTO DE DESTELLO (iOS Style Feedback) -->
     <FrameLayout
         android:id="@+id/visualization_effect"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#90FFD700"
+        android:background="#B3000000" 
         android:visibility="gone"
         android:clickable="true"
         android:focusable="true">
+        <!-- El fondo #B3000000 oscurece la pantalla 70% para resaltar el éxito -->
         
         <LinearLayout
             android:layout_width="match_parent"
@@ -197,16 +210,22 @@
             android:layout_gravity="center"
             android:orientation="vertical"
             android:gravity="center">
+            
+            <ImageView
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@drawable/ic_sparkle"
+                android:tint="#FFD700"
+                android:layout_marginBottom="12dp"/>
+
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="¡Manifestado!"
+                android:text="Visión Registrada"
                 android:textColor="#FFFFFF"
-                android:textSize="24sp"
-                android:fontFamily="sans-serif-black"
-                android:shadowColor="#40000000"
-                android:shadowDy="2"
-                android:shadowRadius="8" />
+                android:textSize="20sp"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="0.02" />
         </LinearLayout>
     </FrameLayout>
 </FrameLayout>

@@ -122,30 +122,22 @@ class SimpleManifestationWidgetService  {
     await _updateWidget(specificWidgetId: widgetId);
   }
 
-  static Future<void> recordManifestationVisualization(
-      {String? widgetId}) async {
+static Future<void> recordManifestationVisualization({String? widgetId}) async {
     final currentIndex = await _getCurrentIndex(widgetId: widgetId);
     final key = 'last_visualization_${currentIndex}_${widgetId ?? "global"}';
     await HomeWidget.saveWidgetData<String>(
         key, DateTime.now().toIso8601String());
 
-    // Activar animación
+    // Activar animación (Mandamos la orden UNA SOLA VEZ)
     await HomeWidget.saveWidgetData<bool>(
       _keyFor('trigger_visualization_animation', widgetId),
       true,
     );
     await _updateWidget(specificWidgetId: widgetId);
-
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    // Desactivar animación
-    await HomeWidget.saveWidgetData<bool>(
-      _keyFor('trigger_visualization_animation', widgetId),
-      false,
-    );
-    await _updateWidget(specificWidgetId: widgetId);
+    
+    // ❌ ELIMINADO: Ya no hacemos el Future.delayed ni la segunda orden.
+    // Kotlin se encargará de apagarlo de forma fluida.
   }
-
   // ===============================================================
   //                        MÉTODOS PRIVADOS
   // ===============================================================
