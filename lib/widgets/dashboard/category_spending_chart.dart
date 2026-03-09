@@ -96,22 +96,52 @@ class _CategorySpendingChartState extends State<CategorySpendingChart>
   }
 
   // ── Data Processing ───────────────────────────────────────────
+  // ── Data Processing ───────────────────────────────────────────
   List<CategorySpending> get _processed {
-    if (widget.spendingData.length <= 5) return widget.spendingData;
+    // 1. Paleta iOS Premium: Azul, Verde, Naranja, Morado, Cian
+    const palette =[
+      '#0A84FF', '#30D158', '#FF9F0A', '#BF5AF2', '#5AC8FA'
+    ];
+
+    // 2. Ordenar los datos reales de mayor a menor gasto
     final sorted = List<CategorySpending>.from(widget.spendingData)
       ..sort((a, b) => b.totalAmount.compareTo(a.totalAmount));
-    final top4 = sorted.take(4).toList();
-    final rest = sorted.skip(4).toList();
+
+    // 3. Asignar colores vibrantes dinámicamente si vienen en gris o nulos
+    final coloredList = sorted.asMap().entries.map((e) {
+      final index = e.key;
+      final item = e.value;
+      
+      // Si el color es el gris por defecto, le asignamos uno de la paleta Apple
+      final String finalColor = (item.color == '#636366' || item.color.isEmpty)
+          ? palette[index % palette.length]
+          : item.color;
+
+      return CategorySpending(
+        categoryName: item.categoryName,
+        totalAmount: item.totalAmount,
+        color: finalColor,
+      );
+    }).toList();
+
+    // 4. Si son 5 o menos, mostramos todos con sus colores nuevos
+    if (coloredList.length <= 5) return coloredList;
+
+    // 5. Si son más de 5, agrupamos los más pequeños en "Otros"
+    final top4 = coloredList.take(4).toList();
+    final rest = coloredList.skip(4).toList();
+    
     if (rest.isNotEmpty) {
       top4.add(CategorySpending(
         categoryName: 'Otros',
         totalAmount: rest.fold(0, (s, i) => s + i.totalAmount),
-        color: '#636366',
+        color: '#8E8E93', // Gris iOS System para "Otros" (Mantiene el orden visual)
       ));
     }
+    
     return top4;
   }
-
+  
   // ── Touch Handling with Haptics ───────────────────────────────
   void _onTouch(int index, List<CategorySpending> data, double total) {
     if (index == _touched) return;
