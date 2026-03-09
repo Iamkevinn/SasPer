@@ -117,6 +117,8 @@ class DashboardData extends Equatable {
     );
   }
 
+// lib/models/dashboard_data_model.dart
+  
   DashboardData copyWithDetails(Map<String, dynamic> map) {
     final List<Budget> allBudgets = (map['budgets_progress'] as List<dynamic>?)
         ?.map((b) => Budget.fromMap(b as Map<String, dynamic>))
@@ -132,7 +134,7 @@ class DashboardData extends Equatable {
       netWorth: (map['net_worth'] as num?)?.toDouble() ?? netWorth,
       totalDebt: (map['total_debt'] as num?)?.toDouble() ?? totalDebt,
       
-      monthlyIncome: monthlyIncome, // 👈 Mantenemos el valor que ya teníamos (o lo actualizamos si viniera en map)
+      monthlyIncome: monthlyIncome, 
       
       healthScore: (map['health_score'] as num?)?.toDouble() ?? healthScore,
       monthlyProjection: (map['monthly_projection'] as num?)?.toDouble() ?? monthlyProjection,
@@ -151,15 +153,26 @@ class DashboardData extends Equatable {
       
       budgets: allBudgets,
       featuredBudgets: allBudgets.where((b) => b.isActive).take(2).toList(),
+      
+      // Mantenemos esto por compatibilidad con otras partes de tu app
       expenseSummaryForWidget: (map['expense_summary_for_widget'] as List<dynamic>?)
           ?.map((e) => ExpenseByCategory.fromMap(e as Map<String, dynamic>))
           .toList() ?? expenseSummaryForWidget,
-      
+          
+      // 👇 AQUÍ ESTÁ LA MAGIA QUE FALTABA 👇
+      categorySpendingSummary: (map['expense_summary_for_widget'] as List<dynamic>?)
+          ?.map((e) => CategorySpending(
+                categoryName: e['category'] as String? ?? 'General',
+                totalAmount: (e['total_spent'] as num?)?.toDouble().abs() ?? 0.0,
+                color: e['color'] as String? ?? '#636366', // Gris por defecto
+              ))
+          .toList() ?? categorySpendingSummary,
+      // 👆 -------------------------------- 👆
+
       isLoading: false, 
-      categorySpendingSummary: const [],
     );
   }
-
+  
   factory DashboardData.empty() {
     return const DashboardData(
       totalBalance: 0.0,
