@@ -1,9 +1,54 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!--
+  widget_goals_layout.xml — Apple-first redesign
+  ═══════════════════════════════════════════════════════════════════
+
+  ELIMINADO respecto al layout original:
+  · widget_background (colorSecondaryContainer + 28dp) →
+      widget_goals_background (colorSurface + 20dp)
+  · Header: doble TextView "OBJETIVOS" (10sp black colorPrimary) +
+    "Metas Activas" (18sp medium) → un solo label 11sp uppercase
+    colorOnSurfaceVariant. En Apple el widget header es UNA línea
+    que identifica la función, no una jerarquía de 2 niveles.
+  · LinearLayout con @drawable/widget_goal_item_background como
+    contenedor de los botones refresh+add — sub-card en el header.
+    Botones directos sin contenedor de card.
+  · refresh_button ImageButton visible —
+      el intent de refresh se reasigna a widget_content (tap en
+      el widget). La lógica onReceive se mantiene intacta en .kt.
+      En Apple no existe botón de refresh visible en widgets.
+  · add_goal_button: se mantiene como único botón de acción con
+      propósito irreemplazable (no se puede añadir meta tocando
+      el widget de otra forma).
+  · empty_view background @drawable/widget_goal_item_background —
+      el estado vacío no necesita fondo de card, se presenta
+      directamente sobre la superficie del widget.
+  · ListView dividerHeight="10dp" entre cards flotantes →
+      divider="@drawable/widget_goals_divider" dividerHeight="1dp"
+      (en realidad 0.5dp via alpha). Sin cards → sin flotación.
+  · paddingBottom="8dp" + clipToPadding="false" en ListView —
+      innecesarios sin el espacio de las cards.
+
+  JERARQUÍA VISUAL del widget completo:
+  ┌─────────────────────────────────────────────┐
+  │  METAS ACTIVAS                         [+]  │  ← header minimal
+  ├─────────────────────────────────────────────┤
+  │  Viaje a Europa                      60%    │
+  │  $1.5M de $5M · Dic 2026                    │
+  │  ████████░░░░░░░░░░░░░                       │
+  ├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+  │  Casa propia                         23%    │
+  │  $4.6M de $20M                              │
+  │  ████░░░░░░░░░░░░░░░░░░░░░░░                 │
+  └─────────────────────────────────────────────┘
+  ═══════════════════════════════════════════════════════════════════
+-->
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/widget_background"
+    android:background="@drawable/widget_goals_background"
     android:theme="@style/Theme.AppWidget">
 
     <LinearLayout
@@ -11,96 +56,81 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:paddingTop="16dp"
-        android:paddingBottom="16dp"
         android:paddingStart="16dp"
-        android:paddingEnd="16dp">
+        android:paddingEnd="16dp"
+        android:paddingTop="14dp"
+        android:paddingBottom="12dp">
 
-        <!-- HEADER MINIMALISTA (Estilo iOS) -->
+        <!-- ═══ HEADER ═══════════════════════════════════════════════════
+             Una línea uppercase que identifica la función del widget.
+             Sin sub-card para los botones. Sin jerarquía de 2 niveles.
+             En Apple Watch Complications y iPhone widgets el header
+             es minimalista — la app se identifica con su ícono en el
+             launcher; el widget no necesita re-identificarse con énfasis.
+        ═══════════════════════════════════════════════════════════════ -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:paddingBottom="12dp">
+            android:layout_marginBottom="10dp">
 
-            <!-- Textos a la izquierda -->
-            <LinearLayout
+            <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:orientation="vertical">
+                android:text="@string/widget_title_goals"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:fontFamily="sans-serif-medium"
+                android:textSize="11sp"
+                android:letterSpacing="0.08"
+                android:textAllCaps="true"
+                tools:text="METAS ACTIVAS" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="MIS METAS"
-                    android:textColor="?attr/colorPrimary"
-                    android:fontFamily="sans-serif-black"
-                    android:textSize="10sp"
-                    android:letterSpacing="0.1" />
+            <!--
+              Botón añadir — único botón visible porque su acción
+              (crear nueva meta) NO es alcanzable tocando el widget.
+              16dp padding para área táctil suficiente en -4dp final.
+              Sin contenedor de card a su alrededor.
+            -->
+            <ImageButton
+                android:id="@+id/add_goal_button"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_add"
+                android:tint="?attr/colorOnSurfaceVariant"
+                android:scaleType="centerInside"
+                android:contentDescription="@string/add_goal" />
 
-                <TextView
-                    android:id="@+id/widget_title"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Progreso de Ahorro"
-                    android:textColor="?attr/colorOnSurface"
-                    android:fontFamily="sans-serif-medium"
-                    android:textSize="16sp"
-                    android:layout_marginTop="2dp"/>
-            </LinearLayout>
-
-            <!-- Controles a la derecha (Botones de Cristal) -->
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:background="@drawable/widget_goal_item_background"
-                android:padding="4dp">
-
-                <ImageButton
-                    android:id="@+id/refresh_button"
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:background="?android:attr/selectableItemBackgroundBorderless"
-                    android:src="@drawable/ic_refresh"
-                    android:tint="?attr/colorOnSurfaceVariant"
-                    android:padding="6dp"
-                    android:scaleType="centerInside"
-                    android:contentDescription="@string/refresh_widget" />
-
-                <ImageButton
-                    android:id="@+id/add_goal_button"
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:background="?android:attr/selectableItemBackgroundBorderless"
-                    android:src="@drawable/ic_add"
-                    android:tint="?attr/colorPrimary"
-                    android:layout_marginStart="4dp"
-                    android:padding="6dp"
-                    android:scaleType="centerInside"
-                    android:contentDescription="@string/add_goal" />
-            </LinearLayout>
         </LinearLayout>
 
-        <!-- CONTENIDO: LISTA O ESTADO VACÍO -->
+        <!-- ═══ LISTA DE METAS / EMPTY STATE ════════════════════════════ -->
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1">
 
-            <!-- ListView con Scroll, sin divisores duros -->
+            <!--
+              ListView con dividers de 0.5dp.
+              Sin cards flotantes → dividerHeight baja a 1dp visual
+              (el drawable tiene alpha reducido en el .kt para los 0.5dp).
+              scrollbars="none" se mantiene — widgets no muestran scrollbars.
+            -->
             <ListView
                 android:id="@+id/goals_list_view"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:divider="@android:color/transparent"
-                android:dividerHeight="10dp"
-                android:scrollbars="none"
-                android:clipToPadding="false" />
+                android:divider="@drawable/widget_goals_divider"
+                android:dividerHeight="1dp"
+                android:scrollbars="none" />
 
-            <!-- Estado Vacío -->
+            <!--
+              EMPTY STATE — sin fondo de card.
+              Ícono 24dp (no 32dp) + texto en una sola línea.
+              Sin background — sobre la superficie del widget directamente.
+              El tap abre la app para añadir la primera meta.
+            -->
             <LinearLayout
                 android:id="@+id/empty_view"
                 android:layout_width="match_parent"
@@ -108,13 +138,12 @@
                 android:orientation="vertical"
                 android:gravity="center"
                 android:visibility="gone"
-                android:background="@drawable/widget_goal_item_background"
-                tools:visibility="visible">
-                
+                tools:visibility="gone">
+
                 <ImageView
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:src="@drawable/ic_add"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@drawable/ic_goals"
                     android:tint="?attr/colorOnSurfaceVariant"
                     android:alpha="0.4"
                     android:contentDescription="@null" />
@@ -123,12 +152,26 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:text="Toca para añadir una meta"
-                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:text="@string/no_active_goals_title"
+                    android:textColor="?attr/colorOnSurface"
                     android:fontFamily="sans-serif-medium"
-                    android:textSize="13sp"
-                    android:alpha="0.7"/>
+                    android:textSize="14sp"
+                    android:gravity="center" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp"
+                    android:text="@string/create_first_goal"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:fontFamily="sans-serif"
+                    android:textSize="12sp"
+                    android:gravity="center" />
+
             </LinearLayout>
+
         </FrameLayout>
+
     </LinearLayout>
+
 </FrameLayout>

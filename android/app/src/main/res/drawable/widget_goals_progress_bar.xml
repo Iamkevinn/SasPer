@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  widget_goals_progress_bar.xml
+  Barra sólida. Sin gradiente de 3 colores — en 6dp de altura
+  el gradiente es imperceptible y añade complejidad innecesaria.
+  colorPrimary para el fill: contrasta limpiamente con colorSurfaceContainerHighest.
+  corners:3dp en lugar de 5dp — más proporcional a la altura de 4dp del nuevo diseño.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item android:id="@android:id/background">
+        <shape android:shape="rectangle">
+            <corners android:radius="3dp" />
+            <solid android:color="?attr/colorSurfaceContainerHighest" />
+        </shape>
+    </item>
+
+    <item android:id="@android:id/progress">
+        <clip>
+            <shape android:shape="rectangle">
+                <corners android:radius="3dp" />
+                <solid android:color="?attr/colorPrimary" />
+            </shape>
+        </clip>
+    </item>
+
+</layer-list>

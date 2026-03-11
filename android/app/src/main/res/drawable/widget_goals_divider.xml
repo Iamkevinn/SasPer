@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  widget_goals_divider.xml
+  Separador de 0.5dp entre items de la lista.
+  Reemplaza el espacio de 10dp entre cards flotantes.
+  colorOutlineVariant con alpha 0.4 — visible pero no intrusivo.
+  Patrón idéntico al separador de Settings en iOS.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="?attr/colorOutlineVariant" />
+</shape>

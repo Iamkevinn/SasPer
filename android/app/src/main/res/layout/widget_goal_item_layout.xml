@@ -1,103 +1,118 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!--
+  widget_goal_item_layout.xml — Apple-first redesign
+  ═══════════════════════════════════════════════════════════════════
+
+  ELIMINADO respecto al layout original:
+  · LinearLayout background @drawable/widget_goal_item_background
+    (ripple + colorSurfaceContainerHigh + corners:20dp) —
+    card anidada dentro de un widget que ya es una card.
+    Jerarquía visual falsa: "tarjeta dentro de tarjeta".
+    Los items se separan con un divider de 1dp — patrón Settings iOS.
+  · FrameLayout 40dp oval con gradiente para el ícono —
+    icon_type no se usa en GoalsListFactory.getViewAt(), el ícono
+    es siempre ic_goal_default con colorPrimary. Una columna de
+    íconos idénticos es ruido sin información. El espacio liberado
+    (40dp + 12dp margin) lo ocupa el nombre.
+  · alpha="0.8" en goal_current_amount —
+    doble reducción de opacidad. colorOnSurfaceVariant ya es tenue.
+  · goal_percentage: 20sp sans-serif-black colorPrimary —
+    compite con el nombre (15sp medium). La barra ya muestra el
+    progreso visualmente. El número confirma sutilmente a 14sp.
+  · padding="16dp" en el item (se acumula con el 16dp del container
+    del widget) — paddingVertical 12dp, horizontal 0dp.
+  · marginTop="14dp" entre info y barra → 8dp.
+  · ProgressBar height="6dp" → 4dp. Más discreta, mismo dato.
+
+  JERARQUÍA VISUAL por item (Apple Reminders pattern):
+  ┌─────────────────────────────────────────────────────┐
+  │  Viaje a Europa                            60%      │
+  │  $1.500.000 de $5.000.000 · Dic 2026                │
+  │  ████████████░░░░░░░░░░░░░░░                        │
+  └─────────────────────────────────────────────────────┘
+  ═══════════════════════════════════════════════════════════════════
+-->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/goal_item_container"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingTop="12dp"
+    android:paddingBottom="12dp"
     android:theme="@style/Theme.AppWidget">
 
+    <!-- Fila superior: nombre + porcentaje -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp"
-        android:background="@drawable/widget_goal_item_background">
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
 
-        <!-- Fila de Información -->
-        <LinearLayout
-            android:layout_width="match_parent"
+        <!--
+          NOMBRE — información primaria.
+          15sp medium. weight=1 para empujar el porcentaje a la derecha.
+          maxLines:1 con ellipsize para nombres largos.
+        -->
+        <TextView
+            android:id="@+id/goal_name"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:layout_weight="1"
+            android:textColor="?attr/colorOnSurface"
+            android:fontFamily="sans-serif-medium"
+            android:textSize="15sp"
+            android:letterSpacing="-0.01"
+            android:maxLines="1"
+            android:ellipsize="end"
+            tools:text="Viaje a Europa" />
 
-            <!-- Ícono de Categoría -->
-            <FrameLayout
-                android:id="@+id/goal_icon_container"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:background="@drawable/widget_goal_icon_background">
+        <!--
+          PORCENTAJE — confirmación sutil del progreso que muestra la barra.
+          14sp medium, colorOnSurfaceVariant. Informa sin competir con el nombre.
+        -->
+        <TextView
+            android:id="@+id/goal_percentage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:fontFamily="sans-serif-medium"
+            android:textSize="14sp"
+            android:letterSpacing="-0.01"
+            tools:text="60%" />
 
-                <ImageView
-                    android:id="@+id/goal_icon"
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:layout_gravity="center"
-                    android:src="@drawable/ic_goal_default"
-                    android:tint="?attr/colorPrimary"
-                    android:contentDescription="@null"
-                    tools:src="@drawable/ic_savings" />
-            </FrameLayout>
-
-            <!-- Título y Subtítulo unificado -->
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="12dp"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/goal_name"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/goal_name_placeholder"
-                    android:textColor="?attr/colorOnSurface"
-                    android:fontFamily="sans-serif-medium"
-                    android:textSize="15sp"
-                    android:letterSpacing="-0.01"
-                    android:maxLines="1"
-                    android:ellipsize="end"
-                    tools:text="Viaje a Europa" />
-
-                <!-- Este es el TextView unificado que ajustamos en Kotlin -->
-                <TextView
-                    android:id="@+id/goal_current_amount"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:textColor="?attr/colorOnSurfaceVariant"
-                    android:fontFamily="sans-serif"
-                    android:textSize="12sp"
-                    android:alpha="0.8"
-                    android:maxLines="1"
-                    android:ellipsize="end"
-                    tools:text="$1.500.000 de $5.000.000 • Dic 2026" />
-            </LinearLayout>
-
-            <!-- Porcentaje Audaz (iOS Style) -->
-            <TextView
-                android:id="@+id/goal_percentage"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:textColor="?attr/colorPrimary"
-                android:fontFamily="sans-serif-black"
-                android:textSize="20sp"
-                android:letterSpacing="-0.03"
-                tools:text="60%" />
-        </LinearLayout>
-
-        <!-- Barra de Progreso Sutil -->
-        <ProgressBar
-            android:id="@+id/goal_progress_bar"
-            style="?android:attr/progressBarStyleHorizontal"
-            android:layout_width="match_parent"
-            android:layout_height="6dp"
-            android:layout_marginTop="14dp"
-            android:max="100"
-            android:progress="60"
-            android:progressDrawable="@drawable/widget_goal_progress_bar"
-            tools:progress="60" />
-            
     </LinearLayout>
-</FrameLayout>
+
+    <!--
+      SUBTÍTULO — "$1.500.000 de $5.000.000 · Dic 2026"
+      12sp regular, colorOnSurfaceVariant sin alpha adicional.
+    -->
+    <TextView
+        android:id="@+id/goal_current_amount"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:fontFamily="sans-serif"
+        android:textSize="12sp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        tools:text="$1.500.000 de $5.000.000 · Dic 2026" />
+
+    <!--
+      BARRA DE PROGRESO — 4dp altura, 8dp margen superior.
+    -->
+    <ProgressBar
+        android:id="@+id/goal_progress_bar"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="4dp"
+        android:layout_marginTop="8dp"
+        android:max="100"
+        android:progress="60"
+        android:progressDrawable="@drawable/widget_goals_progress_bar"
+        tools:progress="60" />
+
+</LinearLayout>

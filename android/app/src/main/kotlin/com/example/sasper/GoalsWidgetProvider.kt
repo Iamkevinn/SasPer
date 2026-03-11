@@ -8,17 +8,22 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.RemoteViews
-import android.content.ComponentName
+import es.antonborri.home_widget.HomeWidgetBackgroundIntent // 👈 Usaremos esto
 
 class GoalsWidgetProvider : AppWidgetProvider() {
 
     companion object {
         const val ACTION_GOALS_WIDGET_REFRESH = "com.example.sasper.ACTION_GOALS_WIDGET_REFRESH"
     }
-
-    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+    
+    override fun onUpdate(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetIds: IntArray
+    ) {
         appWidgetIds.forEach { appWidgetId ->
             
+            // --- CONFIGURACIÓN DE LA LISTA (Igual) ---
             val serviceIntent = Intent(context, GoalsWidgetService::class.java).apply {
                 putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
                 data = Uri.parse(toUri(Intent.URI_INTENT_SCHEME))
@@ -29,45 +34,40 @@ class GoalsWidgetProvider : AppWidgetProvider() {
                 setEmptyView(R.id.goals_list_view, R.id.empty_view)
             }
 
-            // Botón para añadir una nueva meta
+            // --- BOTÓN PARA AÑADIR (Igual) ---
             val addGoalIntent = Intent(context, MainActivity::class.java).apply {
-                action = "com.example.sasper.ACTION_ADD_GOAL"
+                action = Intent.ACTION_VIEW
+                data = Uri.parse("sasper://add_goal") // Deep link a la pantalla de añadir
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
             val addGoalPendingIntent = PendingIntent.getActivity(
-                context,
-                appWidgetId * 10 + 1,
-                addGoalIntent,
+                context, appWidgetId * 10, addGoalIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             views.setOnClickPendingIntent(R.id.add_goal_button, addGoalPendingIntent)
             views.setOnClickPendingIntent(R.id.empty_view, addGoalPendingIntent)
 
-            // Botón para refrescar el widget
-            val refreshIntent = Intent(context, GoalsWidgetProvider::class.java).apply {
-                action = ACTION_GOALS_WIDGET_REFRESH
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-            }
-            val refreshPendingIntent = PendingIntent.getBroadcast(
-                context,
-                appWidgetId,
-                refreshIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
+            // --- BOTÓN DE REFRESCAR (Ahora habla con Dart) ---
+            // Le pedimos a Dart que ejecute la lógica de actualización en segundo plano
+            val refreshUri = Uri.parse("home_widget://goals?action=refresh")
+            val refreshPendingIntent = HomeWidgetBackgroundIntent.getBroadcast(context, refreshUri)
             views.setOnClickPendingIntent(R.id.refresh_button, refreshPendingIntent)
 
+            // --- TEMPLATE PARA CLICKS EN LA LISTA (Igual) ---
+            val itemTemplate = Intent(context, MainActivity::class.java).apply {
+                action = Intent.ACTION_VIEW
+                data = Uri.parse("sasper://goal_detail")
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            val itemTemplatePendingIntent = PendingIntent.getActivity(
+                context, appWidgetId * 10 + 1, itemTemplate,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setPendingIntentTemplate(R.id.goals_list_view, itemTemplatePendingIntent)
+
             appWidgetManager.updateAppWidget(appWidgetId, views)
-            appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetId, R.id.goals_list_view)
         }
     }
 
-    override fun onReceive(context: Context, intent: Intent) {
-        super.onReceive(context, intent)
-        if (intent.action == ACTION_GOALS_WIDGET_REFRESH) {
-            val appWidgetManager = AppWidgetManager.getInstance(context)
-            val thisAppWidget = ComponentName(context.packageName, javaClass.name)
-            val appWidgetIds = appWidgetManager.getAppWidgetIds(thisAppWidget)
-            appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetIds, R.id.goals_list_view)
-        }
-    }
+    // ❌ ELIMINAMOS onReceive: Toda la lógica de refresco se delega a Dart
 }

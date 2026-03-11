@@ -58,6 +58,13 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
   try {
     await Supabase.initialize(url: supabaseUrl, anonKey: supabaseApiKey);
+  } catch (e) {
+    if (!e.toString().contains('already been initialized')) {
+      developer.log('🔥 Error en Supabase FCM Background: $e', name: 'NotificationService-FCM');
+    }
+  }
+
+  try {
     final uid = Supabase.instance.client.auth.currentUser?.id;
     if (uid != null) {
       final fcmToken = await FirebaseMessaging.instance.getToken();
@@ -68,7 +75,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       }
     }
   } catch (e) {
-    developer.log('🔥 Error en FCM Background: $e', name: 'NotificationService-FCM');
+    developer.log('🔥 Error guardando token FCM Background: $e', name: 'NotificationService-FCM');
   }
 }
 
@@ -80,6 +87,9 @@ class NotificationService {
   late final SupabaseClient _supabase;
   late final FirebaseMessaging _firebaseMessaging;
   late final http.Client _httpClient;
+  
+  // 🌟 NUEVA VARIABLE: Evita la reinicialización de variables late final
+  bool _dependenciesInitialized = false;
 
   final FlutterLocalNotificationsPlugin _localNotifier =
       FlutterLocalNotificationsPlugin();
@@ -93,47 +103,57 @@ class NotificationService {
     required FirebaseMessaging firebaseMessaging,
     http.Client? httpClient,
   }) {
+    // 🌟 NUEVO BLOQUE: Si ya se inicializó, ignorar y retornar
+    if (_dependenciesInitialized) {
+      developer.log('⚡ Dependencias ya estaban inicializadas. Saltando...', name: 'NotificationService');
+      return;
+    }
+
     _supabase = supabaseClient;
     _firebaseMessaging = firebaseMessaging;
     _httpClient = httpClient ?? http.Client();
+    
+    _dependenciesInitialized = true; // 🌟 Marcamos como completado
+    
     developer.log('✅ Dependencias inyectadas.', name: 'NotificationService');
   }
 
   // --- INICIALIZACIÓN RÁPIDA (Al arrancar la app) ---
-Future<void> initializeQuick() async {
-  developer.log('🚀 Iniciando configuración de notificaciones...', name: 'NotificationService');
+  Future<void> initializeQuick() async {
+    developer.log('🚀 Iniciando configuración de notificaciones...', name: 'NotificationService');
 
-  // 1. Configurar Zonas Horarias
-  try {
-    tz.initializeTimeZones();
-    final timezoneInfo = await FlutterTimezone.getLocalTimezone();
-    tz.setLocalLocation(tz.getLocation(timezoneInfo.identifier));
-    developer.log('🌍 Zona horaria detectada: ${timezoneInfo.identifier}', name: 'NotificationService');
-  } catch (e) {
-    developer.log('⚠️ Fallo zona horaria: $e', name: 'NotificationService');
-    tz.setLocalLocation(tz.getLocation('UTC'));
+    // 1. Configurar Zonas Horarias
+    try {
+      tz.initializeTimeZones();
+      final timezoneInfo = await FlutterTimezone.getLocalTimezone();
+      tz.setLocalLocation(tz.getLocation(timezoneInfo.identifier));
+      developer.log('🌍 Zona horaria detectada: ${timezoneInfo.identifier}', name: 'NotificationService');
+    } catch (e) {
+      developer.log('⚠️ Fallo zona horaria: $e', name: 'NotificationService');
+      tz.setLocalLocation(tz.getLocation('UTC'));
+    }
+
+    // 2. Configurar Plugin
+    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const iosInit = DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
+    
+    final settings = InitializationSettings(android: androidInit, iOS: iosInit);
+    
+    await _localNotifier.initialize(
+      settings,
+      onDidReceiveNotificationResponse: onDidReceiveNotificationResponse,
+      onDidReceiveBackgroundNotificationResponse: onDidReceiveBackgroundNotificationResponse,
+    );
+
+    // 3. Crear canales
+    await _createAndroidChannels();
+    _setupMessageListeners();
   }
 
-  // 2. Configurar Plugin
-  const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-  const iosInit = DarwinInitializationSettings(
-    requestAlertPermission: false,
-    requestBadgePermission: false,
-    requestSoundPermission: false,
-  );
-  
-  final settings = InitializationSettings(android: androidInit, iOS: iosInit);
-  
-  await _localNotifier.initialize(
-    settings,
-    onDidReceiveNotificationResponse: onDidReceiveNotificationResponse,
-    onDidReceiveBackgroundNotificationResponse: onDidReceiveBackgroundNotificationResponse,
-  );
-
-  // 3. Crear canales (Aquí se llamará al método que corregiremos abajo)
-  await _createAndroidChannels();
-  _setupMessageListeners();
-}
   // --- INICIALIZACIÓN TARDÍA (Permisos y Token) ---
   Future<void> initializeLate() async {
     // 1. Pedir permisos de sistema (Android 13+ / iOS)
@@ -185,43 +205,44 @@ Future<void> initializeQuick() async {
     _firebaseMessaging.onTokenRefresh.listen((token) => _saveTokenToSupabase(token));
   }
 
-Future<void> _createAndroidChannels() async {
-  final androidImpl = _localNotifier.resolvePlatformSpecificImplementation<
-      AndroidFlutterLocalNotificationsPlugin>();
-  
-  if (androidImpl == null) return;
+  Future<void> _createAndroidChannels() async {
+    final androidImpl = _localNotifier.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    
+    if (androidImpl == null) return;
 
-  // Canal para Gastos Fijos
-  await androidImpl.createNotificationChannel(
-    const AndroidNotificationChannel(
-      'recurring_payments_channel',
-      'Recordatorios de Pagos',
-      description: 'Notificaciones sobre gastos fijos.',
-      importance: Importance.max,
-      playSound: true,
-    ),
-  );
+    // Canal para Gastos Fijos
+    await androidImpl.createNotificationChannel(
+      const AndroidNotificationChannel(
+        'recurring_payments_channel',
+        'Recordatorios de Pagos',
+        description: 'Notificaciones sobre gastos fijos.',
+        importance: Importance.max,
+        playSound: true,
+      ),
+    );
 
-  // --- NUEVO: Canal para Pruebas Gratuitas ---
-  await androidImpl.createNotificationChannel(
-    const AndroidNotificationChannel(
-      'free_trials_channel',
-      'Pruebas Gratuitas',
-      description: 'Alertas para cancelar suscripciones a tiempo.',
-      importance: Importance.max,
-      playSound: true,
-    ),
-  );
+    // --- NUEVO: Canal para Pruebas Gratuitas ---
+    await androidImpl.createNotificationChannel(
+      const AndroidNotificationChannel(
+        'free_trials_channel',
+        'Pruebas Gratuitas',
+        description: 'Alertas para cancelar suscripciones a tiempo.',
+        importance: Importance.max,
+        playSound: true,
+      ),
+    );
 
-  // Canal de Pruebas
-  await androidImpl.createNotificationChannel(
-    const AndroidNotificationChannel(
-      'test_channel',
-      'Pruebas',
-      importance: Importance.max,
-    ),
-  );
-}
+    // Canal de Pruebas
+    await androidImpl.createNotificationChannel(
+      const AndroidNotificationChannel(
+        'test_channel',
+        'Pruebas',
+        importance: Importance.max,
+      ),
+    );
+  }
+
   Future<void> _saveTokenToSupabase(String token) async {
     final uid = _supabase.auth.currentUser?.id;
     if (uid == null) return;
@@ -316,165 +337,168 @@ Future<void> _createAndroidChannels() async {
     }
   }
 
-Future<void> scheduleFreeTrialReminder({
-  required String id,
-  required String serviceName,
-  required DateTime endDate,
-  required double price, 
-  required TimeOfDay notificationTime,
-}) async {
-  final now = DateTime.now();
-  
-  // 1. Calculamos qué día será "3 días antes"
-  final reminderDay = endDate.subtract(const Duration(days: 3));
-  
-  // 2. Combinamos ese día con la hora que eligió el usuario
-  DateTime reminderDateTime = DateTime(
-    reminderDay.year,
-    reminderDay.month,
-    reminderDay.day,
-    notificationTime.hour,
-    notificationTime.minute,
-  );
+  Future<void> scheduleFreeTrialReminder({
+    required String id,
+    required String serviceName,
+    required DateTime endDate,
+    required double price, 
+    required TimeOfDay notificationTime,
+  }) async {
+    final now = DateTime.now();
+    
+    // 1. Calculamos qué día será "3 días antes"
+    final reminderDay = endDate.subtract(const Duration(days: 3));
+    
+    // 2. Combinamos ese día con la hora que eligió el usuario
+    DateTime reminderDateTime = DateTime(
+      reminderDay.year,
+      reminderDay.month,
+      reminderDay.day,
+      notificationTime.hour,
+      notificationTime.minute,
+    );
 
-  // 3. Lógica para pruebas urgentes (que vencen en menos de 3 días)
-  if (reminderDateTime.isBefore(now)) {
-    if (endDate.isAfter(now)) {
-      // Notificamos en 1 minuto si la fecha ya pasó pero la prueba sigue activa
-      reminderDateTime = now.add(const Duration(minutes: 1));
-      developer.log('⚠️ Aviso urgente programado en 1 min.', name: 'NotificationService');
-    } else {
-      // Si la prueba ya venció en el mundo real, no hacemos nada
-      return;
+    // 3. Lógica para pruebas urgentes (que vencen en menos de 3 días)
+    if (reminderDateTime.isBefore(now)) {
+      if (endDate.isAfter(now)) {
+        // Notificamos en 1 minuto si la fecha ya pasó pero la prueba sigue activa
+        reminderDateTime = now.add(const Duration(minutes: 1));
+        developer.log('⚠️ Aviso urgente programado en 1 min.', name: 'NotificationService');
+      } else {
+        // Si la prueba ya venció en el mundo real, no hacemos nada
+        return;
+      }
     }
+
+    final baseId = id.hashCode & 0x7FFFFFFF;
+    final fmt = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+
+    // 4. Programamos la notificación
+    await _localNotifier.zonedSchedule(
+      baseId,
+      '⏰ ¡Prueba por finalizar!',
+      'Tu prueba de $serviceName termina pronto. Cancela hoy para evitar el cobro de ${fmt.format(price)}.',
+      tz.TZDateTime.from(reminderDateTime, tz.local),
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'free_trials_channel',
+          'Pruebas Gratuitas',
+          importance: Importance.max,
+          priority: Priority.high,
+          playSound: true, // Nos aseguramos de que suene
+        ),
+        iOS: DarwinNotificationDetails(presentAlert: true, presentSound: true),
+      ),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+    );
+    
+    developer.log('🔔 Recordatorio programado para $serviceName a las ${reminderDateTime.hour}:${reminderDateTime.minute}', name: 'NotificationService');
   }
 
-  final baseId = id.hashCode & 0x7FFFFFFF;
-  final fmt = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+  // Método para cancelar si el usuario marca "Ya cancelé"
+  Future<void> cancelTrialReminder(String id) async {
+    await _localNotifier.cancel(id.hashCode & 0x7FFFFFFF);
+  }
 
-  // 4. Programamos la notificación
-  await _localNotifier.zonedSchedule(
-    baseId,
-    '⏰ ¡Prueba por finalizar!',
-    'Tu prueba de $serviceName termina pronto. Cancela hoy para evitar el cobro de ${fmt.format(price)}.',
-    tz.TZDateTime.from(reminderDateTime, tz.local),
-    const NotificationDetails(
-      android: AndroidNotificationDetails(
-        'free_trials_channel',
-        'Pruebas Gratuitas',
-        importance: Importance.max,
-        priority: Priority.high,
-        playSound: true, // Nos aseguramos de que suene
-      ),
-      iOS: DarwinNotificationDetails(presentAlert: true, presentSound: true),
-    ),
-    androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-  );
-  
-  developer.log('🔔 Recordatorio programado para $serviceName a las ${reminderDateTime.hour}:${reminderDateTime.minute}', name: 'NotificationService');
-}
-// Método para cancelar si el usuario marca "Ya cancelé"
-Future<void> cancelTrialReminder(String id) async {
-  await _localNotifier.cancel(id.hashCode & 0x7FFFFFFF);
-}
   /// Lógica central para calcular y programar las notificaciones.
   /// ESTRATEGIA: Doble aviso por cada mes (previo + final)
   /// Programa notificaciones para los próximos 12 meses a partir de AHORA
-Future<void> _scheduleRemindersForTransaction(RecurringTransaction tx) async {
-  final baseId = tx.id.hashCode & 0x7FFFFFFF;
-  final now = tz.TZDateTime.now(tz.local);
-  final firstDueDate = tz.TZDateTime.from(tx.nextDueDate, tz.local);
+  Future<void> _scheduleRemindersForTransaction(RecurringTransaction tx) async {
+    final baseId = tx.id.hashCode & 0x7FFFFFFF;
+    final now = tz.TZDateTime.now(tz.local);
+    final firstDueDate = tz.TZDateTime.from(tx.nextDueDate, tz.local);
 
-  developer.log('📅 Programando [${tx.frequency}]: ${tx.description}', name: 'NotificationService');
+    developer.log('📅 Programando [${tx.frequency}]: ${tx.description}', name: 'NotificationService');
 
-  int scheduledCount = 0;
-  
-  // En lugar de un simple offset de meses, calculamos la próxima fecha 
-  // basándonos en la frecuencia real.
-  for (var i = 0; i < 12; i++) {
-    tz.TZDateTime dueDate;
-
-    switch (tx.frequency.toLowerCase()) {
-      case 'diario':
-        dueDate = firstDueDate.add(Duration(days: i));
-        break;
-      case 'semanal':
-        dueDate = firstDueDate.add(Duration(days: i * 7));
-        break;
-      case 'cada_2_semanas':
-        dueDate = firstDueDate.add(Duration(days: i * 14));
-        break;
-      case 'quincenal':
-        dueDate = firstDueDate.add(Duration(days: i * 15));
-        break;
-      case 'mensual':
-        dueDate = tz.TZDateTime(tz.local, firstDueDate.year, firstDueDate.month + i, firstDueDate.day, firstDueDate.hour, firstDueDate.minute);
-        break;
-      case 'bimestral':
-        dueDate = tz.TZDateTime(tz.local, firstDueDate.year, firstDueDate.month + (i * 2), firstDueDate.day, firstDueDate.hour, firstDueDate.minute);
-        break;
-      case 'trimestral':
-        dueDate = tz.TZDateTime(tz.local, firstDueDate.year, firstDueDate.month + (i * 3), firstDueDate.day, firstDueDate.hour, firstDueDate.minute);
-        break;
-      case 'semestral':
-        dueDate = tz.TZDateTime(tz.local, firstDueDate.year, firstDueDate.month + (i * 6), firstDueDate.day, firstDueDate.hour, firstDueDate.minute);
-        break;
-      case 'anual':
-        dueDate = tz.TZDateTime(tz.local, firstDueDate.year + i, firstDueDate.month, firstDueDate.day, firstDueDate.hour, firstDueDate.minute);
-        break;
-      default: // Default mensual
-        dueDate = tz.TZDateTime(tz.local, firstDueDate.year, firstDueDate.month + i, firstDueDate.day, firstDueDate.hour, firstDueDate.minute);
-    }
-
-    // Si esta ocurrencia ya pasó, la saltamos
-    if (dueDate.isBefore(now)) continue;
-
-    // --- PROGRAMACIÓN DE ALERTAS (IGUAL A TU LÓGICA ANTERIOR) ---
+    int scheduledCount = 0;
     
-    // 1. AVISO PREVIO (3 días antes)
-    // Para frecuencias muy cortas (diario/semanal), quizás 3 días es mucho. 
-    // Podrías poner un IF aquí si quieres evitarlo.
-    final reminderEarly = dueDate.subtract(const Duration(days: 3));
-    if (reminderEarly.isAfter(now)) {
+    // En lugar de un simple offset de meses, calculamos la próxima fecha 
+    // basándonos en la frecuencia real.
+    for (var i = 0; i < 12; i++) {
+      tz.TZDateTime dueDate;
+
+      switch (tx.frequency.toLowerCase()) {
+        case 'diario':
+          dueDate = firstDueDate.add(Duration(days: i));
+          break;
+        case 'semanal':
+          dueDate = firstDueDate.add(Duration(days: i * 7));
+          break;
+        case 'cada_2_semanas':
+          dueDate = firstDueDate.add(Duration(days: i * 14));
+          break;
+        case 'quincenal':
+          dueDate = firstDueDate.add(Duration(days: i * 15));
+          break;
+        case 'mensual':
+          dueDate = tz.TZDateTime(tz.local, firstDueDate.year, firstDueDate.month + i, firstDueDate.day, firstDueDate.hour, firstDueDate.minute);
+          break;
+        case 'bimestral':
+          dueDate = tz.TZDateTime(tz.local, firstDueDate.year, firstDueDate.month + (i * 2), firstDueDate.day, firstDueDate.hour, firstDueDate.minute);
+          break;
+        case 'trimestral':
+          dueDate = tz.TZDateTime(tz.local, firstDueDate.year, firstDueDate.month + (i * 3), firstDueDate.day, firstDueDate.hour, firstDueDate.minute);
+          break;
+        case 'semestral':
+          dueDate = tz.TZDateTime(tz.local, firstDueDate.year, firstDueDate.month + (i * 6), firstDueDate.day, firstDueDate.hour, firstDueDate.minute);
+          break;
+        case 'anual':
+          dueDate = tz.TZDateTime(tz.local, firstDueDate.year + i, firstDueDate.month, firstDueDate.day, firstDueDate.hour, firstDueDate.minute);
+          break;
+        default: // Default mensual
+          dueDate = tz.TZDateTime(tz.local, firstDueDate.year, firstDueDate.month + i, firstDueDate.day, firstDueDate.hour, firstDueDate.minute);
+      }
+
+      // Si esta ocurrencia ya pasó, la saltamos
+      if (dueDate.isBefore(now)) continue;
+
+      // --- PROGRAMACIÓN DE ALERTAS (IGUAL A TU LÓGICA ANTERIOR) ---
+      
+      // 1. AVISO PREVIO (3 días antes)
+      // Para frecuencias muy cortas (diario/semanal), quizás 3 días es mucho. 
+      // Podrías poner un IF aquí si quieres evitarlo.
+      final reminderEarly = dueDate.subtract(const Duration(days: 3));
+      if (reminderEarly.isAfter(now)) {
+        await _localNotifier.zonedSchedule(
+          baseId + i,
+          '⏰ Recordatorio: ${tx.description}',
+          'Tu pago vence en 3 días (${dueDate.day}/${dueDate.month})',
+          reminderEarly,
+          _notifDetails(tx.description, isFinal: false),
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        );
+        scheduledCount++;
+      }
+
+      // 2. AVISO FINAL (Mismo día)
       await _localNotifier.zonedSchedule(
-        baseId + i,
-        '⏰ Recordatorio: ${tx.description}',
-        'Tu pago vence en 3 días (${dueDate.day}/${dueDate.month})',
-        reminderEarly,
-        _notifDetails(tx.description, isFinal: false),
+        baseId + i + 10000,
+        '🔴 ¡Hoy vence!: ${tx.description}',
+        'Tu pago vence HOY a las ${dueDate.hour}:${dueDate.minute.toString().padLeft(2, '0')}',
+        dueDate,
+        _notifDetails(tx.description, isFinal: true),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       );
       scheduledCount++;
     }
 
-    // 2. AVISO FINAL (Mismo día)
-    await _localNotifier.zonedSchedule(
-      baseId + i + 10000,
-      '🔴 ¡Hoy vence!: ${tx.description}',
-      'Tu pago vence HOY a las ${dueDate.hour}:${dueDate.minute.toString().padLeft(2, '0')}',
-      dueDate,
-      _notifDetails(tx.description, isFinal: true),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-    );
-    scheduledCount++;
+    developer.log('✅ Finalizado: $scheduledCount notificaciones creadas.', name: 'NotificationService');
   }
 
-  developer.log('✅ Finalizado: $scheduledCount notificaciones creadas.', name: 'NotificationService');
-}
+  // Función auxiliar para limpiar el código de detalles
+  NotificationDetails _notifDetails(String desc, {required bool isFinal}) {
+    return NotificationDetails(
+      android: AndroidNotificationDetails(
+        'recurring_payments_channel',
+        'Recordatorios de Pagos',
+        importance: Importance.max,
+        priority: Priority.high,
+        color: isFinal ? const Color(0xFFFF0000) : null,
+      ),
+      iOS: const DarwinNotificationDetails(presentAlert: true, presentSound: true),
+    );
+  }
 
-// Función auxiliar para limpiar el código de detalles
-NotificationDetails _notifDetails(String desc, {required bool isFinal}) {
-  return NotificationDetails(
-    android: AndroidNotificationDetails(
-      'recurring_payments_channel',
-      'Recordatorios de Pagos',
-      importance: Importance.max,
-      priority: Priority.high,
-      color: isFinal ? const Color(0xFFFF0000) : null,
-    ),
-    iOS: const DarwinNotificationDetails(presentAlert: true, presentSound: true),
-  );
-}
   // ============================================================================
   // MÉTODOS AUXILIARES
   // ============================================================================

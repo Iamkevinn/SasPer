@@ -1,7 +1,24 @@
-<!-- android/app/src/main/res/xml/goals_widget_info.xml -->
-<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  goals_widget_info.xml
+  AÑADIDO respecto al original:
+  · targetCellWidth="4" targetCellHeight="3" —
+    Android 12+ (API 31) usa estos atributos para calcular el tamaño
+    inicial del widget. Sin ellos, el sistema usa la fórmula legacy
+    (minWidth/minHeight) que puede resultar en tamaños incorrectos.
+    4×3 = ancho de 4 columnas, alto de 3 filas → espacio para 2–3 metas
+    visibles sin scroll, que es el caso de uso principal.
+  SIN CAMBIOS:
+  · minWidth="250dp" minHeight="110dp" — se mantienen para Android 11-.
+  · updatePeriodMillis="1800000" (30 min) — se mantiene.
+  · resizeMode="horizontal|vertical" — se mantiene.
+-->
+<appwidget-provider
+    xmlns:android="http://schemas.android.com/apk/res/android"
     android:minWidth="250dp"
     android:minHeight="110dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="3"
     android:updatePeriodMillis="1800000"
     android:previewImage="@drawable/widget_goals"
     android:initialLayout="@layout/widget_goals_layout"

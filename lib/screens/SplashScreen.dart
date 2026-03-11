@@ -81,12 +81,26 @@ class _SplashScreenState extends State<SplashScreen> {
       // ------------------------------------------------------------
       // ⚙️ 2. Inicializaciones críticas (en paralelo)
       // ------------------------------------------------------------
+      
+      // Creamos una función segura para inicializar Supabase
+      Future<void> initSupabaseSafe() async {
+        try {
+          await Supabase.initialize(
+            url: AppConfig.supabaseUrl,
+            anonKey: AppConfig.supabaseAnonKey,
+          );
+        } catch (e) {
+          if (!e.toString().contains('already been initialized')) {
+            rethrow;
+          } else {
+            developer.log("⚡ Supabase ya estaba inicializado.", name: "SplashInit");
+          }
+        }
+      }
+
       await Future.wait([
         Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform),
-        Supabase.initialize(
-          url: AppConfig.supabaseUrl,
-          anonKey: AppConfig.supabaseAnonKey,
-        ),
+        initSupabaseSafe(), // Usamos la función segura aquí
         initializeDateFormatting('es_CO', null),
       ]);
 
