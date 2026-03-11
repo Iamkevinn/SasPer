@@ -5,14 +5,15 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 // Screens
 import 'loading_screen.dart';
 import 'login_screen.dart';
 import 'biometric_gate.dart';
-// Services
 
+// Services
 import 'package:sasper/services/notification_service.dart';
-import 'package:sasper/services/widget_service.dart' as widget_service; // 🔥 AÑADIDO
+import 'package:sasper/services/widget_service.dart' as widget_service;
 import 'package:sasper/services/global_insight_service.dart';
 
 /// 🔐 Widget "guardián" que gestiona el estado de autenticación
@@ -50,7 +51,8 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       final session = Supabase.instance.client.auth.currentSession;
       if (session != null) {
-        _refreshWidgetData();
+        // 🔥 OPTIMIZACIÓN: unawaited para que no bloquee el hilo principal al reanudar
+        unawaited(_refreshWidgetData());
       }
     }
   }
@@ -71,13 +73,12 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   void _handleWidgetClick(Uri uri) {
     final action = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : '';
 
-    // Usamos un switch en el host para manejar diferentes widgets
     switch (uri.host) {
       case 'manifestation_widget':
+      case 'simple_manifestation_widget': // Unificados porque hacen lo mismo
         switch (action) {
           case 'open_app':
-            developer.log('📱 Usuario abrió app desde widget de manifestación',
-                name: 'AuthGate');
+            developer.log('📱 Usuario abrió app desde widget de manifestación', name: 'AuthGate');
             break;
           case 'visualize':
             _showVisualizationFeedback();
@@ -88,23 +89,10 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       case 'affirmation_widget':
         switch (action) {
           case 'open_app':
-            developer.log('📱 Usuario abrió app desde widget de afirmación',
-                name: 'AuthGate');
+            developer.log('📱 Usuario abrió app desde widget de afirmación', name: 'AuthGate');
             break;
           case 'focus':
             _showFocusFeedback();
-            break;
-        }
-        break;
-
-      case 'simple_manifestation_widget':
-        switch (action) {
-          case 'open_app':
-            developer.log('📱 Usuario abrió app desde widget simple de manifestación',
-                name: 'AuthGate');
-            break;
-          case 'visualize':
-            _showVisualizationFeedback();
             break;
         }
         break;
@@ -116,8 +104,8 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Row(
-          children: const [
+        content: const Row(
+          children: [
             Icon(Icons.psychology, color: Colors.lightBlueAccent),
             SizedBox(width: 12),
             Expanded(
@@ -140,7 +128,6 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
 
   /// 🧠 Inicializa el escucha global de insights de IA
   void _initializeGlobalInsights() {
-    // Ya no pasamos 'context'
     GlobalInsightService.instance.startListening(); 
     developer.log('✅ GlobalInsightService iniciado', name: 'AuthGate');
   }
@@ -149,10 +136,6 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   Future<void> _refreshWidgetData() async {
     try {
       await Future.wait([
-        //ManifestationWidgetService.initializeWidget(),
-        //AffirmationWidgetService.initializeWidget(),
-        //SimpleManifestationWidgetService.initializeWidget(), // 🔥 AGREGADO
-        // 🔥 AÑADIDO: Refrescar widgets financieros
         widget_service.WidgetService.updateFinancialHealthWidget(),
         widget_service.WidgetService.updateMonthlyComparisonWidget(),
         widget_service.WidgetService.updateGoalsWidget(),
@@ -162,8 +145,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
         _servicesTimeout,
         onTimeout: () {
           developer.log('⚠️ Timeout al refrescar widget', name: 'AuthGate');
-          throw TimeoutException(
-              'El refrescado de los widgets tardó demasiado.');
+          throw TimeoutException('El refrescado de los widgets tardó demasiado.');
         },
       );
       developer.log('✅ Widgets refrescados', name: 'AuthGate');
@@ -177,8 +159,8 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Row(
-          children: const [
+        content: const Row(
+          children: [
             Icon(Icons.auto_awesome, color: Colors.amber),
             SizedBox(width: 12),
             Expanded(
@@ -211,27 +193,13 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
         final session = snapshot.data?.session;
 
         if (session != null) {
-          // Usuario autenticado: inicializar servicios una sola vez
-          final initializationFuture =
-              _initializeUserServices(session.user.id);
-          return FutureBuilder<void>(
-            future: initializationFuture,
-            builder: (context, futureSnapshot) {
-              if (futureSnapshot.connectionState == ConnectionState.done) {
-                if (futureSnapshot.hasError) {
-                  developer.log(
-                    '⚠️ Error en inicialización: ${futureSnapshot.error}',
-                    name: 'AuthGate',
-                  );
-                }
-                return const BiometricGate();
-              } else {
-                return const LoadingScreen();
-              }
-            },
-          );
+          // 🔥 OPTIMIZACIÓN PRINCIPAL: 
+          // En lugar de usar un FutureBuilder que frena la UI, lanzamos los 
+          // servicios en segundo plano y pasamos inmediatamente a la app.
+          unawaited(_initializeUserServicesInBackground(session.user.id));
+          
+          return const BiometricGate(); // Entra instantáneamente
         } else {
-          // Usuario no autenticado: resetear estado
           return const LoginScreen();
         }
       },
@@ -239,46 +207,34 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   }
 
   /// 🚀 Inicializa todos los servicios que dependen del usuario autenticado
-  Future<void> _initializeUserServices(String userId) async {
+  /// NOTA: Esta función ahora corre en "segundo plano" sin bloquear la UI
+  Future<void> _initializeUserServicesInBackground(String userId) async {
     if (kDebugMode) {
-      developer.log(
-        "✅ Usuario autenticado ($userId). Inicializando servicios...",
-        name: 'AuthGate',
-      );
+      developer.log("✅ Usuario autenticado ($userId). Cargando servicios en background...", name: 'AuthGate');
     }
 
     try {
-      // Ejecutar inicializaciones en paralelo para mayor velocidad
       _initializeGlobalInsights();
+      // Ejecutar inicializaciones de forma asíncrona sin frenar al usuario
       await Future.wait([
         _initializeNotifications(),
-        //_initializeManifestationWidget(),
-        //_initializeAffirmationWidget(),
-        //_initializeSimpleManifestationWidget(), // 🔥 AGREGADO
         _initializeFinancialWidgets(),
-      ], eagerError: false); // Continuar aunque alguno falle
-
+      ], eagerError: false);
 
       if (kDebugMode) {
-        developer.log(
-          '✅ Todos los servicios inicializados exitosamente.',
-          name: 'AuthGate',
-        );
+        developer.log('✅ Todos los servicios background listos.', name: 'AuthGate');
       }
     } catch (e, stackTrace) {
       developer.log(
-        "🚨 Error durante inicialización de servicios: $e",
+        "🚨 Error en servicios background: $e",
         name: 'AuthGate',
         error: e,
         stackTrace: stackTrace,
       );
-      // No hacer rethrow para permitir que la app continúe
     }
   }
 
-  /// 🔄 Inicializa widgets específicos por widgetId
-  
-  // 🔥 NUEVA FUNCIÓN: Inicializar todos los widgets financieros
+  /// 🔥 Inicializar todos los widgets financieros
   Future<void> _initializeFinancialWidgets() async {
     try {
       await Future.wait([
@@ -289,51 +245,20 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
         widget_service.WidgetService.updateNextPaymentWidget(),
       ]).timeout(
         _servicesTimeout,
-        onTimeout: () {
-          developer.log(
-            '⚠️ Timeout al inicializar widgets financieros',
-            name: 'AuthGate',
-          );
-          throw TimeoutException('Financial widgets timeout');
-        },
       );
-      developer.log(
-        '✅ Widgets financieros inicializados',
-        name: 'AuthGate',
-      );
-    } catch (e, stackTrace) {
-      developer.log(
-        '⚠️ Error al inicializar widgets financieros: $e',
-        name: 'AuthGate',
-        error: e,
-        stackTrace: stackTrace,
-      );
+      developer.log('✅ Widgets financieros inicializados', name: 'AuthGate');
+    } catch (e) {
+      developer.log('⚠️ Error al inicializar widgets financieros: $e', name: 'AuthGate');
     }
   }
-
-  
 
   /// 🔔 Inicializa el servicio de notificaciones
   Future<void> _initializeNotifications() async {
     try {
-      await NotificationService.instance.initializeLate().timeout(
-        _servicesTimeout,
-        onTimeout: () {
-          developer.log('⚠️ Timeout en NotificationService', name: 'AuthGate');
-        },
-      );
+      await NotificationService.instance.initializeLate().timeout(_servicesTimeout);
       developer.log('✅ NotificationService inicializado', name: 'AuthGate');
     } catch (e) {
-      developer.log(
-        '⚠️ Error en NotificationService: $e',
-        name: 'AuthGate',
-      );
+      developer.log('⚠️ Error en NotificationService: $e', name: 'AuthGate');
     }
   }
-
-  /// 🌟 Inicializa el widget de manifestaciones
-  
-  /// 🌟 Inicializa el widget simple de manifestaciones
-
-  /// 📝 Establece un estado por defecto para el widget
 }

@@ -1,24 +1,38 @@
+// lib/main.dart
+import 'dart:async';
 import 'dart:developer' as developer;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:sasper/config/app_config.dart';
-import 'package:sasper/screens/SplashScreen.dart';
 import 'package:provider/provider.dart';
-import 'package:sasper/services/theme_provider.dart';
 import 'package:line_awesome_flutter/line_awesome_flutter.dart';
 import 'package:quick_actions/quick_actions.dart';
-import 'package:sasper/screens/add_transaction_screen.dart';
-import 'dart:async';
+import 'package:flutter_quill/flutter_quill.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:home_widget/home_widget.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
-import 'package:flutter_quill/flutter_quill.dart';
-import 'package:sasper/theme/design_system.dart';
 
-// 🌟 NUEVO: Import para el widget de manifestaciones
+// --- Archivos locales ---
+import 'package:sasper/config/app_config.dart';
+import 'package:sasper/config/global_state.dart';
+import 'package:sasper/theme/design_system.dart';
+import 'package:sasper/services/theme_provider.dart';
+import 'package:sasper/firebase_options.dart';
+import 'package:sasper/data/dashboard_repository.dart';
+import 'package:sasper/services/notification_service.dart';
+import 'package:sasper/home_widget_callback_handler.dart' as hw;
+
+// --- Pantallas ---
+import 'package:sasper/screens/auth_gate.dart';
+import 'package:sasper/screens/add_transaction_screen.dart';
 
 // =================================================================
 //                 CONFIGURACIÓN GLOBAL
@@ -26,35 +40,98 @@ import 'package:sasper/theme/design_system.dart';
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
+  // 1. Asegurar que los bindings de Flutter estén listos (Obligatorio)
+  WidgetsFlutterBinding.ensureInitialized();
+  
   if (kDebugMode) {
-    print("--- CÓDIGOS PARA ICONOS DE GASTOS ---");
-    print(
-        'El código para "Comida" (utensils) es: ${LineAwesomeIcons.utensils_solid.codePoint}');
-    print(
-        'El código para "Transporte" (bus) es: ${LineAwesomeIcons.bus_alt_solid.codePoint}');
+    print("--- INICIANDO SASPER ---");
   }
 
-  WidgetsFlutterBinding.ensureInitialized();
-  await initializeDateFormatting('es_CO', null);
+  // 2. Tareas síncronas muy rápidas
   AppConfig.checkKeys();
 
-  try {
-    tz.initializeTimeZones();
-    final TimezoneInfo timeZoneInfo = await FlutterTimezone.getLocalTimezone();
-    final String timeZoneName = timeZoneInfo.identifier;
-    tz.setLocalLocation(tz.getLocation(timeZoneName));
-    developer.log('✅ Timezone inicializado globalmente: $timeZoneName',
-        name: 'Main');
-  } catch (e) {
-    developer.log('🔥 Error al inicializar timezone: $e', name: 'Main');
-  }
+  // 3. 🚀 CARGA PARALELA (Todo lo crítico antes de dibujar la app)
+  // Al usar Future.wait, Firebase, Supabase y los idiomas cargan al mismo tiempo.
+  await Future.wait([
+    Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform),
+    _initSupabaseSafe(),
+    initializeDateFormatting('es_CO', null),
+    _initTimezoneSafe(),
+    _saveSupabaseKeysForBackground(),
+  ]);
 
+  GlobalState.supabaseInitialized = true;
+
+  // 4. 📦 INYECCIÓN DE DEPENDENCIAS (Rápido, en memoria)
+  final supabase = Supabase.instance.client;
+  final messaging = FirebaseMessaging.instance;
+  
+  DashboardRepository.instance.initialize(supabase);
+  NotificationService.instance.initializeDependencies(
+    supabaseClient: supabase,
+    firebaseMessaging: messaging,
+  );
+
+  // 5. 🔄 REGISTRO DE SEGUNDO PLANO
+  HomeWidget.registerBackgroundCallback(hw.homeWidgetBackgroundCallback);
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
+  // 6. 👻 TAREAS FANTASMA (Se ejecutan sin frenar el inicio de la app)
+  unawaited(_saveMaterialYouColors());
+  unawaited(NotificationService.instance.initializeQuick());
+
+  // 7. 🎨 ¡DIBUJAR LA APP DIRECTAMENTE!
   runApp(
     ChangeNotifierProvider(
       create: (_) => ThemeProvider(),
       child: const MyApp(),
     ),
   );
+}
+
+// =================================================================
+//                 FUNCIONES AUXILIARES DE INICIO
+// =================================================================
+
+Future<void> _initSupabaseSafe() async {
+  try {
+    await Supabase.initialize(
+      url: AppConfig.supabaseUrl,
+      anonKey: AppConfig.supabaseAnonKey,
+    );
+  } catch (e) {
+    if (!e.toString().contains('already been initialized')) {
+      developer.log('🔥 Error al inicializar Supabase: $e', name: 'MainInit');
+    }
+  }
+}
+
+Future<void> _initTimezoneSafe() async {
+  try {
+    tz.initializeTimeZones();
+    final TimezoneInfo timeZoneInfo = await FlutterTimezone.getLocalTimezone();
+    tz.setLocalLocation(tz.getLocation(timeZoneInfo.identifier));
+  } catch (e) {
+    developer.log('🔥 Error al inicializar timezone: $e', name: 'MainInit');
+  }
+}
+
+Future<void> _saveSupabaseKeysForBackground() async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString('supabase_url', AppConfig.supabaseUrl);
+  await prefs.setString('supabase_api_key', AppConfig.supabaseAnonKey);
+}
+
+Future<void> _saveMaterialYouColors() async {
+  try {
+    final palette = await DynamicColorPlugin.getCorePalette();
+    if (palette == null) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('m3_primary', palette.primary.get(100));
+    await prefs.setInt('m3_surface', palette.neutral.get(100));
+    await prefs.setInt('m3_onSurface', palette.neutralVariant.get(0));
+  } catch (_) {}
 }
 
 // =================================================================
@@ -69,119 +146,15 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   final QuickActions quickActions = const QuickActions();
-  //final _appLinks = AppLinks();
-  //StreamSubscription<Uri>? _linkSubscription;
 
   @override
   void initState() {
     super.initState();
     _setupQuickActions();
     _handleQuickActions();
-    //_initDeepLinks();
   }
 
-  @override
-  void dispose() {
-    //_linkSubscription?.cancel();
-    super.dispose();
-  }
-
-  /// Inicializa el manejo de deep links (clics desde widgets y otros)
-  //Future<void> _initDeepLinks() async {
-  //  _linkSubscription = _appLinks.uriLinkStream.listen((uri) {
-  //    if (mounted) {
-  //      _navigateToRouteFromUri(uri);
-  //    }
-  //  }, onError: (err) {
-  //    if (mounted && kDebugMode) {
-  //      print('Error escuchando los links: $err');
-  //    }
-  //  });
-  //}
-
-  /// Navega a la pantalla correcta basándose en el URI del deep link
-  //void _navigateToRouteFromUri(Uri uri) {
-  //  if (kDebugMode) {
-  //    print('🔗 Link recibido: $uri');
-  //  }
-//
-  //  // Deep link para agregar transacción
-  //  if (uri.scheme == 'sasper' &&
-  //      uri.host == 'sasper' &&
-  //      uri.path == '/add_transaction') {
-  //    navigatorKey.currentState?.pushNamed('/add_transaction');
-  //    return;
-  //  }
-//
-  //  // 🌟 NUEVO: Deep link para interacciones del widget de manifestaciones
-  //  if (uri.scheme == 'sasper' && uri.host == 'manifestation') {
-  //    _handleManifestationWidgetAction(uri);
-  //    return;
-  //  }
-  //}
-
-  /// 🌟 NUEVO: Maneja las acciones del widget de manifestaciones
-  //void _handleManifestationWidgetAction(Uri uri) {
-  //  final action = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : '';
-//
-  //  if (kDebugMode) {
-  //    print('🌟 Acción de widget de manifestación: $action');
-  //  }
-//
-  //  switch (action) {
-  //    case 'open_app':
-  //      // El usuario abrió la app desde el widget
-  //      // Podrías navegar directamente a la pantalla de manifestaciones
-  //      navigatorKey.currentState?.pushNamed('/manifestations');
-  //      break;
-//
-  //    case 'next':
-  //    case 'previous':
-  //    case 'visualize':
-  //      // Estas acciones se manejan en el background callback
-  //      // pero si la app está abierta, mostramos feedback
-  //      if (action == 'visualize') {
-  //        _showVisualizationFeedback();
-  //      }
-  //      break;
-//
-  //    default:
-  //      if (kDebugMode) {
-  //        print('❓ Acción desconocida: $action');
-  //      }
-  //  }
-  //}
-
-  /// 🌟 NUEVO: Muestra feedback cuando el usuario "manifiesta"
-  //void _showVisualizationFeedback() {
-  //  final context = navigatorKey.currentContext;
-  //  if (context == null) return;
-//
-  //  ScaffoldMessenger.of(context).showSnackBar(
-  //    SnackBar(
-  //      content: Row(
-  //        children: const [
-  //          Icon(Icons.auto_awesome, color: Colors.amber),
-  //          SizedBox(width: 12),
-  //          Expanded(
-  //            child: Text(
-  //              '✨ ¡Manifestación visualizada!',
-  //              style: TextStyle(fontWeight: FontWeight.w600),
-  //            ),
-  //          ),
-  //        ],
-  //      ),
-  //      backgroundColor: Colors.deepPurple.shade700,
-  //      behavior: SnackBarBehavior.floating,
-  //      shape: RoundedRectangleBorder(
-  //        borderRadius: BorderRadius.circular(12),
-  //      ),
-  //      duration: const Duration(seconds: 2),
-  //    ),
-  //  );
-  //}
-
-  /// Define los accesos directos (Shortcuts)
+  /// Define los accesos directos (Shortcuts de icono de app)
   void _setupQuickActions() {
     quickActions.setShortcutItems(<ShortcutItem>[
       const ShortcutItem(
@@ -189,7 +162,6 @@ class _MyAppState extends State<MyApp> {
         localizedTitle: 'Nueva Transacción',
         icon: 'ic_shortcut_add_adaptive',
       ),
-      // 🌟 NUEVO: Shortcut para ver manifestaciones
       const ShortcutItem(
         type: 'view_manifestations',
         localizedTitle: 'Mis Manifestaciones',
@@ -247,10 +219,10 @@ class _MyAppState extends State<MyApp> {
             Locale('en', ''),
           ],
           navigatorKey: navigatorKey,
-          home: const SplashScreen(),
+          // 🔥 MAGIA AQUÍ: Entramos directamente al AuthGate sin pasar por un Splash falso
+          home: const AuthGate(),
           routes: {
             '/add_transaction': (context) => const AddTransactionScreen(),
-            // 🌟 NUEVO: Ruta para manifestaciones (debes crearla o ajustarla)
             // '/manifestations': (context) => const ManifestationsScreen(),
           },
         );
