@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  widget_next_payment_action_background.xml
+  Botón de acción principal — pill compacto.
+  colorPrimaryContainer da contraste sin competir con el monto.
+  Sin ripple: los widgets Android no ejecutan ripples en home screen.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="?attr/colorPrimaryContainer" />
+    <corners android:radius="12dp" />
+</shape>

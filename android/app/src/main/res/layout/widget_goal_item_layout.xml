@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Envolvemos en un FrameLayout para permitir sombras y márgenes limpios -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/goal_item_container"
@@ -7,7 +6,6 @@
     android:layout_height="wrap_content"
     android:theme="@style/Theme.AppWidget">
 
-    <!-- Tarjeta Principal (Superficie terciaria / elevada) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -15,18 +13,18 @@
         android:padding="16dp"
         android:background="@drawable/widget_goal_item_background">
 
-        <!-- Info Principal -->
+        <!-- Fila de Información -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical">
 
-            <!-- Icono con fondo sutil -->
+            <!-- Ícono de Categoría -->
             <FrameLayout
                 android:id="@+id/goal_icon_container"
-                android:layout_width="38dp"
-                android:layout_height="38dp"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
                 android:background="@drawable/widget_goal_icon_background">
 
                 <ImageView
@@ -40,52 +38,56 @@
                     tools:src="@drawable/ic_savings" />
             </FrameLayout>
 
-            <!-- Textos (Nombre y Resumen) -->
+            <!-- Título y Subtítulo unificado -->
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:layout_marginStart="14dp"
+                android:layout_marginStart="12dp"
                 android:orientation="vertical">
 
                 <TextView
                     android:id="@+id/goal_name"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="@string/goal_name_placeholder"
                     android:textColor="?attr/colorOnSurface"
                     android:fontFamily="sans-serif-medium"
                     android:textSize="15sp"
+                    android:letterSpacing="-0.01"
                     android:maxLines="1"
                     android:ellipsize="end"
                     tools:text="Viaje a Europa" />
 
+                <!-- Este es el TextView unificado que ajustamos en Kotlin -->
                 <TextView
                     android:id="@+id/goal_current_amount"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:fontFamily="sans-serif"
                     android:textSize="12sp"
                     android:alpha="0.8"
-                    tools:text="1.5M de 5M" />
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    tools:text="$1.500.000 de $5.000.000 • Dic 2026" />
             </LinearLayout>
 
-            <!-- Porcentaje Gigante (Estilo iOS Fitness) -->
+            <!-- Porcentaje Audaz (iOS Style) -->
             <TextView
                 android:id="@+id/goal_percentage"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
-                android:textColor="?attr/colorOnSurface"
+                android:textColor="?attr/colorPrimary"
                 android:fontFamily="sans-serif-black"
                 android:textSize="20sp"
                 android:letterSpacing="-0.03"
                 tools:text="60%" />
         </LinearLayout>
 
-        <!-- Barra de Progreso (Integrada sutilmente) -->
+        <!-- Barra de Progreso Sutil -->
         <ProgressBar
             android:id="@+id/goal_progress_bar"
             style="?android:attr/progressBarStyleHorizontal"
