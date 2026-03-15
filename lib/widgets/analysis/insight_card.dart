@@ -79,7 +79,7 @@ class InsightCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        insight.description,
+                        insight.displayDescription,
                         style: TextStyle(
                           fontSize: 13,
                           color: colorScheme.onSurfaceVariant.withOpacity(0.8),

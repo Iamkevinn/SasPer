@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sasper/models/insight_model.dart';
+import 'package:intl/intl.dart';
 
 class HeroInsightCard extends StatelessWidget {
   final Insight insight;
@@ -19,6 +20,8 @@ class HeroInsightCard extends StatelessWidget {
         return 'Ver Cuentas';
       case InsightType.upcoming_payment:
         return 'Ver Pagos';
+      case InsightType.end_of_month_projection:
+        return 'Ver Cuentas';
       default:
         return 'Ver Detalles';
     }
@@ -32,6 +35,19 @@ class HeroInsightCard extends StatelessWidget {
     // Usamos la extensión que ya creaste en tu modelo para obtener el icono y el color. ¡Excelente!
     final IconData displayIcon = insight.severity.icon;
     final Color displayColor = insight.severity.getColor(context);
+    String displayDescription = insight.description;
+
+    if (insight.type == InsightType.end_of_month_projection) {
+      final pending = (insight.metadata['pending'] ?? 0).toDouble();
+      final shortfall = (insight.metadata['shortfall'] ?? 0).toDouble();
+      final fmt = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+
+      if (shortfall > 0) {
+        displayDescription = 'Para llegar a fin de mes necesitas: ${fmt.format(pending)}\n\nTe faltan: ${fmt.format(shortfall)} para cubrir tus gastos fijos.';
+      } else {
+        displayDescription = 'Tienes saldo suficiente para cubrir tus gastos recurrentes restantes de este mes (${fmt.format(pending)}).';
+      }
+    }
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 24),
@@ -87,7 +103,7 @@ class HeroInsightCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            insight.description,
+            insight.displayDescription,
             style: GoogleFonts.poppins(
               color: Colors.white.withOpacity(0.85),
               fontSize: 14,

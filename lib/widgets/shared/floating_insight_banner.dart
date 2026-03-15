@@ -56,7 +56,7 @@ class FloatingInsightBanner extends StatelessWidget {
                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                           ),
                           Text(
-                            insight.description,
+                            insight.displayDescription,
                             style: TextStyle(
                               fontSize: 12,
                               color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),

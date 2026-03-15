@@ -80,6 +80,11 @@ class DashboardRepository {
       final userId = client.auth.currentUser?.id;
       if (userId == null) throw Exception('Usuario no autenticado.');
 
+      // 👈 NUEVO: Llamada silenciosa a la IA / Base de datos para la proyección de fin de mes.
+      // Lo hacemos sin "await" para que no retrase la carga visual del Dashboard.
+      client.rpc('update_end_of_month_projection', params: {'p_user_id': userId})
+          .catchError((e) => developer.log('⚠️ Error calculando proyección: $e', name: 'DashboardRepository'));
+          
       // Etapa 1: Balance y Health Score (rápido)
       final balanceDataMap = await client.rpc('get_dashboard_balance', params: {'p_user_id': userId});
       DashboardData partialData = DashboardData.fromPartialMap(balanceDataMap);

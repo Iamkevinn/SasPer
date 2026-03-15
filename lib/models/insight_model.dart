@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:equatable/equatable.dart';
 import 'package:iconsax/iconsax.dart';
 import 'dart:developer' as developer;
+import 'package:intl/intl.dart';
 
 /// Define la severidad o el tono de un insight.
 enum InsightSeverity { info, success, warning, alert }
@@ -30,6 +31,7 @@ enum InsightType {
   trial_ending,
   test_alert,
   warning,
+  end_of_month_projection,
 }
 
 class Insight extends Equatable {
@@ -43,6 +45,23 @@ class Insight extends Equatable {
   final bool isRead;
   final Map<String, dynamic> metadata;
 
+  // 👈 NUEVA PROPIEDAD INTELIGENTE
+  String get displayDescription {
+    if (type == InsightType.end_of_month_projection) {
+      final pending = (metadata['pending'] ?? 0).toDouble();
+      final shortfall = (metadata['shortfall'] ?? 0).toDouble();
+      final fmt = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+
+      if (description == 'shortfall' || shortfall > 0) {
+        return 'Para llegar a fin de mes necesitas: ${fmt.format(pending)}\nTe faltan: ${fmt.format(shortfall)} para cubrir tus gastos fijos.';
+      } else {
+        return 'Tienes saldo suficiente para cubrir tus gastos recurrentes restantes de este mes (${fmt.format(pending)}).';
+      }
+    }
+    // Si es otro tipo de insight, devuelve la descripción normal de la DB
+    return description;
+  }
+  
   const Insight({
     required this.id,
     required this.userId,

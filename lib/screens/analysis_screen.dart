@@ -753,7 +753,7 @@ class _HeroInsightCard extends StatelessWidget {
 
           // Descripción
           Text(
-            insight.description,
+            insight.displayDescription,
             style: TextStyle(
               fontSize: 15,
               height: 1.5,
