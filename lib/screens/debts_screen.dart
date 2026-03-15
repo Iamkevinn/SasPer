@@ -171,9 +171,10 @@ class _DebtsScreenState extends State<DebtsScreen>
       await Share.shareXFiles([XFile(file.path)],
           text: 'Progreso con: ${debt.name}');
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         NotificationHelper.show(
             message: 'No se pudo compartir', type: NotificationType.error);
+      }
     } finally {
       if (mounted) setState(() { _isSharing = false; _debtToShare = null; });
     }

@@ -79,11 +79,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _loadBiometric() async {
     final v = await PreferencesService.instance.isBiometricLockEnabled();
-    if (mounted)
+    if (mounted) {
       setState(() {
         _biometric = v;
         _loadingBio = false;
       });
+    }
   }
 
   Future<void> _setBiometric(bool v) async {

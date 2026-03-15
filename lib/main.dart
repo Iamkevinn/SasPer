@@ -8,7 +8,6 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
-import 'package:line_awesome_flutter/line_awesome_flutter.dart';
 import 'package:quick_actions/quick_actions.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:shared_preferences/shared_preferences.dart';

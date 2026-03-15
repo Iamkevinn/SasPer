@@ -38,7 +38,6 @@ import 'package:intl/intl.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:developer' as developer;
 
-import 'package:sasper/config/app_config.dart';
 import 'package:sasper/data/account_repository.dart';
 import 'package:sasper/data/transaction_repository.dart';
 import 'package:sasper/data/category_repository.dart';

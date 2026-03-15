@@ -32,7 +32,6 @@ import 'package:sasper/widgets/analysis_charts/income_expense_bar_chart.dart';
 import 'package:sasper/widgets/analysis_charts/category_comparison_chart.dart';
 import 'package:sasper/widgets/analysis_charts/expense_pie_chart.dart';
 import 'package:sasper/widgets/analysis_charts/income_pie_chart.dart';
-import 'package:sasper/widgets/shared/empty_state_card.dart';
 import 'package:sasper/widgets/analysis/insight_card.dart';
 import 'package:intl/intl.dart';
 

@@ -1136,9 +1136,10 @@ class _DateTileState extends State<_DateTile>
     Color dateColor = onSurf;
     if (hasDate) {
       final daysLeft = widget.date!.difference(DateTime.now()).inDays;
-      if (daysLeft < 0)       dateColor = _kRed;
-      else if (daysLeft <= 7) dateColor = _kOrange;
-      else                    dateColor = _kGreen;
+      if (daysLeft < 0) {
+        dateColor = _kRed;
+      } else if (daysLeft <= 7) {dateColor = _kOrange;}
+      else                    {dateColor = _kGreen;}
     }
 
     final label = hasDate
