@@ -1,7 +1,9 @@
-// lib/models/recurring_transaction_model.dart (NUEVO ARCHIVO)
+// lib/models/recurring_transaction_model.dart
 
 import 'package:equatable/equatable.dart';
+
 enum RecurringStatus { active, paused }
+
 class RecurringTransaction extends Equatable {
   final String id;
   final String userId;
@@ -17,6 +19,9 @@ class RecurringTransaction extends Equatable {
   final DateTime? endDate;
   final DateTime createdAt;
   final RecurringStatus status;
+  // --- NUEVOS CAMPOS OPCIONALES ---
+  final String? payeeName;
+  final String? payeeAccount;
 
   const RecurringTransaction({
     required this.id,
@@ -33,11 +38,10 @@ class RecurringTransaction extends Equatable {
     this.endDate,
     required this.createdAt,
     required this.status,
+    this.payeeName,
+    this.payeeAccount,
   });
 
-  /// Crea una instancia "vacía" de RecurringTransaction.
-  /// Ideal para usar como placeholder en Skeletonizer.
-  /// No puede ser `const` porque usa DateTime.now().
   factory RecurringTransaction.empty() {
     return RecurringTransaction(
       id: '',
@@ -53,9 +57,10 @@ class RecurringTransaction extends Equatable {
       nextDueDate: DateTime.now(),
       createdAt: DateTime.now(),
       status: RecurringStatus.active,
+      payeeName: null,
+      payeeAccount: null,
     );
   }
-  
   
   factory RecurringTransaction.fromMap(Map<String, dynamic> map) {
     return RecurringTransaction(
@@ -72,11 +77,12 @@ class RecurringTransaction extends Equatable {
       nextDueDate: DateTime.parse(map['next_due_date'] as String),
       endDate: map['end_date'] != null ? DateTime.parse(map['end_date'] as String) : null,
       createdAt: DateTime.parse(map['created_at'] as String),
-          status: map['status'] == 'paused' ? RecurringStatus.paused : RecurringStatus.active,
+      status: map['status'] == 'paused' ? RecurringStatus.paused : RecurringStatus.active,
+      payeeName: map['payee_name'] as String?,
+      payeeAccount: map['payee_account'] as String?,
     );
   }
 
-  // ---- AÑADIMOS MÉTODO toJson ----
   Map<String, dynamic> toJson() {
     return {
       'description': description,
@@ -89,10 +95,11 @@ class RecurringTransaction extends Equatable {
       'start_date': startDate.toIso8601String(),
       'next_due_date': nextDueDate.toIso8601String(),
       'end_date': endDate?.toIso8601String(),
+      'payee_name': payeeName,
+      'payee_account': payeeAccount,
     };
   }
   
-  // ---- MÉTODO copyWith CORREGIDO Y COMPLETO ----
   RecurringTransaction copyWith({
     String? id,
     String? description,
@@ -106,11 +113,13 @@ class RecurringTransaction extends Equatable {
     DateTime? nextDueDate,
     DateTime? endDate,
     DateTime? createdAt,
-    RecurringStatus? status, // <-- 1. AÑADIR status A LOS PARÁMETROS
+    RecurringStatus? status,
+    String? payeeName,
+    String? payeeAccount,
   }) {
     return RecurringTransaction(
       id: id ?? this.id,
-      userId: userId, // CORREGIDO: Usar this.userId
+      userId: this.userId, 
       description: description ?? this.description,
       amount: amount ?? this.amount,
       type: type ?? this.type,
@@ -118,14 +127,20 @@ class RecurringTransaction extends Equatable {
       accountId: accountId ?? this.accountId,
       frequency: frequency ?? this.frequency,
       interval: interval ?? this.interval,
-      startDate: startDate ?? this.startDate, // CORREGIDO: Usar this y permitir cambio
-      nextDueDate: nextDueDate ?? this.nextDueDate, // CORREGIDO: Usar this y permitir cambio
-      endDate: endDate ?? this.endDate, // CORREGIDO: Usar this y permitir cambio
-      createdAt: createdAt ?? this.createdAt, // CORREGIDO: Usar this y permitir cambio
-      status: status ?? this.status, // <-- 2. AÑADIR ARGUMENTO PARA status
+      startDate: startDate ?? this.startDate, 
+      nextDueDate: nextDueDate ?? this.nextDueDate, 
+      endDate: endDate ?? this.endDate, 
+      createdAt: createdAt ?? this.createdAt, 
+      status: status ?? this.status, 
+      payeeName: payeeName ?? this.payeeName,
+      payeeAccount: payeeAccount ?? this.payeeAccount,
     );
   }
   
   @override
-  List<Object?> get props => [id, userId, description, amount, type, category, accountId, frequency, interval, startDate, nextDueDate, endDate, createdAt,status];
+  List<Object?> get props =>[
+    id, userId, description, amount, type, category, 
+    accountId, frequency, interval, startDate, nextDueDate, 
+    endDate, createdAt, status, payeeName, payeeAccount
+  ];
 }

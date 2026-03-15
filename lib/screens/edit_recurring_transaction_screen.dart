@@ -14,6 +14,8 @@ import 'package:sasper/services/notification_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'dart:developer' as developer;
+import 'package:flutter_contacts/flutter_contacts.dart' hide Account;
+
 
 // ─── TOKENS DE DISEÑO ────────────────────────────────────────────────────────
 class _C {
@@ -122,6 +124,11 @@ class _EditRecurringTransactionScreenState extends State<EditRecurringTransactio
   late AnimationController _typeCtrl;
   late Animation<double> _typeAnim;
 
+  late final TextEditingController _payeeNameCtrl;
+  late final TextEditingController _payeeAccountCtrl;
+  final _payeeNameFocus = FocusNode();
+  final _payeeAccountFocus = FocusNode();
+
   Color get _typeColor => _type == 'Gasto' ? _C.red : _C.green;
 
   double get _rawAmount => double.tryParse(_amountCtrl.text.replaceAll(',', '.')) ?? 0;
@@ -135,10 +142,14 @@ class _EditRecurringTransactionScreenState extends State<EditRecurringTransactio
     
     _descriptionCtrl = TextEditingController(text: t.description);
     _amountCtrl = TextEditingController(text: t.amount.toStringAsFixed(2).replaceAll('.00', ''));
+    // 👈 NUEVO: Inicializar con los datos existentes
+    _payeeNameCtrl = TextEditingController(text: t.payeeName ?? '');
+    _payeeAccountCtrl = TextEditingController(text: t.payeeAccount ?? '');
     _type = t.type;
     _frequencyId = t.frequency;
     _selectedAccId = t.accountId;
     _nextDueDate = t.nextDueDate;
+    
     _notifTime = TimeOfDay(hour: t.nextDueDate.hour, minute: t.nextDueDate.minute);
 
     _accountsFuture = _accountRepo.getAccounts();
@@ -176,6 +187,9 @@ class _EditRecurringTransactionScreenState extends State<EditRecurringTransactio
 
     _descriptionCtrl.addListener(_markAsChanged);
     _amountCtrl.addListener(_markAsChanged);
+    // 👈 NUEVO: Escuchar cambios para habilitar el botón de guardar
+    _payeeNameCtrl.addListener(_markAsChanged);
+    _payeeAccountCtrl.addListener(_markAsChanged);
   }
 
   void _markAsChanged() {
@@ -188,10 +202,39 @@ class _EditRecurringTransactionScreenState extends State<EditRecurringTransactio
   void dispose() {
     _descriptionCtrl.dispose();
     _amountCtrl.dispose();
+    _payeeNameCtrl.dispose(); // 👈 NUEVO
+    _payeeAccountCtrl.dispose(); // 👈 NUEVO
     _descriptionFocus.dispose();
     _amountFocus.dispose();
+    _payeeNameFocus.dispose(); // 👈 NUEVO
+    _payeeAccountFocus.dispose(); // 👈 NUEVO
     _typeCtrl.dispose();
     super.dispose();
+  }
+
+  // 👈 NUEVO: Método para elegir de la agenda
+  Future<void> _pickContact() async {
+    HapticFeedback.lightImpact();
+    try {
+      if (await FlutterContacts.requestPermission(readonly: true)) {
+        final contact = await FlutterContacts.openExternalPick();
+        if (contact != null) {
+          setState(() {
+            _payeeNameCtrl.text = contact.displayName;
+            _hasChanges = true;
+          });
+          HapticFeedback.selectionClick();
+          _payeeAccountFocus.requestFocus();
+        }
+      } else {
+        NotificationHelper.show(
+          message: 'Permiso de contactos denegado.', 
+          type: NotificationType.warning
+        );
+      }
+    } catch (e) {
+      developer.log('Error abriendo contactos: $e', name: 'EditRecurringScreen');
+    }
   }
 
   void _setType(String t) {
@@ -270,6 +313,9 @@ class _EditRecurringTransactionScreenState extends State<EditRecurringTransactio
         accountId: _selectedAccId,
         frequency: _frequencyId,
         nextDueDate: _nextDueDate,
+        // 👈 NUEVO: Guardar los cambios (o borrarlos si los dejó vacíos)
+        payeeName: _payeeNameCtrl.text.trim().isEmpty ? "" : _payeeNameCtrl.text.trim(),
+        payeeAccount: _payeeAccountCtrl.text.trim().isEmpty ? "" : _payeeAccountCtrl.text.trim(),
       );
 
       await _repository.updateRecurringTransaction(updatedTransaction);
@@ -494,6 +540,48 @@ class _EditRecurringTransactionScreenState extends State<EditRecurringTransactio
 
                     const SizedBox(height: _C.md),
 
+                    // 👈 NUEVO: A quién pagar (Edición)
+                    _FormSection(
+                      label: 'A quién se paga (Opcional)',
+                      c: c,
+                      child: _FormField(
+                        controller: _payeeNameCtrl,
+                        focusNode: _payeeNameFocus,
+                        hint: 'Persona, empresa o entidad...',
+                        icon: Iconsax.user,
+                        accentColor: _typeColor,
+                        c: c,
+                        textCapitalization: TextCapitalization.words,
+                        onSubmitted: (_) => _payeeAccountFocus.requestFocus(),
+                        suffixIcon: IconButton(
+                          icon: Icon(Iconsax.book_saved, color: _typeColor, size: 20),
+                          onPressed: _pickContact,
+                          tooltip: 'Buscar en contactos',
+                          splashColor: Colors.transparent,
+                          highlightColor: Colors.transparent,
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: _C.md),
+
+                    // 👈 NUEVO: Cuenta destino (Edición)
+                    _FormSection(
+                      label: 'Cuenta destino / Referencia (Opcional)',
+                      c: c,
+                      child: _FormField(
+                        controller: _payeeAccountCtrl,
+                        focusNode: _payeeAccountFocus,
+                        hint: 'Nº de cuenta, teléfono, alias...',
+                        icon: Iconsax.bank,
+                        accentColor: _typeColor,
+                        c: c,
+                        textCapitalization: TextCapitalization.none,
+                      ),
+                    ),
+
+                    const SizedBox(height: _C.md),
+                    
                     _FormSection(
                       label: 'Frecuencia', c: c,
                       child: _FrequencyPicker(
@@ -667,8 +755,8 @@ class _FormField extends StatefulWidget {
   final TextEditingController controller; final FocusNode focusNode; final String hint;
   final IconData icon; final Color accentColor; final _C c; final TextCapitalization textCapitalization;
   final ValueChanged<String>? onSubmitted; final String? Function(String?)? validator;
-
-  const _FormField({required this.controller, required this.focusNode, required this.hint, required this.icon, required this.accentColor, required this.c, this.textCapitalization = TextCapitalization.none, this.onSubmitted, this.validator});
+  final Widget? suffixIcon; 
+  const _FormField({required this.controller, required this.focusNode, required this.hint, required this.icon, required this.accentColor, required this.c, this.textCapitalization = TextCapitalization.none, this.onSubmitted, this.validator,this.suffixIcon});
   @override State<_FormField> createState() => _FormFieldState();
 }
 
@@ -687,7 +775,7 @@ class _FormFieldState extends State<_FormField> {
       child: TextFormField(
         controller: widget.controller, focusNode: widget.focusNode, textCapitalization: widget.textCapitalization, onFieldSubmitted: widget.onSubmitted, validator: widget.validator,
         style: TextStyle(fontSize: 16, color: c.label, fontWeight: FontWeight.w500),
-        decoration: InputDecoration(hintText: widget.hint, hintStyle: TextStyle(color: c.label4, fontSize: 15), prefixIcon: Padding(padding: const EdgeInsets.only(left: 2), child: Icon(widget.icon, color: _focused ? widget.accentColor : c.label4, size: 20)), border: InputBorder.none, contentPadding: const EdgeInsets.symmetric(horizontal: _C.md, vertical: 15), errorStyle: const TextStyle(height: 0)),
+        decoration: InputDecoration(hintText: widget.hint, hintStyle: TextStyle(color: c.label4, fontSize: 15), prefixIcon: Padding(padding: const EdgeInsets.only(left: 2), child: Icon(widget.icon, color: _focused ? widget.accentColor : c.label4, size: 20)), suffixIcon: widget.suffixIcon, border: InputBorder.none, contentPadding: const EdgeInsets.symmetric(horizontal: _C.md, vertical: 15), errorStyle: const TextStyle(height: 0)),
       ),
     );
   }

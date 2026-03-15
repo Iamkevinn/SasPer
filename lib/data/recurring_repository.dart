@@ -128,6 +128,8 @@ class RecurringRepository {
     required int interval,
     required DateTime startDate,
     DateTime? endDate,
+    String? payeeName,      // <-- NUEVO: Nombre de a quién se le paga
+    String? payeeAccount, 
   }) async {
     try {
       // 🔥 SOLUCIÓN: Usar formato ISO 8601 COMPLETO con offset de zona horaria
@@ -177,6 +179,8 @@ class RecurringRepository {
         'start_date': startDateStr,
         'next_due_date': startDateStr,
         'end_date': endDateStr,
+        'payee_name': payeeName,      // <-- NUEVO: Agregar al mapa
+        'payee_account': payeeAccount, 
       };
 
       final response = await client

@@ -28,6 +28,7 @@ import 'package:intl/intl.dart';
 import 'package:sasper/data/account_repository.dart';
 import 'package:sasper/data/recurring_repository.dart';
 import 'package:sasper/models/account_model.dart';
+import 'package:flutter_contacts/flutter_contacts.dart' hide Account; 
 import 'package:sasper/services/notification_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
@@ -129,6 +130,12 @@ class _AddRecurringTransactionScreenState
   final _descriptionFocus     = FocusNode();
   final _amountFocus          = FocusNode();
 
+    // 👈 NUEVOS CONTROLADORES Y FOCOS
+  final _payeeNameCtrl        = TextEditingController();
+  final _payeeAccountCtrl     = TextEditingController();
+  final _payeeNameFocus       = FocusNode();
+  final _payeeAccountFocus    = FocusNode();
+  
   bool       _isLoading       = false;
   String     _type            = 'Gasto';
   String     _frequencyId     = 'mensual';
@@ -189,6 +196,10 @@ class _AddRecurringTransactionScreenState
     _descriptionFocus.dispose();
     _amountFocus.dispose();
     _typeCtrl.dispose();
+    _payeeNameCtrl.dispose();    // 👈 NUEVO
+    _payeeAccountCtrl.dispose(); // 👈 NUEVO
+    _payeeNameFocus.dispose();   // 👈 NUEVO
+    _payeeAccountFocus.dispose(); // 👈 NUEVO
     super.dispose();
   }
 
@@ -240,6 +251,32 @@ class _AddRecurringTransactionScreenState
     if (picked != null) setState(() => _notifTime = picked);
   }
 
+  // ── Contactos ─────────────────────────────────────────────────────────────
+  Future<void> _pickContact() async {
+    HapticFeedback.lightImpact();
+    try {
+      // Abre el selector nativo de contactos de iOS/Android
+      if (await FlutterContacts.requestPermission(readonly: true)) {
+        final contact = await FlutterContacts.openExternalPick();
+        if (contact != null) {
+          setState(() {
+            _payeeNameCtrl.text = contact.displayName;
+          });
+          HapticFeedback.selectionClick();
+          // Pasamos el foco al siguiente campo automáticamente
+          _payeeAccountFocus.requestFocus(); 
+        }
+      } else {
+        NotificationHelper.show(
+          message: 'Permiso de contactos denegado.', 
+          type: NotificationType.warning
+        );
+      }
+    } catch (e) {
+      developer.log('Error abriendo contactos: $e', name: 'AddRecurringScreen');
+    }
+  }
+
   // ── Guardar ───────────────────────────────────────────────────────────────
   Future<void> _save() async {
     if (!_formKey.currentState!.validate() || _selectedAccId == null || _selectedCategory == null) {
@@ -272,6 +309,8 @@ class _AddRecurringTransactionScreenState
         frequency:   repoFrequency,
         interval:    1,
         startDate:   startDT,
+        payeeName:   _payeeNameCtrl.text.trim().isNotEmpty ? _payeeNameCtrl.text.trim() : null,
+        payeeAccount: _payeeAccountCtrl.text.trim().isNotEmpty ? _payeeAccountCtrl.text.trim() : null,
       );
 
       await NotificationService.instance.scheduleRecurringReminders(newTx);
@@ -537,7 +576,48 @@ class _AddRecurringTransactionScreenState
                     ),
 
                     const SizedBox(height: _C.md),
+// 👈 NUEVO: A quién pagar (Nombre / Entidad)
+                    _FormSection(
+                      label: 'A quién se paga (Opcional)',
+                      c: c,
+                      child: _FormField(
+                        controller: _payeeNameCtrl,
+                        focusNode: _payeeNameFocus,
+                        hint: 'Persona, empresa o entidad...',
+                        icon: Iconsax.user,
+                        accentColor: _typeColor,
+                        c: c,
+                        textCapitalization: TextCapitalization.words,
+                        onSubmitted: (_) => _payeeAccountFocus.requestFocus(),
+                        // Botón para agenda de contactos integrado elegantemente
+                        suffixIcon: IconButton(
+                          icon: Icon(Iconsax.book_saved, color: _typeColor, size: 20),
+                          onPressed: _pickContact,
+                          tooltip: 'Buscar en contactos',
+                          splashColor: Colors.transparent,
+                          highlightColor: Colors.transparent,
+                        ),
+                      ),
+                    ),
 
+                    const SizedBox(height: _C.md),
+
+                    // 👈 NUEVO: A dónde pagar (Número de cuenta)
+                    _FormSection(
+                      label: 'Cuenta destino / Referencia (Opcional)',
+                      c: c,
+                      child: _FormField(
+                        controller: _payeeAccountCtrl,
+                        focusNode: _payeeAccountFocus,
+                        hint: 'Nº de cuenta, teléfono, alias...',
+                        icon: Iconsax.bank,
+                        accentColor: _typeColor,
+                        c: c,
+                        textCapitalization: TextCapitalization.none,
+                      ),
+                    ),
+
+                    const SizedBox(height: _C.md),
                     // Selector de frecuencia — el más visual de la pantalla
                     _FormSection(
                       label: 'Frecuencia',
@@ -789,12 +869,14 @@ class _FormField extends StatefulWidget {
   final TextCapitalization textCapitalization;
   final ValueChanged<String>? onSubmitted;
   final String? Function(String?)? validator;
+  final Widget? suffixIcon; // 👈 NUEVO PARÁMETRO
 
   const _FormField({
     required this.controller, required this.focusNode, required this.hint,
     required this.icon, required this.accentColor, required this.c,
     this.textCapitalization = TextCapitalization.none,
     this.onSubmitted, this.validator,
+    this.suffixIcon,
   });
 
   @override
@@ -853,6 +935,7 @@ class _FormFieldState extends State<_FormField> {
             child: Icon(widget.icon,
                 color: _focused ? widget.accentColor : c.label4, size: 20),
           ),
+          suffixIcon: widget.suffixIcon,
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(
               horizontal: _C.md, vertical: 15),
