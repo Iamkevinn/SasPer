@@ -86,7 +86,7 @@ class GoalRepository {
   Future<void> refreshData() => _fetchAndPushData();
   
   /// Añade una nueva meta para el usuario actual.
-  Future<void> addGoal({
+  Future<Goal> addGoal({
     required String name,
     required double targetAmount,
     DateTime? targetDate,
@@ -94,6 +94,11 @@ class GoalRepository {
     required GoalTimeframe timeframe,
     required GoalPriority priority,
     String? categoryId,
+    GoalSavingsFrequency? savingsFrequency,
+    int? savingsDayOfWeek,
+    int? savingsDayOfMonth,
+    double? savingsAmount,
+    DateTime? nextReminderDate,
   }) async {
     try {
       final userId = client.auth.currentUser!.id;
@@ -105,7 +110,12 @@ class GoalRepository {
         dateString = targetDate.toIso8601String().split('T')[0];
       }
 
-      await client.from('goals').insert({
+      String? reminderDateString; // <--- AQUÍ ES DONDE FALTABA LA DECLARACIÓN
+      if (nextReminderDate != null) {
+        reminderDateString = nextReminderDate.toIso8601String().split('T')[0];
+      }
+      
+      final response = await client.from('goals').insert({
         'user_id': userId,
         'name': name,
         'target_amount': targetAmount,
@@ -116,8 +126,14 @@ class GoalRepository {
         'timeframe': timeframe.name, // Ahora enviará 'short', 'medium' o 'long'
         'priority': priority.name,
         'category_id': categoryId,
-      });
+        'savings_frequency': savingsFrequency?.name,
+        'savings_day_of_week': savingsDayOfWeek,
+        'savings_day_of_month': savingsDayOfMonth,
+        'savings_amount': savingsAmount,
+        'next_reminder_date': reminderDateString,
+      }).select().single();;
       developer.log('✅ [Repo] Meta "$name" añadida con éxito.', name: 'GoalRepository');
+      return Goal.fromMap(response);
     } catch (e) {
       developer.log('🔥 [Repo] Error añadiendo meta: $e', name: 'GoalRepository');
       throw Exception('No se pudo crear la meta.');
@@ -138,6 +154,11 @@ class GoalRepository {
             'priority': goal.priority.name,
             'category_id': goal.categoryId,
             'notes_content': goal.notesContent,
+            'savings_frequency': goal.savingsFrequency?.name,
+            'savings_day_of_week': goal.savingsDayOfWeek,
+            'savings_day_of_month': goal.savingsDayOfMonth,
+            'savings_amount': goal.savingsAmount,
+            'next_reminder_date': goal.nextReminderDate?.toIso8601String().split('T').first,
           })
           .eq('id', goal.id);
       developer.log('✅ [Repo] Meta actualizada con éxito.', name: 'GoalRepository');

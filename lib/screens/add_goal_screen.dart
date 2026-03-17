@@ -45,6 +45,7 @@ import 'package:sasper/data/goal_repository.dart';
 import 'package:sasper/data/analysis_repository.dart';
 import 'package:sasper/models/goal_model.dart';
 import 'package:sasper/services/event_service.dart';
+import 'package:sasper/services/notification_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'dart:developer' as developer;
@@ -160,6 +161,9 @@ class _AddGoalScreenState extends State<AddGoalScreen>
   double      _amount     = 0.0;
   bool        _isSaving   = false;
   bool        _isSuccess  = false;
+  GoalSavingsFrequency? _savingsFrequency; // Frecuencia seleccionada
+  int? _selectedDay; // Día de la semana (1-7) o del mes (1-31)
+  double? _savingsAmount; // Monto sugerido para el ritual
 
   @override
   void initState() {
@@ -202,6 +206,43 @@ class _AddGoalScreenState extends State<AddGoalScreen>
       developer.log('Error cargando datos financieros: $e');
       if (mounted) setState(() { _monthlyIncome = 1.0; _isLoadingData = false; });
     }
+  }
+
+  // 👈 --- NUEVA FUNCIÓN PARA CALCULAR FECHA DE RECORDATORIO ---
+  DateTime? _calculateNextReminderDate({
+    required GoalSavingsFrequency frequency,
+    required int day,
+  }) {
+    final now = DateTime.now();
+
+    if (frequency == GoalSavingsFrequency.daily) {
+      return DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
+    }
+    
+    if (frequency == GoalSavingsFrequency.weekly) {
+      // day: 1=Lunes, ..., 7=Domingo
+      DateTime reminder = DateTime(now.year, now.month, now.day);
+      // Avanza día a día hasta encontrar el próximo día de la semana correcto
+      while (reminder.weekday != day) {
+        reminder = reminder.add(const Duration(days: 1));
+      }
+      // Si el día calculado es hoy, lo movemos a la próxima semana
+      if (reminder.day == now.day && reminder.month == now.month && reminder.year == now.year) {
+        return reminder.add(const Duration(days: 7));
+      }
+      return reminder;
+    }
+    
+    if (frequency == GoalSavingsFrequency.monthly) {
+      // day: 1-31
+      DateTime reminder = DateTime(now.year, now.month, day);
+      // Si el día de este mes ya pasó, lo programamos para el mes siguiente
+      if (reminder.isBefore(now)) {
+        return DateTime(now.year, now.month + 1, day);
+      }
+      return reminder;
+    }
+    return null;
   }
 
   // ── Cálculos ─────────────────────────────────────────────────────────────
@@ -300,13 +341,37 @@ class _AddGoalScreenState extends State<AddGoalScreen>
               ? GoalTimeframe.medium
               : GoalTimeframe.long;
 
-      await _goalRepo.addGoal(
+      // Determinamos si el ritual está configurado
+      final bool isRitualConfigured = _savingsFrequency != null && 
+          (_savingsFrequency == GoalSavingsFrequency.daily || _selectedDay != null);
+
+      // Necesitamos hacer un pequeño cambio para que addGoal devuelva la meta creada y así obtener su ID.
+      final newGoal = await _goalRepo.addGoal(
         name:         _nameCtrl.text.trim(),
         targetAmount: _amount,
         targetDate:   _targetDate,
         priority:     _priority,
         timeframe:    timeframe,
+        savingsFrequency: _savingsFrequency,
+        savingsDayOfWeek: _savingsFrequency == GoalSavingsFrequency.weekly ? _selectedDay : null,
+        savingsDayOfMonth: _savingsFrequency == GoalSavingsFrequency.monthly ? _selectedDay : null,
+        savingsAmount: _savingsAmount,
+        nextReminderDate: (_savingsFrequency != null && (_savingsFrequency == GoalSavingsFrequency.daily || _selectedDay != null))
+            ? _calculateNextReminderDate(frequency: _savingsFrequency!, day: _selectedDay ?? 0)
+            : null,
       );
+
+      // 👈 SEGUNDO: Si se configuró un ritual, programa la notificación.
+      if (newGoal.savingsFrequency != null && newGoal.savingsAmount != null) {
+        await NotificationService.instance.scheduleGoalReminder(
+          goalId: newGoal.id,
+          goalName: newGoal.name,
+          savingsAmount: newGoal.savingsAmount!,
+          frequency: newGoal.savingsFrequency!,
+          day: newGoal.savingsDayOfWeek ?? newGoal.savingsDayOfMonth,
+        );
+        developer.log('✅ Notificación programada para la meta: ${newGoal.name}', name: 'AddGoalScreen');
+      }
 
       if (mounted) {
         setState(() { _isSuccess = true; _isSaving = false; });
@@ -468,6 +533,20 @@ class _AddGoalScreenState extends State<AddGoalScreen>
                                           weekly:  _weekly,
                                           monthly: _monthly,
                                           c:       c,
+                                          savingsFrequency: _savingsFrequency,
+                                          selectedDay: _selectedDay,
+                                          onFrequencyChanged: (freq) {
+                                            setState(() {
+                                              _savingsFrequency = freq;
+                                              _selectedDay = null; // Resetea el día al cambiar de frecuencia
+                                              _savingsAmount = freq == null ? null : (freq == GoalSavingsFrequency.weekly ? _weekly : _monthly);
+                                            });
+                                          },
+                                          onDayChanged: (day) {
+                                            setState(() {
+                                              _selectedDay = day;
+                                            });
+                                          },
                                         ),
                                         const SizedBox(height: _C.sm),
                                         // Viabilidad — parte del plan, no sección aparte
@@ -980,15 +1059,28 @@ class _PrioritySelector extends StatelessWidget {
 //
 // Tres métricas en una fila. La mensual es la principal (más grande).
 // Sin gradientes, sin bordes dobles. El dato habla solo.
+
 class _PlanCard extends StatelessWidget {
   final double daily;
   final double weekly;
   final double monthly;
   final _C c;
 
+  // --- Callbacks y estado del Ritual ---
+  final GoalSavingsFrequency? savingsFrequency;
+  final int? selectedDay;
+  final Function(GoalSavingsFrequency?) onFrequencyChanged;
+  final Function(int) onDayChanged;
+
   const _PlanCard({
-    required this.daily, required this.weekly,
-    required this.monthly, required this.c,
+    required this.daily,
+    required this.weekly,
+    required this.monthly,
+    required this.c,
+    required this.savingsFrequency,
+    required this.selectedDay,
+    required this.onFrequencyChanged,
+    required this.onDayChanged,
   });
 
   @override
@@ -1004,11 +1096,12 @@ class _PlanCard extends StatelessWidget {
         boxShadow: [
           BoxShadow(
               color: Colors.black.withOpacity(c.isDark ? 0.14 : 0.03),
-              blurRadius: 8, offset: const Offset(0, 2)),
+              blurRadius: 8,
+              offset: const Offset(0, 2)),
         ],
       ),
       child: Column(children: [
-        // Header
+        // Header "Necesitas ahorrar"
         Padding(
           padding: const EdgeInsets.fromLTRB(_C.md, _C.md, _C.md, 0),
           child: Row(children: [
@@ -1023,41 +1116,229 @@ class _PlanCard extends StatelessWidget {
             const SizedBox(width: _C.sm + 2),
             Text('Necesitas ahorrar',
                 style: TextStyle(
-                  fontSize: 13, fontWeight: FontWeight.w700,
-                  color: c.label, letterSpacing: -0.1,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: c.label,
+                  letterSpacing: -0.1,
                 )),
           ]),
         ),
-
         const SizedBox(height: _C.md),
-        Container(height: 0.5,
-            margin: const EdgeInsets.symmetric(horizontal: _C.md),
-            color: c.sep.withOpacity(0.5)),
+        Container(height: 0.5, margin: const EdgeInsets.symmetric(horizontal: _C.md), color: c.sep.withOpacity(0.5)),
 
-        // Tres métricas
+        // Tres métricas de ahorro
         Padding(
           padding: const EdgeInsets.all(_C.md),
           child: Row(children: [
-            Expanded(child: _PlanMetric(
-              label: 'Diario',
-              value: compact.format(daily),
-              isMain: false, c: c,
-            )),
+            Expanded(child: _PlanMetric(label: 'Diario', value: compact.format(daily), isMain: false, c: c)),
             Container(width: 0.5, height: 44, color: c.sep),
-            Expanded(child: _PlanMetric(
-              label: 'Semanal',
-              value: compact.format(weekly),
-              isMain: false, c: c,
-            )),
+            Expanded(child: _PlanMetric(label: 'Semanal', value: compact.format(weekly), isMain: false, c: c)),
             Container(width: 0.5, height: 44, color: c.sep),
-            Expanded(child: _PlanMetric(
-              label: 'Mensual',
-              value: compact.format(monthly),
-              isMain: true, c: c,
-            )),
+            Expanded(child: _PlanMetric(label: 'Mensual', value: compact.format(monthly), isMain: true, c: c)),
           ]),
         ),
+        
+        // --- SECCIÓN DEL RITUAL DE AHORRO (APARECE CON ANIMACIÓN) ---
+        AnimatedSize(
+          duration: _C.mid,
+          curve: _C.easeOut,
+          child: Column(
+            children: [
+               Container(height: 0.5, margin: const EdgeInsets.symmetric(horizontal: _C.md), color: c.sep.withOpacity(0.5)),
+               const SizedBox(height: _C.md),
+               Padding(
+                 padding: const EdgeInsets.symmetric(horizontal: _C.md),
+                 child: Row(children: [
+                   Container(
+                     width: 30, height: 30,
+                     decoration: BoxDecoration(
+                       color: _C.purple.withOpacity(c.isDark ? 0.18 : 0.09),
+                       borderRadius: BorderRadius.circular(_C.rSM),
+                     ),
+                     child: const Icon(Iconsax.notification_bing, size: 14, color: _C.purple),
+                   ),
+                   const SizedBox(width: _C.sm + 2),
+                   Text('Crear un recordatorio',
+                       style: TextStyle(
+                         fontSize: 13,
+                         fontWeight: FontWeight.w700,
+                         color: c.label,
+                         letterSpacing: -0.1,
+                       )),
+                 ]),
+               ),
+               const SizedBox(height: _C.sm),
+               _FrequencySelector(
+                 c: c,
+                 selected: savingsFrequency,
+                 onChanged: onFrequencyChanged,
+               ),
+              if (savingsFrequency != null && savingsFrequency != GoalSavingsFrequency.daily)
+                _DaySelector(
+                  c: c,
+                  frequency: savingsFrequency!,
+                  selectedDay: selectedDay,
+                  onDayChanged: onDayChanged,
+                )
+            ],
+          ),
+        ),
+        const SizedBox(height: _C.md),
       ]),
+    );
+  }
+}
+
+// 👈 --- NUEVO WIDGET: SELECTOR DE FRECUENCIA DEL RITUAL ---
+class _FrequencySelector extends StatelessWidget {
+  final _C c;
+  final GoalSavingsFrequency? selected;
+  final Function(GoalSavingsFrequency?) onChanged;
+  
+  const _FrequencySelector({required this.c, required this.selected, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(_C.md, _C.sm, _C.md, 0),
+      child: Row(
+        children: GoalSavingsFrequency.values.map((freq) {
+          final isSelected = selected == freq;
+          final label = freq == GoalSavingsFrequency.daily ? 'Diario' : freq == GoalSavingsFrequency.weekly ? 'Semanal' : 'Mensual';
+
+          return Expanded(
+            child: GestureDetector(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                onChanged(isSelected ? null : freq);
+              },
+              child: AnimatedContainer(
+                duration: _C.fast,
+                margin: const EdgeInsets.symmetric(horizontal: 2),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected ? _C.purple.withOpacity(c.isDark ? 0.22 : 0.12) : c.raised,
+                  borderRadius: BorderRadius.circular(_C.rMD),
+                  border: Border.all(
+                    color: isSelected ? _C.purple.withOpacity(0.4) : c.sep.withOpacity(0.3),
+                    width: isSelected ? 1.0 : 0.5,
+                  )
+                ),
+                child: Center(
+                  child: Text(label, style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: isSelected ? _C.purple : c.label3,
+                  )),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+// 👈 --- NUEVO WIDGET: SELECTOR DE DÍA (SEMANA O MES) ---
+class _DaySelector extends StatelessWidget {
+  final _C c;
+  final GoalSavingsFrequency frequency;
+  final int? selectedDay;
+  final Function(int) onDayChanged;
+
+  const _DaySelector({required this.c, required this.frequency, required this.selectedDay, required this.onDayChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    if (frequency == GoalSavingsFrequency.weekly) {
+      const weekDays = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(_C.md, _C.sm, _C.md, 0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: List.generate(7, (index) {
+            final day = index + 1; // 1=Lunes, 7=Domingo
+            final isSelected = selectedDay == day;
+            return GestureDetector(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                onDayChanged(day);
+              },
+              child: AnimatedContainer(
+                duration: _C.fast,
+                width: 36, height: 36,
+                decoration: BoxDecoration(
+                  color: isSelected ? _C.purple.withOpacity(c.isDark ? 0.22 : 0.12) : Colors.transparent,
+                  shape: BoxShape.circle,
+                  border: isSelected ? Border.all(color: _C.purple.withOpacity(0.4), width: 1.0) : null,
+                ),
+                child: Center(
+                  child: Text(weekDays[index], style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    color: isSelected ? _C.purple : c.label3,
+                  )),
+                ),
+              ),
+            );
+          }),
+        ),
+      );
+    }
+
+    if (frequency == GoalSavingsFrequency.monthly) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(_C.md, _C.sm, _C.md, 0),
+        child: _ScaleBtn(
+          onTap: () => _showDayPicker(context),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: c.raised,
+              borderRadius: BorderRadius.circular(_C.rMD),
+              border: Border.all(color: c.sep.withOpacity(0.4), width: 0.5),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  selectedDay == null ? 'Elige un día del mes' : 'Recordarme el día $selectedDay de cada mes',
+                  style: TextStyle(color: selectedDay != null ? c.label2 : c.label4, fontSize: 13, fontWeight: FontWeight.w500),
+                ),
+                Icon(Iconsax.calendar_edit, size: 16, color: c.label4),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
+  void _showDayPicker(BuildContext context) {
+    HapticFeedback.mediumImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: c.surface,
+      builder: (ctx) => SizedBox(
+        height: 250,
+        child: GridView.builder(
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 7),
+          itemCount: 31,
+          itemBuilder: (context, index) {
+            final day = index + 1;
+            return InkWell(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                onDayChanged(day);
+                Navigator.pop(ctx);
+              },
+              child: Center(child: Text('$day', style: TextStyle(color: c.label2))),
+            );
+          },
+        ),
+      ),
     );
   }
 }

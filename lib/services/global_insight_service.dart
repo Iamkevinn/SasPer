@@ -5,6 +5,7 @@ import 'package:sasper/widgets/shared/floating_insight_banner.dart';
 import 'package:sasper/screens/analysis_screen.dart';
 import 'package:sasper/main.dart'; // 👈 Importa donde esté tu navigatorKey
 import 'dart:developer' as developer;
+import 'package:sasper/services/notification_service.dart';
 
 class GlobalInsightService {
   static final instance = GlobalInsightService._();
@@ -23,7 +24,7 @@ class GlobalInsightService {
       if (userId == null) return;
 
       client
-          .channel('public:insights_global')
+          .channel('public:insights')
           .onPostgresChanges(
             event: PostgresChangeEvent.insert,
             schema: 'public',
@@ -34,12 +35,36 @@ class GlobalInsightService {
               value: userId,
             ),
             callback: (payload) {
-              developer.log('🧠 IA: Procesando nuevo insight...');
-              final newInsight = Insight.fromMap(payload.newRecord);
+              developer.log('🧠 [EVENTO] Payload completo: $payload'); // <--- MIRA ESTO EN LA CONSOLA
+  
+              // payload.newRecord es el mapa que necesitas para Insight.fromMap
+              final newRecord = payload.newRecord; 
+              final newInsight = Insight.fromMap(newRecord);
+              
+              developer.log('🧠 IA: Tipo recibido: ${newInsight.type}'); // <--- MIRA ESTO
+              // 👈 --- NUEVA LÓGICA INTELIGENTE ---
+              if (newInsight.type == InsightType.goal_saving_reminder) {
+                // Si es un recordatorio de meta, disparamos la notificación local interactiva.
+                final goalId = newInsight.metadata['goal_id'] as String? ?? '';
+                final goalName = newInsight.metadata['goal_name'] as String? ?? 'tu meta';
+                final savingsAmount = (newInsight.metadata['savings_amount'] as num? ?? 0).toDouble();
+
+                if (goalId.isNotEmpty) {
+                  NotificationService.instance.showGoalSavingReminder(
+                    goalId: goalId,
+                    goalName: goalName,
+                    savingsAmount: savingsAmount,
+                  );
+                }
+              } else {
+                // Para cualquier otro tipo de insight, mostramos el banner superior como antes.
               _showTopBanner(newInsight);
+              }
             },
           )
-          .subscribe();
+          .subscribe((status, error) {
+            developer.log('📡 Estado de suscripción Realtime: $status, Error: $error');
+          });
 
       _isListening = true;
       developer.log('✅ Global Insight Listener activado.');

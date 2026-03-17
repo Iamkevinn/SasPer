@@ -256,6 +256,12 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   Future<void> _initializeNotifications() async {
     try {
       await NotificationService.instance.initializeLate().timeout(_servicesTimeout);
+      await NotificationService.instance.refreshAllSchedules(); 
+
+      // 👈 AÑADE ESTAS DOS LÍNEAS TEMPORALMENTE PARA DIAGNÓSTICO
+      await NotificationService.instance.debugCheckPendingNotifications();
+      await NotificationService.instance.testOneMinuteNotification();
+      
       developer.log('✅ NotificationService inicializado', name: 'AuthGate');
     } catch (e) {
       developer.log('⚠️ Error en NotificationService: $e', name: 'AuthGate');

@@ -3,6 +3,22 @@
 import 'package:equatable/equatable.dart';
 import 'package:sasper/models/category_model.dart'; 
 
+// --- NUEVO ENUM PARA EL RITUAL DE AHORRO ---
+enum GoalSavingsFrequency {
+  daily,
+  weekly,
+  monthly;
+
+  static GoalSavingsFrequency? fromString(String? frequency) {
+    switch (frequency?.toLowerCase()) {
+      case 'daily': return GoalSavingsFrequency.daily;
+      case 'weekly': return GoalSavingsFrequency.weekly;
+      case 'monthly': return GoalSavingsFrequency.monthly;
+      default: return null;
+    }
+  }
+}
+
 enum GoalTimeframe {
   short,
   medium,
@@ -72,6 +88,13 @@ class Goal extends Equatable {
   final Category? category; // Para almacenar el objeto completo de la categoría
   final dynamic notesContent;
 
+  // --- NUEVOS CAMPOS DEL RITUAL DE AHORRO ---
+  final GoalSavingsFrequency? savingsFrequency;
+  final int? savingsDayOfWeek;
+  final int? savingsDayOfMonth;
+  final double? savingsAmount;
+  final DateTime? nextReminderDate;
+
   const Goal({
     required this.id,
     required this.userId,
@@ -87,6 +110,11 @@ class Goal extends Equatable {
     this.categoryId,
     this.category,
     this.notesContent,
+    this.savingsFrequency,
+    this.savingsDayOfWeek,
+    this.savingsDayOfMonth,
+    this.savingsAmount,
+    this.nextReminderDate,
   });
 
   /// Crea una instancia "vacía" de Goal.
@@ -129,6 +157,11 @@ class Goal extends Equatable {
         // Si la consulta de Supabase incluye la categoría, la parseamos aquí.
         category: map['categories'] != null ? Category.fromMap(map['categories']) : null,
         notesContent: map['notes_content'],
+        savingsFrequency: GoalSavingsFrequency.fromString(map['savings_frequency'] as String?),
+        savingsDayOfWeek: map['savings_day_of_week'] as int?,
+        savingsDayOfMonth: map['savings_day_of_month'] as int?,
+        savingsAmount: (map['savings_amount'] as num?)?.toDouble(),
+        nextReminderDate: map['next_reminder_date'] != null ? DateTime.parse(map['next_reminder_date'] as String) : null,
       );
     } catch (e) {
       throw FormatException('Error al parsear Goal: $e', map);
@@ -151,6 +184,11 @@ class Goal extends Equatable {
     String? categoryId,
     Category? category,
     dynamic notesContent,
+    GoalSavingsFrequency? savingsFrequency,
+    int? savingsDayOfWeek,
+    int? savingsDayOfMonth,
+    double? savingsAmount,
+    DateTime? nextReminderDate,
   }) {
     return Goal(
       id: id ?? this.id,
@@ -166,7 +204,12 @@ class Goal extends Equatable {
       priority: priority ?? this.priority,
       categoryId: categoryId ?? this.categoryId,
       category: category ?? this.category,
-      notesContent: notesContent ?? this.notesContent
+      notesContent: notesContent ?? this.notesContent,
+      savingsFrequency: savingsFrequency ?? this.savingsFrequency,
+      savingsDayOfWeek: savingsDayOfWeek ?? this.savingsDayOfWeek,
+      savingsDayOfMonth: savingsDayOfMonth ?? this.savingsDayOfMonth,
+      savingsAmount: savingsAmount ?? this.savingsAmount,
+      nextReminderDate: nextReminderDate ?? this.nextReminderDate,
     );
   }
 
@@ -194,5 +237,7 @@ class Goal extends Equatable {
         categoryId,
         category,
         notesContent,
+        savingsFrequency, savingsDayOfWeek, savingsDayOfMonth,
+        savingsAmount, nextReminderDate,
       ];
 }

@@ -83,5 +83,61 @@ def send_recurring_payment_reminders():
     except Exception as e:
         print(f"Error fatal en la función de recordatorios: {e}")
 
+def send_goal_reminders():
+    """
+    Busca insights de tipo 'goal_saving_reminder' y envía notificaciones push.
+    """
+    print("Iniciando revisión de metas...")
+    try:
+        supabase_url = os.getenv("SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_SERVICE_KEY")
+        fcm_server_key = os.getenv("FCM_SERVER_KEY")
+        
+        supabase = create_client(supabase_url, supabase_key)
+
+        # 1. Buscar insights de metas pendientes
+        response = supabase.from_("insights") \
+            .select("id, user_id, metadata, profiles(fcm_token)") \
+            .eq("type", "goal_saving_reminder") \
+            .eq("is_read", False) \
+            .execute()
+
+        insights = response.data
+        if not insights:
+            print("No hay metas para recordar hoy.")
+            return
+
+        for insight in insights:
+            profile = insight.get("profiles")
+            if not profile or not profile.get("fcm_token"):
+                continue
+
+            # 2. Extraer datos del JSON metadata
+            meta = insight.get("metadata", {})
+            goal_name = meta.get("goal_name", "tu meta")
+            savings_amount = meta.get("savings_amount", 0)
+
+            # 3. Enviar notificación Push (Firebase)
+            headers = {"Authorization": f"key={fcm_server_key}", "Content-Type": "application/json"}
+            payload = {
+                "to": profile["fcm_token"],
+                "notification": {
+                    "title": "✨ Hoy toca ahorrar para tu meta",
+                    "body": f"¡Aporta ${savings_amount} para \"{goal_name}\"!"
+                },
+                "data": {
+                    "type": "goal_reminder",
+                    "goal_id": meta.get("goal_id")
+                }
+            }
+            
+            requests.post("https://fcm.googleapis.com/fcm/send", json=payload, headers=headers)
+            print(f"Notificación de ahorro enviada a usuario {insight['user_id']}")
+
+    except Exception as e:
+        print(f"Error en send_goal_reminders: {e}")
+
+# Y finalmente, asegúrate de llamar a ambas funciones en el __main__
 if __name__ == "__main__":
     send_recurring_payment_reminders()
+    send_goal_reminders() # <-- Añade esta línea

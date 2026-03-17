@@ -32,6 +32,7 @@ enum InsightType {
   test_alert,
   warning,
   end_of_month_projection,
+  goal_saving_reminder,
 }
 
 class Insight extends Equatable {

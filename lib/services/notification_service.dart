@@ -8,7 +8,10 @@ import 'package:http/http.dart' as http;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:intl/intl.dart';
+import 'package:sasper/data/goal_repository.dart';
 import 'package:sasper/data/recurring_repository.dart';
+import 'package:sasper/main.dart';
+import 'package:sasper/models/goal_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
@@ -190,6 +193,11 @@ class NotificationService {
     });
     FirebaseMessaging.onMessageOpenedApp.listen((msg) {
       developer.log('📂 FCM Opened: ${msg.messageId}', name: 'NotificationService');
+      // AQUÍ: Lee el 'goal_id' del payload y navega a la meta
+      final goalId = msg.data['goal_id'];
+      if (goalId != null) {
+        navigatorKey.currentState?.pushNamed('/goal_details', arguments: goalId);
+      }
     });
     _firebaseMessaging.onTokenRefresh.listen((token) => _saveTokenToSupabase(token));
   }
@@ -205,6 +213,16 @@ class NotificationService {
         'recurring_payments_channel',
         'Recordatorios de Pagos',
         description: 'Notificaciones sobre gastos fijos.',
+        importance: Importance.max,
+        playSound: true,
+      ),
+    );
+
+    await androidImpl.createNotificationChannel(
+      const AndroidNotificationChannel(
+        'goal_reminders_channel', // ID único
+        'Recordatorios de Metas', // Nombre visible para el usuario
+        description: 'Notificaciones para ayudarte a cumplir tus metas de ahorro.',
         importance: Importance.max,
         playSound: true,
       ),
@@ -268,21 +286,77 @@ class NotificationService {
       return;
     }
     
-    developer.log('🔄 Refrescando todas las alarmas...', name: 'NotificationService');
+    developer.log('🔄 Refrescando todas las alarmas (Pagos y Metas)...', name: 'NotificationService');
     try {
-      final recurringTxs = await RecurringRepository.instance.getAll();
+      // 1. Borramos todo para evitar duplicados
       await _localNotifier.cancelAll();
       
+      // 2. Reprogramamos TODOS los pagos recurrentes
+      final recurringTxs = await RecurringRepository.instance.getAll();
       for (final tx in recurringTxs) {
         await _scheduleRemindersForTransaction(tx);
       }
-      developer.log('✅ ${recurringTxs.length} transacciones actualizadas', name: 'NotificationService');
+      
+      // 3. 👈 ¡NUEVO! Reprogramamos TODAS las metas con ritual activo
+      final activeGoals = await GoalRepository.instance.getActiveGoals();
+      int goalsScheduled = 0;
+      for (final goal in activeGoals) {
+        if (goal.savingsFrequency != null && goal.savingsAmount != null) {
+          await scheduleGoalReminder(
+            goalId: goal.id,
+            goalName: goal.name,
+            savingsAmount: goal.savingsAmount!,
+            frequency: goal.savingsFrequency!,
+            day: goal.savingsDayOfWeek ?? goal.savingsDayOfMonth,
+          );
+          goalsScheduled++;
+        }
+      }
+
+      developer.log('✅ Alarmas restauradas: ${recurringTxs.length} pagos fijos y $goalsScheduled metas.', name: 'NotificationService');
     } catch (e) {
       developer.log('🔥 Error refrescando schedules: $e', name: 'NotificationService');
-      throw Exception('No se pudieron refrescar las alarmas: $e');
     }
   }
 
+  // 👈 HERRAMIENTA DE DIAGNÓSTICO
+  Future<void> debugCheckPendingNotifications() async {
+    final pending = await _localNotifier.pendingNotificationRequests();
+    developer.log('🔔 ====== ALARMAS PENDIENTES EN EL TELÉFONO: ${pending.length} ======', name: 'DEBUG_NOTIF');
+    
+    if (pending.isEmpty) {
+      developer.log('❌ No hay ninguna notificación programada. El OS las borró o no se registraron.', name: 'DEBUG_NOTIF');
+    } else {
+      for (var p in pending) {
+        developer.log('✅ ID: ${p.id} | Título: ${p.title} | Payload: ${p.payload}', name: 'DEBUG_NOTIF');
+      }
+    }
+  }
+
+  // 👈 PRUEBA DE 1 MINUTO
+  Future<void> testOneMinuteNotification() async {
+    final now = tz.TZDateTime.now(tz.local);
+    final inOneMinute = now.add(const Duration(minutes: 1));
+    
+    developer.log('⏰ Programando prueba para: $inOneMinute (Hora actual: $now)', name: 'DEBUG_NOTIF');
+
+    await _localNotifier.zonedSchedule(
+      999999,
+      'Prueba de 1 Minuto',
+      '¡Si ves esto, el sistema operativo SÍ permite alarmas exactas!',
+      inOneMinute,
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'goal_reminders_channel', 'Recordatorios de Metas',
+          importance: Importance.max, priority: Priority.high,
+        ),
+        iOS: DarwinNotificationDetails(presentAlert: true, presentSound: true),
+      ),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+    );
+    await debugCheckPendingNotifications();
+  }
+  
   Future<void> scheduleFreeTrialReminder({
     required String id,
     required String serviceName,
@@ -321,6 +395,57 @@ class NotificationService {
         iOS: DarwinNotificationDetails(presentAlert: true, presentSound: true),
       ),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+    );
+  }
+
+  // 👈 --- NUEVO MÉTODO PARA NOTIFICACIONES DE METAS ---
+  Future<void> showGoalSavingReminder({
+    required String goalId,
+    required String goalName,
+    required double savingsAmount,
+  }) async {
+    final fmt = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+    final amountString = fmt.format(savingsAmount);
+
+    // El payload es un JSON que enviamos a la notificación.
+    // Cuando el usuario interactúe, podremos leer estos datos.
+    final payload = jsonEncode({
+      'type': 'goal_reminder',
+      'goal_id': goalId,
+    });
+
+    await _localNotifier.show(
+      ('goal-$goalId').hashCode, // ID único para esta notificación
+      '✨ Hoy toca ahorrar para tu meta',
+      '¡Aporta $amountString para "$goalName"!',
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          'goal_reminders_channel',
+          'Recordatorios de Metas',
+          importance: Importance.max,
+          priority: Priority.high,
+          playSound: true,
+          // --- ACCIONES INTERACTIVAS (BOTONES) ---
+          actions: [
+            const AndroidNotificationAction(
+              'SAVED_ACTION', // ID de la acción
+              'Ya lo guardé',
+              showsUserInterface: true, // Abre la app al tocar
+            ),
+            const AndroidNotificationAction(
+              'SNOOZE_ACTION',
+              'Posponer',
+              cancelNotification: true, // Cierra la notificación al tocar
+            ),
+          ],
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentSound: true,
+          categoryIdentifier: 'GOAL_REMINDER_CATEGORY', // Conectaremos esto en un paso futuro para iOS
+        ),
+      ),
+      payload: payload,
     );
   }
 
@@ -378,6 +503,94 @@ class NotificationService {
       scheduledCount++;
     }
   }
+
+ 
+
+// 2. Método de programación corregido
+// 1. Método auxiliar para calcular la fecha
+tz.TZDateTime _nextOccurrence(GoalSavingsFrequency frequency, int? day) {
+  final now = tz.TZDateTime.now(tz.local);
+  
+  // 1. Definimos la hora objetivo (ej: 9:00 AM)
+  tz.TZDateTime scheduledDate = tz.TZDateTime(tz.local, now.year, now.month, now.day, 9, 0);
+
+  // 2. Si ya pasó la hora de hoy, lo ponemos para mañana como base
+  if (scheduledDate.isBefore(now)) {
+    scheduledDate = scheduledDate.add(const Duration(days: 1));
+  }
+
+  // 3. Lógica según la frecuencia
+  switch (frequency) {
+    case GoalSavingsFrequency.daily:
+      // Si la hora de hoy ya pasó, ya se añadió 1 día en el paso 2.
+      return scheduledDate;
+
+    case GoalSavingsFrequency.weekly:
+      // day: 1 (Lunes) a 7 (Domingo)
+      if (day != null) {
+        // Avanzamos hasta que el día de la semana coincida
+        while (scheduledDate.weekday != day) {
+          scheduledDate = scheduledDate.add(const Duration(days: 1));
+        }
+      }
+      return scheduledDate;
+
+    case GoalSavingsFrequency.monthly:
+      // day: 1 a 31
+      if (day != null) {
+        // Ajustamos al día del mes solicitado
+        scheduledDate = tz.TZDateTime(tz.local, scheduledDate.year, scheduledDate.month, day, 9, 0);
+        // Si esa fecha ya pasó este mes, nos vamos al mes siguiente
+        if (scheduledDate.isBefore(now)) {
+          scheduledDate = tz.TZDateTime(tz.local, scheduledDate.year, scheduledDate.month + 1, day, 9, 0);
+        }
+      }
+      return scheduledDate;
+  }
+}
+// 2. El método de programación (SIN el parámetro problemático)
+Future<void> scheduleGoalReminder({
+  required String goalId,
+  required String goalName,
+  required double savingsAmount,
+  required GoalSavingsFrequency frequency,
+  int? day, 
+}) async {
+  final fmt = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+  final amountString = fmt.format(savingsAmount);
+
+  final nextDate = _nextOccurrence(frequency, day);
+  developer.log('📅 Programando meta $goalId para: $nextDate', name: 'NotificationService');
+  
+  await _localNotifier.zonedSchedule(
+    goalId.hashCode & 0x7FFFFFFF, // Aseguramos un ID válido para Android
+    '✨ Hoy toca ahorrar para tu meta',
+    '¡Aporta $amountString para "$goalName"!',
+    _nextOccurrence(frequency, day),
+    const NotificationDetails(
+      android: AndroidNotificationDetails(
+        'goal_reminders_channel', 
+        'Recordatorios de Metas',
+        importance: Importance.max, 
+        priority: Priority.high,
+      ),
+      iOS: DarwinNotificationDetails(
+        presentAlert: true, 
+        presentSound: true,
+      ),
+    ),
+    androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+    matchDateTimeComponents: _getMatchComponent(frequency), // 👈 Esto hace que se repita
+  );
+}
+
+// 3. Helper para la repetición automática
+DateTimeComponents? _getMatchComponent(GoalSavingsFrequency freq) {
+  if (freq == GoalSavingsFrequency.daily) return DateTimeComponents.time;
+  if (freq == GoalSavingsFrequency.weekly) return DateTimeComponents.dayOfWeekAndTime;
+  if (freq == GoalSavingsFrequency.monthly) return DateTimeComponents.dayOfMonthAndTime;
+  return null;
+}
 
   NotificationDetails _notifDetails(String desc, {required bool isFinal}) {
     return NotificationDetails(
