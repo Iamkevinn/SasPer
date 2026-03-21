@@ -88,6 +88,7 @@ class _EditAccountScreenState extends State<EditAccountScreen>
   final _formKey     = GlobalKey<FormState>();
 
   late final TextEditingController _nameCtrl;
+  late final TextEditingController _descriptionCtrl;
   late String _type;
   bool _loading = false;
 
@@ -101,6 +102,7 @@ class _EditAccountScreenState extends State<EditAccountScreen>
   void initState() {
     super.initState();
     _nameCtrl = TextEditingController(text: widget.account.name);
+    _descriptionCtrl = TextEditingController(text: widget.account.description);
     _type     = widget.account.type;
     _fadeCtrl.forward();
   }
@@ -108,6 +110,7 @@ class _EditAccountScreenState extends State<EditAccountScreen>
   @override
   void dispose() {
     _nameCtrl.dispose();
+    _descriptionCtrl.dispose(); 
     _fadeCtrl.dispose();
     super.dispose();
   }
@@ -126,6 +129,7 @@ class _EditAccountScreenState extends State<EditAccountScreen>
     try {
       final updated = widget.account.copyWith(
         name: _nameCtrl.text.trim(),
+        description: _descriptionCtrl.text.trim().isNotEmpty ? _descriptionCtrl.text.trim() : null,
         type: _type,
       );
       await _accountRepo.updateAccount(updated);
@@ -228,9 +232,32 @@ class _EditAccountScreenState extends State<EditAccountScreen>
                       const SizedBox(height: 28),
 
                       // ── Nombre ────────────────────────────────────────
-                      _GroupLabel('NOMBRE'),
+                      _GroupLabel('DATOS DE LA CUENTA'),
                       const SizedBox(height: 10),
-                      _NameField(controller: _nameCtrl),
+                      _FieldGroup(
+                        children:[
+                          _InputField(
+                            controller:      _nameCtrl,
+                            label:           'Nombre de la cuenta',
+                            hint:            'Ej: Mi Banco Principal',
+                            icon:            Iconsax.text,
+                            textInputAction: TextInputAction.next,
+                            noBg:            true,
+                            validator: (v) =>
+                                (v == null || v.trim().isEmpty)
+                                    ? 'El nombre no puede estar vacío' : null,
+                          ),
+                          _FieldDivider(),
+                          _InputField(
+                            controller:      _descriptionCtrl,
+                            label:           'Descripción (Opcional)',
+                            hint:            'Propósito, nro de cuenta...',
+                            icon:            Iconsax.info_circle,
+                            textInputAction: TextInputAction.done,
+                            noBg:            true,
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 28),
 
                       // ── Tipo de cuenta ────────────────────────────────
@@ -335,6 +362,136 @@ class _BalanceCard extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// INPUT FIELD & GROUPS — adaptados para consistencia con add_account
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _InputField extends StatefulWidget {
+  final TextEditingController controller;
+  final String label, hint;
+  final IconData icon;
+  final TextInputType? keyboardType;
+  final TextInputAction? textInputAction;
+  final bool noBg;
+  final String? Function(String?)? validator;
+
+  const _InputField({
+    required this.controller,
+    required this.label,
+    required this.hint,
+    required this.icon,
+    this.keyboardType,
+    this.textInputAction,
+    this.validator,
+    this.noBg = false,
+  });
+
+  @override
+  State<_InputField> createState() => _InputFieldState();
+}
+
+class _InputFieldState extends State<_InputField> {
+  final _focus = FocusNode();
+  bool _hasFocus = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(() =>
+        setState(() => _hasFocus = _focus.hasFocus));
+  }
+
+  @override
+  void dispose() { _focus.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final onSurf = Theme.of(context).colorScheme.onSurface;
+    final bg     = isDark
+        ? Colors.white.withOpacity(0.07)
+        : Colors.black.withOpacity(0.04);
+
+    final field = TextFormField(
+      controller:      widget.controller,
+      focusNode:       _focus,
+      keyboardType:    widget.keyboardType,
+      textInputAction: widget.textInputAction,
+      textCapitalization: TextCapitalization.sentences,
+      style: GoogleFonts.dmSans(
+          fontSize: 15, fontWeight: FontWeight.w500, color: onSurf),
+      decoration: InputDecoration(
+        labelText:  widget.label,
+        hintText:   widget.hint,
+        labelStyle: GoogleFonts.dmSans(
+            fontSize: 14, fontWeight: FontWeight.w500,
+            color: _hasFocus ? _kBlue : onSurf.withOpacity(0.42)),
+        hintStyle: GoogleFonts.dmSans(
+            fontSize: 14, color: onSurf.withOpacity(0.25)),
+        prefixIcon: Padding(
+          padding: const EdgeInsets.only(left: 14, right: 10),
+          child: Icon(widget.icon, size: 17,
+              color: _hasFocus
+                  ? _kBlue.withOpacity(0.80)
+                  : onSurf.withOpacity(0.35)),
+        ),
+        prefixIconConstraints:
+            const BoxConstraints(minWidth: 44, minHeight: 44),
+        border:              InputBorder.none,
+        contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16, vertical: 14),
+        errorStyle: GoogleFonts.dmSans(
+            fontSize: 11, fontWeight: FontWeight.w600, color: _kRed),
+        errorBorder:        InputBorder.none,
+        focusedErrorBorder: InputBorder.none,
+      ),
+      validator: widget.validator,
+    );
+
+    if (widget.noBg) return field;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(14),
+        border: _hasFocus
+            ? Border.all(color: _kBlue.withOpacity(0.60), width: 1.5)
+            : Border.all(color: Colors.transparent, width: 1.5),
+      ),
+      child: field,
+    );
+  }
+}
+
+class _FieldGroup extends StatelessWidget {
+  final List<Widget> children;
+  const _FieldGroup({required this.children});
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg     = isDark
+        ? Colors.white.withOpacity(0.07)
+        : Colors.black.withOpacity(0.04);
+    return Container(
+      decoration: BoxDecoration(
+          color: bg, borderRadius: BorderRadius.circular(14)),
+      child: Column(mainAxisSize: MainAxisSize.min, children: children),
+    );
+  }
+}
+
+class _FieldDivider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final onSurf = Theme.of(context).colorScheme.onSurface;
+    return Padding(
+      padding: const EdgeInsets.only(left: 44 + 28),
+      child: Container(height: 0.5, color: onSurf.withOpacity(0.08)),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // NAME FIELD — campo editable del nombre de la cuenta
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -402,6 +559,9 @@ class _NameFieldState extends State<_NameField> {
             ? 'El nombre no puede estar vacío'
             : null,
       ),
+      
+      
+      
     );
   }
 }

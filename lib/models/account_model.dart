@@ -10,6 +10,7 @@ class Account extends Equatable {
   final String id;
   final String userId;
   final String name;
+  final String? description; 
   final String type;
   final double balance;
   final double initialBalance;
@@ -29,6 +30,7 @@ class Account extends Equatable {
     required this.id,
     required this.userId,
     required this.name,
+    this.description,
     required this.type,
     required this.balance,
     required this.initialBalance,
@@ -64,6 +66,7 @@ class Account extends Equatable {
       id: '',
       userId: '',
       name: 'Cargando...',
+      description: null, 
       type: 'Efectivo',
       balance: 0.0,
       initialBalance: 0.0,
@@ -84,6 +87,7 @@ class Account extends Equatable {
         userId: map['user_id'].toString(),
         name: map['name'] as String? ?? 'Cuenta sin nombre',
         type: map['type'] as String? ?? 'Sin tipo',
+        description: map['description'] as String?,
         balance: currentBalance,
         initialBalance: (map['initial_balance'] as num? ?? 0.0).toDouble(),
         createdAt: DateTime.parse(map['created_at'] as String),
@@ -108,6 +112,7 @@ class Account extends Equatable {
     String? id,
     String? userId,
     String? name,
+    String? description,
     String? type,
     double? balance,
     double? initialBalance,
@@ -124,6 +129,7 @@ class Account extends Equatable {
       id: id ?? this.id,
       userId: userId ?? this.userId,
       name: name ?? this.name,
+      description: description ?? this.description,
       type: type ?? this.type,
       balance: balance ?? this.balance,
       initialBalance: initialBalance ?? this.initialBalance,
@@ -158,6 +164,7 @@ class Account extends Equatable {
         id,
         userId,
         name,
+        description,
         type,
         balance,
         initialBalance,

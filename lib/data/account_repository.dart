@@ -59,6 +59,7 @@ Future<void> addAccount({
   required String name,
   required String type,
   required double initialBalance,
+  String? description,
   double? creditLimit,
   int? closingDay,
   int? dueDay,
@@ -70,6 +71,7 @@ Future<void> addAccount({
   await client.from('accounts').insert({
     'user_id': userId,
     'name': name,
+    'description': description,
     'type': type,
     'balance': initialBalance,
     'initial_balance': initialBalance,
@@ -116,7 +118,7 @@ Future<Map<String, double>> getCreditCardAnalytics(String cardId) async {
     try {
       await client
           .from('accounts')
-          .update({'name': account.name, 'type': account.type})
+          .update({'name': account.name,'description': account.description, 'type': account.type})
           .eq('id', account.id);
     } catch (e) {
       developer.log('🔥 Error al actualizar cuenta: $e', name: 'AccountRepository');

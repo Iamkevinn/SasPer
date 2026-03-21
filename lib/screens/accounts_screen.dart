@@ -37,18 +37,15 @@ class _C {
   bool get isDark => Theme.of(ctx).brightness == Brightness.dark;
 
   // Superficies — escala iOS systemGroupedBackground
-  Color get bg =>
-      isDark ? const Color(0xFF000000) : const Color(0xFFF2F2F7);
-  Color get surface =>
-      isDark ? const Color(0xFF1C1C1E) : Colors.white;
+  Color get bg => isDark ? const Color(0xFF000000) : const Color(0xFFF2F2F7);
+  Color get surface => isDark ? const Color(0xFF1C1C1E) : Colors.white;
   Color get surfaceRaised =>
       isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF5F5F7);
   Color get separator =>
       isDark ? const Color(0xFF38383A) : const Color(0xFFE5E5EA);
 
   // Texto
-  Color get label =>
-      isDark ? const Color(0xFFFFFFFF) : const Color(0xFF1C1C1E);
+  Color get label => isDark ? const Color(0xFFFFFFFF) : const Color(0xFF1C1C1E);
   Color get label2 =>
       isDark ? const Color(0xFFEBEBF5) : const Color(0xFF3A3A3C);
   Color get label3 =>
@@ -58,26 +55,26 @@ class _C {
 
   // Semánticos iOS
   static const Color expense = Color(0xFFFF3B30);
-  static const Color income  = Color(0xFF30D158);
+  static const Color income = Color(0xFF30D158);
   static const Color warning = Color(0xFFFF9F0A);
-  static const Color accent  = Color(0xFF0A84FF);
+  static const Color accent = Color(0xFF0A84FF);
 
   // Colores por tipo de cuenta
   static const Map<String, Color> typeColors = {
-    'Efectivo':           Color(0xFF30D158),
-    'Cuenta Bancaria':    Color(0xFF0A84FF),
+    'Efectivo': Color(0xFF30D158),
+    'Cuenta Bancaria': Color(0xFF0A84FF),
     'Tarjeta de Crédito': Color(0xFFBF5AF2),
-    'Ahorros':            Color(0xFFFF9F0A),
-    'Inversión':          Color(0xFF64D2FF),
+    'Ahorros': Color(0xFFFF9F0A),
+    'Inversión': Color(0xFF64D2FF),
   };
   static const Color typeColorDefault = Color(0xFF8E8E93);
 
   static const Map<String, IconData> typeIcons = {
-    'Efectivo':           Iconsax.money_3,
-    'Cuenta Bancaria':    Iconsax.building_4,
+    'Efectivo': Iconsax.money_3,
+    'Cuenta Bancaria': Iconsax.building_4,
     'Tarjeta de Crédito': Iconsax.card,
-    'Ahorros':            Iconsax.safe_home,
-    'Inversión':          Iconsax.chart_1,
+    'Ahorros': Iconsax.safe_home,
+    'Inversión': Iconsax.chart_1,
   };
   static const IconData typeIconDefault = Iconsax.wallet_3;
 
@@ -85,11 +82,11 @@ class _C {
   IconData typeIcon(String type) => typeIcons[type] ?? typeIconDefault;
 
   // Espaciado
-  static const double xs  = 4.0;
-  static const double sm  = 8.0;
-  static const double md  = 16.0;
-  static const double lg  = 24.0;
-  static const double xl  = 32.0;
+  static const double xs = 4.0;
+  static const double sm = 8.0;
+  static const double md = 16.0;
+  static const double lg = 24.0;
+  static const double xl = 32.0;
 
   // Radios
   static const double rSM = 8.0;
@@ -98,9 +95,9 @@ class _C {
   static const double rXL = 20.0;
 
   // Animaciones
-  static const Duration fast  = Duration(milliseconds: 150);
-  static const Duration mid   = Duration(milliseconds: 280);
-  static const Duration slow  = Duration(milliseconds: 420);
+  static const Duration fast = Duration(milliseconds: 150);
+  static const Duration mid = Duration(milliseconds: 280);
+  static const Duration slow = Duration(milliseconds: 420);
   static const Curve curveOut = Curves.easeOutCubic;
 }
 
@@ -120,7 +117,11 @@ class AccountsScreenState extends State<AccountsScreen> {
   bool _showArchived = false;
 
   static const List<String> _filters = [
-    'Todas', 'Efectivo', 'Bancarias', 'Crédito', 'Ahorros',
+    'Todas',
+    'Efectivo',
+    'Bancarias',
+    'Crédito',
+    'Ahorros',
   ];
 
   @override
@@ -169,8 +170,7 @@ class AccountsScreenState extends State<AccountsScreen> {
         pageBuilder: (_, a, __) => page,
         transitionDuration: _C.slow,
         transitionsBuilder: (_, animation, __, child) => SlideTransition(
-          position: Tween<Offset>(
-                  begin: const Offset(1, 0), end: Offset.zero)
+          position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero)
               .animate(CurvedAnimation(parent: animation, curve: _C.curveOut)),
           child: child,
         ),
@@ -211,8 +211,7 @@ class AccountsScreenState extends State<AccountsScreen> {
       _repo.refreshData();
       EventService.instance.fire(AppEvent.accountUpdated);
       NotificationHelper.show(
-          message: '"${account.name}" archivada.',
-          type: NotificationType.info);
+          message: '"${account.name}" archivada.', type: NotificationType.info);
     } catch (e) {
       NotificationHelper.show(
           message: e.toString(), type: NotificationType.error);
@@ -260,7 +259,8 @@ class AccountsScreenState extends State<AccountsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  width: 48, height: 48,
+                  width: 48,
+                  height: 48,
                   decoration: BoxDecoration(
                     color: _C.expense.withOpacity(c.isDark ? 0.18 : 0.09),
                     borderRadius: BorderRadius.circular(_C.rMD),
@@ -270,8 +270,10 @@ class AccountsScreenState extends State<AccountsScreen> {
                 const SizedBox(height: _C.md),
                 Text('Eliminar cuenta',
                     style: TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.w700,
-                        color: c.label, letterSpacing: -0.3)),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: c.label,
+                        letterSpacing: -0.3)),
                 const SizedBox(height: _C.sm),
                 Text(
                   '¿Eliminar "${account.name}"? Esta acción no se puede deshacer.',
@@ -281,13 +283,15 @@ class AccountsScreenState extends State<AccountsScreen> {
                 Row(children: [
                   Expanded(
                     child: _OutlineBtn(
-                        label: 'Cancelar', c: c,
+                        label: 'Cancelar',
+                        c: c,
                         onTap: () => Navigator.pop(ctx, false)),
                   ),
                   const SizedBox(width: _C.sm),
                   Expanded(
                     child: _FilledBtn(
-                        label: 'Eliminar', color: _C.expense,
+                        label: 'Eliminar',
+                        color: _C.expense,
                         onTap: () {
                           HapticFeedback.mediumImpact();
                           Navigator.pop(ctx, true);
@@ -304,11 +308,15 @@ class AccountsScreenState extends State<AccountsScreen> {
 
   List<Account> _filterAccounts(List<Account> accounts) {
     return switch (_selectedFilter) {
-      'Efectivo'  => accounts.where((a) => a.type == 'Efectivo').toList(),
-      'Bancarias' => accounts.where((a) => a.type == 'Cuenta Bancaria').toList(),
-      'Crédito'   => accounts.where((a) => a.type == 'Tarjeta de Crédito').toList(),
-      'Ahorros'   => accounts.where((a) => a.type == 'Ahorros' || a.type == 'Inversión').toList(),
-      _           => accounts,
+      'Efectivo' => accounts.where((a) => a.type == 'Efectivo').toList(),
+      'Bancarias' =>
+        accounts.where((a) => a.type == 'Cuenta Bancaria').toList(),
+      'Crédito' =>
+        accounts.where((a) => a.type == 'Tarjeta de Crédito').toList(),
+      'Ahorros' => accounts
+          .where((a) => a.type == 'Ahorros' || a.type == 'Inversión')
+          .toList(),
+      _ => accounts,
     };
   }
 
@@ -320,10 +328,8 @@ class AccountsScreenState extends State<AccountsScreen> {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness:
-            c.isDark ? Brightness.light : Brightness.dark,
-        statusBarBrightness:
-            c.isDark ? Brightness.dark : Brightness.light,
+        statusBarIconBrightness: c.isDark ? Brightness.light : Brightness.dark,
+        statusBarBrightness: c.isDark ? Brightness.dark : Brightness.light,
       ),
       child: Scaffold(
         backgroundColor: c.bg,
@@ -336,16 +342,17 @@ class AccountsScreenState extends State<AccountsScreen> {
             }
             if (snapshot.hasError) {
               return _ErrorState(
-                  error: '${snapshot.error}', c: c,
-                  onRetry: _handleRefresh);
+                  error: '${snapshot.error}', c: c, onRetry: _handleRefresh);
             }
             if (!snapshot.hasData || snapshot.data!.isEmpty) {
               return _EmptyState(c: c, onAdd: _navigateToAddAccount);
             }
 
-            final all      = snapshot.data!;
-            final active   = all.where((a) => a.status == AccountStatus.active).toList();
-            final archived = all.where((a) => a.status == AccountStatus.archived).toList();
+            final all = snapshot.data!;
+            final active =
+                all.where((a) => a.status == AccountStatus.active).toList();
+            final archived =
+                all.where((a) => a.status == AccountStatus.archived).toList();
 
             return _buildBody(active, archived, c);
           },
@@ -354,8 +361,7 @@ class AccountsScreenState extends State<AccountsScreen> {
     );
   }
 
-  Widget _buildBody(
-      List<Account> active, List<Account> archived, _C c) {
+  Widget _buildBody(List<Account> active, List<Account> archived, _C c) {
     final filtered = _filterAccounts(active);
     final total = active.fold<double>(0, (s, a) => s + a.balance);
 
@@ -374,10 +380,8 @@ class AccountsScreenState extends State<AccountsScreen> {
           SliverToBoxAdapter(
             child: _FadeSlide(
               delay: 0,
-              child: _BalanceHero(
-                  total: total,
-                  accountCount: active.length,
-                  c: c),
+              child:
+                  _BalanceHero(total: total, accountCount: active.length, c: c),
             ),
           ),
 
@@ -422,8 +426,7 @@ class AccountsScreenState extends State<AccountsScreen> {
                 show: _showArchived,
                 count: archived.length,
                 c: c,
-                onToggle: () =>
-                    setState(() => _showArchived = !_showArchived),
+                onToggle: () => setState(() => _showArchived = !_showArchived),
               ),
             ),
             if (_showArchived)
@@ -482,9 +485,9 @@ class AccountsScreenState extends State<AccountsScreen> {
 
   // ── Grupos de cuentas por tipo ───────────────────────────────────────────
   List<Widget> _buildAccountGroups(
-      List<Account> accounts, {
-      required bool archived,
-      required _C c,
+    List<Account> accounts, {
+    required bool archived,
+    required _C c,
   }) {
     // Agrupar por tipo
     final Map<String, List<Account>> groups = {};
@@ -542,8 +545,8 @@ class _BalanceHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final isNeg = total < 0;
     final color = isNeg ? _C.expense : _C.income;
-    final fmt = NumberFormat.currency(
-        locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+    final fmt =
+        NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
     final compactFmt = NumberFormat.compactCurrency(
         locale: 'es_CO', symbol: '\$', decimalDigits: 1);
     final displayTotal =
@@ -555,9 +558,8 @@ class _BalanceHero extends StatelessWidget {
       decoration: BoxDecoration(
         color: c.surface,
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(
-            color: color.withOpacity(0.12), width: 0.5),
-        boxShadow:[
+        border: Border.all(color: color.withOpacity(0.12), width: 0.5),
+        boxShadow: [
           BoxShadow(
             color: color.withOpacity(c.isDark ? 0.12 : 0.06),
             blurRadius: 24,
@@ -572,20 +574,23 @@ class _BalanceHero extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children:[
+        children: [
           // Eyebrow
           Row(
-            children:[
+            children: [
               Container(
-                  width: 6, height: 6,
-                  decoration: BoxDecoration(
-                      shape: BoxShape.circle, color: color)),
+                  width: 6,
+                  height: 6,
+                  decoration:
+                      BoxDecoration(shape: BoxShape.circle, color: color)),
               const SizedBox(width: 6),
               Text(
                 'SALDO CONTABLE (FÍSICO)', // <-- Cambio de etiqueta
                 style: TextStyle(
-                  fontSize: 10, fontWeight: FontWeight.w700,
-                  letterSpacing: 0.9, color: c.label3,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.9,
+                  color: c.label3,
                 ),
               ),
             ],
@@ -614,16 +619,17 @@ class _BalanceHero extends StatelessWidget {
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children:[
+              children: [
                 Row(
                   mainAxisSize: MainAxisSize.min,
-                  children:[
+                  children: [
                     Icon(Iconsax.card, size: 13, color: c.label3),
                     const SizedBox(width: 5),
                     Text(
                       '$accountCount cuenta${accountCount != 1 ? 's' : ''} activa${accountCount != 1 ? 's' : ''}',
                       style: TextStyle(
-                        fontSize: 12, fontWeight: FontWeight.w500,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
                         color: c.label3,
                       ),
                     ),
@@ -633,15 +639,16 @@ class _BalanceHero extends StatelessWidget {
                 // --- NUEVA NOTA EDUCATIVA ---
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children:[
-                    Icon(Iconsax.info_circle, size: 12, color: _C.accent.withOpacity(0.8)),
+                  children: [
+                    Icon(Iconsax.info_circle,
+                        size: 12, color: _C.accent.withOpacity(0.8)),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
                         'Este es el dinero exacto que hay en tus bancos (incluye tu dinero reservado). Ve a Inicio para ver tu saldo disponible.',
                         style: TextStyle(
-                          fontSize: 11, 
-                          color: c.label4, 
+                          fontSize: 11,
+                          color: c.label4,
                           height: 1.3,
                         ),
                       ),
@@ -656,6 +663,7 @@ class _BalanceHero extends StatelessWidget {
     );
   }
 }
+
 // ─── ACCIONES RÁPIDAS ────────────────────────────────────────────────────────
 // Dos acciones frecuentes: transferir y añadir. Sin más ruido.
 class _QuickActions extends StatelessWidget {
@@ -664,7 +672,9 @@ class _QuickActions extends StatelessWidget {
   final VoidCallback onAdd;
 
   const _QuickActions({
-    required this.c, required this.onTransfer, required this.onAdd,
+    required this.c,
+    required this.onTransfer,
+    required this.onAdd,
   });
 
   @override
@@ -706,8 +716,11 @@ class _ActionBtn extends StatefulWidget {
   final VoidCallback onTap;
 
   const _ActionBtn({
-    required this.label, required this.icon, required this.color,
-    required this.c, required this.onTap,
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.c,
+    required this.onTap,
   });
 
   @override
@@ -744,7 +757,8 @@ class _ActionBtnState extends State<_ActionBtn> {
             Text(
               widget.label,
               style: TextStyle(
-                fontSize: 14, fontWeight: FontWeight.w600,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
                 color: widget.color,
               ),
             ),
@@ -764,8 +778,10 @@ class _FilterBar extends StatelessWidget {
   final Function(String) onSelect;
 
   const _FilterBar({
-    required this.selected, required this.filters,
-    required this.c, required this.onSelect,
+    required this.selected,
+    required this.filters,
+    required this.c,
+    required this.onSelect,
   });
 
   @override
@@ -790,18 +806,14 @@ class _FilterBar extends StatelessWidget {
               duration: _C.fast,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
-                color: isSelected
-                    ? _C.accent
-                    : c.surfaceRaised,
+                color: isSelected ? _C.accent : c.surfaceRaised,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
                 f,
                 style: TextStyle(
                   fontSize: 13,
-                  fontWeight: isSelected
-                      ? FontWeight.w600
-                      : FontWeight.w400,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                   color: isSelected ? Colors.white : c.label3,
                 ),
               ),
@@ -827,9 +839,15 @@ class _AccountGroup extends StatefulWidget {
   final Function(Account) onUnarchive;
 
   const _AccountGroup({
-    required this.type, required this.accounts, required this.c,
-    required this.isArchived, required this.onTapAccount, required this.onEdit,
-    required this.onDelete, required this.onArchive, required this.onUnarchive,
+    required this.type,
+    required this.accounts,
+    required this.c,
+    required this.isArchived,
+    required this.onTapAccount,
+    required this.onEdit,
+    required this.onDelete,
+    required this.onArchive,
+    required this.onUnarchive,
   });
 
   @override
@@ -853,7 +871,10 @@ class _AccountGroupState extends State<_AccountGroup>
   }
 
   @override
-  void dispose() { _arrowCtrl.dispose(); super.dispose(); }
+  void dispose() {
+    _arrowCtrl.dispose();
+    super.dispose();
+  }
 
   void _toggle() {
     HapticFeedback.selectionClick();
@@ -864,9 +885,8 @@ class _AccountGroupState extends State<_AccountGroup>
   @override
   Widget build(BuildContext context) {
     final color = c.typeColor(widget.type);
-    final icon  = c.typeIcon(widget.type);
-    final subtotal = widget.accounts
-        .fold<double>(0, (s, a) => s + a.balance);
+    final icon = c.typeIcon(widget.type);
+    final subtotal = widget.accounts.fold<double>(0, (s, a) => s + a.balance);
     final fmt = NumberFormat.compactCurrency(
         locale: 'es_CO', symbol: '\$', decimalDigits: 0);
 
@@ -879,7 +899,8 @@ class _AccountGroupState extends State<_AccountGroup>
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(c.isDark ? 0.18 : 0.04),
-            blurRadius: 10, offset: const Offset(0, 2),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -895,7 +916,8 @@ class _AccountGroupState extends State<_AccountGroup>
                 children: [
                   // Ícono de tipo
                   Container(
-                    width: 40, height: 40,
+                    width: 40,
+                    height: 40,
                     decoration: BoxDecoration(
                       color: color.withOpacity(c.isDark ? 0.18 : 0.1),
                       borderRadius: BorderRadius.circular(_C.rSM + 2),
@@ -914,8 +936,10 @@ class _AccountGroupState extends State<_AccountGroup>
                             Text(
                               widget.type,
                               style: TextStyle(
-                                fontSize: 15, fontWeight: FontWeight.w700,
-                                color: c.label, letterSpacing: -0.2,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: c.label,
+                                letterSpacing: -0.2,
                               ),
                             ),
                             const SizedBox(width: _C.xs + 2),
@@ -923,14 +947,15 @@ class _AccountGroupState extends State<_AccountGroup>
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 6, vertical: 1),
                               decoration: BoxDecoration(
-                                color: color.withOpacity(
-                                    c.isDark ? 0.18 : 0.12),
+                                color:
+                                    color.withOpacity(c.isDark ? 0.18 : 0.12),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
                                 '${widget.accounts.length}',
                                 style: TextStyle(
-                                  fontSize: 11, fontWeight: FontWeight.w700,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
                                   color: color,
                                 ),
                               ),
@@ -940,7 +965,8 @@ class _AccountGroupState extends State<_AccountGroup>
                         Text(
                           fmt.format(subtotal),
                           style: TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w500,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
                             color: subtotal < 0 ? _C.expense : c.label3,
                           ),
                         ),
@@ -950,10 +976,8 @@ class _AccountGroupState extends State<_AccountGroup>
 
                   // Flecha animada
                   RotationTransition(
-                    turns: Tween(begin: 0.0, end: 0.5)
-                        .animate(CurvedAnimation(
-                            parent: _arrowCtrl,
-                            curve: _C.curveOut)),
+                    turns: Tween(begin: 0.0, end: 0.5).animate(CurvedAnimation(
+                        parent: _arrowCtrl, curve: _C.curveOut)),
                     child: Icon(Icons.keyboard_arrow_down_rounded,
                         color: c.label4, size: 22),
                   ),
@@ -1015,10 +1039,22 @@ class _AccountGroupState extends State<_AccountGroup>
         account: account,
         c: c,
         isActive: isActive,
-        onEdit: () { Navigator.pop(context); widget.onEdit(account); },
-        onArchive: () { Navigator.pop(context); widget.onArchive(account); },
-        onUnarchive: () { Navigator.pop(context); widget.onUnarchive(account); },
-        onDelete: () { Navigator.pop(context); widget.onDelete(account); },
+        onEdit: () {
+          Navigator.pop(context);
+          widget.onEdit(account);
+        },
+        onArchive: () {
+          Navigator.pop(context);
+          widget.onArchive(account);
+        },
+        onUnarchive: () {
+          Navigator.pop(context);
+          widget.onUnarchive(account);
+        },
+        onDelete: () {
+          Navigator.pop(context);
+          widget.onDelete(account);
+        },
       ),
     );
   }
@@ -1034,8 +1070,11 @@ class _AccountRow extends StatefulWidget {
   final VoidCallback onOptions;
 
   const _AccountRow({
-    required this.account, required this.c, required this.isArchived,
-    required this.onTap, required this.onOptions,
+    required this.account,
+    required this.c,
+    required this.isArchived,
+    required this.onTap,
+    required this.onOptions,
   });
 
   @override
@@ -1050,8 +1089,8 @@ class _AccountRowState extends State<_AccountRow> {
     final c = widget.c;
     final acc = widget.account;
     final isNeg = acc.balance < 0;
-    final fmt = NumberFormat.currency(
-        locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+    final fmt =
+        NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
     final compactFmt = NumberFormat.compactCurrency(
         locale: 'es_CO', symbol: '\$', decimalDigits: 1);
     final displayBalance = acc.balance.abs() > 9999999
@@ -1067,30 +1106,27 @@ class _AccountRowState extends State<_AccountRow> {
       onTapCancel: () => setState(() => _pressing = false),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 80),
-        color: _pressing
-            ? c.surfaceRaised
-            : Colors.transparent,
-        padding: const EdgeInsets.symmetric(
-            horizontal: _C.md, vertical: 12),
+        color: _pressing ? c.surfaceRaised : Colors.transparent,
+        padding: const EdgeInsets.symmetric(horizontal: _C.md, vertical: 12),
         child: Opacity(
           opacity: widget.isArchived ? 0.6 : 1.0,
           child: Row(
             children: [
               // Inicial del nombre en círculo de color
               Container(
-                width: 40, height: 40,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
-                  color: c.typeColor(acc.type)
-                      .withOpacity(c.isDark ? 0.18 : 0.1),
+                  color:
+                      c.typeColor(acc.type).withOpacity(c.isDark ? 0.18 : 0.1),
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
                 child: Text(
-                  acc.name.isNotEmpty
-                      ? acc.name[0].toUpperCase()
-                      : '?',
+                  acc.name.isNotEmpty ? acc.name[0].toUpperCase() : '?',
                   style: TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
                     color: c.typeColor(acc.type),
                   ),
                 ),
@@ -1105,12 +1141,28 @@ class _AccountRowState extends State<_AccountRow> {
                     Text(
                       acc.name,
                       style: TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.w600,
-                        color: c.label, letterSpacing: -0.1,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: c.label,
+                        letterSpacing: -0.1,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    // 👈 NUEVO: Mostrar descripción si existe
+                    if (acc.description != null && acc.description!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          acc.description!,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: c.label4, // Color sutil secundario
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     if (widget.isArchived)
                       Text(
                         'Archivada',
@@ -1126,7 +1178,8 @@ class _AccountRowState extends State<_AccountRow> {
                   Text(
                     displayBalance,
                     style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
                       color: isNeg ? _C.expense : c.label,
                       letterSpacing: -0.3,
                     ),
@@ -1162,21 +1215,24 @@ class _AccountOptionsSheet extends StatelessWidget {
   final VoidCallback onDelete;
 
   const _AccountOptionsSheet({
-    required this.account, required this.c, required this.isActive,
-    required this.onEdit, required this.onArchive,
-    required this.onUnarchive, required this.onDelete,
+    required this.account,
+    required this.c,
+    required this.isActive,
+    required this.onEdit,
+    required this.onArchive,
+    required this.onUnarchive,
+    required this.onDelete,
   });
 
   @override
   Widget build(BuildContext context) {
-    final fmt = NumberFormat.currency(
-        locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+    final fmt =
+        NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
 
     return Container(
       decoration: BoxDecoration(
         color: c.surface,
-        borderRadius:
-            const BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         border: Border(top: BorderSide(color: c.separator, width: 0.5)),
       ),
       child: Column(
@@ -1185,10 +1241,10 @@ class _AccountOptionsSheet extends StatelessWidget {
           // Handle
           Container(
             margin: const EdgeInsets.symmetric(vertical: 12),
-            width: 36, height: 4,
+            width: 36,
+            height: 4,
             decoration: BoxDecoration(
-                color: c.separator,
-                borderRadius: BorderRadius.circular(2)),
+                color: c.separator, borderRadius: BorderRadius.circular(2)),
           ),
 
           // Header — nombre de la cuenta + saldo
@@ -1197,17 +1253,22 @@ class _AccountOptionsSheet extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  width: 44, height: 44,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
-                    color: c.typeColor(account.type)
+                    color: c
+                        .typeColor(account.type)
                         .withOpacity(c.isDark ? 0.18 : 0.1),
                     shape: BoxShape.circle,
                   ),
                   alignment: Alignment.center,
                   child: Text(
-                    account.name.isNotEmpty ? account.name[0].toUpperCase() : '?',
+                    account.name.isNotEmpty
+                        ? account.name[0].toUpperCase()
+                        : '?',
                     style: TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.w700,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
                       color: c.typeColor(account.type),
                     ),
                   ),
@@ -1219,11 +1280,22 @@ class _AccountOptionsSheet extends StatelessWidget {
                     children: [
                       Text(account.name,
                           style: TextStyle(
-                              fontSize: 17, fontWeight: FontWeight.w700,
-                              color: c.label, letterSpacing: -0.3)),
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                              color: c.label,
+                              letterSpacing: -0.3)),
+                      if (account.description != null &&
+                          account.description!.isNotEmpty)
+                        Text(account.description!,
+                            style: TextStyle(
+                                fontSize: 13,
+                                color: c.label4,
+                                fontWeight: FontWeight.w400)),
+                      const SizedBox(height: 2),
                       Text(fmt.format(account.balance),
                           style: TextStyle(
-                              fontSize: 14, color: c.label3,
+                              fontSize: 14,
+                              color: c.label3,
                               fontWeight: FontWeight.w500)),
                     ],
                   ),
@@ -1231,11 +1303,11 @@ class _AccountOptionsSheet extends StatelessWidget {
                 GestureDetector(
                   onTap: () => Navigator.pop(context),
                   child: Container(
-                    width: 30, height: 30,
+                    width: 30,
+                    height: 30,
                     decoration: BoxDecoration(
                         color: c.surfaceRaised, shape: BoxShape.circle),
-                    child: Icon(Icons.close_rounded,
-                        size: 16, color: c.label3),
+                    child: Icon(Icons.close_rounded, size: 16, color: c.label3),
                   ),
                 ),
               ],
@@ -1247,27 +1319,39 @@ class _AccountOptionsSheet extends StatelessWidget {
 
           if (isActive) ...[
             _SheetOption(
-              icon: Iconsax.edit, label: 'Editar',
+              icon: Iconsax.edit,
+              label: 'Editar',
               subtitle: 'Modificar nombre o detalles',
-              color: _C.accent, c: c, onTap: onEdit,
+              color: _C.accent,
+              c: c,
+              onTap: onEdit,
             ),
             _SheetOption(
-              icon: Iconsax.archive, label: 'Archivar',
+              icon: Iconsax.archive,
+              label: 'Archivar',
               subtitle: 'Ocultar sin eliminar',
-              color: _C.warning, c: c, onTap: onArchive,
+              color: _C.warning,
+              c: c,
+              onTap: onArchive,
             ),
           ] else ...[
             _SheetOption(
-              icon: Iconsax.undo, label: 'Restaurar',
+              icon: Iconsax.undo,
+              label: 'Restaurar',
               subtitle: 'Volver a cuentas activas',
-              color: _C.income, c: c, onTap: onUnarchive,
+              color: _C.income,
+              c: c,
+              onTap: onUnarchive,
             ),
             if (account.balance == 0)
               _SheetOption(
-                icon: Iconsax.trash, label: 'Eliminar',
+                icon: Iconsax.trash,
+                label: 'Eliminar',
                 subtitle: 'Eliminar permanentemente',
-                color: _C.expense, c: c,
-                isDestructive: true, onTap: onDelete,
+                color: _C.expense,
+                c: c,
+                isDestructive: true,
+                onTap: onDelete,
               ),
           ],
 
@@ -1288,8 +1372,12 @@ class _SheetOption extends StatefulWidget {
   final bool isDestructive;
 
   const _SheetOption({
-    required this.icon, required this.label, required this.subtitle,
-    required this.color, required this.c, required this.onTap,
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.color,
+    required this.c,
+    required this.onTap,
     this.isDestructive = false,
   });
 
@@ -1313,15 +1401,14 @@ class _SheetOptionState extends State<_SheetOption> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 80),
         color: _pressing ? widget.c.surfaceRaised : Colors.transparent,
-        padding: const EdgeInsets.symmetric(
-            horizontal: _C.lg, vertical: 11),
+        padding: const EdgeInsets.symmetric(horizontal: _C.lg, vertical: 11),
         child: Row(
           children: [
             Container(
-              width: 40, height: 40,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
-                color: widget.color
-                    .withOpacity(widget.c.isDark ? 0.18 : 0.10),
+                color: widget.color.withOpacity(widget.c.isDark ? 0.18 : 0.10),
                 borderRadius: BorderRadius.circular(_C.rSM + 2),
               ),
               child: Icon(widget.icon, color: widget.color, size: 18),
@@ -1332,19 +1419,17 @@ class _SheetOptionState extends State<_SheetOption> {
               children: [
                 Text(widget.label,
                     style: TextStyle(
-                      fontSize: 15, fontWeight: FontWeight.w600,
-                      color: widget.isDestructive
-                          ? widget.color
-                          : widget.c.label,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color:
+                          widget.isDestructive ? widget.color : widget.c.label,
                     )),
                 Text(widget.subtitle,
-                    style: TextStyle(
-                        fontSize: 13, color: widget.c.label3)),
+                    style: TextStyle(fontSize: 13, color: widget.c.label3)),
               ],
             ),
             const Spacer(),
-            Icon(Icons.chevron_right_rounded,
-                color: widget.c.label4, size: 18),
+            Icon(Icons.chevron_right_rounded, color: widget.c.label4, size: 18),
           ],
         ),
       ),
@@ -1360,8 +1445,10 @@ class _ArchivadosToggle extends StatelessWidget {
   final VoidCallback onToggle;
 
   const _ArchivadosToggle({
-    required this.show, required this.count,
-    required this.c, required this.onToggle,
+    required this.show,
+    required this.count,
+    required this.c,
+    required this.onToggle,
   });
 
   @override
@@ -1377,7 +1464,8 @@ class _ArchivadosToggle extends StatelessWidget {
           children: [
             Icon(
               show ? Iconsax.eye_slash : Iconsax.eye,
-              size: 15, color: c.label4,
+              size: 15,
+              color: c.label4,
             ),
             const SizedBox(width: 6),
             Text(
@@ -1385,7 +1473,8 @@ class _ArchivadosToggle extends StatelessWidget {
                   ? 'Ocultar archivadas'
                   : '$count cuenta${count != 1 ? 's' : ''} archivada${count != 1 ? 's' : ''}',
               style: TextStyle(
-                fontSize: 13, fontWeight: FontWeight.w500,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
                 color: c.label3,
               ),
             ),
@@ -1408,17 +1497,19 @@ class _FilterEmptyState extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            width: 64, height: 64,
-            decoration: BoxDecoration(
-                color: c.surfaceRaised, shape: BoxShape.circle),
-            child: Icon(Iconsax.search_status,
-                size: 28, color: c.label4),
+            width: 64,
+            height: 64,
+            decoration:
+                BoxDecoration(color: c.surfaceRaised, shape: BoxShape.circle),
+            child: Icon(Iconsax.search_status, size: 28, color: c.label4),
           ),
           const SizedBox(height: _C.md),
           Text('Sin cuentas en esta categoría',
               style: TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.w600,
-                  color: c.label, letterSpacing: -0.2)),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: c.label,
+                  letterSpacing: -0.2)),
           const SizedBox(height: _C.sm),
           Text('Prueba otro filtro',
               style: TextStyle(fontSize: 14, color: c.label3)),
@@ -1446,16 +1537,17 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: _C.lg),
             Text('Comienza aquí',
                 style: TextStyle(
-                  fontSize: 24, fontWeight: FontWeight.w800,
-                  color: c.label, letterSpacing: -0.5,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                  color: c.label,
+                  letterSpacing: -0.5,
                 ),
                 textAlign: TextAlign.center),
             const SizedBox(height: _C.sm),
             Text(
               'Añade tu primera cuenta para\norganizar tus finanzas.',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                  fontSize: 15, color: c.label3, height: 1.45),
+              style: TextStyle(fontSize: 15, color: c.label3, height: 1.45),
             ),
             const SizedBox(height: _C.xl),
             GestureDetector(
@@ -1464,14 +1556,15 @@ class _EmptyState extends StatelessWidget {
                 onAdd();
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 28, vertical: 14),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
                 decoration: BoxDecoration(
                     color: _C.accent,
                     borderRadius: BorderRadius.circular(_C.rMD)),
                 child: const Text('Añadir primera cuenta',
                     style: TextStyle(
-                        color: Colors.white, fontSize: 16,
+                        color: Colors.white,
+                        fontSize: 16,
                         fontWeight: FontWeight.w600)),
               ),
             ),
@@ -1498,18 +1591,20 @@ class _ErrorState extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 64, height: 64,
+              width: 64,
+              height: 64,
               decoration: BoxDecoration(
                   color: _C.expense.withOpacity(c.isDark ? 0.18 : 0.09),
                   shape: BoxShape.circle),
-              child: const Icon(Iconsax.danger,
-                  size: 28, color: _C.expense),
+              child: const Icon(Iconsax.danger, size: 28, color: _C.expense),
             ),
             const SizedBox(height: _C.md),
             Text('Algo salió mal',
                 style: TextStyle(
-                    fontSize: 20, fontWeight: FontWeight.w700,
-                    color: c.label, letterSpacing: -0.3)),
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: c.label,
+                    letterSpacing: -0.3)),
             const SizedBox(height: _C.sm),
             Text(error,
                 textAlign: TextAlign.center,
@@ -1521,14 +1616,15 @@ class _ErrorState extends StatelessWidget {
                 onRetry();
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: _C.lg, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: _C.lg, vertical: 12),
                 decoration: BoxDecoration(
                     color: _C.accent,
                     borderRadius: BorderRadius.circular(_C.rMD)),
                 child: const Text('Reintentar',
                     style: TextStyle(
-                        color: Colors.white, fontSize: 15,
+                        color: Colors.white,
+                        fontSize: 15,
                         fontWeight: FontWeight.w600)),
               ),
             ),
@@ -1563,7 +1659,10 @@ class _SkeletonLoaderState extends State<_SkeletonLoader>
   }
 
   @override
-  void dispose() { _ctrl.dispose(); super.dispose(); }
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1571,16 +1670,15 @@ class _SkeletonLoaderState extends State<_SkeletonLoader>
     return AnimatedBuilder(
       animation: _anim,
       builder: (_, __) {
-        final shimmer =
-            Color.lerp(c.surface, c.surfaceRaised, _anim.value)!;
+        final shimmer = Color.lerp(c.surface, c.surfaceRaised, _anim.value)!;
         return CustomScrollView(
           physics: const NeverScrollableScrollPhysics(),
           slivers: [
             SliverToBoxAdapter(
               child: Container(
-                height: 56, color: c.bg,
-                padding: const EdgeInsets.fromLTRB(
-                    _C.md, 12, _C.md, _C.sm),
+                height: 56,
+                color: c.bg,
+                padding: const EdgeInsets.fromLTRB(_C.md, 12, _C.md, _C.sm),
                 child: _shimmerBox(shimmer, 140, 28, _C.rSM),
               ),
             ),
@@ -1591,9 +1689,13 @@ class _SkeletonLoaderState extends State<_SkeletonLoader>
                   _shimmerBox(shimmer, double.infinity, 140, 28),
                   const SizedBox(height: _C.md),
                   Row(children: [
-                    Expanded(child: _shimmerBox(shimmer, double.infinity, 48, _C.rLG)),
+                    Expanded(
+                        child:
+                            _shimmerBox(shimmer, double.infinity, 48, _C.rLG)),
                     const SizedBox(width: _C.sm),
-                    Expanded(child: _shimmerBox(shimmer, double.infinity, 48, _C.rLG)),
+                    Expanded(
+                        child:
+                            _shimmerBox(shimmer, double.infinity, 48, _C.rLG)),
                   ]),
                   const SizedBox(height: _C.md),
                   _shimmerBox(shimmer, double.infinity, 160, _C.rXL),
@@ -1608,11 +1710,11 @@ class _SkeletonLoaderState extends State<_SkeletonLoader>
     );
   }
 
-  Widget _shimmerBox(Color color, double w, double h, double r) =>
-      Container(
-        width: w, height: h,
-        decoration: BoxDecoration(
-            color: color, borderRadius: BorderRadius.circular(r)),
+  Widget _shimmerBox(Color color, double w, double h, double r) => Container(
+        width: w,
+        height: h,
+        decoration:
+            BoxDecoration(color: color, borderRadius: BorderRadius.circular(r)),
       );
 }
 
@@ -1638,8 +1740,7 @@ class _OutlineBtn extends StatelessWidget {
         alignment: Alignment.center,
         child: Text(label,
             style: TextStyle(
-                color: c.label, fontSize: 15,
-                fontWeight: FontWeight.w500)),
+                color: c.label, fontSize: 15, fontWeight: FontWeight.w500)),
       ),
     );
   }
@@ -1663,7 +1764,8 @@ class _FilledBtn extends StatelessWidget {
         alignment: Alignment.center,
         child: Text(label,
             style: const TextStyle(
-                color: Colors.white, fontSize: 15,
+                color: Colors.white,
+                fontSize: 15,
                 fontWeight: FontWeight.w600)),
       ),
     );
@@ -1691,16 +1793,18 @@ class _FadeSlideState extends State<_FadeSlide>
     super.initState();
     _ctrl = AnimationController(duration: _C.slow, vsync: this);
     _opacity = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
-    _slide = Tween<Offset>(
-            begin: const Offset(0, 0.04), end: Offset.zero)
+    _slide = Tween<Offset>(begin: const Offset(0, 0.04), end: Offset.zero)
         .animate(CurvedAnimation(parent: _ctrl, curve: _C.curveOut));
-    Future.delayed(
-        Duration(milliseconds: widget.delay),
-        () { if (mounted) _ctrl.forward(); });
+    Future.delayed(Duration(milliseconds: widget.delay), () {
+      if (mounted) _ctrl.forward();
+    });
   }
 
   @override
-  void dispose() { _ctrl.dispose(); super.dispose(); }
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1709,7 +1813,6 @@ class _FadeSlideState extends State<_FadeSlide>
       child: SlideTransition(position: _slide, child: widget.child),
     );
   }
-  
 }
 
 // ── No-op TickerProvider — para controladores estáticos de fallback ───────────

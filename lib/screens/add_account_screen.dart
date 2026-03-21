@@ -123,6 +123,7 @@ class _AddAccountScreenState extends State<AddAccountScreen>
   final _formKey = GlobalKey<FormState>();
 
   final _nameCtrl            = TextEditingController();
+  final _descriptionCtrl     = TextEditingController();
   final _balanceCtrl         = TextEditingController(text: '0');
   final _creditLimitCtrl     = TextEditingController();
   final _closingDayCtrl      = TextEditingController();
@@ -150,6 +151,7 @@ class _AddAccountScreenState extends State<AddAccountScreen>
   @override
   void dispose() {
     _nameCtrl.dispose();
+    _descriptionCtrl.dispose();
     _balanceCtrl.dispose();
     _creditLimitCtrl.dispose();
     _closingDayCtrl.dispose();
@@ -181,6 +183,7 @@ class _AddAccountScreenState extends State<AddAccountScreen>
 
       await _repo.addAccount(
         name:           _nameCtrl.text.trim(),
+        description:    _descriptionCtrl.text.trim().isNotEmpty ? _descriptionCtrl.text.trim() : null,
         type:           _selectedType,
         initialBalance: balance,
         creditLimit:    double.tryParse(_creditLimitCtrl.text),
@@ -301,6 +304,15 @@ class _AddAccountScreenState extends State<AddAccountScreen>
                             (v == null || v.trim().isEmpty)
                                 ? 'El nombre es obligatorio' : null,
                       ),
+                      _FieldDivider(),
+                          _InputField(
+                            controller:      _descriptionCtrl,
+                            label:           'Descripción (Opcional)',
+                            hint:            'Propósito, nro de cuenta...',
+                            icon:            Iconsax.info_circle,
+                            textInputAction: TextInputAction.next,
+                            noBg:            true,
+                          ),
                       const SizedBox(height: 12),
 
                       // Sugerencias rápidas
