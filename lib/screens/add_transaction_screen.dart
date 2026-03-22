@@ -31,6 +31,9 @@ import 'dart:developer' as developer;
 import 'package:sasper/screens/place_search_screen.dart';
 import 'package:geolocator/geolocator.dart';
 
+import 'package:sasper/data/goal_repository.dart'; // 👈 NUEVO
+import 'package:sasper/models/goal_model.dart';    // 👈 NUEVO
+
 // ─── DESIGN TOKENS ────────────────────────────────────────────────────────────
 
 class _C {
@@ -110,6 +113,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
   late AnimationController _shakeController;
   late Animation<double>   _shakeAnimation;
 
+  final _goalRepo = GoalRepository.instance;
+  List<Goal> _activeGoals =[];
+
   DateTime _selectedDate     = DateTime.now();
   String   _transactionType  = 'Gasto';
   Category? _selectedCategory;
@@ -171,6 +177,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     super.initState();
     _loadAvailableFunds();
 
+    // 2. CARGAMOS LAS METAS ACTIVAS AL ABRIR LA PANTALLA
+    _goalRepo.getActiveGoals().then((goals) {
+      if (mounted) setState(() => _activeGoals = goals);
+    });
+
     _shakeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 420),
@@ -204,6 +215,35 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     } catch (e) {
       developer.log('Error cargando fondos: $e', name: 'AddTransactionScreen');
     }
+  }
+
+  void _showSmartGoalSuggestion(Goal goal, double suggestedAmount, String accountId) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      isDismissible: false, // Forzamos a que lean el consejo
+      enableDrag: false,
+      builder: (_) => _SmartSuggestionSheet(
+        goal: goal,
+        suggestedAmount: suggestedAmount,
+        isExpense: _isExpense,
+        accountId: accountId,
+        onComplete: (bool saved) {
+          // Cerramos el BottomSheet
+          Navigator.of(context).pop();
+          // Cerramos la pantalla de Transacción
+          Navigator.of(this.context).pop(true); 
+          
+          if (saved) {
+            EventService.instance.fire(AppEvent.goalUpdated);
+            NotificationHelper.show(message: '¡Ahorro y transacción guardados! 🎉', type: NotificationType.success);
+          } else {
+            NotificationHelper.show(message: 'Transacción guardada', type: NotificationType.success);
+          }
+        },
+      ),
+    );
   }
 
   void _runSmartMatching() {
@@ -529,21 +569,55 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
         if (_selectedFundSource != null) {
           EventService.instance.fire(AppEvent.debtsChanged);
         }
-        Navigator.of(context).pop(true);
-        NotificationHelper.show(
-            message: 'Transacción guardada',
-            type: NotificationType.success);
+        
+        // 👈 1. CÁLCULO DEL SALDO REAL DESPUÉS DEL GASTO/INGRESO
+        double remainingBalance = _selectedAccount!.balance;
+        if (_isExpense) {
+          remainingBalance -= amount.abs();
+        } else {
+          remainingBalance += amount.abs();
+        }
+
+        // 👈 2. MAGIA DE ECONOMÍA CONDUCTUAL
+        final topGoal = _getTopPriorityGoal();
+        final suggestedAmount = math.min(
+          amount.abs() * 0.10, 
+          topGoal != null ? topGoal.targetAmount - topGoal.currentAmount : 0.0
+        );
+
+        // 👈 3. AHORA VALIDAMOS CONTRA EL SALDO RESTANTE (remainingBalance)
+        if (topGoal != null && suggestedAmount >= 1000 && remainingBalance >= suggestedAmount) {
+           setState(() => _isLoading = false);
+           _showSmartGoalSuggestion(topGoal, suggestedAmount, _selectedAccount!.id);
+        } else {
+           Navigator.of(context).pop(true);
+           NotificationHelper.show(message: 'Transacción guardada', type: NotificationType.success);
+        }
       }
     } catch (e) {
-      developer.log('Error guardando transacción: $e',
-          name: 'AddTransactionScreen');
+      developer.log('Error guardando transacción: $e', name: 'AddTransactionScreen');
       if (mounted) {
-        NotificationHelper.show(
-            message: 'Error al guardar', type: NotificationType.error);
+        NotificationHelper.show(message: 'Error al guardar', type: NotificationType.error);
       }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted && _isLoading) setState(() => _isLoading = false);
     }
+  }
+
+  // 👈 FUNCIÓN PARA OBTENER LA META MÁS URGENTE
+  Goal? _getTopPriorityGoal() {
+    final incomplete = _activeGoals.where((g) => g.currentAmount < g.targetAmount).toList();
+    if (incomplete.isEmpty) return null;
+    
+    // Ordenamos por prioridad (Alta > Media > Baja) y luego por fecha más cercana
+    incomplete.sort((a, b) {
+      if (a.priority != b.priority) {
+        // High (index 2) va primero que Low (index 0)
+        return b.priority.index.compareTo(a.priority.index); 
+      }
+      return (a.targetDate ?? DateTime(2100)).compareTo(b.targetDate ?? DateTime(2100));
+    });
+    return incomplete.first;
   }
 
   Future<void> _getCurrentLocation() async {
@@ -1783,6 +1857,127 @@ class _AITipCard extends StatelessWidget {
               style: const TextStyle(color: _T.textSecondary, fontSize: 13, height: 1.4),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+// ─── ENTRENADOR DIARIO (SMART SUGGESTION SHEET) ────────────────────────────────
+
+class _SmartSuggestionSheet extends StatefulWidget {
+  final Goal goal;
+  final double suggestedAmount;
+  final bool isExpense;
+  final String accountId;
+  final Function(bool saved) onComplete;
+
+  const _SmartSuggestionSheet({
+    required this.goal,
+    required this.suggestedAmount,
+    required this.isExpense,
+    required this.accountId,
+    required this.onComplete,
+  });
+
+  @override
+  State<_SmartSuggestionSheet> createState() => _SmartSuggestionSheetState();
+}
+
+class _SmartSuggestionSheetState extends State<_SmartSuggestionSheet> {
+  bool _isSaving = false;
+
+  Future<void> _saveContribution() async {
+    setState(() => _isSaving = true);
+    try {
+      HapticFeedback.mediumImpact();
+      await GoalRepository.instance.addContribution(
+        goalId: widget.goal.id,
+        accountId: widget.accountId,
+        amount: widget.suggestedAmount,
+      );
+      EventService.instance.fire(AppEvent.transactionCreated);
+      widget.onComplete(true);
+    } catch (e) {
+      developer.log('Error en ahorro inteligente: $e');
+      widget.onComplete(false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = _C(context);
+    final fmt = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+
+    final title = widget.isExpense ? 'Fricción Positiva ⚖️' : '¡Día de pago! 🚀';
+    final message = widget.isExpense
+        ? 'Si guardas ${fmt.format(widget.suggestedAmount)} ahora, mantienes tu meta "${widget.goal.name}" en fecha a pesar de este gasto.'
+        : '¡Genial! Destina el 10% (${fmt.format(widget.suggestedAmount)}) a tu meta urgente "${widget.goal.name}" y acelera tu progreso.';
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(_T.md, _T.md, _T.md, _T.lg + MediaQuery.of(context).padding.bottom),
+      decoration: const BoxDecoration(
+        color: _T.surfaceHighest,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children:[
+          Container(
+            width: 40, height: 4,
+            margin: const EdgeInsets.only(bottom: 24),
+            decoration: BoxDecoration(color: _T.border, borderRadius: BorderRadius.circular(2)),
+          ),
+          
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: _T.accent.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Iconsax.magic_star5, size: 32, color: _T.accent),
+          ),
+          const SizedBox(height: 20),
+          
+          Text(title, style: const TextStyle(color: _T.textPrimary, fontSize: 20, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: _T.textSecondary, fontSize: 15, height: 1.5),
+          ),
+          const SizedBox(height: 32),
+
+          // Botón Primario: Aceptar sugerencia
+          GestureDetector(
+            onTap: _isSaving ? null : _saveContribution,
+            child: AnimatedContainer(
+              duration: _T.fast,
+              height: 54,
+              decoration: BoxDecoration(
+                color: _T.accent,
+                borderRadius: BorderRadius.circular(_T.rMD),
+              ),
+              alignment: Alignment.center,
+              child: _isSaving 
+                  ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : Text('Aportar ${fmt.format(widget.suggestedAmount)}', 
+                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+            ),
+          ),
+          const SizedBox(height: 16),
+          
+          // Botón Secundario: Rechazar
+          GestureDetector(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              widget.onComplete(false);
+            },
+            child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text('Quizás luego', style: TextStyle(color: _T.textSecondary, fontSize: 15, fontWeight: FontWeight.w600)),
+            ),
+          )
         ],
       ),
     );
