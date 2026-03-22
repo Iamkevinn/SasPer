@@ -59,6 +59,7 @@ import 'package:sasper/screens/goal_notes_editor_screen.dart';
 import 'package:sasper/services/event_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
+import 'package:sasper/services/notification_service.dart'; // 👈 NUEVO
 
 // ── Tokens ───────────────────────────────────────────────────────────────────
 class _T {
@@ -141,6 +142,11 @@ class _EditGoalScreenState extends State<EditGoalScreen>
 
   Timer? _debounce;
 
+   // 👈 NUEVAS VARIABLES PARA EL RITUAL
+  GoalSavingsFrequency? _savingsFrequency; 
+  int? _selectedDay; 
+  double? _savingsAmount;
+
   // Fade-in único
   late final AnimationController _fadeCtrl = AnimationController(
       vsync: this, duration: const Duration(milliseconds: 280));
@@ -165,6 +171,10 @@ class _EditGoalScreenState extends State<EditGoalScreen>
     _priority   = g.priority;
     _selectedCategoryId = g.categoryId;
 
+    _savingsFrequency = g.savingsFrequency;
+    _selectedDay = g.savingsDayOfWeek ?? g.savingsDayOfMonth;
+    _savingsAmount = g.savingsAmount;
+
     _targetCtrl.addListener(_onAmountChanged);
     _fadeCtrl.forward();
     _loadData();
@@ -178,6 +188,35 @@ class _EditGoalScreenState extends State<EditGoalScreen>
     _fadeCtrl.dispose();
     _projCtrl.dispose();
     super.dispose();
+  }
+
+  // 👈 FUNCIÓN CALCULADORA DE FECHAS DE ALARMA
+  DateTime? _calculateNextReminderDate({
+    required GoalSavingsFrequency frequency,
+    required int day,
+  }) {
+    final now = DateTime.now();
+    if (frequency == GoalSavingsFrequency.daily) {
+      return DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
+    }
+    if (frequency == GoalSavingsFrequency.weekly) {
+      DateTime reminder = DateTime(now.year, now.month, now.day);
+      while (reminder.weekday != day) {
+        reminder = reminder.add(const Duration(days: 1));
+      }
+      if (reminder.day == now.day && reminder.month == now.month && reminder.year == now.year) {
+        return reminder.add(const Duration(days: 7));
+      }
+      return reminder;
+    }
+    if (frequency == GoalSavingsFrequency.monthly) {
+      DateTime reminder = DateTime(now.year, now.month, day);
+      if (reminder.isBefore(now)) {
+        return DateTime(now.year, now.month + 1, day);
+      }
+      return reminder;
+    }
+    return null;
   }
 
   // ── Data loading ──────────────────────────────────────────────────────────
@@ -313,27 +352,32 @@ class _EditGoalScreenState extends State<EditGoalScreen>
 
   // ── Save ──────────────────────────────────────────────────────────────────
 
-  Future<void> _requestSave() async {
+Future<void> _requestSave() async {
     FocusScope.of(context).unfocus();
     if (!_formKey.currentState!.validate()) {
       HapticFeedback.heavyImpact(); return;
     }
 
     final newName   = _nameCtrl.text.trim();
-    final newAmount = double.parse(
-        _targetCtrl.text.replaceAll(',', '.'));
+    final newAmount = double.parse(_targetCtrl.text.replaceAll(',', '.'));
     final g = widget.goal;
 
     final nameChanged   = newName != g.name;
     final amountChanged = newAmount != g.targetAmount;
     final dateChanged   = _targetDate != g.targetDate;
+    
+    // 👈 DETECCIÓN DE CAMBIOS EN EL RITUAL
+    final frequencyChanged = _savingsFrequency != g.savingsFrequency;
+    final dayChanged = _selectedDay != (g.savingsDayOfWeek ?? g.savingsDayOfMonth);
+
     final hasChanges    = nameChanged || amountChanged || dateChanged
         || _selectedCategoryId != g.categoryId
         || _priority != g.priority
-        || _timeframe != g.timeframe;
+        || _timeframe != g.timeframe
+        || frequencyChanged // 👈 AÑADIDO
+        || dayChanged;      // 👈 AÑADIDO
 
     if (!hasChanges) {
-      // Sin cambios — sheet informativo
       await _showNoChangesSheet();
       return;
     }
@@ -351,6 +395,11 @@ class _EditGoalScreenState extends State<EditGoalScreen>
   Future<void> _save() async {
     setState(() => _loading = true);
     try {
+      // Calculamos cuánto debería ahorrar según los datos actuales en pantalla
+      final currentMonthly = _projection?.monthlyNeeded ?? 0.0;
+      final currentWeekly = currentMonthly / 4.345;
+      final currentDaily = currentMonthly / 30.437;
+
       final updated = widget.goal.copyWith(
         name:         _nameCtrl.text.trim(),
         targetAmount: double.parse(_targetCtrl.text.replaceAll(',', '.')),
@@ -358,27 +407,48 @@ class _EditGoalScreenState extends State<EditGoalScreen>
         priority:     _priority,
         categoryId:   _selectedCategoryId,
         timeframe:    _timeframe,
+        // 👈 GUARDADO DE DATOS DEL RITUAL
+        savingsFrequency: _savingsFrequency,
+        savingsDayOfWeek: _savingsFrequency == GoalSavingsFrequency.weekly ? _selectedDay : null,
+        savingsDayOfMonth: _savingsFrequency == GoalSavingsFrequency.monthly ? _selectedDay : null,
+        savingsAmount: _savingsFrequency == null ? null : (
+          _savingsFrequency == GoalSavingsFrequency.daily ? currentDaily :
+          _savingsFrequency == GoalSavingsFrequency.weekly ? currentWeekly : currentMonthly
+        ),
+        
+        nextReminderDate: (_savingsFrequency != null && (_savingsFrequency == GoalSavingsFrequency.daily || _selectedDay != null))
+            ? _calculateNextReminderDate(frequency: _savingsFrequency!, day: _selectedDay ?? 0)
+            : null,
       );
+      
       await _goalRepo.updateGoal(updated);
+
+      // 👈 RE-PROGRAMAR NOTIFICACIÓN SI EL RITUAL ESTÁ ACTIVO
+      if (updated.savingsFrequency != null && updated.savingsAmount != null) {
+        await NotificationService.instance.scheduleGoalReminder(
+          goalId: updated.id,
+          goalName: updated.name,
+          savingsAmount: updated.savingsAmount!,
+          frequency: updated.savingsFrequency!,
+          day: updated.savingsDayOfWeek ?? updated.savingsDayOfMonth,
+        );
+      }
 
       if (!mounted) return;
       HapticFeedback.heavyImpact();
       EventService.instance.fire(AppEvent.goalUpdated);
       Navigator.of(context).pop(true);
-      NotificationHelper.show(
-          message: 'Meta actualizada', type: NotificationType.success);
+      NotificationHelper.show(message: 'Meta actualizada', type: NotificationType.success);
     } catch (e) {
       developer.log('Error al actualizar meta: $e', name: 'EditGoalScreen');
       if (mounted) {
         HapticFeedback.heavyImpact();
-        NotificationHelper.show(
-            message: 'Error al actualizar.', type: NotificationType.error);
+        NotificationHelper.show(message: 'Error al actualizar.', type: NotificationType.error);
       }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
-
   // ── Sheets ────────────────────────────────────────────────────────────────
 
   Future<bool?> _showConfirmSheet({
@@ -575,6 +645,20 @@ class _EditGoalScreenState extends State<EditGoalScreen>
                               onApply:    _applySuggestion,
                             ),
                           ],
+                          const SizedBox(height: 28),
+                          _GroupLabel('RECORDATORIO DE AHORRO'),
+                          const SizedBox(height: 10),
+                          _RitualCard(
+                            savingsFrequency: _savingsFrequency,
+                            selectedDay: _selectedDay,
+                            onFrequencyChanged: (freq) {
+                              setState(() {
+                                _savingsFrequency = freq;
+                                _selectedDay = null;
+                              });
+                            },
+                            onDayChanged: (day) => setState(() => _selectedDay = day),
+                          ),
                           const SizedBox(height: 28),
                         ],
                       ] else ...[
@@ -2041,4 +2125,214 @@ class FinancialProjection {
 
   static int _suggested(double remaining, double income) =>
       (remaining / (income * 0.20)).ceil();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RITUAL CARD (Recordatorios)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _RitualCard extends StatelessWidget {
+  final GoalSavingsFrequency? savingsFrequency;
+  final int? selectedDay;
+  final Function(GoalSavingsFrequency?) onFrequencyChanged;
+  final Function(int) onDayChanged;
+
+  const _RitualCard({
+    required this.savingsFrequency,
+    required this.selectedDay,
+    required this.onFrequencyChanged,
+    required this.onDayChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final onSurf = Theme.of(context).colorScheme.onSurface;
+    final bg     = isDark
+        ? Colors.white.withOpacity(0.07)
+        : Colors.black.withOpacity(0.04);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+          color: bg, borderRadius: BorderRadius.circular(14)),
+      child: Column(
+        children:[
+          Row(children:[
+            Container(
+              width: 30, height: 30,
+              decoration: BoxDecoration(
+                color: _kPurple.withOpacity(0.10),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Center(child: Icon(Iconsax.notification_bing, size: 14, color: _kPurple)),
+            ),
+            const SizedBox(width: 10),
+            Text('Activar recordatorio',
+                style: _T.label(13, w: FontWeight.w700, c: onSurf)),
+          ]),
+          const SizedBox(height: 14),
+          _FrequencySelector(
+            selected: savingsFrequency,
+            onChanged: onFrequencyChanged,
+          ),
+          if (savingsFrequency != null && savingsFrequency != GoalSavingsFrequency.daily)
+            _DaySelector(
+              frequency: savingsFrequency!,
+              selectedDay: selectedDay,
+              onDayChanged: onDayChanged,
+            )
+        ],
+      ),
+    );
+  }
+}
+
+class _FrequencySelector extends StatelessWidget {
+  final GoalSavingsFrequency? selected;
+  final Function(GoalSavingsFrequency?) onChanged;
+  
+  const _FrequencySelector({required this.selected, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final onSurf = Theme.of(context).colorScheme.onSurface;
+
+    return Row(
+      children: GoalSavingsFrequency.values.map((freq) {
+        final isSelected = selected == freq;
+        final label = freq == GoalSavingsFrequency.daily ? 'Diario' : freq == GoalSavingsFrequency.weekly ? 'Semanal' : 'Mensual';
+
+        return Expanded(
+          child: GestureDetector(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              onChanged(isSelected ? null : freq);
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              margin: const EdgeInsets.symmetric(horizontal: 2),
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                color: isSelected ? _kPurple.withOpacity(0.12) : (isDark ? Colors.white.withOpacity(0.05) : Colors.white),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isSelected ? _kPurple.withOpacity(0.4) : onSurf.withOpacity(0.1),
+                  width: isSelected ? 1.0 : 0.5,
+                )
+              ),
+              child: Center(
+                child: Text(label, style: _T.label(12,
+                  w: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  c: isSelected ? _kPurple : onSurf.withOpacity(0.6),
+                )),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
+
+class _DaySelector extends StatelessWidget {
+  final GoalSavingsFrequency frequency;
+  final int? selectedDay;
+  final Function(int) onDayChanged;
+
+  const _DaySelector({required this.frequency, required this.selectedDay, required this.onDayChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final onSurf = Theme.of(context).colorScheme.onSurface;
+
+    if (frequency == GoalSavingsFrequency.weekly) {
+      const weekDays =['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+      return Padding(
+        padding: const EdgeInsets.only(top: 14),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: List.generate(7, (index) {
+            final day = index + 1;
+            final isSelected = selectedDay == day;
+            return GestureDetector(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                onDayChanged(day);
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                width: 36, height: 36,
+                decoration: BoxDecoration(
+                  color: isSelected ? _kPurple.withOpacity(0.12) : Colors.transparent,
+                  shape: BoxShape.circle,
+                  border: isSelected ? Border.all(color: _kPurple.withOpacity(0.4), width: 1.0) : null,
+                ),
+                child: Center(
+                  child: Text(weekDays[index], style: _T.label(13,
+                    w: isSelected ? FontWeight.bold : FontWeight.normal,
+                    c: isSelected ? _kPurple : onSurf.withOpacity(0.6),
+                  )),
+                ),
+              ),
+            );
+          }),
+        ),
+      );
+    }
+
+    if (frequency == GoalSavingsFrequency.monthly) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 14),
+        child: GestureDetector(
+          onTap: () {
+            HapticFeedback.mediumImpact();
+            showModalBottomSheet(
+              context: context,
+              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+              builder: (ctx) => SizedBox(
+                height: 250,
+                child: GridView.builder(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 7),
+                  itemCount: 31,
+                  itemBuilder: (context, index) {
+                    final day = index + 1;
+                    return InkWell(
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        onDayChanged(day);
+                        Navigator.pop(ctx);
+                      },
+                      child: Center(child: Text('$day', style: _T.label(14, c: onSurf))),
+                    );
+                  },
+                ),
+              ),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: onSurf.withOpacity(0.1), width: 0.5),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children:[
+                Text(
+                  selectedDay == null ? 'Elige un día del mes' : 'Recordarme el día $selectedDay',
+                  style: _T.label(13, w: FontWeight.w500, c: selectedDay != null ? onSurf : onSurf.withOpacity(0.5)),
+                ),
+                Icon(Iconsax.calendar_edit, size: 16, color: onSurf.withOpacity(0.5)),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    return const SizedBox.shrink();
+  }
 }

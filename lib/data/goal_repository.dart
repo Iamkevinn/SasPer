@@ -1,5 +1,6 @@
 // lib/data/goal_repository.dart
 
+import 'package:sasper/services/notification_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:developer' as developer;
 import 'dart:async';
@@ -175,6 +176,8 @@ class GoalRepository {
         'delete_goal_safely',
         params: {'goal_id_to_delete': goalId},
       );
+      // 👈 CANCELAR NOTIFICACIÓN AL BORRAR
+      await NotificationService.instance.cancelGoalReminder(goalId);
     } catch (e) {
       developer.log('🔥 [Repo] Error en RPC delete_goal_safely: $e', name: 'GoalRepository');
       throw Exception('No se pudo eliminar la meta.');

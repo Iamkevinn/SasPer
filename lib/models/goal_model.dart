@@ -95,6 +95,8 @@ class Goal extends Equatable {
   final double? savingsAmount;
   final DateTime? nextReminderDate;
 
+  final DateTime? lastContributionDate;
+
   const Goal({
     required this.id,
     required this.userId,
@@ -115,6 +117,7 @@ class Goal extends Equatable {
     this.savingsDayOfMonth,
     this.savingsAmount,
     this.nextReminderDate,
+    this.lastContributionDate,
   });
 
   /// Crea una instancia "vacía" de Goal.
@@ -162,6 +165,7 @@ class Goal extends Equatable {
         savingsDayOfMonth: map['savings_day_of_month'] as int?,
         savingsAmount: (map['savings_amount'] as num?)?.toDouble(),
         nextReminderDate: map['next_reminder_date'] != null ? DateTime.parse(map['next_reminder_date'] as String) : null,
+        lastContributionDate: map['last_contribution_date'] != null ? DateTime.parse(map['last_contribution_date'] as String) : null,
       );
     } catch (e) {
       throw FormatException('Error al parsear Goal: $e', map);
@@ -189,6 +193,7 @@ class Goal extends Equatable {
     int? savingsDayOfMonth,
     double? savingsAmount,
     DateTime? nextReminderDate,
+    DateTime? lastContributionDate,
   }) {
     return Goal(
       id: id ?? this.id,
@@ -239,5 +244,6 @@ class Goal extends Equatable {
         notesContent,
         savingsFrequency, savingsDayOfWeek, savingsDayOfMonth,
         savingsAmount, nextReminderDate,
+        lastContributionDate,
       ];
 }

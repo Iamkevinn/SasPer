@@ -75,7 +75,7 @@ dependencies:
   connectivity_plus: ^7.0.0 # Actualizado
   equatable: ^2.0.7 # Actualizado
   provider: ^6.1.5 # Actualizado
-  shared_preferences: ^2.5.3 # Actualizado
+  shared_preferences: ^2.5.4 # Actualizado
   flutter_local_notifications: ^19.4.0 # Actualizado
   timezone: ^0.10.0
   flutter_timezone: ^5.0.1 # Actualizado
@@ -98,6 +98,7 @@ dependencies:
   url_launcher: ^6.3.2
   flutter_quill: ^11.5.0
   path: ^1.9.1
+  workmanager: ^0.9.0+3
   
 # Dependencias que solo se usan durante el desarrollo.
 dev_dependencies:

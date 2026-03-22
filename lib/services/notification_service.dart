@@ -46,8 +46,7 @@ void onDidReceiveBackgroundNotificationResponse(NotificationResponse resp) {
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  developer.log(
-      '🔔 [FCM-Background] Mensaje recibido: ${message.messageId}',
+  developer.log('🔔 [FCM-Background] Mensaje recibido: ${message.messageId}',
       name: 'NotificationService-FCM');
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -62,7 +61,8 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     await Supabase.initialize(url: supabaseUrl, anonKey: supabaseApiKey);
   } catch (e) {
     if (!e.toString().contains('already been initialized')) {
-      developer.log('🔥 Error en Supabase FCM Background: $e', name: 'NotificationService-FCM');
+      developer.log('🔥 Error en Supabase FCM Background: $e',
+          name: 'NotificationService-FCM');
     }
   }
 
@@ -77,7 +77,8 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       }
     }
   } catch (e) {
-    developer.log('🔥 Error guardando token FCM Background: $e', name: 'NotificationService-FCM');
+    developer.log('🔥 Error guardando token FCM Background: $e',
+        name: 'NotificationService-FCM');
   }
 }
 
@@ -89,7 +90,7 @@ class NotificationService {
   late final SupabaseClient _supabase;
   late final FirebaseMessaging _firebaseMessaging;
   late final http.Client _httpClient;
-  
+
   bool _dependenciesInitialized = false;
 
   final FlutterLocalNotificationsPlugin _localNotifier =
@@ -105,27 +106,30 @@ class NotificationService {
     http.Client? httpClient,
   }) {
     if (_dependenciesInitialized) {
-      developer.log('⚡ Dependencias ya estaban inicializadas. Saltando...', name: 'NotificationService');
+      developer.log('⚡ Dependencias ya estaban inicializadas. Saltando...',
+          name: 'NotificationService');
       return;
     }
 
     _supabase = supabaseClient;
     _firebaseMessaging = firebaseMessaging;
     _httpClient = httpClient ?? http.Client();
-    
+
     _dependenciesInitialized = true;
     developer.log('✅ Dependencias inyectadas.', name: 'NotificationService');
   }
 
   // --- INICIALIZACIÓN RÁPIDA (Al arrancar la app) ---
   Future<void> initializeQuick() async {
-    developer.log('🚀 Iniciando configuración de notificaciones...', name: 'NotificationService');
+    developer.log('🚀 Iniciando configuración de notificaciones...',
+        name: 'NotificationService');
 
     try {
       tz.initializeTimeZones();
       final timezoneInfo = await FlutterTimezone.getLocalTimezone();
       tz.setLocalLocation(tz.getLocation(timezoneInfo.identifier));
-      developer.log('🌍 Zona horaria detectada: ${timezoneInfo.identifier}', name: 'NotificationService');
+      developer.log('🌍 Zona horaria detectada: ${timezoneInfo.identifier}',
+          name: 'NotificationService');
     } catch (e) {
       developer.log('⚠️ Fallo zona horaria: $e', name: 'NotificationService');
       tz.setLocalLocation(tz.getLocation('UTC'));
@@ -137,13 +141,14 @@ class NotificationService {
       requestBadgePermission: false,
       requestSoundPermission: false,
     );
-    
+
     final settings = InitializationSettings(android: androidInit, iOS: iosInit);
-    
+
     await _localNotifier.initialize(
       settings,
       onDidReceiveNotificationResponse: onDidReceiveNotificationResponse,
-      onDidReceiveBackgroundNotificationResponse: onDidReceiveBackgroundNotificationResponse,
+      onDidReceiveBackgroundNotificationResponse:
+          onDidReceiveBackgroundNotificationResponse,
     );
 
     await _createAndroidChannels();
@@ -156,7 +161,7 @@ class NotificationService {
 
     try {
       final settings = await _firebaseMessaging.requestPermission(
-        alert: true, badge: true, sound: true);
+          alert: true, badge: true, sound: true);
 
       if (settings.authorizationStatus == AuthorizationStatus.authorized) {
         await _updateAndSaveToken();
@@ -175,7 +180,8 @@ class NotificationService {
       if (alarmStatus.isDenied) await Permission.scheduleExactAlarm.request();
     } else if (Platform.isIOS) {
       await _localNotifier
-          .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
+          .resolvePlatformSpecificImplementation<
+              IOSFlutterLocalNotificationsPlugin>()
           ?.requestPermissions(alert: true, badge: true, sound: true);
     }
   }
@@ -189,23 +195,27 @@ class NotificationService {
 
   void _setupMessageListeners() {
     FirebaseMessaging.onMessage.listen((msg) {
-      developer.log('📲 FCM Foreground: ${msg.messageId}', name: 'NotificationService');
+      developer.log('📲 FCM Foreground: ${msg.messageId}',
+          name: 'NotificationService');
     });
     FirebaseMessaging.onMessageOpenedApp.listen((msg) {
-      developer.log('📂 FCM Opened: ${msg.messageId}', name: 'NotificationService');
+      developer.log('📂 FCM Opened: ${msg.messageId}',
+          name: 'NotificationService');
       // AQUÍ: Lee el 'goal_id' del payload y navega a la meta
       final goalId = msg.data['goal_id'];
       if (goalId != null) {
-        navigatorKey.currentState?.pushNamed('/goal_details', arguments: goalId);
+        navigatorKey.currentState
+            ?.pushNamed('/goal_details', arguments: goalId);
       }
     });
-    _firebaseMessaging.onTokenRefresh.listen((token) => _saveTokenToSupabase(token));
+    _firebaseMessaging.onTokenRefresh
+        .listen((token) => _saveTokenToSupabase(token));
   }
 
   Future<void> _createAndroidChannels() async {
     final androidImpl = _localNotifier.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
-    
+
     if (androidImpl == null) return;
 
     await androidImpl.createNotificationChannel(
@@ -222,7 +232,8 @@ class NotificationService {
       const AndroidNotificationChannel(
         'goal_reminders_channel', // ID único
         'Recordatorios de Metas', // Nombre visible para el usuario
-        description: 'Notificaciones para ayudarte a cumplir tus metas de ahorro.',
+        description:
+            'Notificaciones para ayudarte a cumplir tus metas de ahorro.',
         importance: Importance.max,
         playSound: true,
       ),
@@ -251,10 +262,14 @@ class NotificationService {
     final uid = _supabase.auth.currentUser?.id;
     if (uid == null) return;
     try {
-      await _supabase.from('profiles').update({'fcm_token': token}).eq('id', uid);
-      developer.log('✅ Token FCM guardado en Supabase', name: 'NotificationService');
+      await _supabase
+          .from('profiles')
+          .update({'fcm_token': token}).eq('id', uid);
+      developer.log('✅ Token FCM guardado en Supabase',
+          name: 'NotificationService');
     } catch (e) {
-      developer.log('⚠️ Error guardando token: $e', name: 'NotificationService');
+      developer.log('⚠️ Error guardando token: $e',
+          name: 'NotificationService');
     }
   }
 
@@ -266,7 +281,8 @@ class NotificationService {
     if (Platform.isAndroid && !await Permission.scheduleExactAlarm.isGranted) {
       final status = await Permission.scheduleExactAlarm.request();
       if (!status.isGranted) {
-        throw Exception('Permiso de alarmas denegado. No se pueden programar recordatorios.');
+        throw Exception(
+            'Permiso de alarmas denegado. No se pueden programar recordatorios.');
       }
     }
     await _scheduleRemindersForTransaction(tx);
@@ -277,26 +293,29 @@ class NotificationService {
       await _localNotifier.cancel(('$txId-early-$i').hashCode & 0x7FFFFFFF);
       await _localNotifier.cancel(('$txId-final-$i').hashCode & 0x7FFFFFFF);
     }
-    developer.log('🗑️ Alertas canceladas para ID: $txId (24 notificaciones)', name: 'NotificationService');
+    developer.log('🗑️ Alertas canceladas para ID: $txId (24 notificaciones)',
+        name: 'NotificationService');
   }
 
   Future<void> refreshAllSchedules() async {
     if (Platform.isAndroid && !await Permission.scheduleExactAlarm.isGranted) {
-      developer.log('⚠️ Sin permiso de alarmas. No se puede refrescar.', name: 'NotificationService');
+      developer.log('⚠️ Sin permiso de alarmas. No se puede refrescar.',
+          name: 'NotificationService');
       return;
     }
-    
-    developer.log('🔄 Refrescando todas las alarmas (Pagos y Metas)...', name: 'NotificationService');
+
+    developer.log('🔄 Refrescando todas las alarmas (Pagos y Metas)...',
+        name: 'NotificationService');
     try {
       // 1. Borramos todo para evitar duplicados
       await _localNotifier.cancelAll();
-      
+
       // 2. Reprogramamos TODOS los pagos recurrentes
       final recurringTxs = await RecurringRepository.instance.getAll();
       for (final tx in recurringTxs) {
         await _scheduleRemindersForTransaction(tx);
       }
-      
+
       // 3. 👈 ¡NUEVO! Reprogramamos TODAS las metas con ritual activo
       final activeGoals = await GoalRepository.instance.getActiveGoals();
       int goalsScheduled = 0;
@@ -313,22 +332,31 @@ class NotificationService {
         }
       }
 
-      developer.log('✅ Alarmas restauradas: ${recurringTxs.length} pagos fijos y $goalsScheduled metas.', name: 'NotificationService');
+      developer.log(
+          '✅ Alarmas restauradas: ${recurringTxs.length} pagos fijos y $goalsScheduled metas.',
+          name: 'NotificationService');
     } catch (e) {
-      developer.log('🔥 Error refrescando schedules: $e', name: 'NotificationService');
+      developer.log('🔥 Error refrescando schedules: $e',
+          name: 'NotificationService');
     }
   }
 
   // 👈 HERRAMIENTA DE DIAGNÓSTICO
   Future<void> debugCheckPendingNotifications() async {
     final pending = await _localNotifier.pendingNotificationRequests();
-    developer.log('🔔 ====== ALARMAS PENDIENTES EN EL TELÉFONO: ${pending.length} ======', name: 'DEBUG_NOTIF');
-    
+    developer.log(
+        '🔔 ====== ALARMAS PENDIENTES EN EL TELÉFONO: ${pending.length} ======',
+        name: 'DEBUG_NOTIF');
+
     if (pending.isEmpty) {
-      developer.log('❌ No hay ninguna notificación programada. El OS las borró o no se registraron.', name: 'DEBUG_NOTIF');
+      developer.log(
+          '❌ No hay ninguna notificación programada. El OS las borró o no se registraron.',
+          name: 'DEBUG_NOTIF');
     } else {
       for (var p in pending) {
-        developer.log('✅ ID: ${p.id} | Título: ${p.title} | Payload: ${p.payload}', name: 'DEBUG_NOTIF');
+        developer.log(
+            '✅ ID: ${p.id} | Título: ${p.title} | Payload: ${p.payload}',
+            name: 'DEBUG_NOTIF');
       }
     }
   }
@@ -337,8 +365,9 @@ class NotificationService {
   Future<void> testOneMinuteNotification() async {
     final now = tz.TZDateTime.now(tz.local);
     final inOneMinute = now.add(const Duration(minutes: 1));
-    
-    developer.log('⏰ Programando prueba para: $inOneMinute (Hora actual: $now)', name: 'DEBUG_NOTIF');
+
+    developer.log('⏰ Programando prueba para: $inOneMinute (Hora actual: $now)',
+        name: 'DEBUG_NOTIF');
 
     await _localNotifier.zonedSchedule(
       999999,
@@ -347,8 +376,10 @@ class NotificationService {
       inOneMinute,
       const NotificationDetails(
         android: AndroidNotificationDetails(
-          'goal_reminders_channel', 'Recordatorios de Metas',
-          importance: Importance.max, priority: Priority.high,
+          'goal_reminders_channel',
+          'Recordatorios de Metas',
+          importance: Importance.max,
+          priority: Priority.high,
         ),
         iOS: DarwinNotificationDetails(presentAlert: true, presentSound: true),
       ),
@@ -356,20 +387,23 @@ class NotificationService {
     );
     await debugCheckPendingNotifications();
   }
-  
+
   Future<void> scheduleFreeTrialReminder({
     required String id,
     required String serviceName,
     required DateTime endDate,
-    required double price, 
+    required double price,
     required TimeOfDay notificationTime,
   }) async {
     final now = DateTime.now();
     final reminderDay = endDate.subtract(const Duration(days: 3));
-    
+
     DateTime reminderDateTime = DateTime(
-      reminderDay.year, reminderDay.month, reminderDay.day,
-      notificationTime.hour, notificationTime.minute,
+      reminderDay.year,
+      reminderDay.month,
+      reminderDay.day,
+      notificationTime.hour,
+      notificationTime.minute,
     );
 
     if (reminderDateTime.isBefore(now)) {
@@ -380,7 +414,8 @@ class NotificationService {
       }
     }
 
-    final fmt = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+    final fmt =
+        NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
 
     await _localNotifier.zonedSchedule(
       id.hashCode & 0x7FFFFFFF,
@@ -389,8 +424,11 @@ class NotificationService {
       tz.TZDateTime.from(reminderDateTime, tz.local),
       const NotificationDetails(
         android: AndroidNotificationDetails(
-          'free_trials_channel', 'Pruebas Gratuitas',
-          importance: Importance.max, priority: Priority.high, playSound: true,
+          'free_trials_channel',
+          'Pruebas Gratuitas',
+          importance: Importance.max,
+          priority: Priority.high,
+          playSound: true,
         ),
         iOS: DarwinNotificationDetails(presentAlert: true, presentSound: true),
       ),
@@ -404,7 +442,8 @@ class NotificationService {
     required String goalName,
     required double savingsAmount,
   }) async {
-    final fmt = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+    final fmt =
+        NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
     final amountString = fmt.format(savingsAmount);
 
     // El payload es un JSON que enviamos a la notificación.
@@ -442,7 +481,8 @@ class NotificationService {
         iOS: const DarwinNotificationDetails(
           presentAlert: true,
           presentSound: true,
-          categoryIdentifier: 'GOAL_REMINDER_CATEGORY', // Conectaremos esto en un paso futuro para iOS
+          categoryIdentifier:
+              'GOAL_REMINDER_CATEGORY', // Conectaremos esto en un paso futuro para iOS
         ),
       ),
       payload: payload,
@@ -458,21 +498,76 @@ class NotificationService {
     final firstDueDate = tz.TZDateTime.from(tx.nextDueDate, tz.local);
 
     int scheduledCount = 0;
-    
+
     for (var i = 0; i < 12; i++) {
       tz.TZDateTime dueDate;
 
       switch (tx.frequency.toLowerCase()) {
-        case 'diario': dueDate = firstDueDate.add(Duration(days: i)); break;
-        case 'semanal': dueDate = firstDueDate.add(Duration(days: i * 7)); break;
-        case 'cada_2_semanas': dueDate = firstDueDate.add(Duration(days: i * 14)); break;
-        case 'quincenal': dueDate = firstDueDate.add(Duration(days: i * 15)); break;
-        case 'mensual': dueDate = tz.TZDateTime(tz.local, firstDueDate.year, firstDueDate.month + i, firstDueDate.day, firstDueDate.hour, firstDueDate.minute); break;
-        case 'bimestral': dueDate = tz.TZDateTime(tz.local, firstDueDate.year, firstDueDate.month + (i * 2), firstDueDate.day, firstDueDate.hour, firstDueDate.minute); break;
-        case 'trimestral': dueDate = tz.TZDateTime(tz.local, firstDueDate.year, firstDueDate.month + (i * 3), firstDueDate.day, firstDueDate.hour, firstDueDate.minute); break;
-        case 'semestral': dueDate = tz.TZDateTime(tz.local, firstDueDate.year, firstDueDate.month + (i * 6), firstDueDate.day, firstDueDate.hour, firstDueDate.minute); break;
-        case 'anual': dueDate = tz.TZDateTime(tz.local, firstDueDate.year + i, firstDueDate.month, firstDueDate.day, firstDueDate.hour, firstDueDate.minute); break;
-        default: dueDate = tz.TZDateTime(tz.local, firstDueDate.year, firstDueDate.month + i, firstDueDate.day, firstDueDate.hour, firstDueDate.minute);
+        case 'diario':
+          dueDate = firstDueDate.add(Duration(days: i));
+          break;
+        case 'semanal':
+          dueDate = firstDueDate.add(Duration(days: i * 7));
+          break;
+        case 'cada_2_semanas':
+          dueDate = firstDueDate.add(Duration(days: i * 14));
+          break;
+        case 'quincenal':
+          dueDate = firstDueDate.add(Duration(days: i * 15));
+          break;
+        case 'mensual':
+          dueDate = tz.TZDateTime(
+              tz.local,
+              firstDueDate.year,
+              firstDueDate.month + i,
+              firstDueDate.day,
+              firstDueDate.hour,
+              firstDueDate.minute);
+          break;
+        case 'bimestral':
+          dueDate = tz.TZDateTime(
+              tz.local,
+              firstDueDate.year,
+              firstDueDate.month + (i * 2),
+              firstDueDate.day,
+              firstDueDate.hour,
+              firstDueDate.minute);
+          break;
+        case 'trimestral':
+          dueDate = tz.TZDateTime(
+              tz.local,
+              firstDueDate.year,
+              firstDueDate.month + (i * 3),
+              firstDueDate.day,
+              firstDueDate.hour,
+              firstDueDate.minute);
+          break;
+        case 'semestral':
+          dueDate = tz.TZDateTime(
+              tz.local,
+              firstDueDate.year,
+              firstDueDate.month + (i * 6),
+              firstDueDate.day,
+              firstDueDate.hour,
+              firstDueDate.minute);
+          break;
+        case 'anual':
+          dueDate = tz.TZDateTime(
+              tz.local,
+              firstDueDate.year + i,
+              firstDueDate.month,
+              firstDueDate.day,
+              firstDueDate.hour,
+              firstDueDate.minute);
+          break;
+        default:
+          dueDate = tz.TZDateTime(
+              tz.local,
+              firstDueDate.year,
+              firstDueDate.month + i,
+              firstDueDate.day,
+              firstDueDate.hour,
+              firstDueDate.minute);
       }
 
       if (dueDate.isBefore(now)) continue;
@@ -504,102 +599,118 @@ class NotificationService {
     }
   }
 
- 
-
 // 2. Método de programación corregido
 // 1. Método auxiliar para calcular la fecha
-tz.TZDateTime _nextOccurrence(GoalSavingsFrequency frequency, int? day) {
-  final now = tz.TZDateTime.now(tz.local);
-  
-  // 1. Definimos la hora objetivo (ej: 9:00 AM)
-  tz.TZDateTime scheduledDate = tz.TZDateTime(tz.local, now.year, now.month, now.day, 9, 0);
+  tz.TZDateTime _nextOccurrence(GoalSavingsFrequency frequency, int? day) {
+    final now = tz.TZDateTime.now(tz.local);
 
-  // 2. Si ya pasó la hora de hoy, lo ponemos para mañana como base
-  if (scheduledDate.isBefore(now)) {
-    scheduledDate = scheduledDate.add(const Duration(days: 1));
+    // 1. Definimos la hora objetivo (ej: 9:00 AM)
+    tz.TZDateTime scheduledDate =
+        tz.TZDateTime(tz.local, now.year, now.month, now.day, 9, 0);
+
+    // 2. Si ya pasó la hora de hoy, lo ponemos para mañana como base
+    if (scheduledDate.isBefore(now)) {
+      scheduledDate = scheduledDate.add(const Duration(days: 1));
+    }
+
+    // 3. Lógica según la frecuencia
+    switch (frequency) {
+      case GoalSavingsFrequency.daily:
+        // Si la hora de hoy ya pasó, ya se añadió 1 día en el paso 2.
+        return scheduledDate;
+
+      case GoalSavingsFrequency.weekly:
+        // day: 1 (Lunes) a 7 (Domingo)
+        if (day != null) {
+          // Avanzamos hasta que el día de la semana coincida
+          while (scheduledDate.weekday != day) {
+            scheduledDate = scheduledDate.add(const Duration(days: 1));
+          }
+        }
+        return scheduledDate;
+
+      case GoalSavingsFrequency.monthly:
+        // day: 1 a 31
+        if (day != null) {
+          // Ajustamos al día del mes solicitado
+          scheduledDate = tz.TZDateTime(
+              tz.local, scheduledDate.year, scheduledDate.month, day, 9, 0);
+          // Si esa fecha ya pasó este mes, nos vamos al mes siguiente
+          if (scheduledDate.isBefore(now)) {
+            scheduledDate = tz.TZDateTime(tz.local, scheduledDate.year,
+                scheduledDate.month + 1, day, 9, 0);
+          }
+        }
+        return scheduledDate;
+    }
   }
 
-  // 3. Lógica según la frecuencia
-  switch (frequency) {
-    case GoalSavingsFrequency.daily:
-      // Si la hora de hoy ya pasó, ya se añadió 1 día en el paso 2.
-      return scheduledDate;
-
-    case GoalSavingsFrequency.weekly:
-      // day: 1 (Lunes) a 7 (Domingo)
-      if (day != null) {
-        // Avanzamos hasta que el día de la semana coincida
-        while (scheduledDate.weekday != day) {
-          scheduledDate = scheduledDate.add(const Duration(days: 1));
-        }
-      }
-      return scheduledDate;
-
-    case GoalSavingsFrequency.monthly:
-      // day: 1 a 31
-      if (day != null) {
-        // Ajustamos al día del mes solicitado
-        scheduledDate = tz.TZDateTime(tz.local, scheduledDate.year, scheduledDate.month, day, 9, 0);
-        // Si esa fecha ya pasó este mes, nos vamos al mes siguiente
-        if (scheduledDate.isBefore(now)) {
-          scheduledDate = tz.TZDateTime(tz.local, scheduledDate.year, scheduledDate.month + 1, day, 9, 0);
-        }
-      }
-      return scheduledDate;
+  Future<void> cancelGoalReminder(String goalId) async {
+    await _localNotifier.cancel(goalId.hashCode & 0x7FFFFFFF);
+    developer.log('🗑️ Alarma cancelada para meta: $goalId',
+        name: 'NotificationService');
   }
-}
+
 // 2. El método de programación (SIN el parámetro problemático)
-Future<void> scheduleGoalReminder({
-  required String goalId,
-  required String goalName,
-  required double savingsAmount,
-  required GoalSavingsFrequency frequency,
-  int? day, 
-}) async {
-  final fmt = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
-  final amountString = fmt.format(savingsAmount);
+  Future<void> scheduleGoalReminder({
+    required String goalId,
+    required String goalName,
+    required double savingsAmount,
+    required GoalSavingsFrequency frequency,
+    int? day,
+  }) async {
+    final fmt =
+        NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+    final amountString = fmt.format(savingsAmount);
 
-  final nextDate = _nextOccurrence(frequency, day);
-  developer.log('📅 Programando meta $goalId para: $nextDate', name: 'NotificationService');
-  
-  await _localNotifier.zonedSchedule(
-    goalId.hashCode & 0x7FFFFFFF, // Aseguramos un ID válido para Android
-    '✨ Hoy toca ahorrar para tu meta',
-    '¡Aporta $amountString para "$goalName"!',
-    _nextOccurrence(frequency, day),
-    const NotificationDetails(
-      android: AndroidNotificationDetails(
-        'goal_reminders_channel', 
-        'Recordatorios de Metas',
-        importance: Importance.max, 
-        priority: Priority.high,
+    final nextDate = _nextOccurrence(frequency, day);
+    developer.log('📅 Programando meta $goalId para: $nextDate',
+        name: 'NotificationService');
+
+    await _localNotifier.zonedSchedule(
+      goalId.hashCode & 0x7FFFFFFF, // Aseguramos un ID válido para Android
+      '✨ Hoy toca ahorrar para tu meta',
+      '¡Aporta $amountString para "$goalName"!',
+      _nextOccurrence(frequency, day),
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'goal_reminders_channel',
+          'Recordatorios de Metas',
+          importance: Importance.max,
+          priority: Priority.high,
+        ),
+        iOS: DarwinNotificationDetails(
+          presentAlert: true,
+          presentSound: true,
+        ),
       ),
-      iOS: DarwinNotificationDetails(
-        presentAlert: true, 
-        presentSound: true,
-      ),
-    ),
-    androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-    matchDateTimeComponents: _getMatchComponent(frequency), // 👈 Esto hace que se repita
-  );
-}
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      matchDateTimeComponents:
+          _getMatchComponent(frequency), // 👈 Esto hace que se repita
+    );
+  }
 
 // 3. Helper para la repetición automática
-DateTimeComponents? _getMatchComponent(GoalSavingsFrequency freq) {
-  if (freq == GoalSavingsFrequency.daily) return DateTimeComponents.time;
-  if (freq == GoalSavingsFrequency.weekly) return DateTimeComponents.dayOfWeekAndTime;
-  if (freq == GoalSavingsFrequency.monthly) return DateTimeComponents.dayOfMonthAndTime;
-  return null;
-}
+  DateTimeComponents? _getMatchComponent(GoalSavingsFrequency freq) {
+    if (freq == GoalSavingsFrequency.daily) return DateTimeComponents.time;
+    if (freq == GoalSavingsFrequency.weekly)
+      return DateTimeComponents.dayOfWeekAndTime;
+    if (freq == GoalSavingsFrequency.monthly)
+      return DateTimeComponents.dayOfMonthAndTime;
+    return null;
+  }
 
   NotificationDetails _notifDetails(String desc, {required bool isFinal}) {
     return NotificationDetails(
       android: AndroidNotificationDetails(
-        'recurring_payments_channel', 'Recordatorios de Pagos',
-        importance: Importance.max, priority: Priority.high,
+        'recurring_payments_channel',
+        'Recordatorios de Pagos',
+        importance: Importance.max,
+        priority: Priority.high,
         color: isFinal ? const Color(0xFFFF0000) : null,
       ),
-      iOS: const DarwinNotificationDetails(presentAlert: true, presentSound: true),
+      iOS: const DarwinNotificationDetails(
+          presentAlert: true, presentSound: true),
     );
   }
 
@@ -611,16 +722,18 @@ DateTimeComponents? _getMatchComponent(GoalSavingsFrequency freq) {
   Future<void> testImmediateNotification() async {
     if (!await Permission.notification.isGranted) {
       final status = await Permission.notification.request();
-      if (!status.isGranted) throw Exception('Permiso de notificaciones denegado');
+      if (!status.isGranted)
+        throw Exception('Permiso de notificaciones denegado');
     }
-    
+
     if (Platform.isAndroid && !await Permission.scheduleExactAlarm.isGranted) {
       final status = await Permission.scheduleExactAlarm.request();
-      if (!status.isGranted) throw Exception('Permiso de alarmas exactas denegado');
+      if (!status.isGranted)
+        throw Exception('Permiso de alarmas exactas denegado');
     }
 
     final when = tz.TZDateTime.now(tz.local).add(const Duration(seconds: 5));
-    
+
     await _localNotifier.zonedSchedule(
       99999,
       '🎉 Prueba Exitosa',
@@ -628,21 +741,25 @@ DateTimeComponents? _getMatchComponent(GoalSavingsFrequency freq) {
       when,
       const NotificationDetails(
         android: AndroidNotificationDetails(
-          'test_channel', 'Pruebas',
-          importance: Importance.max, priority: Priority.high,
+          'test_channel',
+          'Pruebas',
+          importance: Importance.max,
+          priority: Priority.high,
         ),
         iOS: DarwinNotificationDetails(presentSound: true),
       ),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
     );
-    developer.log('✅ Test notification programada para: $when', name: 'NotificationService');
+    developer.log('✅ Test notification programada para: $when',
+        name: 'NotificationService');
   }
 
   Future<void> triggerBudgetNotification({
     required String userId,
     required String categoryName,
   }) async {
-    final url = Uri.parse('${AppConfig.renderBackendBaseUrl}/check-budget-on-transaction');
+    final url = Uri.parse(
+        '${AppConfig.renderBackendBaseUrl}/check-budget-on-transaction');
     try {
       final response = await _httpClient.post(
         url,
@@ -653,7 +770,8 @@ DateTimeComponents? _getMatchComponent(GoalSavingsFrequency freq) {
         throw Exception('Error del servidor: ${response.statusCode}');
       }
     } catch (e) {
-      developer.log('🔥 Error triggerBudgetNotification: $e', name: 'NotificationService');
+      developer.log('🔥 Error triggerBudgetNotification: $e',
+          name: 'NotificationService');
       throw Exception('No se pudo verificar el presupuesto.');
     }
   }

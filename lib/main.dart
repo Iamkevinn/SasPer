@@ -33,6 +33,10 @@ import 'package:sasper/home_widget_callback_handler.dart' as hw;
 import 'package:sasper/screens/auth_gate.dart';
 import 'package:sasper/screens/add_transaction_screen.dart';
 
+import 'package:workmanager/workmanager.dart';
+import 'package:sasper/services/smart_notification_worker.dart';
+
+
 // =================================================================
 //                 CONFIGURACIÓN GLOBAL
 // =================================================================
@@ -41,7 +45,7 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 Future<void> main() async {
   // 1. Asegurar que los bindings de Flutter estén listos (Obligatorio)
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   if (kDebugMode) {
     print("--- INICIANDO SASPER ---");
   }
@@ -49,8 +53,7 @@ Future<void> main() async {
   // 2. Tareas síncronas muy rápidas
   AppConfig.checkKeys();
 
-  // 3. 🚀 CARGA PARALELA (Todo lo crítico antes de dibujar la app)
-  // Al usar Future.wait, Firebase, Supabase y los idiomas cargan al mismo tiempo.
+  // 3. 🚀 CARGA PARALELA
   await Future.wait([
     Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform),
     _initSupabaseSafe(),
@@ -61,10 +64,10 @@ Future<void> main() async {
 
   GlobalState.supabaseInitialized = true;
 
-  // 4. 📦 INYECCIÓN DE DEPENDENCIAS (Rápido, en memoria)
+  // 4. 📦 INYECCIÓN DE DEPENDENCIAS
   final supabase = Supabase.instance.client;
   final messaging = FirebaseMessaging.instance;
-  
+
   DashboardRepository.instance.initialize(supabase);
   NotificationService.instance.initializeDependencies(
     supabaseClient: supabase,
@@ -75,7 +78,37 @@ Future<void> main() async {
   HomeWidget.registerBackgroundCallback(hw.homeWidgetBackgroundCallback);
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-  // 6. 👻 TAREAS FANTASMA (Se ejecutan sin frenar el inicio de la app)
+  // 👈 NUEVO: INICIALIZACIÓN DE WORKMANAGER
+  try {
+    Workmanager().initialize(
+      smartGoalDispatcher, // 2. USAMOS EL NUEVO NOMBRE AQUÍ
+      isInDebugMode: true, // Ponlo en true para que nos avise en la consola
+    );
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    // Código de prueba: Forzar ejecución en 10 segundos
+    /*Workmanager().registerOneOffTask(
+      "prueba_rapida_2",
+      smartGoalTask,
+      initialDelay: const Duration(seconds: 10),
+    );*/
+
+    // Registramos la tarea para que corra cada 24h
+    Workmanager().registerPeriodicTask(
+      "1", // ID único de la tarea
+      smartGoalTask,
+      frequency: const Duration(hours: 24),
+      constraints: Constraints(
+        networkType: NetworkType.connected, // Solo si hay internet
+        requiresBatteryNotLow: true, // No agotar la batería del usuario
+      ),
+    );
+  } catch (e) {
+    developer.log('🔥 Error iniciando Workmanager: $e', name: 'MainInit');
+  }
+
+  // 6. 👻 TAREAS FANTASMA
   unawaited(_saveMaterialYouColors());
   unawaited(NotificationService.instance.initializeQuick());
 
@@ -87,7 +120,6 @@ Future<void> main() async {
     ),
   );
 }
-
 // =================================================================
 //                 FUNCIONES AUXILIARES DE INICIO
 // =================================================================
