@@ -31,9 +31,25 @@ import 'package:sasper/models/recurring_transaction_model.dart';
 @pragma('vm:entry-point')
 void onDidReceiveNotificationResponse(NotificationResponse resp) {
   developer.log(
-    '🔔 [Acción] Notificación tocada (payload: ${resp.payload})',
+    '🔔 [Acción] Notificación tocada (payload: ${resp.payload}, botón: ${resp.actionId})',
     name: 'NotificationService',
   );
+
+  if (resp.payload != null) {
+    try {
+      final data = jsonDecode(resp.payload!);
+      
+      // Si la notificación es de nuestras metas inteligentes...
+      if (data['type'] == 'smart_goal_reminder') {
+        // Usamos la llave global de navegación para saltar a la pantalla de Metas
+        // sin importar en qué parte de la app estaba el usuario
+        navigatorKey.currentState?.pushNamed('/goals');
+      }
+      
+    } catch (e) {
+      developer.log('🔥 Error leyendo payload: $e', name: 'NotificationService');
+    }
+  }
 }
 
 @pragma('vm:entry-point')

@@ -10,6 +10,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:quick_actions/quick_actions.dart';
 import 'package:flutter_quill/flutter_quill.dart';
+import 'package:sasper/screens/manifestations_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -32,6 +33,7 @@ import 'package:sasper/home_widget_callback_handler.dart' as hw;
 // --- Pantallas ---
 import 'package:sasper/screens/auth_gate.dart';
 import 'package:sasper/screens/add_transaction_screen.dart';
+import 'package:sasper/screens/goals_screen.dart';
 
 import 'package:workmanager/workmanager.dart';
 import 'package:sasper/services/smart_notification_worker.dart';
@@ -88,14 +90,14 @@ Future<void> main() async {
     ////////////////////////////////////////////////////////////////////////////////////////////////////
 
     // Código de prueba: Forzar ejecución en 10 segundos
-    /*Workmanager().registerOneOffTask(
+    Workmanager().registerOneOffTask(
       "prueba_rapida_2",
       smartGoalTask,
       initialDelay: const Duration(seconds: 10),
-    );*/
+    );
 
     // Registramos la tarea para que corra cada 24h
-    Workmanager().registerPeriodicTask(
+    /*Workmanager().registerPeriodicTask(
       "1", // ID único de la tarea
       smartGoalTask,
       frequency: const Duration(hours: 24),
@@ -103,7 +105,7 @@ Future<void> main() async {
         networkType: NetworkType.connected, // Solo si hay internet
         requiresBatteryNotLow: true, // No agotar la batería del usuario
       ),
-    );
+    );*/
   } catch (e) {
     developer.log('🔥 Error iniciando Workmanager: $e', name: 'MainInit');
   }
@@ -254,7 +256,8 @@ class _MyAppState extends State<MyApp> {
           home: const AuthGate(),
           routes: {
             '/add_transaction': (context) => const AddTransactionScreen(),
-            // '/manifestations': (context) => const ManifestationsScreen(),
+            '/goals': (context) => const GoalsScreen(),
+            '/manifestations': (context) => const ManifestationsScreen(),
           },
         );
       },

@@ -1,5 +1,6 @@
 // lib/services/smart_notification_worker.dart
 
+import 'dart:convert';
 import 'dart:developer' as developer;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:intl/intl.dart';
@@ -89,19 +90,33 @@ void smartGoalDispatcher() {
           final recalculatedAmount = remainingAmount / periodsLeft;
           final amountStr = fmt.format(recalculatedAmount);
 
+          final payloadJson = jsonEncode({
+            'type': 'smart_goal_reminder',
+            'goal_id': goal.id,
+          });
+          
           // 3. ENVIAR NOTIFICACIÓN
           await localNotifier.show(
             goal.id.hashCode & 0x7FFFFFFF,
             '⚠️ Reajuste para: ${goal.name}',
             'No ahorraste $missedText. Tu nueva cuota es de $amountStr. Guárdalo hoy o es muy probable que te lo gastes en $topCategoryName.',
-            const NotificationDetails(
+             NotificationDetails(
               android: AndroidNotificationDetails(
                 'goal_reminders_channel', 'Recordatorios de Metas',
                 importance: Importance.max, priority: Priority.high,
-                styleInformation: BigTextStyleInformation(''), 
+                styleInformation: const BigTextStyleInformation(''),
+                // 👇 NUEVO: BOTÓN DE ACCIÓN
+                actions:[
+                  const AndroidNotificationAction(
+                    'AHORRAR_AHORA', 
+                    'Ahorrar ahora 💰',
+                    showsUserInterface: true, // Esto hace que la app se abra al tocar
+                  ),
+                ],
               ),
               iOS: DarwinNotificationDetails(presentAlert: true, presentSound: true),
             ),
+            payload: payloadJson,
           );
           
           developer.log('🔔[SmartWorker] Notificación lanzada: ${goal.name}', name: 'SmartWorker');
