@@ -1,201 +1,208 @@
 // lib/widgets/analysis_charts/category_comparison_chart.dart
+//
+// iOS: barras agrupadas este mes vs anterior, panel contextual al tocar,
+// sin headers redundantes, colores semánticos azul/teal.
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:sasper/models/analysis_models.dart';
-import 'package:sasper/widgets/shared/empty_state_card.dart';
 
-class CategoryComparisonChart extends StatelessWidget {
+const _kBlue  = Color(0xFF007AFF);
+const _kBlue2 = Color(0xFF5AC8FA);
+
+class CategoryComparisonChart extends StatefulWidget {
   final List<CategorySpendingComparisonData> data;
-
   const CategoryComparisonChart({super.key, required this.data});
 
   @override
-  Widget build(BuildContext context) {
-    // Filtramos los datos que no aportan información visual.
-    final filteredData = data.where((d) => d.currentMonthSpent > 0 || d.previousMonthSpent > 0).toList();
-
-    if (filteredData.isEmpty) {
-      return const EmptyStateCard(
-        title: 'Comparativa de Gastos',
-        message: 'No hay gastos suficientes este mes o el anterior para poder comparar.',
-        icon: Iconsax.chart_fail,
-      );
-    }
-
-    // El widget principal ahora es más legible.
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildHeader(context),
-        const SizedBox(height: 24),
-        _buildChartContainer(context, filteredData),
-        const SizedBox(height: 16),
-        _buildLegend(context),
-      ],
-    );
-  }
-
-  // --- WIDGETS HELPER PARA CONSTRUIR LA UI ---
-
-  Widget _buildHeader(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const Icon(Iconsax.chart_fail, size: 20),
-            const SizedBox(width: 8),
-            Text(
-              'Gastos: Mes Actual vs. Anterior',
-              style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Compara tus gastos por categoría con el mes pasado para identificar tendencias.',
-          style: textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-        ),
-      ],
-    );
-  }
-  
-  Widget _buildChartContainer(BuildContext context, List<CategorySpendingComparisonData> filteredData) {
-    return Container(
-      height: 300,
-      padding: const EdgeInsets.only(top: 16), // Padding ajustado
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withAlpha(50),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: BarChart(
-        // 1. TODA la configuración del gráfico ahora está en este método.
-        _buildBarChartData(context, filteredData),
-      ),
-    );
-  }
-
-  Widget _buildLegend(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _LegendItem(color: colorScheme.primary, text: 'Este Mes'),
-        const SizedBox(width: 24),
-        _LegendItem(color: colorScheme.secondary, text: 'Mes Pasado'),
-      ],
-    );
-  }
-  
-  // --- LÓGICA DE CONFIGURACIÓN DEL GRÁFICO (EXTRAÍDA) ---
-
-  BarChartData _buildBarChartData(BuildContext context, List<CategorySpendingComparisonData> filteredData) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return BarChartData(
-      // Propiedades del gráfico
-      barTouchData: BarTouchData(
-        touchTooltipData: BarTouchTooltipData(
-          getTooltipItem: (group, groupIndex, rod, rodIndex) {
-            //final item = filteredData[group.x.toInt()];
-            final amount = rod.toY;
-            final month = rodIndex == 0 ? "Este Mes" : "Mes Pasado";
-            return BarTooltipItem(
-              '${NumberFormat.currency(locale: 'es_CO', symbol: '\$').format(amount)}\n',
-              TextStyle(color: colorScheme.onInverseSurface, fontWeight: FontWeight.bold),
-              children: [
-                TextSpan(text: month, style: TextStyle(color: colorScheme.onInverseSurface, fontSize: 12)),
-              ],
-            );
-          },
-        ),
-      ),
-      // Generación de las barras
-      barGroups: List.generate(filteredData.length, (index) {
-        final item = filteredData[index];
-        return BarChartGroupData(
-          x: index,
-          barRods: [
-            BarChartRodData(toY: item.currentMonthSpent, color: colorScheme.primary, width: 14, borderRadius: BorderRadius.circular(4)),
-            BarChartRodData(toY: item.previousMonthSpent, color: colorScheme.secondary, width: 14, borderRadius: BorderRadius.circular(4)),
-          ],
-        );
-      }),
-      // Configuración de los ejes
-      titlesData: FlTitlesData(
-        show: true,
-        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        leftTitles: AxisTitles(
-          sideTitles: SideTitles(
-            showTitles: true,
-            reservedSize: 45,
-            getTitlesWidget: (value, meta) => _leftTitleWidgets(value, meta, textTheme),
-          ),
-        ),
-        bottomTitles: AxisTitles(
-          sideTitles: SideTitles(
-            showTitles: true,
-            reservedSize: 30,
-            getTitlesWidget: (value, meta) => _bottomTitleWidgets(value, meta, filteredData, textTheme),
-          ),
-        ),
-      ),
-      // Estilo de bordes y rejilla
-      borderData: FlBorderData(show: false),
-      gridData: FlGridData(
-        show: true,
-        drawVerticalLine: false,
-        getDrawingHorizontalLine: (value) => FlLine(color: colorScheme.onSurface.withOpacity(0.1), strokeWidth: 1),
-      ),
-    );
-  }
-  
-  // 2. LÓGICA DE TÍTULOS EXTRAÍDA para mayor claridad
-  Widget _leftTitleWidgets(double value, TitleMeta meta, TextTheme textTheme) {
-    if (value == meta.max || value == 0) return const SizedBox.shrink(); // No mostrar el título más alto ni el cero
-    return Text(
-      '${(value / 1000).toStringAsFixed(0)}k',
-      style: textTheme.bodySmall,
-    );
-  }
-
-  Widget _bottomTitleWidgets(double value, TitleMeta meta, List<CategorySpendingComparisonData> data, TextTheme textTheme) {
-    final index = value.toInt();
-    if (index >= data.length) return const SizedBox.shrink();
-    
-    final category = data[index].category;
-    // Lógica de abreviación mejorada
-    final title = category.length > 4 ? '${category.substring(0, 3)}.' : category;
-    
-    return SideTitleWidget(
-      space: 8.0,
-      meta: meta,
-      child: Text(title, style: textTheme.bodySmall),
-    );
-  }
+  State<CategoryComparisonChart> createState() => _CategoryComparisonChartState();
 }
 
-// 3. WIDGET REUTILIZABLE para los items de la leyenda
-class _LegendItem extends StatelessWidget {
-  final Color color;
-  final String text;
+class _CategoryComparisonChartState extends State<CategoryComparisonChart> {
+  int _touched = -1;
 
-  const _LegendItem({required this.color, required this.text});
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get _label  => _isDark ? Colors.white : const Color(0xFF1C1C1E);
+  Color get _label3 => _isDark ? const Color(0xFF8E8E93) : const Color(0xFF636366);
+  Color get _grid   => _isDark ? const Color(0xFF38383A) : const Color(0xFFE5E5EA);
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(width: 12, height: 12, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3))),
-        const SizedBox(width: 8),
-        Text(text, style: Theme.of(context).textTheme.bodySmall),
-      ],
+    final filtered = widget.data
+        .where((d) => d.currentMonthSpent > 0 || d.previousMonthSpent > 0)
+        .toList();
+
+    if (filtered.isEmpty) return const SizedBox.shrink();
+
+    final fmt = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+    final fmtCompact = NumberFormat.compactCurrency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+    final allValues = filtered.expand((d) => [d.currentMonthSpent, d.previousMonthSpent]);
+    final maxY = allValues.reduce((a, b) => a > b ? a : b) * 1.25;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 12, 16, 20),
+      child: Column(
+        children: [
+          // Panel del item tocado
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            child: _touched >= 0
+                ? Padding(
+                    key: ValueKey(_touched),
+                    padding: const EdgeInsets.only(left: 16, bottom: 12),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            filtered[_touched].category,
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _label),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            _pill(_kBlue, 'Este mes: ${fmt.format(filtered[_touched].currentMonthSpent)}'),
+                            const SizedBox(height: 4),
+                            _pill(_kBlue2, 'Anterior: ${fmt.format(filtered[_touched].previousMonthSpent)}'),
+                          ],
+                        ),
+                        const SizedBox(width: 16),
+                      ],
+                    ),
+                  )
+                : const SizedBox(key: ValueKey(-1), height: 0),
+          ),
+
+          SizedBox(
+            height: 200,
+            child: BarChart(BarChartData(
+              alignment: BarChartAlignment.spaceAround,
+              maxY: maxY,
+              barTouchData: BarTouchData(
+                touchTooltipData: BarTouchTooltipData(
+                  getTooltipColor: (_) => Colors.transparent,
+                  tooltipPadding: EdgeInsets.zero,
+                  getTooltipItem: (_, __, ___, ____) => null,
+                ),
+                touchCallback: (event, resp) {
+                  setState(() {
+                    if (!event.isInterestedForInteractions || resp?.spot == null) {
+                      _touched = -1;
+                      return;
+                    }
+                    HapticFeedback.selectionClick();
+                    _touched = resp!.spot!.touchedBarGroupIndex;
+                  });
+                },
+              ),
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                getDrawingHorizontalLine: (_) => FlLine(color: _grid, strokeWidth: 0.5),
+              ),
+              borderData: FlBorderData(show: false),
+              titlesData: FlTitlesData(
+                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 52,
+                    getTitlesWidget: (v, meta) {
+                      if (v == 0 || v == meta.max) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: Text(fmtCompact.format(v),
+                          style: TextStyle(fontSize: 10, color: _label3),
+                          textAlign: TextAlign.right,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 28,
+                    getTitlesWidget: (v, meta) {
+                      final i = v.toInt();
+                      if (i >= filtered.length) return const SizedBox.shrink();
+                      final cat = filtered[i].category;
+                      final lbl = cat.length > 5 ? '${cat.substring(0, 4)}.' : cat;
+                      final isHl = i == _touched;
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(lbl, style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: isHl ? FontWeight.w700 : FontWeight.w400,
+                          color: isHl ? _label : _label3,
+                        )),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              barGroups: List.generate(filtered.length, (i) {
+                final d = filtered[i];
+                final isHl = i == _touched;
+                final w = isHl ? 14.0 : 11.0;
+                return BarChartGroupData(
+                  x: i,
+                  barRods: [
+                    BarChartRodData(
+                      toY: d.currentMonthSpent,
+                      color: _kBlue.withOpacity(isHl ? 1.0 : 0.8),
+                      width: w,
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(5)),
+                    ),
+                    BarChartRodData(
+                      toY: d.previousMonthSpent,
+                      color: _kBlue2.withOpacity(isHl ? 1.0 : 0.7),
+                      width: w,
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(5)),
+                    ),
+                  ],
+                );
+              }),
+            )),
+          ),
+
+          const SizedBox(height: 16),
+
+          Padding(
+            padding: const EdgeInsets.only(left: 16),
+            child: Row(
+              children: [
+                _dot(_kBlue, 'Este mes'),
+                const SizedBox(width: 16),
+                _dot(_kBlue2, 'Mes anterior'),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
+
+  Widget _pill(Color color, String text) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(
+      color: color.withOpacity(_isDark ? 0.15 : 0.1),
+      borderRadius: BorderRadius.circular(6),
+    ),
+    child: Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
+  );
+
+  Widget _dot(Color color, String label) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+      const SizedBox(width: 6),
+      Text(label, style: TextStyle(fontSize: 12, color: _label3)),
+    ],
+  );
 }

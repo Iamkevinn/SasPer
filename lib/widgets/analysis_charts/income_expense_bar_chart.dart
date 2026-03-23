@@ -1,191 +1,194 @@
 // lib/widgets/analysis_charts/income_expense_bar_chart.dart
+//
+// iOS: barras agrupadas verde/rojo sin gradientes, sin headers redundantes,
+// tooltip que muestra el mes y ambos valores.
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:sasper/models/analysis_models.dart';
-import 'package:sasper/widgets/shared/empty_state_card.dart';
 
-class IncomeExpenseBarChart extends StatelessWidget {
+const _kGreen = Color(0xFF34C759);
+const _kRed   = Color(0xFFFF3B30);
+
+class IncomeExpenseBarChart extends StatefulWidget {
   final List<MonthlyIncomeExpenseSummaryData> data;
-
   const IncomeExpenseBarChart({super.key, required this.data});
 
   @override
-  Widget build(BuildContext context) {
-    if (data.isEmpty) {
-      return const EmptyStateCard(
-        title: 'Ingresos vs. Gastos',
-        message: 'Aún no hay suficientes datos para comparar tus ingresos y gastos mensuales.',
-        icon: Iconsax.chart,
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildHeader(context),
-        const SizedBox(height: 16),
-        _buildChartContainer(context),
-        const SizedBox(height: 12),
-        _buildLegend(context),
-      ],
-    );
-  }
-  
-  // --- WIDGETS HELPER PARA CONSTRUIR LA UI ---
-
-  Widget _buildHeader(BuildContext context) {
-    return Row(
-      children: [
-        const Icon(Iconsax.chart, size: 20),
-        const SizedBox(width: 8),
-        Text(
-          'Ingresos vs. Gastos',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildChartContainer(BuildContext context) {
-    return Container(
-      height: 300,
-      padding: const EdgeInsets.only(top: 20, right: 16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withAlpha(50),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: BarChart(
-        // 1. La configuración del gráfico se delega a este método.
-        _buildBarChartData(context),
-      ),
-    );
-  }
-
-  Widget _buildLegend(BuildContext context) {
-    // Usamos los mismos colores que en el gráfico para la leyenda
-    final incomeColor = Colors.green.shade400;
-    final expenseColor = Colors.red.shade400;
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _LegendItem(color: incomeColor, text: 'Ingresos'),
-        const SizedBox(width: 24),
-        _LegendItem(color: expenseColor, text: 'Gastos'),
-      ],
-    );
-  }
-
-  // --- LÓGICA DE CONFIGURACIÓN DEL GRÁFICO (EXTRAÍDA) ---
-
-  BarChartData _buildBarChartData(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final incomeColor = Colors.green.shade400;
-    final expenseColor = Colors.red.shade400;
-
-    return BarChartData(
-      alignment: BarChartAlignment.spaceAround,
-      barTouchData: _buildBarTouchData(context),
-      titlesData: FlTitlesData(
-        show: true,
-        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        bottomTitles: AxisTitles(
-          sideTitles: SideTitles(
-            showTitles: true,
-            reservedSize: 30,
-            getTitlesWidget: (value, meta) => _bottomTitleWidgets(value, meta, textTheme),
-          ),
-        ),
-        leftTitles: AxisTitles(
-          sideTitles: SideTitles(
-            showTitles: true,
-            reservedSize: 45,
-            getTitlesWidget: (value, meta) => _leftTitleWidgets(value, meta, textTheme),
-          ),
-        ),
-      ),
-      borderData: FlBorderData(show: false),
-      gridData: FlGridData(
-        show: true,
-        drawVerticalLine: false,
-        getDrawingHorizontalLine: (value) => FlLine(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.1), strokeWidth: 1),
-      ),
-      barGroups: List.generate(data.length, (index) {
-        final item = data[index];
-        return BarChartGroupData(
-          x: index,
-          barRods: [
-            BarChartRodData(toY: item.totalIncome, color: incomeColor, width: 14, borderRadius: BorderRadius.circular(4)),
-            BarChartRodData(toY: item.totalExpense, color: expenseColor, width: 14, borderRadius: BorderRadius.circular(4)),
-          ],
-        );
-      }),
-    );
-  }
-
-  BarTouchData _buildBarTouchData(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final currencyFormatter = NumberFormat.currency(locale: 'es_CO', symbol: '\$');
-
-    return BarTouchData(
-      touchTooltipData: BarTouchTooltipData(
-        getTooltipColor: (group) => colorScheme.secondaryContainer,
-        getTooltipItem: (group, groupIndex, rod, rodIndex) {
-          final rodName = rodIndex == 0 ? 'Ingreso' : 'Gasto';
-          return BarTooltipItem(
-            '$rodName\n',
-            TextStyle(color: colorScheme.onSecondaryContainer, fontWeight: FontWeight.bold, fontSize: 14),
-            children: <TextSpan>[
-              TextSpan(
-                text: currencyFormatter.format(rod.toY),
-                style: TextStyle(color: colorScheme.onSecondaryContainer, fontSize: 12, fontWeight: FontWeight.w500),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  // 2. LÓGICA DE TÍTULOS EXTRAÍDA
-  Widget _bottomTitleWidgets(double value, TitleMeta meta, TextTheme textTheme) {
-    final index = value.toInt();
-    if (index >= data.length) return const SizedBox.shrink();
-    
-    final title = DateFormat.MMM('es_CO').format(data[index].monthStart);
-    return SideTitleWidget(
-      space: 8.0,
-      meta: meta,
-      child: Text(title, style: textTheme.bodySmall),
-    );
-  }
-
-  Widget _leftTitleWidgets(double value, TitleMeta meta, TextTheme textTheme) {
-    if (value == 0) return const Text('0', style: TextStyle(fontSize: 10));
-    if (value == meta.max) return const SizedBox.shrink();
-    
-    return Text('${(value / 1000).toStringAsFixed(0)}k', style: textTheme.bodySmall);
-  }
+  State<IncomeExpenseBarChart> createState() => _IncomeExpenseBarChartState();
 }
 
-// Widget reutilizable para la leyenda
-class _LegendItem extends StatelessWidget {
-  final Color color;
-  final String text;
+class _IncomeExpenseBarChartState extends State<IncomeExpenseBarChart> {
+  int _touched = -1;
 
-  const _LegendItem({required this.color, required this.text});
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get _label  => _isDark ? Colors.white : const Color(0xFF1C1C1E);
+  Color get _label3 => _isDark ? const Color(0xFF8E8E93) : const Color(0xFF636366);
+  Color get _grid   => _isDark ? const Color(0xFF38383A) : const Color(0xFFE5E5EA);
 
   @override
   Widget build(BuildContext context) {
+    if (widget.data.isEmpty) return const SizedBox.shrink();
+
+    final fmt = NumberFormat.compactCurrency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+    final fmtFull = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+
+    final allValues = widget.data.expand((d) => [d.totalIncome, d.totalExpense]);
+    final maxY = allValues.reduce((a, b) => a > b ? a : b) * 1.25;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 12, 16, 20),
+      child: Column(
+        children: [
+          // Panel del mes seleccionado
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            child: _touched >= 0
+                ? Padding(
+                    key: ValueKey(_touched),
+                    padding: const EdgeInsets.only(left: 16, bottom: 12),
+                    child: Row(
+                      children: [
+                        Text(
+                          DateFormat.yMMMM('es_CO').format(widget.data[_touched].monthStart),
+                          style: TextStyle(fontSize: 13, color: _label3),
+                        ),
+                        const Spacer(),
+                        _miniPill(_kGreen, fmtFull.format(widget.data[_touched].totalIncome)),
+                        const SizedBox(width: 8),
+                        _miniPill(_kRed, fmtFull.format(widget.data[_touched].totalExpense)),
+                        const SizedBox(width: 16),
+                      ],
+                    ),
+                  )
+                : const SizedBox(key: ValueKey(-1), height: 0),
+          ),
+          SizedBox(
+            height: 180,
+            child: BarChart(BarChartData(
+              alignment: BarChartAlignment.spaceAround,
+              maxY: maxY,
+              barTouchData: BarTouchData(
+                touchTooltipData: BarTouchTooltipData(
+                  getTooltipColor: (_) => Colors.transparent,
+                  tooltipPadding: EdgeInsets.zero,
+                  getTooltipItem: (_, __, ___, ____) => null,
+                ),
+                touchCallback: (event, resp) {
+                  setState(() {
+                    if (!event.isInterestedForInteractions || resp?.spot == null) {
+                      _touched = -1;
+                      return;
+                    }
+                    HapticFeedback.selectionClick();
+                    _touched = resp!.spot!.touchedBarGroupIndex;
+                  });
+                },
+              ),
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                getDrawingHorizontalLine: (_) => FlLine(color: _grid, strokeWidth: 0.5),
+              ),
+              borderData: FlBorderData(show: false),
+              titlesData: FlTitlesData(
+                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 52,
+                    getTitlesWidget: (v, meta) {
+                      if (v == 0 || v == meta.max) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: Text(fmt.format(v),
+                          style: TextStyle(fontSize: 10, color: _label3),
+                          textAlign: TextAlign.right,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 28,
+                    getTitlesWidget: (v, meta) {
+                      final i = v.toInt();
+                      if (i >= widget.data.length) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(
+                          DateFormat.MMM('es_CO').format(widget.data[i].monthStart),
+                          style: TextStyle(fontSize: 11, color: _label3),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              barGroups: List.generate(widget.data.length, (i) {
+                final d = widget.data[i];
+                final isTouched = i == _touched;
+                final w = isTouched ? 14.0 : 11.0;
+                return BarChartGroupData(
+                  x: i,
+                  groupVertically: false,
+                  barRods: [
+                    BarChartRodData(
+                      toY: d.totalIncome,
+                      color: _kGreen.withOpacity(isTouched ? 1.0 : 0.75),
+                      width: w,
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(5)),
+                    ),
+                    BarChartRodData(
+                      toY: d.totalExpense,
+                      color: _kRed.withOpacity(isTouched ? 1.0 : 0.75),
+                      width: w,
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(5)),
+                    ),
+                  ],
+                );
+              }),
+            )),
+          ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.only(left: 16),
+            child: Row(
+              children: [
+                _legendDot(_kGreen, 'Ingresos'),
+                const SizedBox(width: 16),
+                _legendDot(_kRed, 'Gastos'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _miniPill(Color color, String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(_isDark ? 0.15 : 0.1),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
+    );
+  }
+
+  Widget _legendDot(Color color, String label) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Container(width: 12, height: 12, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3))),
-        const SizedBox(width: 8),
-        Text(text, style: Theme.of(context).textTheme.bodySmall),
+        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        const SizedBox(width: 6),
+        Text(label, style: TextStyle(fontSize: 12, color: _label3)),
       ],
     );
   }

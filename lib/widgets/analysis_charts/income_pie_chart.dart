@@ -1,202 +1,147 @@
 // lib/widgets/analysis_charts/income_pie_chart.dart
+//
+// iOS: mismo patrón que expense_pie_chart pero paleta verde/azul para ingresos.
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:sasper/models/analysis_models.dart';
-import 'package:sasper/widgets/shared/empty_state_card.dart';
+
+const _kColors = [
+  Color(0xFF34C759),
+  Color(0xFF007AFF),
+  Color(0xFF5AC8FA),
+  Color(0xFFAF52DE),
+  Color(0xFF30B0C7),
+  Color(0xFF32ADE6),
+  Color(0xFF636366),
+];
 
 class IncomePieChart extends StatefulWidget {
   final List<IncomeByCategory> data;
-
   const IncomePieChart({super.key, required this.data});
-  
-  // La paleta de colores se puede mantener estática
-  static const List<Color> _chartColors = [
-    Color(0xFF2196F3), Color(0xFF4CAF50), Color(0xFFFF9800), 
-    Color(0xFF9C27B0), Color(0xFF009688), Color(0xFFE91E63), 
-    Color(0xFF3F51B5),
-  ];
 
   @override
   State<IncomePieChart> createState() => _IncomePieChartState();
 }
 
 class _IncomePieChartState extends State<IncomePieChart> {
-  int? _touchedIndex;
+  int _touched = -1;
+
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get _label  => _isDark ? Colors.white : const Color(0xFF1C1C1E);
+  Color get _label3 => _isDark ? const Color(0xFF8E8E93) : const Color(0xFF636366);
+  Color get _label2 => _isDark ? const Color(0xFFEBEBF5) : const Color(0xFF3A3A3C);
 
   @override
   Widget build(BuildContext context) {
-    if (widget.data.isEmpty) {
-      return _buildEmptyState();
-    }
-    final double totalIncome = widget.data.fold(0, (sum, item) => sum + item.totalIncome);
-    if (totalIncome == 0) {
-      return _buildEmptyState();
-    }
-    
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildHeader(context),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface.withAlpha(50),
-            borderRadius: BorderRadius.circular(20),
+    final total = widget.data.fold<double>(0, (s, e) => s + e.totalIncome);
+    if (total == 0) return const SizedBox.shrink();
+
+    final fmt = NumberFormat.compactCurrency(locale: 'es_CO', symbol: '\$', decimalDigits: 1);
+    final fmtFull = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+
+    final sorted = [...widget.data]..sort((a, b) => b.totalIncome.compareTo(a.totalIncome));
+    final top = sorted.take(6).toList();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+      child: Column(
+        children: [
+          SizedBox(
+            height: 180,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                PieChart(PieChartData(
+                  sectionsSpace: 2,
+                  centerSpaceRadius: 54,
+                  pieTouchData: PieTouchData(
+                    touchCallback: (event, resp) {
+                      setState(() {
+                        if (!event.isInterestedForInteractions || resp?.touchedSection == null) {
+                          _touched = -1;
+                          return;
+                        }
+                        HapticFeedback.selectionClick();
+                        _touched = resp!.touchedSection!.touchedSectionIndex;
+                      });
+                    },
+                  ),
+                  sections: List.generate(top.length, (i) {
+                    final isTouched = i == _touched;
+                    final pct = top[i].totalIncome / total * 100;
+                    return PieChartSectionData(
+                      color: _kColors[i % _kColors.length],
+                      value: top[i].totalIncome,
+                      radius: isTouched ? 56 : 46,
+                      title: pct > 8 ? '${pct.toStringAsFixed(0)}%' : '',
+                      titleStyle: const TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white,
+                      ),
+                    );
+                  }),
+                )),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _touched >= 0 ? fmt.format(top[_touched].totalIncome) : fmt.format(total),
+                      style: TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: -0.5,
+                        color: _touched >= 0 ? _kColors[_touched % _kColors.length] : _label,
+                      ),
+                    ),
+                    Text(
+                      _touched >= 0 ? top[_touched].category : 'Total ingresos',
+                      style: TextStyle(fontSize: 11, color: _label3),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-          child: Column(
-            children: [
-              SizedBox(
-                height: 200,
-                child: PieChart(
-                  _buildPieChartData(totalIncome),
+          const SizedBox(height: 16),
+          ...List.generate(top.length, (i) {
+            final item = top[i];
+            final color = _kColors[i % _kColors.length];
+            final pct = item.totalIncome / total * 100;
+            final isHl = i == _touched;
+            return GestureDetector(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                setState(() => _touched = _touched == i ? -1 : i);
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 140),
+                margin: const EdgeInsets.only(bottom: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+                decoration: BoxDecoration(
+                  color: isHl ? color.withOpacity(_isDark ? 0.15 : 0.08) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(item.category,
+                        style: TextStyle(fontSize: 14, fontWeight: isHl ? FontWeight.w600 : FontWeight.w400, color: _label2),
+                      ),
+                    ),
+                    Text('${pct.toStringAsFixed(0)}%', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: _label3)),
+                    const SizedBox(width: 12),
+                    Text(fmtFull.format(item.totalIncome),
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: isHl ? color : _label),
+                    ),
+                  ],
                 ),
               ),
-              const Divider(height: 32, thickness: 0.5),
-              _buildLegend(context),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return const EmptyStateCard(
-      title: 'Fuentes de Ingreso',
-      message: 'Aún no has registrado ingresos este mes.',
-      icon: Iconsax.money_add,
-    );
-  }
-
-  Widget _buildHeader(BuildContext context) {
-    return Row(
-      children: [
-        const Icon(Iconsax.money_add, size: 20),
-        const SizedBox(width: 8),
-        Text(
-          'Ingresos del Mes por Categoría',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLegend(BuildContext context) {
-    return Wrap(
-      spacing: 16.0,
-      runSpacing: 10.0,
-      alignment: WrapAlignment.center,
-      children: widget.data.asMap().entries.map((entry) {
-        final index = entry.key;
-        final item = entry.value;
-        return _LegendItem(
-          color: IncomePieChart._chartColors[index % IncomePieChart._chartColors.length],
-          text: item.category,
-        );
-      }).toList(),
-    );
-  }
-
-  // --- LÓGICA DE CONFIGURACIÓN DEL GRÁFICO (EXTRAÍDA) ---
-
-  PieChartData _buildPieChartData(double totalIncome) {
-    return PieChartData(
-      pieTouchData: PieTouchData(
-        touchCallback: (FlTouchEvent event, pieTouchResponse) {
-          setState(() {
-            if (!event.isInterestedForInteractions ||
-                pieTouchResponse == null ||
-                pieTouchResponse.touchedSection == null) {
-              _touchedIndex = -1;
-              return;
-            }
-            _touchedIndex = pieTouchResponse.touchedSection!.touchedSectionIndex;
-          });
-        },
-      ),
-      sectionsSpace: 3,
-      centerSpaceRadius: 60,
-      sections: List.generate(widget.data.length, (index) {
-        final item = widget.data[index];
-        final isTouched = index == _touchedIndex;
-        final percentage = (item.totalIncome / totalIncome) * 100;
-        
-        final double radius = isTouched ? 60.0 : 50.0;
-        final double fontSize = isTouched ? 16.0 : 14.0;
-        final Color color = IncomePieChart._chartColors[index % IncomePieChart._chartColors.length];
-
-        return PieChartSectionData(
-          color: color,
-          value: item.totalIncome,
-          title: percentage > 7 ? '${percentage.toStringAsFixed(0)}%' : '',
-          radius: radius,
-          titleStyle: TextStyle(
-            fontSize: fontSize,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-            shadows: const [Shadow(color: Colors.black38, blurRadius: 3)],
-          ),
-          badgeWidget: isTouched ? _buildTooltipBadge(item.category, item.totalIncome, color) : null,
-          badgePositionPercentageOffset: .98,
-        );
-      }),
-    );
-  }
-
-  Widget _buildTooltipBadge(String category, double amount, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(8),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 4,
-            offset: const Offset(2, 2),
-          ),
+            );
+          }),
         ],
       ),
-      child: Text(
-        '$category\n${NumberFormat.currency(locale: 'es_CO', symbol: '\$').format(amount)}',
-        textAlign: TextAlign.center,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
-}
-
-// Widget reutilizable para los items de la leyenda
-class _LegendItem extends StatelessWidget {
-  final Color color;
-  final String text;
-
-  const _LegendItem({required this.color, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(3),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(text, style: Theme.of(context).textTheme.bodyMedium),
-      ],
     );
   }
 }

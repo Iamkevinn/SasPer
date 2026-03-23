@@ -2,93 +2,90 @@
 //
 // ┌─────────────────────────────────────────────────────────────────────────────┐
 // │  FILOSOFÍA DE DISEÑO — Apple iOS                                            │
-// │  • El AppBar no compite con el contenido. Título con padding generoso.     │
-// │  • Jerarquía de información: insight principal → stats → gráficos.         │
-// │  • Cada sección respira. El espacio en blanco es intencional.              │
-// │  • Colores semánticos vivos pero controlados — siempre adaptativos.        │
-// │  • El ícono de IA tiene su momento; no pulsa constantemente.               │
-// │  • Las tarjetas de gráficos son contenedores neutros: el gráfico habla.    │
+// │  • Jerarquía absoluta: insight → métricas → descubrimientos → gráficos.   │
+// │  • Cada elemento tiene un propósito. Nada existe por decoración.           │
+// │  • Animaciones de entrada escalonadas (stagger). Sin loops ni pulsos.      │
+// │  • Colores semánticos únicamente donde codifican significado real.         │
+// │  • El espacio en blanco es parte del diseño, no ausencia de él.            │
+// │  • Separadores .5px en lugar de cards anidadas para agrupar contexto.      │
 // └─────────────────────────────────────────────────────────────────────────────┘
 
 import 'dart:async';
 import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:sasper/utils/NotificationHelper.dart';
-import 'package:sasper/widgets/analysis_charts/average_analysis_section.dart';
-import 'package:sasper/widgets/analysis_charts/mood_by_day_chart.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:intl/intl.dart';
+import 'package:lottie/lottie.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'package:sasper/data/analysis_repository.dart';
 import 'package:sasper/models/analysis_models.dart';
 import 'package:sasper/models/insight_model.dart';
-import 'package:lottie/lottie.dart';
-import 'package:sasper/widgets/analysis_charts/mood_spending_analysis_card.dart';
-import 'package:sasper/widgets/analysis_charts/heatmap_section.dart';
-import 'package:sasper/widgets/analysis_charts/monthly_cashflow_chart.dart';
-import 'package:sasper/widgets/analysis_charts/net_worth_trend_chart.dart';
-import 'package:sasper/widgets/analysis_charts/income_expense_bar_chart.dart';
+import 'package:sasper/utils/NotificationHelper.dart';
+import 'package:sasper/widgets/analysis_charts/average_analysis_section.dart';
 import 'package:sasper/widgets/analysis_charts/category_comparison_chart.dart';
 import 'package:sasper/widgets/analysis_charts/expense_pie_chart.dart';
+import 'package:sasper/widgets/analysis_charts/heatmap_section.dart';
+import 'package:sasper/widgets/analysis_charts/income_expense_bar_chart.dart';
 import 'package:sasper/widgets/analysis_charts/income_pie_chart.dart';
+import 'package:sasper/widgets/analysis_charts/monthly_cashflow_chart.dart';
+import 'package:sasper/widgets/analysis_charts/mood_by_day_chart.dart';
+import 'package:sasper/widgets/analysis_charts/mood_spending_analysis_card.dart';
+import 'package:sasper/widgets/analysis_charts/net_worth_trend_chart.dart';
 import 'package:sasper/widgets/analysis/insight_card.dart';
-import 'package:intl/intl.dart';
 
-// ─── TOKENS DINÁMICOS ────────────────────────────────────────────────────────
-class _C {
-  final BuildContext ctx;
-  _C(this.ctx);
+// ─── TOKENS DE DISEÑO iOS ────────────────────────────────────────────────────
+abstract class _iOS {
+  // Fondos y superficies
+  static Color bg(BuildContext ctx) =>
+      _dark(ctx) ? const Color(0xFF000000) : const Color(0xFFF2F2F7);
+  static Color surface(BuildContext ctx) =>
+      _dark(ctx) ? const Color(0xFF1C1C1E) : Colors.white;
+  static Color surface2(BuildContext ctx) =>
+      _dark(ctx) ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F7);
 
-  bool get isDark => Theme.of(ctx).brightness == Brightness.dark;
+  // Texto (jerarquía de 4 niveles, igual que UIKit)
+  static Color label(BuildContext ctx) =>
+      _dark(ctx) ? Colors.white : const Color(0xFF1C1C1E);
+  static Color label2(BuildContext ctx) =>
+      _dark(ctx) ? const Color(0xFFEBEBF5) : const Color(0xFF3A3A3C);
+  static Color label3(BuildContext ctx) =>
+      _dark(ctx) ? const Color(0xFF8E8E93) : const Color(0xFF636366);
+  static Color label4(BuildContext ctx) =>
+      _dark(ctx) ? const Color(0xFF48484A) : const Color(0xFFAEAEB2);
 
-  // Superficies
-  Color get bg =>
-      isDark ? const Color(0xFF000000) : const Color(0xFFF2F2F7);
-  Color get surface =>
-      isDark ? const Color(0xFF1C1C1E) : Colors.white;
-  Color get surfaceRaised =>
-      isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF5F5F7);
-  Color get separator =>
-      isDark ? const Color(0xFF38383A) : const Color(0xFFE5E5EA);
+  // Separador
+  static Color sep(BuildContext ctx) => _dark(ctx)
+      ? const Color(0xFF38383A)
+      : const Color(0xFFE5E5EA);
 
-  // Texto
-  Color get label =>
-      isDark ? const Color(0xFFFFFFFF) : const Color(0xFF1C1C1E);
-  Color get label2 =>
-      isDark ? const Color(0xFFEBEBF5) : const Color(0xFF3A3A3C);
-  Color get label3 =>
-      isDark ? const Color(0xFF8E8E93) : const Color(0xFF636366);
-  Color get label4 =>
-      isDark ? const Color(0xFF48484A) : const Color(0xFFAEAEB2);
-
-  // Semánticos — iOS colors
-  static const Color expense = Color(0xFFFF3B30);
-  static const Color income  = Color(0xFF30D158);
-  static const Color warning = Color(0xFFFF9F0A);
-  static const Color accent  = Color(0xFF0A84FF);
-  static const Color purple  = Color(0xFFBF5AF2);
+  // Colores semánticos iOS
+  static const Color blue   = Color(0xFF007AFF);
+  static const Color green  = Color(0xFF34C759);
+  static const Color red    = Color(0xFFFF3B30);
+  static const Color orange = Color(0xFFFF9F0A);
+  static const Color purple = Color(0xFFAF52DE);
+  static const Color teal   = Color(0xFF5AC8FA);
 
   // Espaciado
-  static const double sm  = 8.0;
-  static const double md  = 16.0;
-  static const double lg  = 24.0;
-  static const double xl  = 32.0;
+  static const double sm = 8.0;
+  static const double md = 16.0;
+  static const double lg = 24.0;
+  static const double xl = 32.0;
 
   // Radios
-  static const double rSM = 8.0;
-  static const double rMD = 12.0;
-  static const double rLG = 16.0;
-  static const double rXL = 20.0;
+  static const double rSM = 10.0;
+  static const double rMD = 14.0;
+  static const double rLG = 18.0;
+  static const double rXL = 22.0;
 
-  // Animaciones
-  static const Duration fast  = Duration(milliseconds: 150);
-  static const Duration mid   = Duration(milliseconds: 280);
-  static const Duration slow  = Duration(milliseconds: 440);
-  static const Curve curveOut = Curves.easeOutCubic;
+  static bool _dark(BuildContext ctx) =>
+      Theme.of(ctx).brightness == Brightness.dark;
 }
 
-// ─── PANTALLA PRINCIPAL ──────────────────────────────────────────────────────
+// ─── PANTALLA ────────────────────────────────────────────────────────────────
 class AnalysisScreen extends StatefulWidget {
   const AnalysisScreen({super.key});
 
@@ -98,534 +95,488 @@ class AnalysisScreen extends StatefulWidget {
 
 class AnalysisScreenState extends State<AnalysisScreen>
     with SingleTickerProviderStateMixin {
-  final AnalysisRepository _repository = AnalysisRepository.instance;
+  final _repo = AnalysisRepository.instance;
 
-  late Future<({AnalysisData charts, List<Insight> insights})> _analysisFuture;
-
-  RealtimeChannel? _realtimeChannel;
+  late Future<({AnalysisData charts, List<Insight> insights})> _future;
+  RealtimeChannel? _channel;
   Timer? _debounce;
 
-  // Controlador de animación del ícono IA — solo en la entrada, no en bucle
-  late AnimationController _aiEntryController;
+  // Controlador de entrada del ícono IA — una vez, no en bucle
+  late AnimationController _aiCtrl;
   late Animation<double> _aiScale;
   late Animation<double> _aiOpacity;
 
   @override
   void initState() {
     super.initState();
-    _analysisFuture = _fetchAllScreenData();
-    _setupRealtimeSubscription();
+    _future = _load();
+    _setupRealtime();
 
-    // Entra suavemente una sola vez — no pulsa infinitamente
-    _aiEntryController = AnimationController(
-      duration: const Duration(milliseconds: 600),
+    _aiCtrl = AnimationController(
       vsync: this,
+      duration: const Duration(milliseconds: 600),
     );
-
-    _aiScale = Tween<double>(begin: 0.6, end: 1.0).animate(
-      CurvedAnimation(parent: _aiEntryController, curve: Curves.elasticOut),
+    _aiScale = Tween<double>(begin: 0.5, end: 1.0).animate(
+      CurvedAnimation(parent: _aiCtrl, curve: Curves.elasticOut),
     );
-
     _aiOpacity = CurvedAnimation(
-      parent: _aiEntryController,
+      parent: _aiCtrl,
       curve: const Interval(0.0, 0.5, curve: Curves.easeOut),
     );
-
-    // Inicia la animación del ícono IA con un delay
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted) _aiEntryController.forward();
+    Future.delayed(const Duration(milliseconds: 400), () {
+      if (mounted) _aiCtrl.forward();
     });
   }
 
-  // Dentro de AnalysisScreenState
-
-Future<void> _dismissInsight(String id) async {
-  HapticFeedback.mediumImpact();
-  
-  try {
-    // 1. Solo llamamos al repositorio.
-    // El RealtimeChannel de initState() se encargará de refrescar la UI 
-    // automáticamente cuando detecte el cambio en la base de datos.
-    await _repository.markInsightAsRead(id);
-    
-    developer.log('Insight marcado como leído en BD: $id');
-  } catch (e) {
-    developer.log('Error eliminando insight: $e');
-    if (mounted) {
-      NotificationHelper.show(
-        message: 'No se pudo ocultar el consejo',
-        type: NotificationType.error
-      );
-    }
-  }
-}
-
-  Future<({AnalysisData charts, List<Insight> insights})>
-      _fetchAllScreenData() async {
+  Future<({AnalysisData charts, List<Insight> insights})> _load() async {
     final results = await Future.wait([
-      _repository.fetchAllAnalysisData().catchError((e) {
-        developer.log('Error gráficos', name: 'AnalysisScreen', error: e);
-        return AnalysisData.empty();
-      }),
-      _repository.getInsights().catchError((e) {
-        developer.log('Error insights', name: 'AnalysisScreen', error: e);
-        return <Insight>[];
-      }),
+      _repo.fetchAllAnalysisData().catchError((_) => AnalysisData.empty()),
+      _repo.getInsights().catchError((_) => <Insight>[]),
     ]);
     return (
       charts: results[0] as AnalysisData,
-      insights: results[1] as List<Insight>
+      insights: results[1] as List<Insight>,
     );
   }
 
-  void _setupRealtimeSubscription() {
-    final client = Supabase.instance.client;
-    _realtimeChannel = client
-        .channel('public:analysis_screen_updates')
+  void _setupRealtime() {
+    _channel = Supabase.instance.client
+        .channel('analysis_v2')
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'transactions',
-          callback: (_) => _triggerRefreshWithDebounce(),
+          callback: (_) => _debounceRefresh(),
         )
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'insights',
-          callback: (_) => _triggerRefreshWithDebounce(),
+          callback: (_) => _debounceRefresh(),
         )
         .subscribe();
   }
 
-  void _triggerRefreshWithDebounce() {
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
+  void _debounceRefresh() {
+    _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 700), () {
-      if (mounted) _handleRefresh();
+      if (mounted) _refresh();
     });
+  }
+
+  Future<void> _refresh() async {
+    if (!mounted) return;
+    setState(() => _future = _load());
+  }
+
+  Future<void> _dismissInsight(String id) async {
+    HapticFeedback.mediumImpact();
+    try {
+      await _repo.markInsightAsRead(id);
+    } catch (e) {
+      developer.log('Error dismissing insight: $e');
+      if (mounted) {
+        NotificationHelper.show(
+          message: 'No se pudo ocultar el consejo',
+          type: NotificationType.error,
+        );
+      }
+    }
   }
 
   @override
   void dispose() {
-    if (_realtimeChannel != null) {
-      Supabase.instance.client.removeChannel(_realtimeChannel!);
+    if (_channel != null) {
+      Supabase.instance.client.removeChannel(_channel!);
     }
     _debounce?.cancel();
-    _aiEntryController.dispose();
+    _aiCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _handleRefresh() async {
-  if (!mounted) return;
-
-  // 1. Iniciamos la carga fuera del setState
-  final refreshedData = _fetchAllScreenData();
-
-  // 2. Actualizamos la variable de estado sincronamente
-  setState(() {
-    _analysisFuture = refreshedData;
-  });
-}
-
+  // ─── BUILD ────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final c = _C(context);
-
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness:
-            c.isDark ? Brightness.light : Brightness.dark,
-        statusBarBrightness:
-            c.isDark ? Brightness.dark : Brightness.light,
+            Theme.of(context).brightness == Brightness.dark
+                ? Brightness.light
+                : Brightness.dark,
       ),
       child: Scaffold(
-        backgroundColor: c.bg,
-        body: RefreshIndicator(
-          onRefresh: _handleRefresh,
-          color: _C.accent,
-          strokeWidth: 1.5,
-          child: FutureBuilder<({AnalysisData charts, List<Insight> insights})>(
-            future: _analysisFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return _SkeletonLoader(c: c);
-              }
-              if (snapshot.hasError) {
-                return _ErrorState(
-                    error: '${snapshot.error}', c: c,
-                    onRetry: _handleRefresh);
-              }
-              if (!snapshot.hasData) {
-                return _EmptyState(c: c, onRefresh: _handleRefresh);
-              }
-
-              final data = snapshot.data!;
-              if (!data.charts.hasData && data.insights.isEmpty) {
-                return _EmptyState(c: c, onRefresh: _handleRefresh);
-              }
-
-              return _buildContent(data.charts, data.insights, c);
-            },
-          ),
+        backgroundColor: _iOS.bg(context),
+        body: FutureBuilder<({AnalysisData charts, List<Insight> insights})>(
+          future: _future,
+          builder: (ctx, snap) {
+            if (snap.connectionState == ConnectionState.waiting) {
+              return _SkeletonLoader(context);
+            }
+            if (snap.hasError) {
+              return _ErrorState(
+                error: '${snap.error}',
+                onRetry: _refresh,
+              );
+            }
+            if (!snap.hasData ||
+                (!snap.data!.charts.hasData &&
+                    snap.data!.insights.isEmpty)) {
+              return _EmptyState(onRefresh: _refresh);
+            }
+            return _Content(
+              charts: snap.data!.charts,
+              insights: snap.data!.insights,
+              aiCtrl: _aiCtrl,
+              aiScale: _aiScale,
+              aiOpacity: _aiOpacity,
+              onDismiss: _dismissInsight,
+              onRefresh: _refresh,
+            );
+          },
         ),
       ),
     );
   }
+}
 
-  // ── Contenido principal ──────────────────────────────────────────────────
-  Widget _buildContent(
-      AnalysisData chartData, List<Insight> insights, _C c) {
-    return CustomScrollView(
-      physics: const BouncingScrollPhysics(),
-      slivers: [
-        // ── HEADER ────────────────────────────────────────────────────────
-        _buildSliverHeader(insights, c),
+// ─── CONTENIDO PRINCIPAL ─────────────────────────────────────────────────────
+class _Content extends StatelessWidget {
+  final AnalysisData charts;
+  final List<Insight> insights;
+  final AnimationController aiCtrl;
+  final Animation<double> aiScale;
+  final Animation<double> aiOpacity;
+  final Future<void> Function(String) onDismiss;
+  final Future<void> Function() onRefresh;
 
-        // ── INSIGHT HERO ──────────────────────────────────────────────────
-        if (insights.isNotEmpty)
-          SliverToBoxAdapter(
-            child: _FadeSlide(
-              delay: 60,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                    _C.md, _C.md, _C.md, 0),
-                child: _HeroInsightCard(
-                    insight: insights.first, c: c,onDismiss: () => _dismissInsight(insights.first.id),),
-              ),
-            ),
-          ),
+  const _Content({
+    required this.charts,
+    required this.insights,
+    required this.aiCtrl,
+    required this.aiScale,
+    required this.aiOpacity,
+    required this.onDismiss,
+    required this.onRefresh,
+  });
 
-        // ── QUICK STATS ───────────────────────────────────────────────────
-        SliverToBoxAdapter(
-          child: _FadeSlide(
-            delay: 100,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                  _C.md, _C.md, _C.md, 0),
-              child: _QuickStats(data: chartData, c: c),
-            ),
-          ),
-        ),
-
-        // ── INSIGHTS SECUNDARIOS ──────────────────────────────────────────
-        if (insights.length > 1) ...[
-          SliverToBoxAdapter(
-            child: _SectionLabel(
-              label: 'Descubrimientos clave',
-              c: c,
-              topPadding: _C.lg,
-            ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: _C.md),
-            sliver: SliverList.separated(
-              itemCount: insights.length - 1,
-              separatorBuilder: (_, __) =>
-                  const SizedBox(height: _C.sm + 2),
-              itemBuilder: (context, i) => _FadeSlide(
-  delay: 140 + i * 50,
-  child: InsightCard(
-    insight: insights[i + 1], 
-    onDismiss: () => _dismissInsight(insights[i + 1].id), // 👈 El cierre debe estar AQUÍ
-  ), 
-),
-            ),
-          ),
-        ],
-
-        // ── GRÁFICOS ──────────────────────────────────────────────────────
-        if (chartData.hasData) ...[
-          SliverToBoxAdapter(
-            child: _SectionLabel(
-              label: 'Análisis detallado',
-              c: c,
-              topPadding: _C.lg,
-            ),
-          ),
-
-          _chartSliver(
-            delay: 160,
-            title: 'Tendencia patrimonial',
-            subtitle: 'Tu evolución financiera',
-            icon: Iconsax.trend_up,
-            color: _C.accent,
-            c: c,
-            visible: chartData.netWorthLineData.isNotEmpty,
-            child: NetWorthTrendChart(data: chartData.netWorthLineData),
-          ),
-
-          _chartSliver(
-            delay: 200,
-            title: 'Análisis emocional',
-            subtitle: 'Cómo tu ánimo afecta tus finanzas',
-            icon: Iconsax.emoji_happy,
-            color: _C.purple,
-            c: c,
-            visible: chartData.moodAnalysisData.isNotEmpty,
-            highlight: true,
-            child: MoodSpendingAnalysisCard(
-                analysisData: chartData.moodAnalysisData),
-          ),
-
-          _chartSliver(
-            delay: 240,
-            title: 'Flujo de efectivo',
-            subtitle: 'Balance mensual',
-            icon: Iconsax.chart_21,
-            color: _C.income,
-            c: c,
-            visible: chartData.cashflowBarData.isNotEmpty,
-            child: MonthlyCashflowChart(data: chartData.cashflowBarData),
-          ),
-
-          _chartSliver(
-            delay: 280,
-            title: 'Categorías',
-            subtitle: 'Patrones de gasto mensuales',
-            icon: Iconsax.category,
-            color: _C.warning,
-            c: c,
-            visible: chartData.categoryComparisonData.isNotEmpty,
-            child: CategoryComparisonChart(
-                data: chartData.categoryComparisonData),
-          ),
-
-          _chartSliver(
-            delay: 320,
-            title: 'Promedios',
-            subtitle: 'Comportamiento financiero promedio',
-            icon: Iconsax.chart_square,
-            color: _C.accent,
-            c: c,
-            visible: chartData.monthlyAverage.monthCount > 0 &&
-                chartData.categoryAverages.isNotEmpty,
-            child: AverageAnalysisSection(
-              monthlyData: chartData.monthlyAverage,
-              categoryData: chartData.categoryAverages,
-            ),
-          ),
-
-          _chartSliver(
-            delay: 360,
-            title: 'Ingresos vs Gastos',
-            subtitle: 'Comparativa mensual',
-            icon: Iconsax.money_recive,
-            color: _C.income,
-            c: c,
-            visible: chartData.incomeExpenseBarData.isNotEmpty,
-            child: IncomeExpenseBarChart(
-                data: chartData.incomeExpenseBarData),
-          ),
-
-          _chartSliver(
-            delay: 400,
-            title: 'Distribución de gastos',
-            subtitle: 'Dónde se va tu dinero',
-            icon: Iconsax.chart_1,
-            color: _C.expense,
-            c: c,
-            visible: chartData.expensePieData.isNotEmpty,
-            child: ExpensePieChart(data: chartData.expensePieData),
-          ),
-
-          _chartSliver(
-            delay: 440,
-            title: 'Fuentes de ingreso',
-            subtitle: 'De dónde viene tu dinero',
-            icon: Iconsax.wallet_money,
-            color: _C.income,
-            c: c,
-            visible: chartData.incomePieData.isNotEmpty,
-            child: IncomePieChart(data: chartData.incomePieData),
-          ),
-
-          _chartSliver(
-            delay: 480,
-            title: 'Ánimo semanal',
-            subtitle: 'Patrones emocionales por día',
-            icon: Iconsax.calendar,
-            color: _C.purple,
-            c: c,
-            visible: chartData.moodByDayData.isNotEmpty,
-            child: MoodByDayChart(analysisData: chartData.moodByDayData),
-          ),
-
-          _chartSliver(
-            delay: 520,
-            title: 'Actividad diaria',
-            subtitle: 'Tu comportamiento financiero',
-            icon: Iconsax.grid_1,
-            color: _C.accent,
-            c: c,
-            visible: chartData.heatmapData.isNotEmpty,
-            child: HeatmapSection(
-              data: chartData.heatmapData,
-              startDate:
-                  DateTime.now().subtract(const Duration(days: 119)),
-              endDate: DateTime.now(),
-            ),
-          ),
-        ],
-
-        // Espacio para la nav bar
-        const SliverToBoxAdapter(child: SizedBox(height: 100)),
-      ],
-    );
+  String _statusMessage() {
+    if (insights.isEmpty) return 'Analizando tu situación...';
+    final pos =
+        insights.where((i) => i.severity == InsightSeverity.success).length;
+    if (pos > 0) return '$pos buenas noticias detectadas';
+    return '${insights.length} descubrimientos disponibles';
   }
 
-  // ── AppBar ───────────────────────────────────────────────────────────────
-  // El título está indentado para no chocar con el botón de regreso.
-  // Usa padding explícito en lugar de depender del default del AppBar.
-  Widget _buildSliverHeader(List<Insight> insights, _C c) {
-    final statusMsg = _statusMessage(insights);
-
-    return SliverAppBar(
-      pinned: true,
-      floating: false,
-      elevation: 0,
-      scrolledUnderElevation: 0,
-      expandedHeight: 110,
-      backgroundColor: c.bg,
-      surfaceTintColor: Colors.transparent,
-
-      // Sin leading — esta pantalla es un tab, no tiene back button.
-      // Si en tu app tiene back button, el padding ya lo compensa.
-      automaticallyImplyLeading: false,
-
-      flexibleSpace: LayoutBuilder(
-        builder: (context, constraints) {
-          final percent = ((constraints.maxHeight - kToolbarHeight) /
-                  (110 - kToolbarHeight))
-              .clamp(0.0, 1.0);
-
-          return FlexibleSpaceBar(
-            titlePadding: EdgeInsets.zero,
-            title: SafeArea(
-              bottom: false,
-              child: Padding(
-                // Padding izquierdo generoso: nunca choca con el back button
-                padding: const EdgeInsets.fromLTRB(
-                    _C.md, 0, _C.md, _C.sm),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        // Eyebrow — solo visible cuando está expandido
-                        Expanded(
-                          child: AnimatedOpacity(
-                            opacity: percent,
-                            duration: _C.mid,
-                            child: Text(
-                              'INTELIGENCIA',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 1.4,
-                                color: _C.accent,
-                              ),
-                            ),
-                          ),
-                        ),
-                        // Ícono IA — entra animado una sola vez
-                        FadeTransition(
-                          opacity: _aiOpacity,
-                          child: ScaleTransition(
-                            scale: _aiScale,
-                            child: Container(
-                              width: 28,
-                              height: 28,
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [_C.accent, _C.purple],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
+  @override
+  Widget build(BuildContext context) {
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      color: _iOS.blue,
+      strokeWidth: 1.5,
+      child: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          // ── HEADER ──────────────────────────────────────────────────────
+          SliverAppBar(
+            pinned: true,
+            floating: false,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            expandedHeight: 108,
+            backgroundColor: _iOS.bg(context),
+            surfaceTintColor: Colors.transparent,
+            automaticallyImplyLeading: false,
+            flexibleSpace: LayoutBuilder(
+              builder: (ctx, constraints) {
+                final pct = ((constraints.maxHeight - kToolbarHeight) /
+                        (108 - kToolbarHeight))
+                    .clamp(0.0, 1.0);
+                return FlexibleSpaceBar(
+                  titlePadding: EdgeInsets.zero,
+                  title: SafeArea(
+                    bottom: false,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                          _iOS.md, 0, _iOS.md, _iOS.sm),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                child: AnimatedOpacity(
+                                  opacity: pct,
+                                  duration: const Duration(milliseconds: 200),
+                                  child: Text(
+                                    'INTELIGENCIA',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 1.3,
+                                      color: _iOS.blue,
+                                    ),
+                                  ),
                                 ),
-                                borderRadius: BorderRadius.circular(8),
                               ),
-                              child: const Icon(
-                                Iconsax.magic_star,
-                                size: 14,
-                                color: Colors.white,
+                              // Ícono IA — entra una sola vez
+                              FadeTransition(
+                                opacity: aiOpacity,
+                                child: ScaleTransition(
+                                  scale: aiScale,
+                                  child: Container(
+                                    width: 28,
+                                    height: 28,
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [_iOS.blue, _iOS.purple],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(
+                                      Iconsax.magic_star,
+                                      size: 13,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Financiero',
+                            style: TextStyle(
+                              fontSize: pct > 0.5 ? 28 : 20,
+                              fontWeight: FontWeight.w800,
+                              color: _iOS.label(ctx),
+                              letterSpacing: -0.8,
+                              height: 1.1,
+                            ),
+                          ),
+                          AnimatedOpacity(
+                            opacity: pct,
+                            duration: const Duration(milliseconds: 200),
+                            child: Text(
+                              _statusMessage(),
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: _iOS.label3(ctx),
+                                height: 1.3,
                               ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    // Título principal
-                    Text(
-                      'Financiero',
-                      style: TextStyle(
-                        fontSize: percent > 0.5 ? 28 : 20,
-                        fontWeight: FontWeight.w800,
-                        color: c.label,
-                        letterSpacing: -0.8,
-                        height: 1.1,
+                        ],
                       ),
                     ),
-                    // Subtítulo — desaparece al colapsar
-                    AnimatedOpacity(
-                      opacity: percent,
-                      duration: _C.mid,
-                      child: Text(
-                        statusMsg,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: c.label3,
-                          height: 1.3,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
+                  background: Container(color: _iOS.bg(context)),
+                );
+              },
+            ),
+          ),
+
+          // ── INSIGHT PRINCIPAL ────────────────────────────────────────────
+          if (insights.isNotEmpty) ...[
+            SliverToBoxAdapter(
+              child: _SectionLabel(
+                label: 'Insight principal',
+                delay: 40,
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: _FadeSlide(
+                delay: 80,
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: _iOS.md),
+                  child: _HeroInsightCard(
+                    insight: insights.first,
+                    onDismiss: () => onDismiss(insights.first.id),
+                  ),
                 ),
               ),
             ),
-            background: Container(color: c.bg),
-          );
-        },
+          ],
+
+          // ── MÉTRICAS RÁPIDAS ─────────────────────────────────────────────
+          SliverToBoxAdapter(
+            child: _SectionLabel(label: 'Resumen del mes', delay: 120),
+          ),
+          SliverToBoxAdapter(
+            child: _FadeSlide(
+              delay: 160,
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: _iOS.md),
+                child: _QuickStats(data: charts),
+              ),
+            ),
+          ),
+
+          // ── DESCUBRIMIENTOS SECUNDARIOS ──────────────────────────────────
+          if (insights.length > 1) ...[
+            SliverToBoxAdapter(
+              child: _SectionLabel(
+                label: 'Descubrimientos',
+                delay: 200,
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: _FadeSlide(
+                delay: 240,
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: _iOS.md),
+                  child: _InsightsList(
+                    insights: insights.skip(1).toList(),
+                    onDismiss: onDismiss,
+                  ),
+                ),
+              ),
+            ),
+          ],
+
+          // ── GRÁFICOS ─────────────────────────────────────────────────────
+          if (charts.hasData) ...[
+            SliverToBoxAdapter(
+              child: _SectionLabel(label: 'Análisis', delay: 280),
+            ),
+            _chartSliver(
+              delay: 320,
+              visible: charts.expensePieData.isNotEmpty,
+              title: 'Distribución de gastos',
+              subtitle: 'Dónde se va tu dinero este mes',
+              icon: Iconsax.chart_1,
+              color: _iOS.red,
+              child: ExpensePieChart(data: charts.expensePieData),
+            ),
+            _chartSliver(
+              delay: 360,
+              visible: charts.cashflowBarData.isNotEmpty,
+              title: 'Flujo de efectivo',
+              subtitle: 'Balance mensual de los últimos meses',
+              icon: Iconsax.chart_21,
+              color: _iOS.green,
+              child: MonthlyCashflowChart(data: charts.cashflowBarData),
+            ),
+            _chartSliver(
+              delay: 400,
+              visible: charts.moodAnalysisData.isNotEmpty,
+              title: 'Estado emocional',
+              subtitle: 'Cómo tu ánimo afecta tus decisiones',
+              icon: Iconsax.emoji_happy,
+              color: _iOS.purple,
+              child: MoodSpendingAnalysisCard(
+                  analysisData: charts.moodAnalysisData),
+            ),
+            _chartSliver(
+              delay: 440,
+              visible: charts.moodByDayData.isNotEmpty,
+              title: 'Ánimo semanal',
+              subtitle: 'Patrones por día de la semana',
+              icon: Iconsax.calendar,
+              color: _iOS.purple,
+              child: MoodByDayChart(analysisData: charts.moodByDayData),
+            ),
+            _chartSliver(
+              delay: 480,
+              visible: charts.netWorthLineData.isNotEmpty,
+              title: 'Tendencia patrimonial',
+              subtitle: 'Tu evolución financiera',
+              icon: Iconsax.trend_up,
+              color: _iOS.blue,
+              child: NetWorthTrendChart(data: charts.netWorthLineData),
+            ),
+            _chartSliver(
+              delay: 520,
+              visible: charts.incomeExpenseBarData.isNotEmpty,
+              title: 'Ingresos vs Gastos',
+              subtitle: 'Comparativa mensual',
+              icon: Iconsax.money_recive,
+              color: _iOS.green,
+              child: IncomeExpenseBarChart(
+                  data: charts.incomeExpenseBarData),
+            ),
+            _chartSliver(
+              delay: 560,
+              visible: charts.categoryComparisonData.isNotEmpty,
+              title: 'Categorías',
+              subtitle: 'Patrones de gasto por categoría',
+              icon: Iconsax.category,
+              color: _iOS.orange,
+              child: CategoryComparisonChart(
+                  data: charts.categoryComparisonData),
+            ),
+            _chartSliver(
+              delay: 600,
+              visible: charts.incomePieData.isNotEmpty,
+              title: 'Fuentes de ingreso',
+              subtitle: 'De dónde viene tu dinero',
+              icon: Iconsax.wallet_money,
+              color: _iOS.green,
+              child: IncomePieChart(data: charts.incomePieData),
+            ),
+            _chartSliver(
+              delay: 640,
+              visible: charts.monthlyAverage.monthCount > 0 &&
+                  charts.categoryAverages.isNotEmpty,
+              title: 'Promedios históricos',
+              subtitle: 'Tu comportamiento financiero promedio',
+              icon: Iconsax.chart_square,
+              color: _iOS.blue,
+              child: AverageAnalysisSection(
+                monthlyData: charts.monthlyAverage,
+                categoryData: charts.categoryAverages,
+              ),
+            ),
+            _chartSliver(
+              delay: 680,
+              visible: charts.heatmapData.isNotEmpty,
+              title: 'Actividad diaria',
+              subtitle: 'Tu comportamiento financiero día a día',
+              icon: Iconsax.grid_1,
+              color: _iOS.teal,
+              child: HeatmapSection(
+                data: charts.heatmapData,
+                startDate:
+                    DateTime.now().subtract(const Duration(days: 119)),
+                endDate: DateTime.now(),
+              ),
+            ),
+          ],
+
+          const SliverToBoxAdapter(child: SizedBox(height: 100)),
+        ],
       ),
     );
   }
 
-  String _statusMessage(List<Insight> insights) {
-    if (insights.isEmpty) return 'Analizando tu situación...';
-    final positive =
-        insights.where((i) => i.severity == InsightSeverity.success).length;
-    if (positive > 0) return '$positive buenas noticias detectadas';
-    return '${insights.length} insights disponibles';
-  }
-
-  // ── Sliver de gráfico ────────────────────────────────────────────────────
   Widget _chartSliver({
     required int delay,
+    required bool visible,
     required String title,
     required String subtitle,
     required IconData icon,
     required Color color,
-    required _C c,
-    required bool visible,
     required Widget child,
-    bool highlight = false,
   }) {
     if (!visible) return const SliverToBoxAdapter(child: SizedBox.shrink());
-
     return SliverToBoxAdapter(
       child: _FadeSlide(
         delay: delay,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(
-              _C.md, 0, _C.md, _C.md),
+              _iOS.md, 0, _iOS.md, _iOS.sm + 2),
           child: _ChartCard(
             title: title,
             subtitle: subtitle,
             icon: icon,
             color: color,
-            c: c,
-            highlight: highlight,
             child: child,
           ),
         ),
@@ -635,29 +586,27 @@ Future<void> _dismissInsight(String id) async {
 }
 
 // ─── LABEL DE SECCIÓN ────────────────────────────────────────────────────────
-// Devuelve un Widget normal — el llamador decide si lo envuelve en Sliver.
 class _SectionLabel extends StatelessWidget {
   final String label;
-  final _C c;
-  final double topPadding;
+  final int delay;
 
-  const _SectionLabel({
-    required this.label,
-    required this.c,
-    this.topPadding = _C.md,
-  });
+  const _SectionLabel({required this.label, required this.delay});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(_C.md, topPadding, _C.md, _C.sm),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.2,
-          color: c.label3,
+    return _FadeSlide(
+      delay: delay,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+            _iOS.md, _iOS.lg, _iOS.md, _iOS.sm),
+        child: Text(
+          label.toUpperCase(),
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+            color: _iOS.label3(context),
+          ),
         ),
       ),
     );
@@ -665,157 +614,412 @@ class _SectionLabel extends StatelessWidget {
 }
 
 // ─── HERO INSIGHT CARD ───────────────────────────────────────────────────────
-// El insight más importante. Tiene peso visual propio pero no grita.
-class _HeroInsightCard extends StatelessWidget {
+class _HeroInsightCard extends StatefulWidget {
   final Insight insight;
-  final _C c;
   final VoidCallback onDismiss;
 
-  const _HeroInsightCard({required this.insight, required this.c, required this.onDismiss});
+  const _HeroInsightCard({
+    required this.insight,
+    required this.onDismiss,
+  });
+
+  @override
+  State<_HeroInsightCard> createState() => _HeroInsightCardState();
+}
+
+class _HeroInsightCardState extends State<_HeroInsightCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _dismissCtrl;
+  late Animation<double> _dismissOpacity;
+  late Animation<double> _dismissScale;
+  late Animation<double> _dismissHeight;
+
+  @override
+  void initState() {
+    super.initState();
+    _dismissCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 380),
+    );
+    _dismissOpacity = Tween<double>(begin: 1, end: 0).animate(
+      CurvedAnimation(
+          parent: _dismissCtrl,
+          curve: const Interval(0, .6, curve: Curves.easeOut)),
+    );
+    _dismissScale = Tween<double>(begin: 1, end: 0.96).animate(
+      CurvedAnimation(parent: _dismissCtrl, curve: Curves.easeOut),
+    );
+    _dismissHeight = Tween<double>(begin: 1, end: 0).animate(
+      CurvedAnimation(
+          parent: _dismissCtrl,
+          curve: const Interval(.4, 1, curve: Curves.easeInOut)),
+    );
+  }
+
+  @override
+  void dispose() {
+    _dismissCtrl.dispose();
+    super.dispose();
+  }
+
+  void _handleDismiss() {
+    HapticFeedback.lightImpact();
+    _dismissCtrl.forward().then((_) => widget.onDismiss());
+  }
 
   @override
   Widget build(BuildContext context) {
-    final color = insight.severity.getColor(context);
-    final icon  = insight.severity.icon;
+    final color = widget.insight.severity.getColor(context);
+    final icon = widget.insight.severity.icon;
 
-    return Container(
-      padding: const EdgeInsets.all(_C.lg),
-      decoration: BoxDecoration(
-        color: c.surface,
-        borderRadius: BorderRadius.circular(_C.rXL),
-        border: Border.all(color: color.withOpacity(0.2), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(c.isDark ? 0.12 : 0.06),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
+    return AnimatedBuilder(
+      animation: _dismissCtrl,
+      builder: (ctx, child) {
+        return SizeTransition(
+          sizeFactor: _dismissHeight,
+          axisAlignment: -1,
+          child: FadeTransition(
+            opacity: _dismissOpacity,
+            child: ScaleTransition(
+              scale: _dismissScale,
+              child: child,
+            ),
           ),
-          BoxShadow(
-            color: Colors.black.withOpacity(c.isDark ? 0.2 : 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 1),
+        );
+      },
+      child: GestureDetector(
+        onTap: () => HapticFeedback.selectionClick(),
+        child: Container(
+          decoration: BoxDecoration(
+            color: _iOS.surface(context),
+            borderRadius: BorderRadius.circular(_iOS.rXL),
+            border: Border.all(
+              color: color.withOpacity(0.18),
+              width: 1,
+            ),
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Fila superior: ícono + etiqueta + título
-          Row(
+          padding: const EdgeInsets.all(_iOS.lg),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Chip de severidad
               Container(
-                width: 44,
-                height: 44,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(c.isDark ? 0.18 : 0.1),
-                  borderRadius: BorderRadius.circular(_C.rMD),
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
                 ),
-                child: Icon(icon, color: color, size: 20),
-              ),
-              const SizedBox(width: _C.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      'INSIGHT PRINCIPAL',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.9,
-                        color: c.label3,
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(width: 6),
                     Text(
-                      insight.title,
+                      widget.insight.severity.label.toUpperCase(),
                       style: TextStyle(
-                        fontSize: 15,
+                        fontSize: 11,
                         fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
                         color: color,
-                        letterSpacing: -0.2,
-                        height: 1.2,
                       ),
                     ),
                   ],
                 ),
               ),
-              // --- BOTÓN CERRAR ---
-              GestureDetector(
-                onTap: onDismiss,
-                child: Icon(Icons.close_rounded, color: c.label4, size: 20),
+              const SizedBox(height: 14),
+
+              // Ícono + título
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(_iOS.rMD),
+                    ),
+                    child: Icon(icon, color: color, size: 19),
+                  ),
+                  const SizedBox(width: _iOS.md),
+                  Expanded(
+                    child: Text(
+                      widget.insight.title,
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: _iOS.label(context),
+                        letterSpacing: -0.3,
+                        height: 1.25,
+                      ),
+                    ),
+                  ),
+                  // Botón cerrar minimalista
+                  GestureDetector(
+                    onTap: _handleDismiss,
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: Icon(
+                        Icons.close_rounded,
+                        size: 18,
+                        color: _iOS.label4(context),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 12),
+
+              // Descripción
+              Text(
+                widget.insight.displayDescription,
+                style: TextStyle(
+                  fontSize: 15,
+                  height: 1.55,
+                  color: _iOS.label2(context),
+                  letterSpacing: 0.1,
+                ),
+              ),
+
+              const SizedBox(height: 18),
+
+              // Acciones
+              Row(
+                children: [
+                  GestureDetector(
+                    onTap: _handleDismiss,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(_iOS.rSM),
+                      ),
+                      child: Text(
+                        'Entendido',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: color,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
 
-          const SizedBox(height: _C.md),
+// ─── LISTA DE INSIGHTS AGRUPADOS ─────────────────────────────────────────────
+// Estilo iOS: filas agrupadas con separador interno, no cards individuales
+class _InsightsList extends StatelessWidget {
+  final List<Insight> insights;
+  final Future<void> Function(String) onDismiss;
 
-          // Descripción
-          Text(
-            insight.displayDescription,
-            style: TextStyle(
-              fontSize: 15,
-              height: 1.5,
-              color: c.label2,
-              letterSpacing: 0.1,
-            ),
-          ),
+  const _InsightsList({
+    required this.insights,
+    required this.onDismiss,
+  });
 
-          const SizedBox(height: _C.md),
-          // Botón de acción principal
-          GestureDetector(
-            onTap: onDismiss,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(10),
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(_iOS.rLG),
+      child: Container(
+        color: _iOS.surface(context),
+        child: Column(
+          children: List.generate(insights.length, (i) {
+            final insight = insights[i];
+            final color = insight.severity.getColor(context);
+            final isLast = i == insights.length - 1;
+
+            return _InsightRow(
+              insight: insight,
+              color: color,
+              showSeparator: !isLast,
+              onDismiss: () => onDismiss(insight.id),
+            );
+          }),
+        ),
+      ),
+    );
+  }
+}
+
+class _InsightRow extends StatefulWidget {
+  final Insight insight;
+  final Color color;
+  final bool showSeparator;
+  final VoidCallback onDismiss;
+
+  const _InsightRow({
+    required this.insight,
+    required this.color,
+    required this.showSeparator,
+    required this.onDismiss,
+  });
+
+  @override
+  State<_InsightRow> createState() => _InsightRowState();
+}
+
+class _InsightRowState extends State<_InsightRow>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  bool _pressed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _dismiss() {
+    HapticFeedback.lightImpact();
+    _ctrl.forward().then((_) => widget.onDismiss());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizeTransition(
+      sizeFactor: Tween<double>(begin: 1, end: 0).animate(
+        CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+      ),
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTapCancel: () => setState(() => _pressed = false),
+        onTap: () => HapticFeedback.selectionClick(),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          color: _pressed
+              ? _iOS.surface2(context)
+              : _iOS.surface(context),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: _iOS.md, vertical: 13),
+                child: Row(
+                  children: [
+                    // Ícono semántico
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: widget.color.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                      child: Icon(
+                        widget.insight.severity.icon,
+                        size: 15,
+                        color: widget.color,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+
+                    // Texto
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.insight.title,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: _iOS.label(context),
+                              letterSpacing: -0.1,
+                              height: 1.2,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            widget.insight.displayDescription,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: _iOS.label3(context),
+                              height: 1.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+
+                    // Dismiss
+                    GestureDetector(
+                      onTap: _dismiss,
+                      behavior: HitTestBehavior.opaque,
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: Icon(
+                          Icons.close_rounded,
+                          size: 16,
+                          color: _iOS.label4(context),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              child: Text(
-                'Entendido',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color),
-              ),
-            ),
-          ),
-          // CTA mínimo
-          GestureDetector(
-            onTap: () => HapticFeedback.selectionClick(),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Ver detalles',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: color,
+              // Separador interno .5px — solo si no es el último
+              if (widget.showSeparator)
+                Padding(
+                  padding:
+                      const EdgeInsets.only(left: 62),
+                  child: Divider(
+                    height: 0.5,
+                    thickness: 0.5,
+                    color: _iOS.sep(context),
                   ),
                 ),
-                const SizedBox(width: 4),
-                Icon(Icons.chevron_right_rounded, color: color, size: 18),
-              ],
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
 // ─── QUICK STATS ─────────────────────────────────────────────────────────────
-// 3 métricas clave. Compactas, legibles, con un color por métrica.
 class _QuickStats extends StatelessWidget {
   final AnalysisData data;
-  final _C c;
 
-  const _QuickStats({required this.data, required this.c});
+  const _QuickStats({required this.data});
 
   @override
   Widget build(BuildContext context) {
     final fmt = NumberFormat.compactCurrency(
         locale: 'es_CO', symbol: '\$', decimalDigits: 1);
 
+    // Datos reales de las RPCs
     final balance = data.netWorthLineData.isNotEmpty
         ? data.netWorthLineData.last.totalBalance
         : 0.0;
@@ -824,7 +1028,7 @@ class _QuickStats extends StatelessWidget {
         : 0.0;
     final totalExpenses = data.expensePieData.isNotEmpty
         ? data.expensePieData.fold<double>(
-            0, (sum, item) => sum + item.totalSpent)
+            0, (s, e) => s + e.totalSpent)
         : 0.0;
 
     return Row(
@@ -834,28 +1038,25 @@ class _QuickStats extends StatelessWidget {
             label: 'Balance',
             value: fmt.format(balance),
             icon: Iconsax.wallet_3,
-            color: balance >= 0 ? _C.income : _C.expense,
-            c: c,
+            color: balance >= 0 ? _iOS.green : _iOS.red,
           ),
         ),
-        const SizedBox(width: _C.sm),
+        const SizedBox(width: _iOS.sm + 2),
         Expanded(
           child: _StatTile(
             label: 'Flujo',
             value: fmt.format(cashflow),
             icon: Iconsax.trend_up,
-            color: cashflow >= 0 ? _C.income : _C.expense,
-            c: c,
+            color: cashflow >= 0 ? _iOS.green : _iOS.red,
           ),
         ),
-        const SizedBox(width: _C.sm),
+        const SizedBox(width: _iOS.sm + 2),
         Expanded(
           child: _StatTile(
             label: 'Gastos',
             value: fmt.format(totalExpenses),
             icon: Iconsax.card,
-            color: _C.expense,
-            c: c,
+            color: _iOS.red,
           ),
         ),
       ],
@@ -863,200 +1064,228 @@ class _QuickStats extends StatelessWidget {
   }
 }
 
-class _StatTile extends StatelessWidget {
+class _StatTile extends StatefulWidget {
   final String label;
   final String value;
   final IconData icon;
   final Color color;
-  final _C c;
 
   const _StatTile({
-    required this.label, required this.value,
-    required this.icon, required this.color, required this.c,
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
   });
 
   @override
+  State<_StatTile> createState() => _StatTileState();
+}
+
+class _StatTileState extends State<_StatTile> {
+  bool _pressed = false;
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(_C.md),
-      decoration: BoxDecoration(
-        color: c.surface,
-        borderRadius: BorderRadius.circular(_C.rLG),
-        border: Border.all(color: c.separator.withOpacity(0.5), width: 0.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(c.isDark ? 0.2 : 0.04),
-            blurRadius: 8, offset: const Offset(0, 1),
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      onTap: () => HapticFeedback.selectionClick(),
+      child: AnimatedScale(
+        scale: _pressed ? 0.97 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        child: Container(
+          padding: const EdgeInsets.all(_iOS.md),
+          decoration: BoxDecoration(
+            color: _iOS.surface(context),
+            borderRadius: BorderRadius.circular(_iOS.rLG),
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 32, height: 32,
-            decoration: BoxDecoration(
-              color: color.withOpacity(c.isDark ? 0.18 : 0.1),
-              borderRadius: BorderRadius.circular(_C.rSM),
-            ),
-            child: Icon(icon, size: 16, color: color),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: widget.color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(widget.icon, size: 14, color: widget.color),
+              ),
+              const SizedBox(height: _iOS.sm + 2),
+              Text(
+                widget.value,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: _iOS.label(context),
+                  letterSpacing: -0.3,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                widget.label,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: _iOS.label3(context),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: _C.sm),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: c.label,
-              letterSpacing: -0.3,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: TextStyle(fontSize: 12, color: c.label3),
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
 // ─── CHART CARD ──────────────────────────────────────────────────────────────
-// Contenedor neutro para cada gráfico.
-// El gráfico habla; la tarjeta solo lo enmarca.
-class _ChartCard extends StatelessWidget {
+class _ChartCard extends StatefulWidget {
   final String title;
   final String subtitle;
   final IconData icon;
   final Color color;
-  final _C c;
   final Widget child;
-  final bool highlight;
 
   const _ChartCard({
-    required this.title, required this.subtitle, required this.icon,
-    required this.color, required this.c, required this.child,
-    this.highlight = false,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.child,
   });
 
   @override
+  State<_ChartCard> createState() => _ChartCardState();
+}
+
+class _ChartCardState extends State<_ChartCard> {
+  bool _pressed = false;
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: c.surface,
-        borderRadius: BorderRadius.circular(_C.rXL),
-        border: highlight
-            ? Border.all(
-                color: color.withOpacity(0.25),
-                width: 1,
-              )
-            : Border.all(color: c.separator.withOpacity(0.4), width: 0.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(c.isDark ? 0.18 : 0.04),
-            blurRadius: 12, offset: const Offset(0, 2),
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      onTap: () => HapticFeedback.selectionClick(),
+      child: AnimatedScale(
+        scale: _pressed ? 0.99 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        child: Container(
+          decoration: BoxDecoration(
+            color: _iOS.surface(context),
+            borderRadius: BorderRadius.circular(_iOS.rXL),
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header de la tarjeta
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-                _C.md, _C.md, _C.md, _C.sm),
-            child: Row(
-              children: [
-                Container(
-                  width: 36, height: 36,
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(c.isDark ? 0.18 : 0.1),
-                    borderRadius: BorderRadius.circular(_C.rSM + 2),
-                  ),
-                  child: Icon(icon, size: 17, color: color),
-                ),
-                const SizedBox(width: _C.sm + 4),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: c.label,
-                          letterSpacing: -0.2,
-                        ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                    _iOS.md, _iOS.md, _iOS.md, 12),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: widget.color.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(9),
                       ),
-                      Text(
-                        subtitle,
-                        style: TextStyle(fontSize: 12, color: c.label3),
+                      child: Icon(widget.icon,
+                          size: 16, color: widget.color),
+                    ),
+                    const SizedBox(width: _iOS.sm + 4),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.title,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: _iOS.label(context),
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                          const SizedBox(height: 1),
+                          Text(
+                            widget.subtitle,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: _iOS.label3(context),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+
+              // Separador .5px
+              Divider(
+                height: 0.5,
+                thickness: 0.5,
+                indent: _iOS.md,
+                endIndent: _iOS.md,
+                color: _iOS.sep(context),
+              ),
+
+              // Contenido del gráfico
+              widget.child,
+            ],
           ),
-
-          // Línea separadora sutil
-          Container(
-              height: 0.5,
-              margin: const EdgeInsets.symmetric(horizontal: _C.md),
-              color: c.separator),
-
-          // El gráfico en sí — sin padding adicional para que respire su propia manera
-          child,
-        ],
+        ),
       ),
     );
   }
 }
 
 // ─── ESTADOS ─────────────────────────────────────────────────────────────────
-class _EmptyState extends StatelessWidget {
-  final _C c;
-  final Future<void> Function() onRefresh;
-
-  const _EmptyState({required this.c, required this.onRefresh});
-
-  @override
-  Widget build(BuildContext context) {
+Widget _EmptyState({required Future<void> Function() onRefresh}) {
+  return Builder(builder: (context) {
     return RefreshIndicator(
       onRefresh: onRefresh,
-      color: _C.accent,
+      color: _iOS.blue,
       strokeWidth: 1.5,
       child: Stack(
         children: [
-          ListView(), // hace que el RefreshIndicator funcione
+          ListView(),
           Center(
             child: Padding(
-              padding: const EdgeInsets.all(_C.xl),
+              padding: const EdgeInsets.all(_iOS.xl),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Lottie.asset(
                     'assets/animations/analysis_animation.json',
-                    width: 200, height: 200,
+                    width: 180,
+                    height: 180,
                   ),
-                  const SizedBox(height: _C.lg),
+                  const SizedBox(height: _iOS.lg),
                   Text(
                     'Sin datos aún',
                     style: TextStyle(
-                      fontSize: 22, fontWeight: FontWeight.w800,
-                      color: c.label, letterSpacing: -0.5,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: _iOS.label(context),
+                      letterSpacing: -0.5,
                     ),
                   ),
-                  const SizedBox(height: _C.sm),
+                  const SizedBox(height: _iOS.sm),
                   Text(
                     'Registra algunas transacciones para ver tus análisis.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                        fontSize: 15, color: c.label3, height: 1.45),
+                      fontSize: 15,
+                      color: _iOS.label3(context),
+                      height: 1.45,
+                    ),
                   ),
                 ],
               ),
@@ -1065,45 +1294,48 @@ class _EmptyState extends StatelessWidget {
         ],
       ),
     );
-  }
+  });
 }
 
-class _ErrorState extends StatelessWidget {
-  final String error;
-  final _C c;
-  final VoidCallback onRetry;
-
-  const _ErrorState(
-      {required this.error, required this.c, required this.onRetry});
-
-  @override
-  Widget build(BuildContext context) {
+Widget _ErrorState({
+  required String error,
+  required Future<void> Function() onRetry,
+}) {
+  return Builder(builder: (context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(_C.xl),
+        padding: const EdgeInsets.all(_iOS.xl),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 64, height: 64,
+              width: 60,
+              height: 60,
               decoration: BoxDecoration(
-                color: _C.expense.withOpacity(c.isDark ? 0.18 : 0.09),
+                color: _iOS.red.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Iconsax.warning_2,
-                  size: 28, color: _C.expense),
+                  size: 26, color: _iOS.red),
             ),
-            const SizedBox(height: _C.lg),
-            Text('Algo salió mal',
-                style: TextStyle(
-                  fontSize: 20, fontWeight: FontWeight.w700,
-                  color: c.label, letterSpacing: -0.3,
-                )),
-            const SizedBox(height: _C.sm),
-            Text(error,
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: c.label3)),
-            const SizedBox(height: _C.lg),
+            const SizedBox(height: _iOS.lg),
+            Text(
+              'Algo salió mal',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: _iOS.label(context),
+                letterSpacing: -0.3,
+              ),
+            ),
+            const SizedBox(height: _iOS.sm),
+            Text(
+              error,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 14, color: _iOS.label3(context)),
+            ),
+            const SizedBox(height: _iOS.lg),
             GestureDetector(
               onTap: () {
                 HapticFeedback.lightImpact();
@@ -1111,33 +1343,39 @@ class _ErrorState extends StatelessWidget {
               },
               child: Container(
                 padding: const EdgeInsets.symmetric(
-                    horizontal: _C.lg, vertical: 12),
+                    horizontal: _iOS.lg, vertical: 12),
                 decoration: BoxDecoration(
-                    color: _C.accent,
-                    borderRadius: BorderRadius.circular(_C.rMD)),
-                child: const Text('Reintentar',
-                    style: TextStyle(
-                        color: Colors.white, fontSize: 15,
-                        fontWeight: FontWeight.w600)),
+                  color: _iOS.blue,
+                  borderRadius: BorderRadius.circular(_iOS.rMD),
+                ),
+                child: const Text(
+                  'Reintentar',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ),
           ],
         ),
       ),
     );
-  }
+  });
 }
 
 // ─── SKELETON LOADER ─────────────────────────────────────────────────────────
-class _SkeletonLoader extends StatefulWidget {
-  final _C c;
-  const _SkeletonLoader({required this.c});
-
-  @override
-  State<_SkeletonLoader> createState() => _SkeletonLoaderState();
+Widget _SkeletonLoader(BuildContext context) {
+  return _ShimmerLoader();
 }
 
-class _SkeletonLoaderState extends State<_SkeletonLoader>
+class _ShimmerLoader extends StatefulWidget {
+  @override
+  State<_ShimmerLoader> createState() => _ShimmerLoaderState();
+}
+
+class _ShimmerLoaderState extends State<_ShimmerLoader>
     with SingleTickerProviderStateMixin {
   late AnimationController _ctrl;
   late Animation<double> _anim;
@@ -1146,86 +1384,85 @@ class _SkeletonLoaderState extends State<_SkeletonLoader>
   void initState() {
     super.initState();
     _ctrl = AnimationController(
-        duration: const Duration(milliseconds: 1000), vsync: this)
-      ..repeat(reverse: true);
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    )..repeat(reverse: true);
     _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut);
   }
 
   @override
-  void dispose() { _ctrl.dispose(); super.dispose(); }
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final c = widget.c;
     return AnimatedBuilder(
       animation: _anim,
-      builder: (_, __) {
-        final shimmer =
-            Color.lerp(c.surface, c.surfaceRaised, _anim.value)!;
+      builder: (ctx, _) {
+        final shimmer = Color.lerp(
+          _iOS.surface(ctx),
+          _iOS.surface2(ctx),
+          _anim.value,
+        )!;
 
         return CustomScrollView(
           physics: const NeverScrollableScrollPhysics(),
           slivers: [
-            // Simula el header
             SliverToBoxAdapter(
               child: Container(
-                height: 110,
-                color: c.bg,
+                height: 108,
+                color: _iOS.bg(ctx),
                 padding: const EdgeInsets.fromLTRB(
-                    _C.md, 60, _C.md, _C.md),
+                    _iOS.md, 60, _iOS.md, _iOS.md),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _shimmerBox(shimmer, 80, 10, _C.rSM),
+                    _box(shimmer, 70, 9, 4),
                     const SizedBox(height: 6),
-                    _shimmerBox(shimmer, 160, 22, _C.rSM),
+                    _box(shimmer, 150, 20, 6),
                   ],
                 ),
               ),
             ),
-
-            // Hero card
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(
-                    _C.md, _C.md, _C.md, 0),
-                child: _shimmerBox(shimmer, double.infinity, 140, _C.rXL),
+                    _iOS.md, _iOS.lg, _iOS.md, 0),
+                child: _box(shimmer, double.infinity, 130, _iOS.rXL),
               ),
             ),
-
-            // Quick stats
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(
-                    _C.md, _C.md, _C.md, 0),
+                    _iOS.md, _iOS.md, _iOS.md, 0),
                 child: Row(
                   children: [
                     Expanded(
-                        child: _shimmerBox(
-                            shimmer, double.infinity, 90, _C.rLG)),
-                    const SizedBox(width: _C.sm),
+                        child: _box(shimmer, double.infinity, 88,
+                            _iOS.rLG)),
+                    const SizedBox(width: _iOS.sm),
                     Expanded(
-                        child: _shimmerBox(
-                            shimmer, double.infinity, 90, _C.rLG)),
-                    const SizedBox(width: _C.sm),
+                        child: _box(shimmer, double.infinity, 88,
+                            _iOS.rLG)),
+                    const SizedBox(width: _iOS.sm),
                     Expanded(
-                        child: _shimmerBox(
-                            shimmer, double.infinity, 90, _C.rLG)),
+                        child: _box(shimmer, double.infinity, 88,
+                            _iOS.rLG)),
                   ],
                 ),
               ),
             ),
-
-            // Gráficos
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(
-                  _C.md, _C.lg, _C.md, 0),
+                  _iOS.md, _iOS.lg, _iOS.md, 0),
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (_, i) => Padding(
-                    padding: const EdgeInsets.only(bottom: _C.md),
-                    child: _shimmerBox(
-                        shimmer, double.infinity, 220, _C.rXL),
+                    padding: const EdgeInsets.only(bottom: _iOS.sm + 2),
+                    child:
+                        _box(shimmer, double.infinity, 200, _iOS.rXL),
                   ),
                   childCount: 3,
                 ),
@@ -1237,21 +1474,21 @@ class _SkeletonLoaderState extends State<_SkeletonLoader>
     );
   }
 
-  Widget _shimmerBox(
-      Color color, double w, double h, double radius) {
-    return Container(
-      width: w, height: h,
-      decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(radius)),
-    );
-  }
+  Widget _box(Color c, double w, double h, double r) => Container(
+        width: w,
+        height: h,
+        decoration: BoxDecoration(
+          color: c,
+          borderRadius: BorderRadius.circular(r),
+        ),
+      );
 }
 
 // ─── ANIMACIÓN DE ENTRADA ────────────────────────────────────────────────────
 class _FadeSlide extends StatefulWidget {
   final Widget child;
   final int delay;
+
   const _FadeSlide({required this.child, required this.delay});
 
   @override
@@ -1267,18 +1504,27 @@ class _FadeSlideState extends State<_FadeSlide>
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(duration: _C.slow, vsync: this);
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 460),
+    );
     _opacity = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
     _slide = Tween<Offset>(
-            begin: const Offset(0, 0.05), end: Offset.zero)
-        .animate(
-            CurvedAnimation(parent: _ctrl, curve: _C.curveOut));
-    Future.delayed(Duration(milliseconds: widget.delay),
-        () { if (mounted) _ctrl.forward(); });
+      begin: const Offset(0, 0.04),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic));
+
+    Future.delayed(
+      Duration(milliseconds: widget.delay),
+      () { if (mounted) _ctrl.forward(); },
+    );
   }
 
   @override
-  void dispose() { _ctrl.dispose(); super.dispose(); }
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1301,4 +1547,20 @@ extension on AnalysisData {
       incomePieData.isNotEmpty ||
       incomeExpenseBarData.isNotEmpty ||
       heatmapData.isNotEmpty;
+}
+
+// ─── EXTENSIÓN SEVERIDAD — solo label (getColor e icon viven en insight_model.dart) ──
+extension _InsightSeverityLabel on InsightSeverity {
+  String get label {
+    switch (this) {
+      case InsightSeverity.success:
+        return 'Buenas noticias';
+      case InsightSeverity.warning:
+        return 'Atención recomendada';
+      case InsightSeverity.alert:
+        return 'Acción necesaria';
+      case InsightSeverity.info:
+        return 'Para tu información';
+    }
+  }
 }

@@ -1,107 +1,13 @@
 // lib/widgets/analysis_charts/heatmap_section.dart
+//
+// iOS: PageView por mes con navegación de flechas + dots,
+// empieza en el mes más reciente, tap abre bottom sheet minimalista.
 
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
-// --- Novedad: Widget para renderizar un solo mes ---
-class _MonthlyHeatmap extends StatelessWidget {
-  final int year;
-  final int month;
-  final Map<DateTime, int> datasets;
-  final double maxPositive;
-  final double maxNegative;
-  final Function(DateTime) onDateTap;
-
-  const _MonthlyHeatmap({
-    required this.year,
-    required this.month,
-    required this.datasets,
-    required this.maxPositive,
-    required this.maxNegative,
-    required this.onDateTap,
-  });
-
-  Color _getColorForValue(int value, BuildContext context) {
-    final theme = Theme.of(context);
-    if (value == 0) {
-      return theme.brightness == Brightness.dark ? Colors.grey.shade800 : Colors.grey.shade200;
-    }
-    if (value > 0) {
-      final intensity = (value / maxPositive).clamp(0.0, 1.0);
-      return Color.lerp(Colors.green.shade100, Colors.green.shade800, intensity)!;
-    } else {
-      final intensity = (value.abs() / maxNegative).clamp(0.0, 1.0);
-      return Color.lerp(Colors.red.shade100, Colors.red.shade800, intensity)!;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final firstDayOfMonth = DateTime(year, month, 1);
-    final daysInMonth = DateTime(year, month + 1, 0).day;
-    // Lunes = 1, Domingo = 7. Restamos 1 para el índice de la cuadrícula.
-    final emptyCells = firstDayOfMonth.weekday - 1;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 24.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            DateFormat.yMMMM('es_CO').format(firstDayOfMonth),
-            style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          const SizedBox(height: 8),
-          _buildWeekHeaders(context),
-          const SizedBox(height: 4),
-          GridView.builder(
-            physics: const NeverScrollableScrollPhysics(),
-            shrinkWrap: true,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 7),
-            itemCount: daysInMonth + emptyCells,
-            itemBuilder: (context, index) {
-              if (index < emptyCells) {
-                return const SizedBox.shrink(); // Celdas vacías al inicio del mes
-              }
-              final day = index - emptyCells + 1;
-              final date = DateTime(year, month, day);
-              final value = datasets[date] ?? 0;
-              return _HeatmapCell(
-                date: date,
-                color: _getColorForValue(value, context),
-                onTap: () => onDateTap(date),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWeekHeaders(BuildContext context) {
-    final days = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
-    return Row(
-      children: days.map((day) => Expanded(
-        child: Center(
-          child: Text(
-            day,
-            style: GoogleFonts.poppins(
-              fontSize: 10,
-              color: Colors.grey,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      )).toList(),
-    );
-  }
-}
-
-
-// --- Novedad: El widget principal ahora es Stateful para gestionar los meses ---
 class HeatmapSection extends StatefulWidget {
   final Map<DateTime, int> data;
   final DateTime startDate;
@@ -119,194 +25,393 @@ class HeatmapSection extends StatefulWidget {
 }
 
 class _HeatmapSectionState extends State<HeatmapSection> {
-  late final Map<DateTime, int> _completeDatasets;
-  late final List<DateTime> _monthsToDisplay;
-  late final double _maxPositive;
-  late final double _maxNegative;
+  late final Map<DateTime, int> _normalized;
+  late final List<DateTime> _months;
+  late final double _maxPos;
+  late final double _maxNeg;
+  late final PageController _pageCtrl;
+  int _currentPage = 0;
+
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get _label  => _isDark ? Colors.white : const Color(0xFF1C1C1E);
+  Color get _label3 => _isDark ? const Color(0xFF8E8E93) : const Color(0xFF636366);
+  Color get _empty  => _isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F7);
 
   @override
   void initState() {
     super.initState();
-    _completeDatasets = _createCompleteDataset(widget.data, widget.startDate, widget.endDate);
-    _monthsToDisplay = _calculateMonthsInRange(widget.startDate, widget.endDate);
-    _calculateMaxValues();
+    _normalized = _normalizeData(widget.data, widget.startDate, widget.endDate);
+    _months = _calcMonths(widget.startDate, widget.endDate);
+    _calcMaxValues();
+    _currentPage = _months.isEmpty ? 0 : _months.length - 1;
+    _pageCtrl = PageController(initialPage: _currentPage);
   }
 
-  void _calculateMaxValues() {
-    final nonZeroValues = _completeDatasets.values.where((v) => v != 0);
-    final positiveValues = nonZeroValues.where((v) => v > 0);
-    final negativeValues = nonZeroValues.where((v) => v < 0).map((v) => v.abs());
-    _maxPositive = positiveValues.isEmpty ? 1.0 : positiveValues.reduce(max).toDouble();
-    _maxNegative = negativeValues.isEmpty ? 1.0 : negativeValues.reduce(max).toDouble();
+  @override
+  void dispose() {
+    _pageCtrl.dispose();
+    super.dispose();
   }
-  
-  static Map<DateTime, int> _createCompleteDataset(Map<DateTime, int> originalData, DateTime start, DateTime end) {
-    final Map<DateTime, int> normalizedKeys = {
-      for (var e in originalData.entries) DateTime(e.key.year, e.key.month, e.key.day): e.value
+
+  void _calcMaxValues() {
+    final pos = _normalized.values.where((v) => v > 0);
+    final neg = _normalized.values.where((v) => v < 0).map((v) => v.abs());
+    _maxPos = pos.isEmpty ? 1.0 : pos.reduce(max).toDouble();
+    _maxNeg = neg.isEmpty ? 1.0 : neg.reduce(max).toDouble();
+  }
+
+  static Map<DateTime, int> _normalizeData(Map<DateTime, int> src, DateTime start, DateTime end) {
+    final norm = {
+      for (var e in src.entries) DateTime(e.key.year, e.key.month, e.key.day): e.value
     };
-    final Map<DateTime, int> complete = {};
+    final result = <DateTime, int>{};
     for (int i = 0; i <= end.difference(start).inDays; i++) {
-      final date = DateTime(start.year, start.month, start.day).add(Duration(days: i));
-      complete[date] = normalizedKeys[date] ?? 0;
+      final d = DateTime(start.year, start.month, start.day).add(Duration(days: i));
+      result[d] = norm[d] ?? 0;
     }
-    return complete;
+    return result;
   }
-  
-  List<DateTime> _calculateMonthsInRange(DateTime start, DateTime end) {
-    final List<DateTime> months = [];
-    DateTime current = DateTime(start.year, start.month, 1);
-    while (current.isBefore(end) || current.isAtSameMomentAs(end)) {
-      months.add(current);
-      current = DateTime(current.year, current.month + 1, 1);
+
+  static List<DateTime> _calcMonths(DateTime start, DateTime end) {
+    final months = <DateTime>[];
+    var cur = DateTime(start.year, start.month, 1);
+    while (!cur.isAfter(end)) {
+      months.add(cur);
+      cur = DateTime(cur.year, cur.month + 1, 1);
     }
     return months;
   }
 
+  Color _cellColor(int value) {
+    if (value == 0) return _empty;
+    if (value > 0) {
+      final t = (value / _maxPos).clamp(0.0, 1.0);
+      return Color.lerp(const Color(0xFF34C759).withOpacity(0.2), const Color(0xFF34C759), t)!;
+    } else {
+      final t = (value.abs() / _maxNeg).clamp(0.0, 1.0);
+      return Color.lerp(const Color(0xFFFF3B30).withOpacity(0.2), const Color(0xFFFF3B30), t)!;
+    }
+  }
+
+  void _onTap(DateTime date) {
+    HapticFeedback.selectionClick();
+    final value = _normalized[date] ?? 0;
+    final fmt = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _DaySheet(
+        date: DateFormat.yMMMd('es_CO').format(date),
+        value: value,
+        formatted: fmt.format(value.abs()),
+        isDark: _isDark,
+      ),
+    );
+  }
+
+  void _go(int direction) {
+    final target = _currentPage + direction;
+    if (target < 0 || target >= _months.length) return;
+    HapticFeedback.selectionClick();
+    _pageCtrl.animateToPage(
+      target,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildHeader(context),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-          decoration: BoxDecoration(
-            color: Theme.of(context).cardColor,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.grey.withOpacity(0.2), width: 1),
+    if (_months.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+      child: Column(
+        children: [
+          // ── Navegación mes ───────────────────────────────────────────
+          Row(
+            children: [
+              _NavButton(
+                icon: Icons.chevron_left_rounded,
+                enabled: _currentPage > 0,
+                onTap: () => _go(-1),
+                isDark: _isDark,
+                label: _label,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
+                  child: Text(
+                    key: ValueKey(_currentPage),
+                    DateFormat.yMMMM('es_CO').format(_months[_currentPage]),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w600,
+                      color: _label, letterSpacing: -0.2,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              _NavButton(
+                icon: Icons.chevron_right_rounded,
+                enabled: _currentPage < _months.length - 1,
+                onTap: () => _go(1),
+                isDark: _isDark,
+                label: _label,
+              ),
+            ],
           ),
-          // --- Novedad: Contenedor con altura fija para la lista scrollable ---
-          child: SizedBox(
-            height: 380, // Altura ajustable según tus necesidades
-            child: ListView.builder(
-              itemCount: _monthsToDisplay.length,
-              itemBuilder: (context, index) {
-                final month = _monthsToDisplay[index];
-                return _MonthlyHeatmap(
-                  year: month.year,
-                  month: month.month,
-                  datasets: _completeDatasets,
-                  maxPositive: _maxPositive,
-                  maxNegative: _maxNegative,
-                  onDateTap: (date) => _showActivitySnackBar(context, date),
-                );
-              },
+
+          const SizedBox(height: 14),
+
+          // ── Cabeceras de días ────────────────────────────────────────
+          Row(
+            children: ['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((d) => Expanded(
+              child: Center(
+                child: Text(d, style: TextStyle(
+                  fontSize: 10, fontWeight: FontWeight.w600, color: _label3,
+                )),
+              ),
+            )).toList(),
+          ),
+
+          const SizedBox(height: 6),
+
+          // ── PageView ─────────────────────────────────────────────────
+          SizedBox(
+            height: 220,
+            child: PageView.builder(
+              controller: _pageCtrl,
+              onPageChanged: (i) => setState(() => _currentPage = i),
+              itemCount: _months.length,
+              itemBuilder: (_, i) => _MonthGrid(
+                year: _months[i].year,
+                month: _months[i].month,
+                data: _normalized,
+                cellColor: _cellColor,
+                onTap: _onTap,
+                label3: _label3,
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 16),
-        _buildLegend(context),
-      ],
-    );
-  }
 
-  Widget _buildLegend(BuildContext context) {
-     final textStyle = GoogleFonts.poppins(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant);
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text('Poco', style: textStyle),
-        const SizedBox(width: 8),
-        Container(width: 15, height: 15, color: Colors.red[100]),
-        Container(width: 15, height: 15, color: Colors.red[400]),
-        Container(width: 15, height: 15, color: Colors.red[800]),
-        const SizedBox(width: 4),
-        Container(
-          width: 15, height: 15, 
-          decoration: BoxDecoration(
-            color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade800 : Colors.grey.shade200
+          const SizedBox(height: 12),
+
+          // ── Dots de página ───────────────────────────────────────────
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(_months.length, (i) {
+              final active = i == _currentPage;
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: active ? 16 : 6,
+                height: 6,
+                margin: const EdgeInsets.symmetric(horizontal: 2),
+                decoration: BoxDecoration(
+                  color: active
+                      ? const Color(0xFF007AFF)
+                      : (_isDark ? const Color(0xFF48484A) : const Color(0xFFAEAEB2)),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              );
+            }),
           ),
-        ),
-        const SizedBox(width: 4),
-        Container(width: 15, height: 15, color: Colors.green[100]),
-        Container(width: 15, height: 15, color: Colors.green[400]),
-        Container(width: 15, height: 15, color: Colors.green[800]),
-        const SizedBox(width: 8),
-        Text('Mucho', style: textStyle),
-      ],
-    );
-  }
 
-  Widget _buildHeader(BuildContext context) {
-    return Row(
-      children: [
-        const Icon(Iconsax.calendar_1, size: 20, color: Colors.grey),
-        const SizedBox(width: 8),
-        Text(
-          'Actividad Financiera Diaria',
-          style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600),
-        ),
-      ],
-    );
-  }
+          const SizedBox(height: 16),
 
-  void _showActivitySnackBar(BuildContext context, DateTime date) {
-     final value = _completeDatasets[date] ?? 0;
-    
-    final currencyFmt = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
-    String message;
-    IconData icon;
-    Color color;
-
-    if (value == 0) {
-      message = 'Sin movimientos registrados';
-      icon = Iconsax.info_circle;
-      color = Colors.grey;
-    } else if (value > 0) {
-      message = 'Flujo neto positivo de ${currencyFmt.format(value)}';
-      icon = Iconsax.arrow_up_3;
-      color = Colors.green;
-    } else {
-      message = 'Flujo neto negativo de ${currencyFmt.format(value.abs())}';
-      icon = Iconsax.arrow_down_2;
-      color = Colors.red;
-    }
-    
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Row(
-        children: [
-          Icon(icon, color: color),
-          const SizedBox(width: 12),
-          Expanded(child: Text('${DateFormat.yMMMd('es_CO').format(date)}: $message')),
+          // ── Leyenda ──────────────────────────────────────────────────
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('Gasto', style: TextStyle(fontSize: 11, color: _label3)),
+              const SizedBox(width: 6),
+              ...List.generate(4, (i) => Container(
+                width: 12, height: 12,
+                margin: const EdgeInsets.only(right: 2),
+                decoration: BoxDecoration(
+                  color: Color.lerp(
+                    const Color(0xFFFF3B30).withOpacity(0.2),
+                    const Color(0xFFFF3B30), (i + 1) / 4,
+                  ),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              )),
+              Container(
+                width: 12, height: 12,
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                decoration: BoxDecoration(color: _empty, borderRadius: BorderRadius.circular(3)),
+              ),
+              ...List.generate(4, (i) => Container(
+                width: 12, height: 12,
+                margin: const EdgeInsets.only(right: 2),
+                decoration: BoxDecoration(
+                  color: Color.lerp(
+                    const Color(0xFF34C759).withOpacity(0.2),
+                    const Color(0xFF34C759), (i + 1) / 4,
+                  ),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              )),
+              const SizedBox(width: 6),
+              Text('Ingreso', style: TextStyle(fontSize: 11, color: _label3)),
+            ],
+          ),
         ],
       ),
-      duration: const Duration(seconds: 3)
-    ));
+    );
   }
 }
 
-// Celda individual del calendario (sin cambios)
-class _HeatmapCell extends StatelessWidget {
-  final DateTime date;
-  final Color color;
+// ── Botón de navegación ───────────────────────────────────────────────────────
+class _NavButton extends StatelessWidget {
+  final IconData icon;
+  final bool enabled;
   final VoidCallback onTap;
+  final bool isDark;
+  final Color label;
 
-  const _HeatmapCell({required this.date, required this.color, required this.onTap});
+  const _NavButton({
+    required this.icon, required this.enabled,
+    required this.onTap, required this.isDark, required this.label,
+  });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
-      child: Tooltip(
-        message: DateFormat.yMMMd('es_CO').format(date),
+      onTap: enabled ? onTap : null,
+      child: AnimatedOpacity(
+        opacity: enabled ? 1.0 : 0.25,
+        duration: const Duration(milliseconds: 150),
         child: Container(
-          margin: const EdgeInsets.all(2),
+          width: 32, height: 32,
           decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(4),
+            color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F7),
+            borderRadius: BorderRadius.circular(8),
           ),
-          child: Center(
-            child: Text(
-              date.day.toString(),
-              style: GoogleFonts.poppins(
-                color: color.computeLuminance() > 0.5 ? Colors.black54 : Colors.white70,
-                fontSize: 8,
-                fontWeight: FontWeight.w600,
+          child: Icon(icon, size: 20, color: label),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Grid de un mes ────────────────────────────────────────────────────────────
+class _MonthGrid extends StatelessWidget {
+  final int year;
+  final int month;
+  final Map<DateTime, int> data;
+  final Color Function(int) cellColor;
+  final void Function(DateTime) onTap;
+  final Color label3;
+
+  const _MonthGrid({
+    required this.year, required this.month, required this.data,
+    required this.cellColor, required this.onTap, required this.label3,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final daysInMonth = DateTime(year, month + 1, 0).day;
+    final emptyCells = DateTime(year, month, 1).weekday - 1;
+
+    return GridView.builder(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 7,
+        mainAxisSpacing: 4,
+        crossAxisSpacing: 4,
+      ),
+      itemCount: daysInMonth + emptyCells,
+      itemBuilder: (_, i) {
+        if (i < emptyCells) return const SizedBox.shrink();
+        final day = i - emptyCells + 1;
+        final date = DateTime(year, month, day);
+        final value = data[date] ?? 0;
+        final color = cellColor(value);
+
+        return GestureDetector(
+          onTap: () => onTap(date),
+          child: Container(
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(5),
+            ),
+            child: Center(
+              child: Text(
+                day.toString(),
+                style: TextStyle(
+                  fontSize: 9, fontWeight: FontWeight.w600,
+                  color: color.computeLuminance() > 0.4 ? Colors.black54 : Colors.white70,
+                ),
               ),
             ),
           ),
-        ),
+        );
+      },
+    );
+  }
+}
+
+// ── Bottom sheet del día ──────────────────────────────────────────────────────
+class _DaySheet extends StatelessWidget {
+  final String date;
+  final int value;
+  final String formatted;
+  final bool isDark;
+
+  const _DaySheet({
+    required this.date, required this.value,
+    required this.formatted, required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isPositive = value > 0;
+    final isZero = value == 0;
+    final color = isZero
+        ? (isDark ? const Color(0xFF8E8E93) : const Color(0xFF636366))
+        : isPositive ? const Color(0xFF34C759) : const Color(0xFFFF3B30);
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 36, height: 4,
+            margin: const EdgeInsets.only(bottom: 20),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF48484A) : const Color(0xFFAEAEB2),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Text(date, style: TextStyle(
+            fontSize: 15, fontWeight: FontWeight.w600,
+            color: isDark ? Colors.white : const Color(0xFF1C1C1E),
+          )),
+          const SizedBox(height: 10),
+          Text(
+            isZero ? 'Sin movimientos' : (isPositive ? 'Flujo neto positivo' : 'Flujo neto negativo'),
+            style: TextStyle(fontSize: 13,
+              color: isDark ? const Color(0xFF8E8E93) : const Color(0xFF636366)),
+          ),
+          if (!isZero) ...[
+            const SizedBox(height: 8),
+            Text(formatted, style: TextStyle(
+              fontSize: 28, fontWeight: FontWeight.w800,
+              color: color, letterSpacing: -0.5,
+            )),
+          ],
+        ],
       ),
     );
   }

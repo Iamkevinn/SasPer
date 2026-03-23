@@ -1,203 +1,149 @@
 // lib/widgets/analysis_charts/expense_pie_chart.dart
+//
+// iOS: donut limpio, leyenda con valores reales, sin headers redundantes.
+// El ChartCard del padre ya muestra título/ícono.
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:sasper/models/analysis_models.dart';
-import 'package:sasper/widgets/shared/empty_state_card.dart';
 
-class ExpensePieChart extends StatefulWidget { // 1. Convertido a StatefulWidget para manejar el estado del toque
+const _kColors = [
+  Color(0xFFFF3B30),
+  Color(0xFF007AFF),
+  Color(0xFFFF9F0A),
+  Color(0xFF34C759),
+  Color(0xFFAF52DE),
+  Color(0xFF5AC8FA),
+  Color(0xFFFF2D55),
+  Color(0xFF636366),
+];
+
+class ExpensePieChart extends StatefulWidget {
   final List<ExpenseByCategory> data;
-
   const ExpensePieChart({super.key, required this.data});
-  
-  // La lista de colores puede ser parte de la clase
-  static const List<Color> _chartColors = [
-    Colors.blue, Colors.red, Colors.green, Colors.orange, 
-    Colors.purple, Colors.teal, Colors.pink, Colors.indigo,
-  ];
 
   @override
   State<ExpensePieChart> createState() => _ExpensePieChartState();
 }
 
 class _ExpensePieChartState extends State<ExpensePieChart> {
-  int? _touchedIndex; // Para saber qué sección está siendo tocada
+  int _touched = -1;
+
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get _label => _isDark ? Colors.white : const Color(0xFF1C1C1E);
+  Color get _label3 => _isDark ? const Color(0xFF8E8E93) : const Color(0xFF636366);
+  Color get _label2 => _isDark ? const Color(0xFFEBEBF5) : const Color(0xFF3A3A3C);
 
   @override
   Widget build(BuildContext context) {
-    if (widget.data.isEmpty) {
-      return _buildEmptyState();
-    }
-    // El cálculo del total se mueve aquí para que sea accesible en todo el build
-    final double totalExpenses = widget.data.fold(0, (sum, item) => sum + item.totalSpent);
-    if (totalExpenses == 0) {
-      return _buildEmptyState();
-    }
+    final total = widget.data.fold<double>(0, (s, e) => s + e.totalSpent);
+    if (total == 0) return const SizedBox.shrink();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildHeader(context),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface.withAlpha(50),
-            borderRadius: BorderRadius.circular(20)
+    final fmt = NumberFormat.compactCurrency(locale: 'es_CO', symbol: '\$', decimalDigits: 1);
+    final fmtFull = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+
+    final sorted = [...widget.data]..sort((a, b) => b.totalSpent.compareTo(a.totalSpent));
+    final top = sorted.take(6).toList();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+      child: Column(
+        children: [
+          SizedBox(
+            height: 180,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                PieChart(PieChartData(
+                  sectionsSpace: 2,
+                  centerSpaceRadius: 54,
+                  pieTouchData: PieTouchData(
+                    touchCallback: (event, resp) {
+                      setState(() {
+                        if (!event.isInterestedForInteractions || resp?.touchedSection == null) {
+                          _touched = -1;
+                          return;
+                        }
+                        HapticFeedback.selectionClick();
+                        _touched = resp!.touchedSection!.touchedSectionIndex;
+                      });
+                    },
+                  ),
+                  sections: List.generate(top.length, (i) {
+                    final isTouched = i == _touched;
+                    final pct = top[i].totalSpent / total * 100;
+                    return PieChartSectionData(
+                      color: _kColors[i % _kColors.length],
+                      value: top[i].totalSpent,
+                      radius: isTouched ? 56 : 46,
+                      title: pct > 8 ? '${pct.toStringAsFixed(0)}%' : '',
+                      titleStyle: const TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white,
+                      ),
+                    );
+                  }),
+                )),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _touched >= 0 ? fmt.format(top[_touched].totalSpent) : fmt.format(total),
+                      style: TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: -0.5,
+                        color: _touched >= 0 ? _kColors[_touched % _kColors.length] : _label,
+                      ),
+                    ),
+                    Text(
+                      _touched >= 0 ? top[_touched].category : 'Total gastos',
+                      style: TextStyle(fontSize: 11, color: _label3),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-          child: Column(
-            children: [
-              SizedBox(
-                height: 200,
-                child: PieChart(
-                  _buildPieChartData(totalExpenses),
+          const SizedBox(height: 16),
+          ...List.generate(top.length, (i) {
+            final item = top[i];
+            final color = _kColors[i % _kColors.length];
+            final pct = item.totalSpent / total * 100;
+            final isHl = i == _touched;
+            return GestureDetector(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                setState(() => _touched = _touched == i ? -1 : i);
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 140),
+                margin: const EdgeInsets.only(bottom: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+                decoration: BoxDecoration(
+                  color: isHl ? color.withOpacity(_isDark ? 0.15 : 0.08) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(item.category,
+                        style: TextStyle(fontSize: 14, fontWeight: isHl ? FontWeight.w600 : FontWeight.w400, color: _label2),
+                      ),
+                    ),
+                    Text('${pct.toStringAsFixed(0)}%', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: _label3)),
+                    const SizedBox(width: 12),
+                    Text(fmtFull.format(item.totalSpent),
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: isHl ? color : _label),
+                    ),
+                  ],
                 ),
               ),
-              const Divider(height: 32, thickness: 0.5),
-              _buildLegend(context),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return const EmptyStateCard(
-      title: 'Gastos por Categoría',
-      message: 'Aún no has registrado gastos este mes.',
-      icon: Iconsax.chart_21,
-    );
-  }
-
-  Widget _buildHeader(BuildContext context) {
-    return Row(children: [
-      const Icon(Iconsax.chart_21, size: 20),
-      const SizedBox(width: 8),
-      Text(
-        'Gastos del Mes por Categoría',
-        style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-      ),
-    ]);
-  }
-
-  Widget _buildLegend(BuildContext context) {
-    return Wrap(
-      spacing: 16.0,
-      runSpacing: 10.0,
-      alignment: WrapAlignment.center,
-      children: widget.data.asMap().entries.map((entry) {
-        final index = entry.key;
-        final item = entry.value;
-        return _LegendItem(
-          color: ExpensePieChart._chartColors[index % ExpensePieChart._chartColors.length],
-          text: item.category,
-        );
-      }).toList(),
-    );
-  }
-
-  // --- LÓGICA DE CONFIGURACIÓN DEL GRÁFICO (EXTRAÍDA) ---
-
-  PieChartData _buildPieChartData(double totalExpenses) {
-    return PieChartData(
-      // 2. Lógica de interactividad
-      pieTouchData: PieTouchData(
-        touchCallback: (FlTouchEvent event, pieTouchResponse) {
-          setState(() {
-            if (!event.isInterestedForInteractions ||
-                pieTouchResponse == null ||
-                pieTouchResponse.touchedSection == null) {
-              _touchedIndex = -1;
-              return;
-            }
-            _touchedIndex = pieTouchResponse.touchedSection!.touchedSectionIndex;
-          });
-        },
-      ),
-      sectionsSpace: 3,
-      centerSpaceRadius: 60,
-      sections: List.generate(widget.data.length, (index) {
-        final item = widget.data[index];
-        final isTouched = index == _touchedIndex;
-        final percentage = (item.totalSpent / totalExpenses) * 100;
-        
-        final double radius = isTouched ? 60.0 : 50.0;
-        final double fontSize = isTouched ? 16.0 : 14.0;
-        final Color color = ExpensePieChart._chartColors[index % ExpensePieChart._chartColors.length];
-
-        return PieChartSectionData(
-          color: color,
-          value: item.totalSpent,
-          title: percentage > 7 ? '${percentage.toStringAsFixed(0)}%' : '',
-          radius: radius,
-          titleStyle: TextStyle(
-            fontSize: fontSize,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-            shadows: const [Shadow(color: Colors.black38, blurRadius: 3)],
-          ),
-          // 3. Tooltip personalizado
-          badgeWidget: isTouched ? _buildTooltipBadge(item.category, item.totalSpent, color) : null,
-          badgePositionPercentageOffset: .98,
-        );
-      }),
-    );
-  }
-
-  // Widget para el tooltip que aparece al tocar
-  Widget _buildTooltipBadge(String category, double amount, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(8),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 4,
-            offset: const Offset(2, 2),
-          ),
+            );
+          }),
         ],
       ),
-      child: Text(
-        '$category\n${NumberFormat.currency(locale: 'es_CO', symbol: '\$').format(amount)}',
-        textAlign: TextAlign.center,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
-}
-
-// Widget reutilizable para los items de la leyenda
-class _LegendItem extends StatelessWidget {
-  final Color color;
-  final String text;
-
-  const _LegendItem({required this.color, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(3),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(text, style: Theme.of(context).textTheme.bodyMedium),
-      ],
     );
   }
 }
