@@ -90,14 +90,14 @@ Future<void> main() async {
     ////////////////////////////////////////////////////////////////////////////////////////////////////
 
     // Código de prueba: Forzar ejecución en 10 segundos
-    Workmanager().registerOneOffTask(
+    /*Workmanager().registerOneOffTask(
       "prueba_rapida_2",
       smartGoalTask,
       initialDelay: const Duration(seconds: 10),
-    );
+    );*/
 
     // Registramos la tarea para que corra cada 24h
-    /*Workmanager().registerPeriodicTask(
+    Workmanager().registerPeriodicTask(
       "1", // ID único de la tarea
       smartGoalTask,
       frequency: const Duration(hours: 24),
@@ -105,7 +105,7 @@ Future<void> main() async {
         networkType: NetworkType.connected, // Solo si hay internet
         requiresBatteryNotLow: true, // No agotar la batería del usuario
       ),
-    );*/
+    );
   } catch (e) {
     developer.log('🔥 Error iniciando Workmanager: $e', name: 'MainInit');
   }
