@@ -87,6 +87,9 @@ Future<void> main() async {
       isInDebugMode: true, // Ponlo en true para que nos avise en la consola
     );
 
+    // 1. 🧹 MATAR A LOS FANTASMAS DE AYER
+    // Esto borra cualquier tarea que Android tenga atascada en la memoria
+
     ////////////////////////////////////////////////////////////////////////////////////////////////////
 
     // Código de prueba: Forzar ejecución en 10 segundos
@@ -97,15 +100,27 @@ Future<void> main() async {
     );*/
 
     // Registramos la tarea para que corra cada 24h
-    Workmanager().registerPeriodicTask(
-      "1", // ID único de la tarea
-      smartGoalTask,
-      frequency: const Duration(hours: 24),
-      constraints: Constraints(
-        networkType: NetworkType.connected, // Solo si hay internet
-        requiresBatteryNotLow: true, // No agotar la batería del usuario
-      ),
-    );
+    // 2. 🕒 REGISTRAR LA NUEVA TAREA LIMPIA
+    // ✅ Usa existingWorkPolicy.keep para no re-registrar si ya existe
+  Workmanager().registerPeriodicTask(
+    "smart_goal_daily_check",
+    smartGoalTask,
+    frequency: const Duration(hours: 24),
+    initialDelay: const Duration(minutes: 1),
+    existingWorkPolicy: ExistingPeriodicWorkPolicy.replace, // 👈 Si ya existe, no la toca
+    constraints: Constraints(
+      networkType: NetworkType.connected,
+      requiresBatteryNotLow: true,
+    ),
+  );
+
+  // ✅ AÑADE ESTO: una tarea de prueba que corre en 15 segundos
+  // para confirmar que el worker SÍ funciona
+   Workmanager().registerOneOffTask(
+    "debug_test_${DateTime.now().millisecondsSinceEpoch}",
+    smartGoalTask,
+    initialDelay: const Duration(seconds: 15),
+  ); 
   } catch (e) {
     developer.log('🔥 Error iniciando Workmanager: $e', name: 'MainInit');
   }

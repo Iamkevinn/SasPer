@@ -179,7 +179,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
 
     // Mantenimiento diferido de notificaciones
     Future.delayed(const Duration(seconds: 15), () {
-      if (mounted) NotificationService.instance.refreshAllSchedules();
+      if (mounted) NotificationService.instance.refreshRecurringSchedules();
     });
   }
 
