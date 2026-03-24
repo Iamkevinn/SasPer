@@ -38,7 +38,6 @@ import 'package:sasper/screens/goals_screen.dart';
 import 'package:workmanager/workmanager.dart';
 import 'package:sasper/services/smart_notification_worker.dart';
 
-
 // =================================================================
 //                 CONFIGURACIÓN GLOBAL
 // =================================================================
@@ -102,25 +101,26 @@ Future<void> main() async {
     // Registramos la tarea para que corra cada 24h
     // 2. 🕒 REGISTRAR LA NUEVA TAREA LIMPIA
     // ✅ Usa existingWorkPolicy.keep para no re-registrar si ya existe
-  Workmanager().registerPeriodicTask(
-    "smart_goal_daily_check",
-    smartGoalTask,
-    frequency: const Duration(hours: 24),
-    initialDelay: const Duration(minutes: 1),
-    existingWorkPolicy: ExistingPeriodicWorkPolicy.replace, // 👈 Si ya existe, no la toca
-    constraints: Constraints(
-      networkType: NetworkType.connected,
-      requiresBatteryNotLow: true,
-    ),
-  );
+    Workmanager().registerPeriodicTask(
+      "smart_goal_daily_check",
+      smartGoalTask,
+      frequency: const Duration(hours: 24),
+      initialDelay: const Duration(minutes: 1),
+      existingWorkPolicy:
+          ExistingPeriodicWorkPolicy.replace, // 👈 Si ya existe, no la toca
+      constraints: Constraints(
+        networkType: NetworkType.connected,
+        requiresBatteryNotLow: true,
+      ),
+    );
 
-  // ✅ AÑADE ESTO: una tarea de prueba que corre en 15 segundos
-  // para confirmar que el worker SÍ funciona
-   Workmanager().registerOneOffTask(
-    "debug_test_${DateTime.now().millisecondsSinceEpoch}",
-    smartGoalTask,
-    initialDelay: const Duration(seconds: 15),
-  ); 
+    // ✅ AÑADE ESTO: una tarea de prueba que corre en 15 segundos
+    // para confirmar que el worker SÍ funciona
+    Workmanager().registerOneOffTask(
+      "debug_test_${DateTime.now().millisecondsSinceEpoch}",
+      smartGoalTask,
+      initialDelay: const Duration(seconds: 15),
+    );
   } catch (e) {
     developer.log('🔥 Error iniciando Workmanager: $e', name: 'MainInit');
   }
@@ -245,9 +245,9 @@ class _MyAppState extends State<MyApp> {
           lightColorScheme = lightDynamic.harmonized();
           darkColorScheme = darkDynamic.harmonized();
         } else {
-          lightColorScheme = ColorScheme.fromSeed(seedColor: Colors.blueAccent);
+          lightColorScheme = ColorScheme.fromSeed(seedColor: AppTheme.accent);
           darkColorScheme = ColorScheme.fromSeed(
-              seedColor: Colors.blueAccent, brightness: Brightness.dark);
+              seedColor: AppTheme.accent, brightness: Brightness.dark);
         }
 
         return MaterialApp(

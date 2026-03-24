@@ -1,10 +1,4 @@
 // lib/screens/add_transaction_screen.dart
-// FIXES aplicados:
-// 1. _buildAccountSection usa FutureBuilder<_accountsFuture> — no lista local
-// 2. DropdownButtonFormField reemplazado por _TappableRow + showModalBottomSheet
-//    → elimina el assert parentDataDirty en SliverToBoxAdapter
-// 3. _buildFundSourceSection idem — Dropdown reemplazado por _TappableRow + sheet
-// 4. _loadInitialData con log de error explícito para debug
 
 import 'dart:convert';
 import 'dart:math' as math;
@@ -30,48 +24,32 @@ import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'dart:developer' as developer;
 import 'package:sasper/screens/place_search_screen.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:sasper/data/goal_repository.dart'; 
+import 'package:sasper/models/goal_model.dart';    
 
-import 'package:sasper/data/goal_repository.dart'; // 👈 NUEVO
-import 'package:sasper/models/goal_model.dart';    // 👈 NUEVO
-
-// ─── DESIGN TOKENS ────────────────────────────────────────────────────────────
-
-class _C {
-  final BuildContext ctx;
-  _C(this.ctx);
-
-  bool get isDark => Theme.of(ctx).brightness == Brightness.dark;
-
-  Color get bg      => isDark ? const Color(0xFF000000) : const Color(0xFFF2F2F7);
-  Color get surface => isDark ? const Color(0xFF1C1C1E) : Colors.white;
-  Color get raised  => isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF5F5F7);
-  Color get sep     => isDark ? const Color(0xFF38383A) : const Color(0xFFE5E5EA);
-
-  Color get label  => isDark ? const Color(0xFFFFFFFF) : const Color(0xFF1C1C1E);
-  Color get label2 => isDark ? const Color(0xFFEBEBF5) : const Color(0xFF3A3A3C);
-  Color get label3 => isDark ? const Color(0xFF8E8E93) : const Color(0xFF636366);
-  Color get label4 => isDark ? const Color(0xFF48484A) : const Color(0xFFAEAEB2);
-
-}
-
+// ─── DESIGN TOKENS DINÁMICOS ──────────────────────────────────────────────────
 
 abstract class _T {
-  static const Color bg             = Color(0xFF0A0A0F);
-  static const Color surfaceRaised  = Color(0xFF181820);
-  static const Color surfaceHighest = Color(0xFF1E1E28);
-  static const Color border         = Color(0xFF252530);
-  static const Color borderSubtle   = Color(0xFF1A1A22);
+  static bool isDark(BuildContext context) => Theme.of(context).brightness == Brightness.dark;
 
-  static const Color textPrimary   = Color(0xFFF0ECE4);
-  static const Color textSecondary = Color(0xFF7A7688);
-  static const Color textTertiary  = Color(0xFF3C3A48);
+  static Color bg(BuildContext context)             => isDark(context) ? const Color(0xFF0A0A0F) : const Color(0xFFF2F2F7);
+  static Color surfaceRaised(BuildContext context)  => isDark(context) ? const Color(0xFF181820) : Colors.white;
+  static Color surfaceHighest(BuildContext context) => isDark(context) ? const Color(0xFF1E1E28) : const Color(0xFFF5F5F7);
+  static Color border(BuildContext context)         => isDark(context) ? const Color(0xFF252530) : const Color(0xFFE5E5EA);
+  static Color borderSubtle(BuildContext context)   => isDark(context) ? const Color(0xFF1A1A22) : const Color(0xFFD1D1D6);
 
-  static const Color accent    = Color(0xFFC9A96E);
+  static Color textPrimary(BuildContext context)   => isDark(context) ? const Color(0xFFF0ECE4) : const Color(0xFF1C1C1E);
+  static Color textSecondary(BuildContext context) => isDark(context) ? const Color(0xFF7A7688) : const Color(0xFF636366);
+  static Color textTertiary(BuildContext context)  => isDark(context) ? const Color(0xFF3C3A48) : const Color(0xFFAEAEB2);
+
+  static const Color accent       = Color(0xFFC9A96E);
 
   static const Color expenseColor = Color(0xFFE05555);
-  static const Color expenseDim   = Color(0xFF3A1515);
+  static Color expenseDim(BuildContext context)    => isDark(context) ? const Color(0xFF3A1515) : const Color(0xFFFFEBEB);
+  
   static const Color incomeColor  = Color(0xFF4EA87A);
-  static const Color incomeDim    = Color(0xFF122A1E);
+  static Color incomeDim(BuildContext context)     => isDark(context) ? const Color(0xFF122A1E) : const Color(0xFFE8F5E9);
+  
   static const Color debtColor    = Color(0xFFFF9F0A);
 
   static const double xs  = 4;
@@ -128,26 +106,22 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
   bool     _isFetchingLocation = false;
   bool     _amountHasValue     = false;
   Debt?    _smartSuggestion;
-  bool _isInterestFree = false; // Añade este estado al inicio de tu clase
+  bool _isInterestFree = false; 
 
-  // --- NUEVOS ESTADOS PARA TARJETAS ---
-  int _installments = 1; // Por defecto 1 cuota
+  int _installments = 1; 
   bool get _isCreditCard => _selectedAccount?.type == 'Tarjeta de Crédito';
 
-  // Cálculo de interés (IA)
   double _calculateInterestCost() {
     final amount = double.tryParse(_amountController.text.trim().replaceAll(',', '.')) ?? 0.0;
     final rate = _selectedAccount?.interestRate ?? 0.0;
     if (_installments <= 1 || amount <= 0 || rate <= 0) return 0;
     
-    // Fórmula de interés compuesto para cuotas fijas (Aproximación francesa)
     double monthlyRate = (rate / 100) / 12;
     double monthlyPayment = amount * (monthlyRate * math.pow(1 + monthlyRate, _installments)) / 
                           (math.pow(1 + monthlyRate, _installments) - 1);
     return (monthlyPayment * _installments) - amount;
   }
 
-  // Consejo de fecha de corte (IA)
   String? _getCreditCardAdvice() {
     if (!_isCreditCard || _selectedAccount?.closingDay == null) return null;
     
@@ -161,13 +135,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     return null;
   }
 
-  // Cuenta y fondo seleccionados — objetos completos, no solo IDs
-  // Esto evita el DropdownButtonFormField que causa parentDataDirty
   Account? _selectedAccount;
   Debt?    _selectedFundSource;
-  List<Debt> _availableFunds = [];
+  List<Debt> _availableFunds =[];
 
-  // FUTUREs — única fuente de verdad para cuentas y presupuestos
   late final Future<List<Account>>  _accountsFuture  = _accountRepo.getAccounts();
   late final Future<List<Budget>>   _budgetsFuture   = _budgetRepo.getBudgets();
   late final Future<List<Category>> _categoriesFuture = _categoryRepo.getCategories();
@@ -177,7 +148,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     super.initState();
     _loadAvailableFunds();
 
-    // 2. CARGAMOS LAS METAS ACTIVAS AL ABRIR LA PANTALLA
     _goalRepo.getActiveGoals().then((goals) {
       if (mounted) setState(() => _activeGoals = goals);
     });
@@ -198,7 +168,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
       _runSmartMatching();
     });
 
-    // Pre-seleccionar la primera cuenta si solo hay una
     _accountsFuture.then((accounts) {
       if (mounted && accounts.length == 1) {
         setState(() => _selectedAccount = accounts.first);
@@ -222,7 +191,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      isDismissible: false, // Forzamos a que lean el consejo
+      isDismissible: false, 
       enableDrag: false,
       builder: (_) => _SmartSuggestionSheet(
         goal: goal,
@@ -230,9 +199,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
         isExpense: _isExpense,
         accountId: accountId,
         onComplete: (bool saved) {
-          // Cerramos el BottomSheet
           Navigator.of(context).pop();
-          // Cerramos la pantalla de Transacción
           Navigator.of(this.context).pop(true); 
           
           if (saved) {
@@ -286,10 +253,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
   bool  get _isExpense   => _transactionType == 'Gasto';
   Color get _typeColor   => _isExpense ? _T.expenseColor : _T.incomeColor;
 
-  // ── ACCIONES ──────────────────────────────────────────────────────────────
-
-  /// Abre un bottom sheet iOS-style para seleccionar cuenta.
-  /// Reemplaza DropdownButtonFormField — elimina el assert parentDataDirty.
   void _showAccountPicker(List<Account> accounts) {
     HapticFeedback.selectionClick();
     final fmt = NumberFormat.currency(
@@ -298,29 +261,28 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        decoration: const BoxDecoration(
-          color: _T.surfaceRaised,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      builder: (sheetContext) => Container(
+        decoration: BoxDecoration(
+          color: _T.surfaceRaised(sheetContext),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          children: [
-            // Handle
+          children:[
             Container(
               width: 36, height: 4,
               margin: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
-                color: _T.textTertiary.withOpacity(0.5),
+                color: _T.textTertiary(sheetContext).withOpacity(0.5),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-              child: Row(children: [
+              child: Row(children:[
                 Text('Selecciona una cuenta',
                     style: TextStyle(
-                        color: _T.textSecondary,
+                        color: _T.textSecondary(sheetContext),
                         fontSize: 13,
                         fontWeight: FontWeight.w500)),
               ]),
@@ -336,11 +298,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                 },
                 child: Container(
                   color: isSelected
-                      ? _T.surfaceHighest
+                      ? _T.surfaceHighest(sheetContext)
                       : Colors.transparent,
                   padding: const EdgeInsets.symmetric(
                       horizontal: 20, vertical: 14),
-                  child: Row(children: [
+                  child: Row(children:[
                     Container(
                       width: 8, height: 8,
                       decoration: BoxDecoration(
@@ -353,8 +315,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                       child: Text(a.name,
                           style: TextStyle(
                               color: isSelected
-                                  ? _T.textPrimary
-                                  : _T.textSecondary,
+                                  ? _T.textPrimary(sheetContext)
+                                  : _T.textSecondary(sheetContext),
                               fontSize: 15,
                               fontWeight: isSelected
                                   ? FontWeight.w600
@@ -383,7 +345,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     );
   }
 
-  /// Abre un bottom sheet para seleccionar fuente de fondos.
   void _showFundPicker() {
     HapticFeedback.selectionClick();
     final fmt = NumberFormat.currency(
@@ -392,19 +353,19 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        decoration: const BoxDecoration(
-          color: _T.surfaceRaised,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      builder: (sheetContext) => Container(
+        decoration: BoxDecoration(
+          color: _T.surfaceRaised(sheetContext),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          children: [
+          children:[
             Container(
               width: 36, height: 4,
               margin: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
-                color: _T.textTertiary.withOpacity(0.5),
+                color: _T.textTertiary(sheetContext).withOpacity(0.5),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -412,11 +373,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
               child: Text('¿Desde dónde?',
                   style: TextStyle(
-                      color: _T.textSecondary,
+                      color: _T.textSecondary(sheetContext),
                       fontSize: 13,
                       fontWeight: FontWeight.w500)),
             ),
-            // Opción: Mi dinero libre
             GestureDetector(
               onTap: () {
                 HapticFeedback.selectionClick();
@@ -425,20 +385,20 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
               },
               child: Container(
                 color: _selectedFundSource == null
-                    ? _T.surfaceHighest
+                    ? _T.surfaceHighest(sheetContext)
                     : Colors.transparent,
                 padding: const EdgeInsets.symmetric(
                     horizontal: 20, vertical: 14),
-                child: Row(children: [
-                  const Icon(Iconsax.wallet_3,
-                      size: 17, color: _T.textSecondary),
+                child: Row(children:[
+                  Icon(Iconsax.wallet_3,
+                      size: 17, color: _T.textSecondary(sheetContext)),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text('Mi dinero libre',
                         style: TextStyle(
                             color: _selectedFundSource == null
-                                ? _T.textPrimary
-                                : _T.textSecondary,
+                                ? _T.textPrimary(sheetContext)
+                                : _T.textSecondary(sheetContext),
                             fontSize: 15,
                             fontWeight: _selectedFundSource == null
                                 ? FontWeight.w600
@@ -450,7 +410,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                 ]),
               ),
             ),
-            // Préstamos disponibles
             ..._availableFunds.map((debt) {
               final isSelected = _selectedFundSource?.id == debt.id;
               return GestureDetector(
@@ -460,10 +419,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                   Navigator.pop(context);
                 },
                 child: Container(
-                  color: isSelected ? _T.surfaceHighest : Colors.transparent,
+                  color: isSelected ? _T.surfaceHighest(sheetContext) : Colors.transparent,
                   padding: const EdgeInsets.symmetric(
                       horizontal: 20, vertical: 14),
-                  child: Row(children: [
+                  child: Row(children:[
                     const Icon(Iconsax.lock_circle,
                         size: 17, color: _T.debtColor),
                     const SizedBox(width: 12),
@@ -472,15 +431,15 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                           style: TextStyle(
                               color: isSelected
                                   ? _T.debtColor
-                                  : _T.textSecondary,
+                                  : _T.textSecondary(sheetContext),
                               fontSize: 15,
                               fontWeight: isSelected
                                   ? FontWeight.w600
                                   : FontWeight.w400)),
                     ),
                     Text(fmt.format(debt.spendingFund),
-                        style: const TextStyle(
-                            fontSize: 13, color: _T.textSecondary)),
+                        style: TextStyle(
+                            fontSize: 13, color: _T.textSecondary(sheetContext))),
                     if (isSelected) ...[
                       const SizedBox(width: 10),
                       const Icon(Icons.check_rounded,
@@ -570,7 +529,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
           EventService.instance.fire(AppEvent.debtsChanged);
         }
         
-        // 👈 1. CÁLCULO DEL SALDO REAL DESPUÉS DEL GASTO/INGRESO
         double remainingBalance = _selectedAccount!.balance;
         if (_isExpense) {
           remainingBalance -= amount.abs();
@@ -578,14 +536,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
           remainingBalance += amount.abs();
         }
 
-        // 👈 2. MAGIA DE ECONOMÍA CONDUCTUAL
         final topGoal = _getTopPriorityGoal();
         final suggestedAmount = math.min(
           amount.abs() * 0.10, 
           topGoal != null ? topGoal.targetAmount - topGoal.currentAmount : 0.0
         );
 
-        // 👈 3. AHORA VALIDAMOS CONTRA EL SALDO RESTANTE (remainingBalance)
         if (topGoal != null && suggestedAmount >= 1000 && remainingBalance >= suggestedAmount) {
            setState(() => _isLoading = false);
            _showSmartGoalSuggestion(topGoal, suggestedAmount, _selectedAccount!.id);
@@ -604,15 +560,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     }
   }
 
-  // 👈 FUNCIÓN PARA OBTENER LA META MÁS URGENTE
   Goal? _getTopPriorityGoal() {
     final incomplete = _activeGoals.where((g) => g.currentAmount < g.targetAmount).toList();
     if (incomplete.isEmpty) return null;
     
-    // Ordenamos por prioridad (Alta > Media > Baja) y luego por fecha más cercana
     incomplete.sort((a, b) {
       if (a.priority != b.priority) {
-        // High (index 2) va primero que Low (index 0)
         return b.priority.index.compareTo(a.priority.index); 
       }
       return (a.targetDate ?? DateTime(2100)).compareTo(b.targetDate ?? DateTime(2100));
@@ -674,13 +627,13 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
       firstDate: DateTime(2020),
       lastDate: DateTime.now(),
       builder: (context, child) => Theme(
-        data: ThemeData.dark().copyWith(
-          colorScheme: const ColorScheme.dark(
+        data: Theme.of(context).copyWith(
+          colorScheme: Theme.of(context).colorScheme.copyWith(
             primary: _T.accent,
-            surface: _T.surfaceRaised,
-            onSurface: _T.textPrimary,
+            surface: _T.surfaceRaised(context),
+            onSurface: _T.textPrimary(context),
           ),
-          dialogBackgroundColor: _T.surfaceRaised,
+          dialogBackgroundColor: _T.surfaceRaised(context),
         ),
         child: child!,
       ),
@@ -690,24 +643,22 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     }
   }
 
-  // ── BUILD ─────────────────────────────────────────────────────────────────
-
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
+      value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-        statusBarBrightness: Brightness.dark,
+        statusBarIconBrightness: _T.isDark(context) ? Brightness.light : Brightness.dark,
+        statusBarBrightness: _T.isDark(context) ? Brightness.dark : Brightness.light,
       ),
       child: Scaffold(
-        backgroundColor: _T.bg,
+        backgroundColor: _T.bg(context),
         body: Form(
           key: _formKey,
           child: CustomScrollView(
             controller: _scrollController,
             physics: const BouncingScrollPhysics(),
-            slivers: [
+            slivers:[
               SliverToBoxAdapter(child: _buildHeader()),
               SliverToBoxAdapter(child: _buildAmountHero()),
               SliverToBoxAdapter(child: _buildSmartSuggestion()),
@@ -726,8 +677,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                   padding: const EdgeInsets.symmetric(horizontal: _T.md),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Fuente de fondos — solo si es gasto y hay préstamos
+                    children:[
                       if (_isExpense && _availableFunds.isNotEmpty) ...[
                         _FadeSlide(
                             delay: 100,
@@ -736,7 +686,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                       ],
                       _FadeSlide(delay: 120, child: _buildAccountSection()),
                       const SizedBox(height: _T.md),
-                      // --- NUEVA SECCIÓN: CUOTAS E INTELIGENCIA DE TARJETA ---
                       if (_isExpense && _isCreditCard) ...[
                         _FadeSlide(
                           delay: 140,
@@ -776,15 +725,13 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     );
   }
 
-  // ── HEADER ────────────────────────────────────────────────────────────────
-
   Widget _buildHeader() {
     return SafeArea(
       bottom: false,
       child: Padding(
         padding:
             const EdgeInsets.fromLTRB(_T.md, _T.sm, _T.sm, 0),
-        child: Row(children: [
+        child: Row(children:[
           _IconBtn(
             icon: Icons.close_rounded,
             onTap: () {
@@ -798,104 +745,100 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     );
   }
 
-  // Widget para seleccionar cuotas
-Widget _buildInstallmentSection() {
-  final interest = _isInterestFree ? 0.0 : _calculateInterestCost();
-  final commonInstallments = [1, 2, 3, 6, 12, 18, 24, 36, 48];
+  Widget _buildInstallmentSection() {
+    final interest = _isInterestFree ? 0.0 : _calculateInterestCost();
+    final commonInstallments =[1, 2, 3, 6, 12, 18, 24, 36, 48];
 
-  return _Section(
-    label: 'Configuración de Cuotas',
-    child: Column(
-      children: [
-        // Selector horizontal (Mucho más rápido)
-        SizedBox(
-          height: 60,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            itemCount: commonInstallments.length,
-            itemBuilder: (context, index) {
-              final n = commonInstallments[index];
-              final isSel = _installments == n;
-              return GestureDetector(
-                onTap: () {
-                  setState(() => _installments = n);
-                  HapticFeedback.selectionClick();
-                },
-                child: AnimatedContainer(
-                  duration: _T.fast,
-                  margin: const EdgeInsets.only(right: 8),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: isSel ? _T.accent : _T.surfaceHighest,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: isSel ? _T.accent : _T.border),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    '$n ${n == 1 ? 'Cuota' : 'Cuotas'}',
-                    style: TextStyle(
-                      color: isSel ? Colors.white : _T.textSecondary,
-                      fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
-                      fontSize: 13,
+    return _Section(
+      label: 'Configuración de Cuotas',
+      child: Column(
+        children:[
+          SizedBox(
+            height: 60,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              itemCount: commonInstallments.length,
+              itemBuilder: (context, index) {
+                final n = commonInstallments[index];
+                final isSel = _installments == n;
+                return GestureDetector(
+                  onTap: () {
+                    setState(() => _installments = n);
+                    HapticFeedback.selectionClick();
+                  },
+                  child: AnimatedContainer(
+                    duration: _T.fast,
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: isSel ? _T.accent : _T.surfaceHighest(context),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: isSel ? _T.accent : _T.border(context)),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      '$n ${n == 1 ? 'Cuota' : 'Cuotas'}',
+                      style: TextStyle(
+                        color: isSel ? Colors.white : _T.textSecondary(context),
+                        fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
-        ),
-        
-        const Divider(height: 1, color: _T.borderSubtle),
+          
+          Divider(height: 1, color: _T.borderSubtle(context)),
 
-        // Switch de "Sin Intereses" (Punto 3)
-        _TappableRow(
-          onTap: () => setState(() => _isInterestFree = !_isInterestFree),
-          child: Row(
-            children: [
-              const Icon(Iconsax.flash_1, size: 18, color: _T.incomeColor),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Promoción Sin Intereses', 
-                      style: TextStyle(color: _T.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
-                    Text('Activa si la tienda ofrece 0% de interés', 
-                      style: TextStyle(color: _T.textSecondary, fontSize: 11)),
-                  ],
-                ),
-              ),
-              Switch.adaptive(
-                value: _isInterestFree,
-                activeColor: _T.incomeColor,
-                onChanged: (v) => setState(() => _isInterestFree = v),
-              ),
-            ],
-          ),
-        ),
-
-        if (interest > 0) ...[
-          const Divider(height: 1, color: _T.borderSubtle),
-          Padding(
-            padding: const EdgeInsets.all(12),
+          _TappableRow(
+            onTap: () => setState(() => _isInterestFree = !_isInterestFree),
             child: Row(
-              children: [
-                const Icon(Iconsax.info_circle, size: 14, color: _T.expenseColor),
-                const SizedBox(width: 8),
-                Text(
-                  'Costo total en intereses: \$${interest.toStringAsFixed(0)}',
-                  style: const TextStyle(color: _T.expenseColor, fontSize: 12, fontWeight: FontWeight.bold),
+              children:[
+                const Icon(Iconsax.flash_1, size: 18, color: _T.incomeColor),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children:[
+                      Text('Promoción Sin Intereses', 
+                        style: TextStyle(color: _T.textPrimary(context), fontSize: 14, fontWeight: FontWeight.w600)),
+                      Text('Activa si la tienda ofrece 0% de interés', 
+                        style: TextStyle(color: _T.textSecondary(context), fontSize: 11)),
+                    ],
+                  ),
+                ),
+                Switch.adaptive(
+                  value: _isInterestFree,
+                  activeColor: _T.incomeColor,
+                  onChanged: (v) => setState(() => _isInterestFree = v),
                 ),
               ],
             ),
           ),
-        ]
-      ],
-    ),
-  );
-}  
-  // ── MONTO HERO ────────────────────────────────────────────────────────────
+
+          if (interest > 0) ...[
+            Divider(height: 1, color: _T.borderSubtle(context)),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children:[
+                  const Icon(Iconsax.info_circle, size: 14, color: _T.expenseColor),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Costo total en intereses: \$${interest.toStringAsFixed(0)}',
+                    style: const TextStyle(color: _T.expenseColor, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
+          ]
+        ],
+      ),
+    );
+  }  
 
   Widget _buildAmountHero() {
     return _FadeSlide(
@@ -912,7 +855,7 @@ Widget _buildInstallmentSection() {
               const EdgeInsets.fromLTRB(_T.md, _T.sm, _T.md, _T.lg),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+            children:[
               AnimatedSwitcher(
                 duration: _T.mid,
                 child: Text(
@@ -929,7 +872,7 @@ Widget _buildInstallmentSection() {
               const SizedBox(height: _T.xs),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
+                children:[
                   Padding(
                     padding: const EdgeInsets.only(right: 4, top: 10),
                     child: AnimatedDefaultTextStyle(
@@ -938,7 +881,7 @@ Widget _buildInstallmentSection() {
                       style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.w300,
-                        color: _amountHasValue ? _typeColor : _T.textTertiary,
+                        color: _amountHasValue ? _typeColor : _T.textTertiary(context),
                         height: 1,
                       ),
                       child: const Text('\$'),
@@ -953,16 +896,16 @@ Widget _buildInstallmentSection() {
                       style: TextStyle(
                         fontSize: 56,
                         fontWeight: FontWeight.w700,
-                        color: _amountHasValue ? _typeColor : _T.textTertiary,
+                        color: _amountHasValue ? _typeColor : _T.textTertiary(context),
                         letterSpacing: -1.5,
                         height: 1.1,
                       ),
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         hintText: '0',
                         hintStyle: TextStyle(
                           fontSize: 56,
                           fontWeight: FontWeight.w700,
-                          color: _T.textTertiary,
+                          color: _T.textTertiary(context),
                           letterSpacing: -1.5,
                           height: 1.1,
                         ),
@@ -987,7 +930,7 @@ Widget _buildInstallmentSection() {
                   gradient: LinearGradient(
                     colors: _amountHasValue
                         ? [_typeColor.withOpacity(0.8), Colors.transparent]
-                        : [_T.border, Colors.transparent],
+                        : [_T.border(context), Colors.transparent],
                   ),
                   borderRadius: BorderRadius.circular(1),
                 ),
@@ -998,8 +941,6 @@ Widget _buildInstallmentSection() {
       ),
     );
   }
-
-  // ── SUGERENCIA INTELIGENTE ────────────────────────────────────────────────
 
   Widget _buildSmartSuggestion() {
     if (_smartSuggestion == null || _selectedFundSource != null) {
@@ -1024,13 +965,13 @@ Widget _buildInstallmentSection() {
               borderRadius: BorderRadius.circular(_T.rMD),
               border: Border.all(color: _T.accent.withOpacity(0.30)),
             ),
-            child: Row(children: [
+            child: Row(children:[
               const Icon(Iconsax.magic_star5, size: 18, color: _T.accent),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+                  children:[
                     Text('Sugerencia inteligente',
                         style: TextStyle(
                             color: _T.accent.withOpacity(0.7),
@@ -1038,8 +979,8 @@ Widget _buildInstallmentSection() {
                             fontWeight: FontWeight.w700,
                             letterSpacing: 0.5)),
                     Text("¿Usar dinero de '${_smartSuggestion!.name}'?",
-                        style: const TextStyle(
-                            color: _T.textPrimary,
+                        style: TextStyle(
+                            color: _T.textPrimary(context),
                             fontSize: 13,
                             fontWeight: FontWeight.w600)),
                   ],
@@ -1054,22 +995,20 @@ Widget _buildInstallmentSection() {
     );
   }
 
-  // ── SELECTOR DE TIPO ──────────────────────────────────────────────────────
-
   Widget _buildTypeToggle() {
     return Container(
       height: 44,
       decoration: BoxDecoration(
-        color: _T.surfaceRaised,
+        color: _T.surfaceRaised(context),
         borderRadius: BorderRadius.circular(_T.rMD),
-        border: Border.all(color: _T.border, width: 0.5),
+        border: Border.all(color: _T.border(context), width: 0.5),
       ),
-      child: Row(children: [
+      child: Row(children:[
         _TypeSegment(
           label: 'Gasto',
           selected: _isExpense,
           selectedColor: _T.expenseColor,
-          selectedBg: _T.expenseDim,
+          selectedBg: _T.expenseDim(context),
           onTap: () {
             if (!_isExpense) {
               HapticFeedback.selectionClick();
@@ -1086,7 +1025,7 @@ Widget _buildInstallmentSection() {
           label: 'Ingreso',
           selected: !_isExpense,
           selectedColor: _T.incomeColor,
-          selectedBg: _T.incomeDim,
+          selectedBg: _T.incomeDim(context),
           onTap: () {
             if (_isExpense) {
               HapticFeedback.selectionClick();
@@ -1103,9 +1042,6 @@ Widget _buildInstallmentSection() {
     );
   }
 
-  // ── FUENTE DE FONDOS ──────────────────────────────────────────────────────
-  // FIX: _TappableRow + showModalBottomSheet en lugar de DropdownButtonFormField
-
   Widget _buildFundSourceSection() {
     final hasSelection = _selectedFundSource != null;
     final fmt = NumberFormat.currency(
@@ -1116,11 +1052,11 @@ Widget _buildInstallmentSection() {
       labelAccent: hasSelection,
       child: _TappableRow(
         onTap: _showFundPicker,
-        child: Row(children: [
+        child: Row(children:[
           Icon(
             hasSelection ? Iconsax.lock_circle : Iconsax.wallet_3,
             size: 16,
-            color: hasSelection ? _T.debtColor : _T.textSecondary,
+            color: hasSelection ? _T.debtColor : _T.textSecondary(context),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -1131,27 +1067,23 @@ Widget _buildInstallmentSection() {
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w500,
-                color: hasSelection ? _T.debtColor : _T.textPrimary,
+                color: hasSelection ? _T.debtColor : _T.textPrimary(context),
               ),
             ),
           ),
           if (hasSelection)
             Text(
               fmt.format(_selectedFundSource!.spendingFund),
-              style: const TextStyle(
-                  fontSize: 13, color: _T.textSecondary),
+              style: TextStyle(
+                  fontSize: 13, color: _T.textSecondary(context)),
             ),
           const SizedBox(width: 4),
-          const Icon(Icons.chevron_right_rounded,
-              color: _T.textTertiary, size: 20),
+          Icon(Icons.chevron_right_rounded,
+              color: _T.textTertiary(context), size: 20),
         ]),
       ),
     );
   }
-
-  // ── CUENTA ────────────────────────────────────────────────────────────────
-  // FIX: FutureBuilder con _accountsFuture + _TappableRow + showModalBottomSheet
-  // Elimina DropdownButtonFormField que causaba el assert parentDataDirty
 
   Widget _buildAccountSection() {
     return _Section(
@@ -1160,7 +1092,6 @@ Widget _buildInstallmentSection() {
       child: FutureBuilder<List<Account>>(
         future: _accountsFuture,
         builder: (context, snap) {
-          // Cargando
           if (snap.connectionState == ConnectionState.waiting) {
             return const Padding(
               padding: EdgeInsets.symmetric(
@@ -1169,11 +1100,10 @@ Widget _buildInstallmentSection() {
             );
           }
 
-          // Error explícito — ya no se silencia
           if (snap.hasError) {
             return Padding(
               padding: const EdgeInsets.all(_T.md),
-              child: Row(children: [
+              child: Row(children:[
                 const Icon(Icons.warning_amber_rounded,
                     size: 16, color: _T.expenseColor),
                 const SizedBox(width: 8),
@@ -1186,13 +1116,12 @@ Widget _buildInstallmentSection() {
             );
           }
 
-          final accounts = snap.data ?? [];
+          final accounts = snap.data ??[];
 
           if (accounts.isEmpty) {
             return const _EmptyHint(text: 'Crea una cuenta primero');
           }
 
-          // Si solo hay 1 cuenta y no está seleccionada, auto-seleccionarla
           if (_selectedAccount == null && accounts.length == 1) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted) setState(() => _selectedAccount = accounts.first);
@@ -1206,13 +1135,13 @@ Widget _buildInstallmentSection() {
 
           return _TappableRow(
             onTap: () => _showAccountPicker(accounts),
-            child: Row(children: [
+            child: Row(children:[
               Container(
                 width: 8, height: 8,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: acc == null
-                      ? _T.textTertiary
+                      ? _T.textTertiary(context)
                       : positive
                           ? _T.incomeColor
                           : _T.expenseColor,
@@ -1225,7 +1154,7 @@ Widget _buildInstallmentSection() {
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
-                    color: acc == null ? _T.textSecondary : _T.textPrimary,
+                    color: acc == null ? _T.textSecondary(context) : _T.textPrimary(context),
                   ),
                 ),
               ),
@@ -1239,16 +1168,14 @@ Widget _buildInstallmentSection() {
                   ),
                 ),
               const SizedBox(width: 4),
-              const Icon(Icons.chevron_right_rounded,
-                  color: _T.textTertiary, size: 20),
+              Icon(Icons.chevron_right_rounded,
+                  color: _T.textTertiary(context), size: 20),
             ]),
           );
         },
       ),
     );
   }
-
-  // ── FECHA ─────────────────────────────────────────────────────────────────
 
   Widget _buildDateSection() {
     final isToday = DateUtils.isSameDay(_selectedDate, DateTime.now());
@@ -1260,22 +1187,20 @@ Widget _buildInstallmentSection() {
       label: 'Fecha',
       child: _TappableRow(
         onTap: _selectDate,
-        child: Row(children: [
+        child: Row(children:[
           Text(label,
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w500,
-                color: isToday ? _T.accent : _T.textPrimary,
+                color: isToday ? _T.accent : _T.textPrimary(context),
               )),
           const Spacer(),
-          const Icon(Icons.chevron_right_rounded,
-              color: _T.textTertiary, size: 20),
+          Icon(Icons.chevron_right_rounded,
+              color: _T.textTertiary(context), size: 20),
         ]),
       ),
     );
   }
-
-  // ── CATEGORÍAS ────────────────────────────────────────────────────────────
 
   Widget _buildCategorySection() {
     return _Section(
@@ -1292,7 +1217,7 @@ Widget _buildInstallmentSection() {
               child: _ShimmerRow(),
             );
           }
-          final all      = catSnap.data ?? [];
+          final all      = catSnap.data ??[];
           final type     = _isExpense ? 'expense' : 'income';
           final filtered = all.where((c) => c.type.name == type).toList();
 
@@ -1304,7 +1229,7 @@ Widget _buildInstallmentSection() {
           return FutureBuilder<List<Budget>>(
             future: _budgetsFuture,
             builder: (_, budgetSnap) {
-              final budgets = budgetSnap.data ?? [];
+              final budgets = budgetSnap.data ??[];
               return Padding(
                 padding: const EdgeInsets.all(_T.md),
                 child: Wrap(
@@ -1336,8 +1261,6 @@ Widget _buildInstallmentSection() {
     );
   }
 
-  // ── ESTADO DE ÁNIMO ───────────────────────────────────────────────────────
-
   Widget _buildMoodSection() {
     return _Section(
       label: 'Ánimo  ·  Opcional',
@@ -1362,8 +1285,6 @@ Widget _buildInstallmentSection() {
     );
   }
 
-  // ── DESCRIPCIÓN ───────────────────────────────────────────────────────────
-
   Widget _buildDescriptionSection() {
     return _Section(
       label: 'Nota  ·  Opcional',
@@ -1373,12 +1294,12 @@ Widget _buildInstallmentSection() {
         child: TextField(
           controller: _descriptionController,
           maxLines: 3,
-          style: const TextStyle(
-              color: _T.textPrimary, fontSize: 15, height: 1.5),
+          style: TextStyle(
+              color: _T.textPrimary(context), fontSize: 15, height: 1.5),
           decoration: InputDecoration(
             hintText: 'Añade una nota...',
             hintStyle: TextStyle(
-                color: _T.textTertiary.withOpacity(0.8)),
+                color: _T.textTertiary(context).withOpacity(0.8)),
             border: InputBorder.none,
             isDense: true,
             contentPadding: EdgeInsets.zero,
@@ -1387,8 +1308,6 @@ Widget _buildInstallmentSection() {
       ),
     );
   }
-
-  // ── UBICACIÓN ─────────────────────────────────────────────────────────────
 
   Widget _buildLocationSection() {
     final hasLocation = _selectedLocationName != null;
@@ -1411,7 +1330,7 @@ Widget _buildInstallmentSection() {
             });
           }
         },
-        child: Row(children: [
+        child: Row(children:[
           Expanded(
             child: Text(
               hasLocation ? _selectedLocationName! : 'Buscar lugar',
@@ -1419,7 +1338,7 @@ Widget _buildInstallmentSection() {
                 fontSize: 15,
                 fontWeight: FontWeight.w500,
                 color:
-                    hasLocation ? _T.textPrimary : _T.textSecondary,
+                    hasLocation ? _T.textPrimary(context) : _T.textSecondary(context),
               ),
               overflow: TextOverflow.ellipsis,
             ),
@@ -1439,7 +1358,7 @@ Widget _buildInstallmentSection() {
                 padding: const EdgeInsets.symmetric(horizontal: _T.xs),
                 child: Icon(Iconsax.gps,
                     size: 18,
-                    color: hasLocation ? _T.accent : _T.textTertiary),
+                    color: hasLocation ? _T.accent : _T.textTertiary(context)),
               ),
             ),
           if (hasLocation) ...[
@@ -1453,18 +1372,16 @@ Widget _buildInstallmentSection() {
                   _selectedLng = null;
                 });
               },
-              child: const Icon(Icons.close_rounded,
-                  size: 16, color: _T.textTertiary),
+              child: Icon(Icons.close_rounded,
+                  size: 16, color: _T.textTertiary(context)),
             ),
           ] else
-            const Icon(Icons.chevron_right_rounded,
-                color: _T.textTertiary, size: 20),
+            Icon(Icons.chevron_right_rounded,
+                color: _T.textTertiary(context), size: 20),
         ]),
       ),
     );
   }
-
-  // ── BOTÓN GUARDAR ─────────────────────────────────────────────────────────
 
   Widget _buildSaveButton() {
     return GestureDetector(
@@ -1476,7 +1393,7 @@ Widget _buildInstallmentSection() {
         decoration: BoxDecoration(
           color: _typeColor,
           borderRadius: BorderRadius.circular(_T.rMD),
-          boxShadow: [
+          boxShadow:[
             BoxShadow(
               color: _typeColor.withOpacity(0.25),
               blurRadius: 20,
@@ -1527,7 +1444,7 @@ class _Section extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+      children:[
         Padding(
           padding: const EdgeInsets.only(left: 2, bottom: _T.sm),
           child: AnimatedDefaultTextStyle(
@@ -1536,7 +1453,7 @@ class _Section extends StatelessWidget {
               fontSize: 11,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.9,
-              color: labelAccent ? _T.accent : _T.textTertiary,
+              color: labelAccent ? _T.accent : _T.textTertiary(context),
             ),
             child: Text(label.toUpperCase()),
           ),
@@ -1544,11 +1461,10 @@ class _Section extends StatelessWidget {
         Container(
           width: double.infinity,
           decoration: BoxDecoration(
-            color: _T.surfaceRaised,
+            color: _T.surfaceRaised(context),
             borderRadius: BorderRadius.circular(_T.rMD),
-            border: Border.all(color: _T.borderSubtle, width: 0.5),
+            border: Border.all(color: _T.borderSubtle(context), width: 0.5),
           ),
-          // IMPORTANTE: sin Clip.antiAlias ni clipBehavior — causaba parentDataDirty
           child: child,
         ),
       ],
@@ -1579,7 +1495,7 @@ class _TappableRowState extends State<_TappableRow> {
       onTapCancel: () => setState(() => _pressing = false),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 80),
-        color: _pressing ? _T.surfaceHighest : Colors.transparent,
+        color: _pressing ? _T.surfaceHighest(context) : Colors.transparent,
         padding: const EdgeInsets.symmetric(
             horizontal: _T.md, vertical: 14),
         child: widget.child,
@@ -1609,14 +1525,14 @@ class _CategoryChip extends StatelessWidget {
         curve: _T.curve,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? color.withOpacity(0.15) : _T.surfaceHighest,
+          color: selected ? color.withOpacity(0.15) : _T.surfaceHighest(context),
           borderRadius: BorderRadius.circular(_T.rSM + 4),
           border: Border.all(
-            color: selected ? color.withOpacity(0.6) : _T.border,
+            color: selected ? color.withOpacity(0.6) : _T.border(context),
             width: selected ? 1.5 : 0.5,
           ),
         ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
+        child: Row(mainAxisSize: MainAxisSize.min, children:[
           if (selected) ...[
             Icon(category.icon ?? Iconsax.category,
                 size: 14, color: color),
@@ -1627,7 +1543,7 @@ class _CategoryChip extends StatelessWidget {
                 fontSize: 13,
                 fontWeight:
                     selected ? FontWeight.w600 : FontWeight.w400,
-                color: selected ? color : _T.textSecondary,
+                color: selected ? color : _T.textSecondary(context),
               )),
         ]),
       ),
@@ -1655,23 +1571,23 @@ class _MoodChip extends StatelessWidget {
         curve: _T.curve,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? _T.accent.withOpacity(0.12) : _T.surfaceHighest,
+          color: selected ? _T.accent.withOpacity(0.12) : _T.surfaceHighest(context),
           borderRadius: BorderRadius.circular(_T.rSM + 4),
           border: Border.all(
-            color: selected ? _T.accent.withOpacity(0.5) : _T.border,
+            color: selected ? _T.accent.withOpacity(0.5) : _T.border(context),
             width: selected ? 1.5 : 0.5,
           ),
         ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
+        child: Row(mainAxisSize: MainAxisSize.min, children:[
           Icon(mood.icon,
               size: 14,
-              color: selected ? _T.accent : _T.textSecondary),
+              color: selected ? _T.accent : _T.textSecondary(context)),
           const SizedBox(width: 6),
           Text(mood.displayName,
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                color: selected ? _T.accent : _T.textSecondary,
+                color: selected ? _T.accent : _T.textSecondary(context),
               )),
         ]),
       ),
@@ -1713,7 +1629,7 @@ class _TypeSegment extends StatelessWidget {
             style: TextStyle(
               fontSize: 14,
               fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-              color: selected ? selectedColor : _T.textSecondary,
+              color: selected ? selectedColor : _T.textSecondary(context),
             ),
             child: Text(label),
           ),
@@ -1735,11 +1651,11 @@ class _IconBtn extends StatelessWidget {
       child: Container(
         width: 36, height: 36,
         decoration: BoxDecoration(
-          color: _T.surfaceRaised,
+          color: _T.surfaceRaised(context),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: _T.border, width: 0.5),
+          border: Border.all(color: _T.border(context), width: 0.5),
         ),
-        child: Icon(icon, size: 18, color: _T.textSecondary),
+        child: Icon(icon, size: 18, color: _T.textSecondary(context)),
       ),
     );
   }
@@ -1754,7 +1670,7 @@ class _EmptyHint extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.all(_T.md),
       child: Text(text,
-          style: const TextStyle(fontSize: 14, color: _T.textSecondary)),
+          style: TextStyle(fontSize: 14, color: _T.textSecondary(context))),
     );
   }
 }
@@ -1788,7 +1704,7 @@ class _ShimmerRowState extends State<_ShimmerRow>
       builder: (_, __) => Container(
         height: 16, width: 120,
         decoration: BoxDecoration(
-          color: Color.lerp(_T.surfaceHighest, _T.border, _anim.value),
+          color: Color.lerp(_T.surfaceHighest(context), _T.border(context), _anim.value),
           borderRadius: BorderRadius.circular(4),
         ),
       ),
@@ -1833,7 +1749,6 @@ class _FadeSlideState extends State<_FadeSlide>
   }
 }
 
-// Tarjeta de consejo IA
 class _AITipCard extends StatelessWidget {
   final String message;
   const _AITipCard({required this.message});
@@ -1848,13 +1763,13 @@ class _AITipCard extends StatelessWidget {
         border: Border.all(color: _T.accent.withOpacity(0.2)),
       ),
       child: Row(
-        children: [
+        children:[
           const Icon(Iconsax.lamp_on, color: _T.accent, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(color: _T.textSecondary, fontSize: 13, height: 1.4),
+              style: TextStyle(color: _T.textSecondary(context), fontSize: 13, height: 1.4),
             ),
           ),
         ],
@@ -1862,7 +1777,6 @@ class _AITipCard extends StatelessWidget {
     );
   }
 }
-// ─── ENTRENADOR DIARIO (SMART SUGGESTION SHEET) ────────────────────────────────
 
 class _SmartSuggestionSheet extends StatefulWidget {
   final Goal goal;
@@ -1905,7 +1819,6 @@ class _SmartSuggestionSheetState extends State<_SmartSuggestionSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final c = _C(context);
     final fmt = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
 
     final title = widget.isExpense ? 'Fricción Positiva ⚖️' : '¡Día de pago! 🚀';
@@ -1915,9 +1828,9 @@ class _SmartSuggestionSheetState extends State<_SmartSuggestionSheet> {
 
     return Container(
       padding: EdgeInsets.fromLTRB(_T.md, _T.md, _T.md, _T.lg + MediaQuery.of(context).padding.bottom),
-      decoration: const BoxDecoration(
-        color: _T.surfaceHighest,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      decoration: BoxDecoration(
+        color: _T.surfaceHighest(context),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1925,7 +1838,7 @@ class _SmartSuggestionSheetState extends State<_SmartSuggestionSheet> {
           Container(
             width: 40, height: 4,
             margin: const EdgeInsets.only(bottom: 24),
-            decoration: BoxDecoration(color: _T.border, borderRadius: BorderRadius.circular(2)),
+            decoration: BoxDecoration(color: _T.border(context), borderRadius: BorderRadius.circular(2)),
           ),
           
           Container(
@@ -1938,17 +1851,16 @@ class _SmartSuggestionSheetState extends State<_SmartSuggestionSheet> {
           ),
           const SizedBox(height: 20),
           
-          Text(title, style: const TextStyle(color: _T.textPrimary, fontSize: 20, fontWeight: FontWeight.bold)),
+          Text(title, style: TextStyle(color: _T.textPrimary(context), fontSize: 20, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
           
           Text(
             message,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: _T.textSecondary, fontSize: 15, height: 1.5),
+            style: TextStyle(color: _T.textSecondary(context), fontSize: 15, height: 1.5),
           ),
           const SizedBox(height: 32),
 
-          // Botón Primario: Aceptar sugerencia
           GestureDetector(
             onTap: _isSaving ? null : _saveContribution,
             child: AnimatedContainer(
@@ -1967,15 +1879,14 @@ class _SmartSuggestionSheetState extends State<_SmartSuggestionSheet> {
           ),
           const SizedBox(height: 16),
           
-          // Botón Secundario: Rechazar
           GestureDetector(
             onTap: () {
               HapticFeedback.lightImpact();
               widget.onComplete(false);
             },
-            child: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Text('Quizás luego', style: TextStyle(color: _T.textSecondary, fontSize: 15, fontWeight: FontWeight.w600)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text('Quizás luego', style: TextStyle(color: _T.textSecondary(context), fontSize: 15, fontWeight: FontWeight.w600)),
             ),
           )
         ],

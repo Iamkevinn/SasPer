@@ -1,18 +1,6 @@
 // lib/screens/settings_screen.dart
 // ─────────────────────────────────────────────────────────────────────────────
-// SASPER · Ajustes — Apple-first redesign
-//
-// Eliminado:
-// • AppBar estándar → header blur sticky
-// • BoxShadow en tarjetas → opacity-based surface sin sombra
-// • InkWell + ripple Material → GestureDetector con press state escala
-// • LinearGradient + BoxShadow en avatar → inicial simple
-// • Dialog centrado para tema → bottom sheet iOS con blur
-// • Dialog centrado para logout → _ConfirmLogoutSheet blur
-// • GoogleFonts.poppins inline → _T.label / _T.display (DM Sans)
-// • Color hex hardcoded mezclado con colorScheme → opacity-based puro
-// • Border.all + outlineVariant → separación por tono
-// • "Probar Notificación" en sección PERFIL → sección NOTIFICACIONES
+// SASPER · Ajustes — Apple-first redesign (True Black AMOLED Mode)
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'dart:ui';
@@ -32,7 +20,7 @@ import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-// ── Tokens ──────────────────────────────────────────────────────────────────
+// ── Tokens Dinámicos ────────────────────────────────────────────────────────
 class _T {
   static TextStyle display(double s,
           {Color? c, FontWeight w = FontWeight.w700}) =>
@@ -49,6 +37,22 @@ class _T {
 
   static const double h = 20.0;
   static const double r = 18.0;
+
+  // Detecta el tema
+  static bool isDark(BuildContext context) => 
+      Theme.of(context).brightness == Brightness.dark;
+
+  // Fondo Negro Puro para AMOLED
+  static Color bg(BuildContext context) => 
+      isDark(context) ? const Color(0xFF000000) : const Color(0xFFF2F2F7);
+
+  // Tarjetas flotantes (gris muy oscuro en modo noche, blanco puro en modo día)
+  static Color surface(BuildContext context) => 
+      isDark(context) ? const Color(0xFF1C1C1E) : Colors.white;
+
+  // Fondos para BottomSheets con Blur
+  static Color sheetBg(BuildContext context) => 
+      isDark(context) ? const Color(0xFF1C1C1E).withOpacity(0.85) : Colors.white.withOpacity(0.92);
 }
 
 const _kBlue = Color(0xFF0A84FF);
@@ -157,21 +161,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final tp = Provider.of<ThemeProvider>(context);
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      body: Column(children: [
+      backgroundColor: _T.bg(context),
+      body: Column(children:[
         // ── Header blur sticky ────────────────────────────────────────────
         ClipRect(
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
             child: Container(
-              color: theme.scaffoldBackgroundColor.withOpacity(0.93),
+              color: _T.bg(context).withOpacity(0.93),
               padding: EdgeInsets.only(
                   top: statusH + 10, left: _T.h + 4, right: _T.h, bottom: 14),
-              child: Row(children: [
+              child: Row(children:[
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
-                  children: [
+                  children:[
                     Text('SASPER',
                         style: _T.label(10,
                             w: FontWeight.w700, c: onSurf.withOpacity(0.35))),
@@ -188,7 +192,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: ListView(
             physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(_T.h, 8, _T.h, 100),
-            children: [
+            children:[
               _SectionLabel('CUENTA'),
               const SizedBox(height: 8),
               _Card(child: _ProfileRow(user: _user)),
@@ -196,7 +200,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _SectionLabel('PERSONALIZACIÓN'),
               const SizedBox(height: 8),
               _Card(
-                  child: Column(children: [
+                  child: Column(children:[
                 _SettingsRow(
                   icon: Iconsax.award,
                   label: 'Mi Progreso',
@@ -249,15 +253,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onTap: () async {
                   HapticFeedback.mediumImpact();
 
-                  // Opcional: Avisar que está procesando
                   NotificationHelper.show(
                     message: 'Iniciando prueba...',
-                    type: NotificationType
-                        .success, // O el tipo que uses para info
+                    type: NotificationType.success,
                   );
 
                   try {
-                    // Esperamos a que el servicio termine
                     await NotificationService.instance
                         .testImmediateNotification();
 
@@ -268,9 +269,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       );
                     }
                   } catch (e) {
-                    // Si el usuario deniega el permiso o hay error, lo capturamos aquí
                     if (mounted) {
-                      // Limpiamos el texto del error para que se vea más amigable
                       final errorMsg =
                           e.toString().replaceAll('Exception: ', '');
                       NotificationHelper.show(
@@ -322,12 +321,9 @@ class _Card extends StatelessWidget {
   const _Card({required this.child});
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-          color: isDark
-              ? Colors.white.withOpacity(0.07)
-              : Colors.black.withOpacity(0.04),
+          color: _T.surface(context),
           borderRadius: BorderRadius.circular(_T.r)),
       child: child,
     );
@@ -340,7 +336,10 @@ class _Divider extends StatelessWidget {
     final onSurf = Theme.of(context).colorScheme.onSurface;
     return Padding(
       padding: const EdgeInsets.only(left: 58),
-      child: Container(height: 0.5, color: onSurf.withOpacity(0.08)),
+      child: Container(
+        height: 0.5, 
+        color: onSurf.withOpacity(_T.isDark(context) ? 0.15 : 0.08) // Más visible en OLED
+      ),
     );
   }
 }
@@ -356,8 +355,7 @@ class _ProfileRow extends StatelessWidget {
     final initial = email.isNotEmpty ? email[0].toUpperCase() : '?';
     return Padding(
       padding: const EdgeInsets.all(16),
-      child: Row(children: [
-        // Avatar — inicial simple, sin gradiente ni sombra coloreada
+      child: Row(children:[
         Container(
           width: 50,
           height: 50,
@@ -371,7 +369,7 @@ class _ProfileRow extends StatelessWidget {
         Expanded(
             child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+          children:[
             Text('Sesión iniciada',
                 style: _T.label(11, c: onSurf.withOpacity(0.40))),
             const SizedBox(height: 3),
@@ -442,7 +440,7 @@ class _SettingsRowState extends State<_SettingsRow>
           scale: lerpDouble(1.0, 0.985, _c.value)!,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-            child: Row(children: [
+            child: Row(children:[
               Container(
                 width: 34,
                 height: 34,
@@ -457,7 +455,7 @@ class _SettingsRowState extends State<_SettingsRow>
               Expanded(
                   child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+                children:[
                   Text(widget.label,
                       style: _T.label(14,
                           w: FontWeight.w600, c: widget.labelColor ?? onSurf)),
@@ -492,7 +490,7 @@ class _BiometricRow extends StatelessWidget {
     final onSurf = Theme.of(context).colorScheme.onSurface;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-      child: Row(children: [
+      child: Row(children:[
         Container(
           width: 34,
           height: 34,
@@ -507,7 +505,7 @@ class _BiometricRow extends StatelessWidget {
         Expanded(
             child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+          children:[
             Text('Bloqueo biométrico',
                 style: _T.label(14, w: FontWeight.w600, c: onSurf)),
             const SizedBox(height: 2),
@@ -552,7 +550,7 @@ class _IOSSwitch extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: Colors.white,
-                boxShadow: [
+                boxShadow:[
                   BoxShadow(
                       color: Colors.black.withOpacity(0.18),
                       blurRadius: 4,
@@ -583,17 +581,13 @@ class _ThemeSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final sheetBg = isDark
-        ? Colors.white.withOpacity(0.10)
-        : Colors.white.withOpacity(0.92);
     final onSurf = Theme.of(context).colorScheme.onSurface;
     final entries = _opts.entries.toList();
 
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
+        child: Column(mainAxisSize: MainAxisSize.min, children:[
           Container(
               width: 36,
               height: 4,
@@ -607,7 +601,7 @@ class _ThemeSheet extends StatelessWidget {
           const SizedBox(height: 10),
           Container(
             decoration: BoxDecoration(
-                color: sheetBg, borderRadius: BorderRadius.circular(16)),
+                color: _T.sheetBg(context), borderRadius: BorderRadius.circular(16)),
             child: Column(children: [
               for (var i = 0; i < entries.length; i++) ...[
                 _ThemeRow(
@@ -688,10 +682,10 @@ class _ThemeRowState extends State<_ThemeRow>
               bottomRight: botR,
             ),
           ),
-          child: Column(children: [
+          child: Column(children:[
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-              child: Row(children: [
+              child: Row(children:[
                 Icon(widget.icon, size: 18, color: onSurf.withOpacity(0.55)),
                 const SizedBox(width: 14),
                 Expanded(
@@ -704,7 +698,7 @@ class _ThemeRowState extends State<_ThemeRow>
               Padding(
                   padding: const EdgeInsets.only(left: 52),
                   child:
-                      Container(height: 0.5, color: onSurf.withOpacity(0.07))),
+                      Container(height: 0.5, color: onSurf.withOpacity(_T.isDark(context) ? 0.15 : 0.08))),
           ]),
         ),
       ),
@@ -721,15 +715,11 @@ class _ConfirmLogoutSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final sheetBg = isDark
-        ? Colors.white.withOpacity(0.10)
-        : Colors.white.withOpacity(0.92);
     final onSurf = Theme.of(context).colorScheme.onSurface;
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
+        child: Column(mainAxisSize: MainAxisSize.min, children:[
           Container(
               width: 36,
               height: 4,
@@ -741,8 +731,8 @@ class _ConfirmLogoutSheet extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-                color: sheetBg, borderRadius: BorderRadius.circular(20)),
-            child: Column(children: [
+                color: _T.sheetBg(context), borderRadius: BorderRadius.circular(20)),
+            child: Column(children:[
               Container(
                 padding: const EdgeInsets.all(13),
                 decoration: BoxDecoration(
@@ -757,7 +747,7 @@ class _ConfirmLogoutSheet extends StatelessWidget {
                   style: _T.label(14,
                       c: onSurf.withOpacity(0.48), w: FontWeight.w400)),
               const SizedBox(height: 22),
-              Row(children: [
+              Row(children:[
                 Expanded(
                     child: _InlineBtn(
                         label: 'Cancelar',
@@ -856,10 +846,6 @@ class _CancelRowState extends State<_CancelRow>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark
-        ? Colors.white.withOpacity(0.10)
-        : Colors.white.withOpacity(0.92);
     return GestureDetector(
       onTapDown: (_) {
         _c.forward();
@@ -878,7 +864,7 @@ class _CancelRowState extends State<_CancelRow>
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 16),
             decoration: BoxDecoration(
-                color: bg, borderRadius: BorderRadius.circular(16)),
+                color: _T.sheetBg(context), borderRadius: BorderRadius.circular(16)),
             child: Center(
                 child: Text('Cancelar',
                     style: _T.label(16, w: FontWeight.w600, c: _kBlue))),
