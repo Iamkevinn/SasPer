@@ -28,6 +28,7 @@ import 'package:sasper/models/account_model.dart';
 import 'package:sasper/services/event_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 // ── Tokens ───────────────────────────────────────────────────────────────────
 class _T {
@@ -92,6 +93,13 @@ class _EditAccountScreenState extends State<EditAccountScreen>
   late String _type;
   bool _loading = false;
 
+  // --- ✨ CAMPOS DE TARJETA DE CRÉDITO (Nuevos) ---
+  late final TextEditingController _creditLimitCtrl;
+  late final TextEditingController _closingDayCtrl;
+  late final TextEditingController _dueDayCtrl;
+  late final TextEditingController _interestRateCtrl;
+  late final TextEditingController _maintenanceFeeCtrl;
+
   // Fade-in único — 280ms, mismo patrón que edit_transaction_screen
   late final AnimationController _fadeCtrl = AnimationController(
       vsync: this, duration: const Duration(milliseconds: 280));
@@ -101,16 +109,31 @@ class _EditAccountScreenState extends State<EditAccountScreen>
   @override
   void initState() {
     super.initState();
-    _nameCtrl = TextEditingController(text: widget.account.name);
-    _descriptionCtrl = TextEditingController(text: widget.account.description);
-    _type     = widget.account.type;
+    final acc = widget.account;
+
+    // Inicializamos los controladores básicos
+    _nameCtrl = TextEditingController(text: acc.name);
+    _descriptionCtrl = TextEditingController(text: acc.description);
+    _type     = acc.type;
+
+    _creditLimitCtrl = TextEditingController(text: acc.creditLimit.toStringAsFixed(0));
+    _closingDayCtrl = TextEditingController(text: acc.closingDay?.toString() ?? '');
+    _dueDayCtrl = TextEditingController(text: acc.dueDay?.toString() ?? '');
+    _interestRateCtrl = TextEditingController(text: acc.interestRate.toString());
+    _maintenanceFeeCtrl = TextEditingController(text: acc.maintenanceFee.toStringAsFixed(0));
+
     _fadeCtrl.forward();
   }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
-    _descriptionCtrl.dispose(); 
+    _descriptionCtrl.dispose();
+    _creditLimitCtrl.dispose();
+    _closingDayCtrl.dispose();
+    _dueDayCtrl.dispose();
+    _interestRateCtrl.dispose();
+    _maintenanceFeeCtrl.dispose();
     _fadeCtrl.dispose();
     super.dispose();
   }
@@ -131,8 +154,31 @@ class _EditAccountScreenState extends State<EditAccountScreen>
         name: _nameCtrl.text.trim(),
         description: _descriptionCtrl.text.trim().isNotEmpty ? _descriptionCtrl.text.trim() : null,
         type: _type,
+        creditLimit: double.tryParse(_creditLimitCtrl.text) ?? 0,
+        closingDay: int.tryParse(_closingDayCtrl.text),
+        dueDay: int.tryParse(_dueDayCtrl.text),
+        interestRate: double.tryParse(_interestRateCtrl.text) ?? 0,
+        maintenanceFee: double.tryParse(_maintenanceFeeCtrl.text) ?? 0,
       );
-      await _accountRepo.updateAccount(updated);
+      
+      /* await _accountRepo.updateAccount(updated); */
+
+      // --- 💥 LLAMADA A RPC EN LUGAR DE REPO.UPDATE ---
+      // Usaremos una RPC para asegurar que los cambios se apliquen correctamente.
+      await Supabase.instance.client.rpc(
+        'update_account_details', 
+        params: {
+          'p_account_id': updated.id,
+          'p_name': updated.name,
+          'p_description': updated.description,
+          'p_type': updated.type,
+          'p_credit_limit': updated.creditLimit,
+          'p_closing_day': updated.closingDay,
+          'p_due_day': updated.dueDay,
+          'p_interest_rate': updated.interestRate,
+          'p_maintenance_fee': updated.maintenanceFee,
+        }
+      );
 
       if (!mounted) return;
       HapticFeedback.heavyImpact();
@@ -206,77 +252,80 @@ class _EditAccountScreenState extends State<EditAccountScreen>
           ),
 
           // ── Scroll ──────────────────────────────────────────────────────
-          Expanded(
-            child: ListView(
+Expanded(
+            child: SingleChildScrollView( // Usamos SingleChildScrollView para mejor control del teclado
               physics: const BouncingScrollPhysics(),
               padding: EdgeInsets.only(
                 left: 20, right: 20, top: 20,
                 bottom: bottomP > 0 ? bottomP + 100 : 120,
               ),
-              children: [
-                Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _BalanceCard(
+                      balance: acc.balance,
+                      formatted: fmt.format(acc.balance),
+                      type: acc.type,
+                    ),
+                    const SizedBox(height: 28),
 
-                      // ── Saldo actual (read-only, contexto) ────────────
-                      // No es un campo editable. No usa TextFormField disabled.
-                      // El saldo solo cambia mediante transacciones — se
-                      // comunica como contexto, no como input bloqueado.
-                      _BalanceCard(
-                        balance:   acc.balance,
-                        formatted: fmt.format(acc.balance),
-                        type:      acc.type,
-                      ),
-                      const SizedBox(height: 28),
+                    _GroupLabel('DATOS DE LA CUENTA'),
+                    const SizedBox(height: 10),
+                    _FieldGroup(
+                      children:[
+                        _InputField(
+                          controller: _nameCtrl,
+                          label: 'Nombre de la cuenta',
+                          hint: 'Ej: Mi Banco Principal',
+                          icon: Iconsax.text,
+                          textInputAction: TextInputAction.next,
+                          noBg: true,
+                          validator: (v) => (v == null || v.trim().isEmpty) ? 'El nombre no puede estar vacío' : null,
+                        ),
+                        _FieldDivider(),
+                        _InputField(
+                          controller: _descriptionCtrl,
+                          label: 'Descripción (Opcional)',
+                          hint: 'Propósito, nro de cuenta...',
+                          icon: Iconsax.info_circle,
+                          textInputAction: TextInputAction.done,
+                          noBg: true,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 28),
 
-                      // ── Nombre ────────────────────────────────────────
-                      _GroupLabel('DATOS DE LA CUENTA'),
-                      const SizedBox(height: 10),
-                      _FieldGroup(
-                        children:[
-                          _InputField(
-                            controller:      _nameCtrl,
-                            label:           'Nombre de la cuenta',
-                            hint:            'Ej: Mi Banco Principal',
-                            icon:            Iconsax.text,
-                            textInputAction: TextInputAction.next,
-                            noBg:            true,
-                            validator: (v) =>
-                                (v == null || v.trim().isEmpty)
-                                    ? 'El nombre no puede estar vacío' : null,
-                          ),
-                          _FieldDivider(),
-                          _InputField(
-                            controller:      _descriptionCtrl,
-                            label:           'Descripción (Opcional)',
-                            hint:            'Propósito, nro de cuenta...',
-                            icon:            Iconsax.info_circle,
-                            textInputAction: TextInputAction.done,
-                            noBg:            true,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 28),
+                    _GroupLabel('TIPO'),
+                    const SizedBox(height: 10),
+                    _TypeSelector(
+                      selected: _type,
+                      onChanged: (t) {
+                        HapticFeedback.selectionClick();
+                        setState(() => _type = t);
+                      },
+                    ),
 
-                      // ── Tipo de cuenta ────────────────────────────────
-                      _GroupLabel('TIPO'),
-                      const SizedBox(height: 10),
-                      _TypeSelector(
-                        selected:  _type,
-                        onChanged: (t) {
-                          HapticFeedback.selectionClick();
-                          setState(() => _type = t);
-                        },
-                      ),
-                    ],
-                  ),
+                    // --- ✨ CAMPOS DINÁMICOS PARA TARJETA DE CRÉDITO ---
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeInOutCubic,
+                      child: _type == 'Tarjeta de Crédito'
+                        ? _CreditCardFields(
+                            creditLimitCtrl: _creditLimitCtrl,
+                            closingDayCtrl: _closingDayCtrl,
+                            dueDayCtrl: _dueDayCtrl,
+                            interestRateCtrl: _interestRateCtrl,
+                            maintenanceFeeCtrl: _maintenanceFeeCtrl,
+                          )
+                        : const SizedBox.shrink(),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
-
           // ── Botón guardar sticky ─────────────────────────────────────────
           _SaveBtn(loading: _loading, onTap: _update),
         ]),
@@ -807,6 +856,92 @@ class _BackBtnState extends State<_BackBtn>
                 size: 18, color: _kBlue),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WIDGET - CAMPOS ESPECÍFICOS DE TARJETA DE CRÉDITO
+// ─────────────────────────────────────────────────────────────────────────────
+class _CreditCardFields extends StatelessWidget {
+  final TextEditingController creditLimitCtrl;
+  final TextEditingController closingDayCtrl;
+  final TextEditingController dueDayCtrl;
+  final TextEditingController interestRateCtrl;
+  final TextEditingController maintenanceFeeCtrl;
+
+  const _CreditCardFields({
+    required this.creditLimitCtrl,
+    required this.closingDayCtrl,
+    required this.dueDayCtrl,
+    required this.interestRateCtrl,
+    required this.maintenanceFeeCtrl,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      // Añadimos un poco de espacio superior para la animación
+      padding: const EdgeInsets.only(top: 28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _GroupLabel('DETALLES DE LA TARJETA'),
+          const SizedBox(height: 10),
+
+          // Cupo y Cuota de Manejo
+          _FieldGroup(children: [
+            _InputField(
+              controller: creditLimitCtrl,
+              label: 'Cupo total',
+              hint: 'Ej: 5000000',
+              icon: Iconsax.card_pos,
+              keyboardType: TextInputType.number,
+              noBg: true,
+            ),
+            _FieldDivider(),
+            _InputField(
+              controller: maintenanceFeeCtrl,
+              label: 'Cuota de manejo',
+              hint: 'Ej: 15000',
+              icon: Iconsax.money_send,
+              keyboardType: TextInputType.number,
+              noBg: true,
+            ),
+          ]),
+          const SizedBox(height: 16),
+          
+          // Días de Corte, Pago e Interés
+          _FieldGroup(children: [
+             _InputField(
+              controller: closingDayCtrl,
+              label: 'Día de corte (1-31)',
+              hint: 'Ej: 15',
+              icon: Iconsax.calendar_1,
+              keyboardType: TextInputType.number,
+              noBg: true,
+            ),
+            _FieldDivider(),
+            _InputField(
+              controller: dueDayCtrl,
+              label: 'Día de pago (1-31)',
+              hint: 'Ej: 30',
+              icon: Iconsax.calendar_tick,
+              keyboardType: TextInputType.number,
+              noBg: true,
+            ),
+             _FieldDivider(),
+            _InputField(
+              controller: interestRateCtrl,
+              label: 'Tasa de interés (% E.A.)',
+              hint: 'Ej: 31.5',
+              icon: Iconsax.percentage_circle,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              noBg: true,
+            ),
+          ]),
+        ],
       ),
     );
   }
