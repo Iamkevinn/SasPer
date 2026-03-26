@@ -23,6 +23,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'dart:ui';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -326,6 +327,9 @@ class _CreditCardBillCardState extends State<_CreditCardBillCard> {
               children: [
                 Container(height: 0.5, color: onSurf.withOpacity(0.08)),
                 ...bill.installments.map((tx) => _InstallmentDetailRow(tx: tx)),
+
+                _InterestWarningBox(bill: bill),
+
                  Container(height: 0.5, color: onSurf.withOpacity(0.08)),
                  _PayBillAction(bill: bill, onBillPaid: widget.onBillPaid),
               ],
@@ -339,6 +343,7 @@ class _CreditCardBillCardState extends State<_CreditCardBillCard> {
 }
 
 // --- Fila de detalle para el desglose ---
+// --- Fila de detalle para el desglose ---
 class _InstallmentDetailRow extends StatelessWidget {
   final Transaction tx;
   const _InstallmentDetailRow({required this.tx});
@@ -347,27 +352,32 @@ class _InstallmentDetailRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final onSurf = Theme.of(context).colorScheme.onSurface;
     
-    // Verificamos si es una compra a cuotas
+    // Gastos vienen negativos, pagos a la tarjeta vienen positivos
+    final bool isPayment = tx.amount > 0; 
+    
     final bool isInstallment = (tx.installmentsTotal ?? 1) > 1;
     final int current = tx.installmentsCurrent ?? 1;
     final int total = tx.installmentsTotal ?? 1;
+
+    // Si es un pago, lo pintamos verde para que destaque que es a favor
+    final Color itemColor = isPayment ? _kGreen : onSurf.withOpacity(0.7);
+    final IconData icon = isPayment ? Iconsax.arrow_down_1 : Iconsax.receipt_item;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
-          Icon(Iconsax.receipt_item, size: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4)),
+          Icon(icon, size: 14, color: isPayment ? itemColor : onSurf.withOpacity(0.4)),
           const SizedBox(width: 8),
-           Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  tx.description ?? 'Compra', 
-                  style: _T.label(13, c: onSurf.withOpacity(0.7))
+                  tx.description ?? (isPayment ? 'Abono' : 'Compra'), 
+                  style: _T.label(13, c: itemColor, w: isPayment ? FontWeight.w600 : FontWeight.w500)
                 ),
-                // ✅ MEJORA UI: Mostramos "Cuota 1 de 2" debajo del nombre de la compra
-                if (isInstallment)
+                if (isInstallment && !isPayment)
                   Text(
                     'Cuota $current de $total',
                     style: _T.label(11, c: onSurf.withOpacity(0.4)),
@@ -376,8 +386,9 @@ class _InstallmentDetailRow extends StatelessWidget {
             )
           ),
           Text(
-            _fmt.format(tx.amount.abs()),
-            style: _T.mono(13, c: onSurf.withOpacity(0.7)),
+            // Mostramos el monto (con un "+" si es un pago parcial)
+            '${isPayment ? "+" : ""}${_fmt.format(tx.amount.abs())}',
+            style: _T.mono(13, c: itemColor),
           ),
         ],
       ),
@@ -1747,6 +1758,72 @@ class _CancelRowState extends State<_CancelRow>
                     style: _T.label(16, w: FontWeight.w600, c: _kBlue))),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WIDGET — ADVERTENCIA DE INTERESES (Apple-first)
+// ─────────────────────────────────────────────────────────────────────────────
+class _InterestWarningBox extends StatelessWidget {
+  final CreditCardBill bill;
+  const _InterestWarningBox({required this.bill});
+
+  @override
+  Widget build(BuildContext context) {
+    // Si la tasa es 0 o no la configuró, no mostramos nada para mantener limpieza
+    if (bill.card.interestRate <= 0) return const SizedBox.shrink();
+
+    final onSurf = Theme.of(context).colorScheme.onSurface;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.03);
+
+    // --- CÁLCULO FINANCIERO REAL ---
+    // 1. Tasa Efectiva Anual (EA) a decimal. Ej: 31.5% -> 0.315
+    final double ea = bill.card.interestRate / 100;
+    
+    // 2. Tasa Efectiva Mensual (TEM). Fórmula: (1 + EA)^(1/12) - 1
+    final double tem = math.pow(1 + ea, 1 / 12) - 1;
+    
+    // 3. Interés proyectado para el próximo mes sobre el saldo no pagado
+    final double projectedInterest = bill.totalAmount.abs() * tem;
+    
+    // 4. Si el interés proyectado es menor a $100 COP, lo omitimos para no causar ruido
+    if (projectedInterest < 100) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Iconsax.info_circle, size: 16, color: onSurf.withOpacity(0.5)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: RichText(
+              text: TextSpan(
+                style: _T.label(12, c: onSurf.withOpacity(0.6), w: FontWeight.w400).copyWith(height: 1.3),
+                children: [
+                  const TextSpan(text: 'Si omites este pago, el próximo mes sumarás aprox. '),
+                  TextSpan(
+                    text: _fmt.format(projectedInterest),
+                    style: _T.mono(12, c: onSurf.withOpacity(0.9), w: FontWeight.w600),
+                  ),
+                  const TextSpan(text: ' en intereses '),
+                  TextSpan(
+                    text: '(${bill.card.interestRate}% EA).',
+                    style: _T.label(11, c: onSurf.withOpacity(0.4)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

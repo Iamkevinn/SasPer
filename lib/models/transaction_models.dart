@@ -132,7 +132,7 @@ class Transaction extends Equatable {
         // Parseamos los nuevos campos desde Supabase
         creditCardId: map['credit_card_id'] as String?,
         installmentsTotal: map['installments_total'] as int?,
-        installmentsCurrent: map['installments_current'] as int?,
+        installmentsCurrent: (map['installment_number'] as int?) ?? (map['installments_current'] as int?),
         isInstallment: map['is_installment'] as bool? ?? false,
         isInterestFree: map['is_interest_free'] as bool? ?? false,
       );
