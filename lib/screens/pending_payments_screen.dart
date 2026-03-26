@@ -34,26 +34,30 @@ import 'package:sasper/data/account_repository.dart';
 import 'package:sasper/data/recurring_repository.dart';
 import 'package:sasper/data/transaction_repository.dart';
 import 'package:sasper/models/account_model.dart';
+import 'package:sasper/models/credit_card_bill_model.dart';
 import 'package:sasper/models/recurring_transaction_model.dart';
 import 'package:sasper/models/transaction_models.dart';
 import 'package:sasper/services/widget_service.dart' as widget_service;
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 // ── Tokens ─────────────────────────────────────────────────────────────────────
 class _T {
   static TextStyle display(double s,
           {Color? c, FontWeight w = FontWeight.w700}) =>
       GoogleFonts.dmSans(
-          fontSize: s, fontWeight: w, color: c,
-          letterSpacing: -0.4, height: 1.1);
+          fontSize: s,
+          fontWeight: w,
+          color: c,
+          letterSpacing: -0.4,
+          height: 1.1);
 
   static TextStyle label(double s,
           {Color? c, FontWeight w = FontWeight.w500}) =>
       GoogleFonts.dmSans(fontSize: s, fontWeight: w, color: c);
 
-  static TextStyle mono(double s,
-          {Color? c, FontWeight w = FontWeight.w600}) =>
+  static TextStyle mono(double s, {Color? c, FontWeight w = FontWeight.w600}) =>
       GoogleFonts.dmMono(fontSize: s, fontWeight: w, color: c);
 
   static const double h = 20.0;
@@ -61,147 +65,376 @@ class _T {
 }
 
 // ── Paleta iOS ──────────────────────────────────────────────────────────────────
-const _kBlue   = Color(0xFF0A84FF);
-const _kGreen  = Color(0xFF30D158);
-const _kRed    = Color(0xFFFF453A);
+const _kBlue = Color(0xFF0A84FF);
+const _kGreen = Color(0xFF30D158);
+const _kRed = Color(0xFFFF453A);
 const _kOrange = Color(0xFFFF9F0A);
-const _kGrey   = Color(0xFF8E8E93);
+const _kGrey = Color(0xFF8E8E93);
 
-final _fmt = NumberFormat.currency(
-    locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+final _fmt =
+    NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SCREEN
 // ─────────────────────────────────────────────────────────────────────────────
-
-class PendingPaymentsScreen extends StatelessWidget {
+class PendingPaymentsScreen extends StatefulWidget {
   const PendingPaymentsScreen({super.key});
 
   @override
+  State<PendingPaymentsScreen> createState() => _PendingPaymentsScreenState();
+}
+
+class _PendingPaymentsScreenState extends State<PendingPaymentsScreen> {
+  late Future<List<CreditCardBill>> _billsFuture;
+  late Stream<List<RecurringTransaction>> _recurringStream;
+
+  @override
+  void initState() {
+    super.initState();
+    // ✅ FIX: Inicializamos los datos aquí, una sola vez cuando la pantalla se crea.
+    _billsFuture = _fetchCreditCardBills();
+    _recurringStream = RecurringRepository.instance.getRecurringTransactionsStream();
+  }
+
+  Future<List<CreditCardBill>> _fetchCreditCardBills() async {
+    final client = Supabase.instance.client;
+    final userId = client.auth.currentUser?.id;
+    if (userId == null) return [];
+
+    try {
+      final response = await client.rpc('get_credit_card_bills', params: {'p_user_id': userId});
+      if (response is List) {
+        return response.map((billMap) => CreditCardBill.fromMap(billMap as Map<String, dynamic>)).toList();
+      }
+      return [];
+    } catch (e) {
+      // Manejo de errores para que la app no se rompa si la RPC falla
+      debugPrint("Error fetching credit card bills: $e");
+      return [];
+    }
+  }
+
+  void _refreshData() {
+    setState(() {
+      _billsFuture = _fetchCreditCardBills();
+      RecurringRepository.instance.refreshData();
+    });
+  }
+  
+  DateTime _day(DateTime dt) => DateTime(dt.year, dt.month, dt.day);
+
+  @override
   Widget build(BuildContext context) {
-    final theme   = Theme.of(context);
-    final onSurf  = theme.colorScheme.onSurface;
+    final theme = Theme.of(context);
+    final onSurf = theme.colorScheme.onSurface;
     final statusH = MediaQuery.of(context).padding.top;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       body: Column(children: [
-        // ── Header blur sticky ────────────────────────────────────────────
         ClipRect(
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
             child: Container(
               color: theme.scaffoldBackgroundColor.withOpacity(0.93),
-              padding: EdgeInsets.only(
-                  top: statusH + 10, left: _T.h + 4,
-                  right: _T.h, bottom: 14),
+              padding: EdgeInsets.only(top: statusH + 10, left: _T.h + 4, right: _T.h, bottom: 14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('FINANZAS',
-                      style: _T.label(10,
-                          w: FontWeight.w700,
-                          c: onSurf.withOpacity(0.35))),
-                  Text('Pagos Pendientes',
-                      style: _T.display(28, c: onSurf)),
+                  Text('FINANZAS', style: _T.label(10, w: FontWeight.w700, c: onSurf.withOpacity(0.35))),
+                  Text('Pagos Pendientes', style: _T.display(28, c: onSurf)),
                 ],
               ),
             ),
           ),
         ),
+      Expanded(
+          child: RefreshIndicator(
+            onRefresh: () async => _refreshData(),
+            color: _kBlue,
+            child: FutureBuilder<List<CreditCardBill>>(
+              future: _billsFuture,
+              builder: (context, billsSnapshot) {
+                return StreamBuilder<List<RecurringTransaction>>(
+                  stream: _recurringStream,
+                  builder: (context, recurringSnapshot) {
+                    if (billsSnapshot.connectionState == ConnectionState.waiting || recurringSnapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator(color: _kBlue));
+                    }
 
-        // ── Contenido ────────────────────────────────────────────────────
-        Expanded(
-          child: FutureBuilder<List<Account>>(
-            future: AccountRepository.instance.getAccounts(),
-            builder: (_, accSnap) {
-              return StreamBuilder<List<RecurringTransaction>>(
-                stream: RecurringRepository.instance
-                    .getRecurringTransactionsStream(),
-                builder: (_, recSnap) {
-                  return StreamBuilder<List<Transaction>>(
-                    stream: TransactionRepository.instance
-                        .getTransactionsStream(),
-                    builder: (_, txSnap) {
-                      // Esperar a que los streams principales estén listos
-                      if (recSnap.connectionState ==
-                              ConnectionState.waiting ||
-                          txSnap.connectionState ==
-                              ConnectionState.waiting) {
-                        return const Center(
-                            child: CircularProgressIndicator());
-                      }
+                    final bills = billsSnapshot.data ?? [];
+                    final recurring = recurringSnapshot.data ?? [];
+                    final now = DateTime.now();
+                    final today = _day(now);
 
-                      final accounts     = accSnap.data ?? [];
-                      final recurring    = recSnap.data ?? [];
-                      final transactions = txSnap.data ?? [];
-                      final now          = DateTime.now();
+                    // ✅ FIX: Reintroducimos la lógica de agrupación que tenías
+                    final limitDate = today.add(const Duration(days: 3));
+                    final allPendingRecurring = recurring.where((tx) {
+                      final txDate = _day(tx.nextDueDate);
+                      // !isAfter significa "Es menor o igual a"
+                      return !txDate.isAfter(limitDate);
+                    }).toList();
+                    final overdue = allPendingRecurring.where((i) => _day(i.nextDueDate).isBefore(today)).toList();
+                    final dueToday = allPendingRecurring.where((i) => _day(i.nextDueDate) == today).toList();
+                    final upcoming = allPendingRecurring.where((i) => _day(i.nextDueDate).isAfter(today)).toList();
+                    
+                    final isEmpty = bills.isEmpty && allPendingRecurring.isEmpty;
+                    if (isEmpty) return const _EmptyState();
 
-                      // Gastos fijos vencidos o próximos (≤ 3 días)
-                      final pendingRecurring = recurring.where((tx) =>
-                          tx.nextDueDate.isBefore(
-                              now.add(const Duration(days: 3)))).toList();
-
-                      // Cuotas activas con pagos pendientes
-                      final activeInstallments = transactions.where((tx) =>
-                          tx.isInstallment == true &&
-                          tx.installmentsCurrent != null &&
-                          tx.installmentsTotal != null &&
-                          tx.installmentsCurrent! <=
-                              tx.installmentsTotal!).toList();
-
-                      // Tarjetas con cuota de manejo
-                      final creditCardsWithFee = accounts.where((a) =>
-                          a.type == 'Tarjeta de Crédito' &&
-                          a.maintenanceFee > 0).toList();
-
-                      final isEmpty = pendingRecurring.isEmpty &&
-                          activeInstallments.isEmpty &&
-                          creditCardsWithFee.isEmpty;
-
-                      if (isEmpty) return const _EmptyState();
-
-                      return ListView(
-                        physics: const BouncingScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(
-                            _T.h, 8, _T.h, 100),
-                        children: [
-                          // 1. Cuotas de manejo (obligaciones bancarias)
-                          if (creditCardsWithFee.isNotEmpty) ...[
-                            _SectionLabel('CUOTAS DE MANEJO'),
-                            const SizedBox(height: 8),
-                            ...creditCardsWithFee.map(
-                                (acc) => _MaintenanceFeeCard(account: acc)),
-                            const SizedBox(height: 24),
-                          ],
-
-                          // 2. Compras a cuotas
-                          if (activeInstallments.isNotEmpty) ...[
-                            _SectionLabel('COMPRAS A CUOTAS'),
-                            const SizedBox(height: 8),
-                            ...activeInstallments.map((tx) =>
-                                _InstallmentCard(tx: tx, accounts: accounts)),
-                            const SizedBox(height: 24),
-                          ],
-
-                          // 3. Gastos fijos recurrentes
-                          if (pendingRecurring.isNotEmpty) ...[
-                            _SectionLabel('GASTOS FIJOS'),
-                            const SizedBox(height: 8),
-                            ...pendingRecurring.map(
-                                (tx) => _RecurringCard(tx: tx)),
-                          ],
+                    return ListView(
+                      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+                      padding: const EdgeInsets.fromLTRB(_T.h, 8, _T.h, 100),
+                      children: [
+                        // 1. Facturas de Tarjetas de Crédito (se mantiene igual)
+                        if (bills.isNotEmpty) ...[
+                          _SectionLabel('TARJETAS DE CRÉDITO'),
+                          const SizedBox(height: 8),
+                          ...bills.map((bill) => _CreditCardBillCard(bill: bill, onBillPaid: _refreshData)),
+                          const SizedBox(height: 24),
                         ],
-                      );
-                    },
-                  );
-                },
-              );
-            },
+
+                        // ✅ FIX: Mostramos los recurrentes agrupados
+                        if (overdue.isNotEmpty) ...[
+                          _SectionLabel('GASTOS FIJOS VENCIDOS', color: _kRed),
+                          const SizedBox(height: 8),
+                          ...overdue.map((tx) => _RecurringCard(tx: tx)),
+                          const SizedBox(height: 24),
+                        ],
+                        
+                        if (dueToday.isNotEmpty) ...[
+                          _SectionLabel('GASTOS FIJOS PARA HOY', color: _kOrange),
+                          const SizedBox(height: 8),
+                          ...dueToday.map((tx) => _RecurringCard(tx: tx)),
+                          const SizedBox(height: 24),
+                        ],
+
+                        if (upcoming.isNotEmpty) ...[
+                          _SectionLabel('PRÓXIMOS GASTOS FIJOS'),
+                          const SizedBox(height: 8),
+                          ...upcoming.map((tx) => _RecurringCard(tx: tx)),
+                        ],
+                      ],
+                    );
+                  },
+                );
+              },
+            ),
           ),
         ),
       ]),
+    );
+  }
+}
+
+
+// ─── NUEVA TARJETA EXPANSIVA PARA FACTURAS DE CRÉDITO ─────────────────────────
+
+class _CreditCardBillCard extends StatefulWidget {
+  final CreditCardBill bill;
+  final VoidCallback onBillPaid; // Callback para refrescar la UI
+  const _CreditCardBillCard({required this.bill, required this.onBillPaid});
+
+  @override
+  State<_CreditCardBillCard> createState() => _CreditCardBillCardState();
+}
+
+class _CreditCardBillCardState extends State<_CreditCardBillCard> {
+  bool _isExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final bill = widget.bill;
+    final card = bill.card;
+    final onSurf = Theme.of(context).colorScheme.onSurface;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF1C1C1E) : Colors.white;
+    
+    final daysUntilDue = bill.dueDate.difference(DateTime.now()).inDays;
+    final statusText = daysUntilDue < 0 ? 'Vencido' : 'Vence en $daysUntilDue días';
+    final statusColor = daysUntilDue < 0 ? _kRed : (daysUntilDue < 7 ? _kOrange : _kGreen);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+          color: bg, borderRadius: BorderRadius.circular(_T.r)),
+      child: Column(
+        children: [
+          // --- Parte visible (no expandida) ---
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                HapticFeedback.lightImpact();
+                setState(() => _isExpanded = !_isExpanded);
+              },
+              borderRadius: BorderRadius.circular(_T.r),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 40, height: 40,
+                          decoration: BoxDecoration(
+                            color: card.accountColor.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Center(child: Icon(card.icon, color: card.accountColor, size: 18)),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(card.name, style: _T.label(15, w: FontWeight.w700, c: onSurf)),
+                              const SizedBox(height: 2),
+                              Text('${bill.installments.length} cuotas este mes', style: _T.label(12, c: onSurf.withOpacity(0.5))),
+                            ],
+                          ),
+                        ),
+                        Text(_fmt.format(bill.totalAmount.abs()), style: _T.mono(17, c: onSurf)),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: statusColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(statusText, style: _T.label(11, c: statusColor, w: FontWeight.w600)),
+                        ),
+                        const Spacer(),
+                        Icon( _isExpanded ? Iconsax.arrow_up_2 : Iconsax.arrow_down_2, size: 14, color: onSurf.withOpacity(0.4)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          
+          // --- Parte expandible (el desglose) ---
+          AnimatedCrossFade(
+            duration: const Duration(milliseconds: 300),
+            firstChild: const SizedBox.shrink(),
+            secondChild: Column(
+              children: [
+                Container(height: 0.5, color: onSurf.withOpacity(0.08)),
+                ...bill.installments.map((tx) => _InstallmentDetailRow(tx: tx)),
+                 Container(height: 0.5, color: onSurf.withOpacity(0.08)),
+                 _PayBillAction(bill: bill, onBillPaid: widget.onBillPaid),
+              ],
+            ),
+            crossFadeState: _isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// --- Fila de detalle para el desglose ---
+class _InstallmentDetailRow extends StatelessWidget {
+  final Transaction tx;
+  const _InstallmentDetailRow({required this.tx});
+
+  @override
+  Widget build(BuildContext context) {
+    final onSurf = Theme.of(context).colorScheme.onSurface;
+    
+    // Verificamos si es una compra a cuotas
+    final bool isInstallment = (tx.installmentsTotal ?? 1) > 1;
+    final int current = tx.installmentsCurrent ?? 1;
+    final int total = tx.installmentsTotal ?? 1;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          Icon(Iconsax.receipt_item, size: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4)),
+          const SizedBox(width: 8),
+           Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  tx.description ?? 'Compra', 
+                  style: _T.label(13, c: onSurf.withOpacity(0.7))
+                ),
+                // ✅ MEJORA UI: Mostramos "Cuota 1 de 2" debajo del nombre de la compra
+                if (isInstallment)
+                  Text(
+                    'Cuota $current de $total',
+                    style: _T.label(11, c: onSurf.withOpacity(0.4)),
+                  ),
+              ],
+            )
+          ),
+          Text(
+            _fmt.format(tx.amount.abs()),
+            style: _T.mono(13, c: onSurf.withOpacity(0.7)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// --- Botón de Pagar Factura ---
+class _PayBillAction extends StatelessWidget {
+  final CreditCardBill bill;
+  final VoidCallback onBillPaid;
+
+   const _PayBillAction({required this.bill, required this.onBillPaid});
+  
+  void _openPaymentSheet(BuildContext context) {
+    HapticFeedback.selectionClick();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: _PaymentSourceSheet(
+          title: 'Pagar factura de ${bill.card.name}',
+          amount: bill.totalAmount.abs(),
+          onAccountSelected: (sourceAccount) async {
+            HapticFeedback.mediumImpact();
+            try {
+              final client = Supabase.instance.client;
+              // Llamamos a la RPC que creamos en la Fase 2
+              await client.rpc('pay_credit_card', params: {
+                'p_user_id': client.auth.currentUser!.id,
+                'p_origin_account_id': sourceAccount.id,
+                'p_credit_card_id': bill.card.id,
+                'p_amount_paid': bill.totalAmount.abs(),
+              });
+              NotificationHelper.show(message: '¡Factura Pagada!', type: NotificationType.success);
+              onBillPaid(); // ✅ Ejecutamos el callback para refrescar
+            } catch (e) {
+              NotificationHelper.show(message: 'Error al procesar el pago: $e', type: NotificationType.error);
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: _ActionBtn(
+        label: 'Pagar Factura de ${bill.card.name}',
+        icon: Iconsax.tick_circle,
+        color: _kBlue,
+        onTap: () => _openPaymentSheet(context),
+      ),
     );
   }
 }
@@ -216,31 +449,32 @@ class _RecurringCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final onSurf    = Theme.of(context).colorScheme.onSurface;
-    final isDark    = Theme.of(context).brightness == Brightness.dark;
+    final onSurf = Theme.of(context).colorScheme.onSurface;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final isOverdue = tx.nextDueDate.isBefore(DateTime.now());
-    final accent    = isOverdue ? _kRed : _kOrange;
-    final bg        = isDark
+    final accent = isOverdue ? _kRed : _kOrange;
+    final bg = isDark
         ? Colors.white.withOpacity(0.07)
         : Colors.black.withOpacity(0.04);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-          color: bg, borderRadius: BorderRadius.circular(_T.r)),
+      decoration:
+          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(_T.r)),
       child: Column(children: [
         Padding(
           padding: const EdgeInsets.all(16),
           child: Row(children: [
             Container(
-              width: 40, height: 40,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
                 color: accent.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Center(
-                child: Icon(isOverdue ? Iconsax.warning_2 : Iconsax.clock,
-                    color: accent, size: 18)),
+                  child: Icon(isOverdue ? Iconsax.warning_2 : Iconsax.clock,
+                      color: accent, size: 18)),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -248,27 +482,25 @@ class _RecurringCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(tx.description,
-                      style: _T.label(15,
-                          w: FontWeight.w700, c: onSurf)),
+                      style: _T.label(15, w: FontWeight.w700, c: onSurf)),
                   const SizedBox(height: 2),
                   Text(
-                    isOverdue
-                        ? 'Venció el ${DateFormat("d MMM", "es_CO").format(tx.nextDueDate)}'
-                        : 'Vence el ${DateFormat("d MMM", "es_CO").format(tx.nextDueDate)}',
-                    style: _T.label(12, c: accent)),
+                      isOverdue
+                          ? 'Venció el ${DateFormat("d MMM", "es_CO").format(tx.nextDueDate)}'
+                          : 'Vence el ${DateFormat("d MMM", "es_CO").format(tx.nextDueDate)}',
+                      style: _T.label(12, c: accent)),
                 ],
               ),
             ),
-            Text(_fmt.format(tx.amount),
-                style: _T.mono(17, c: onSurf)),
+            Text(_fmt.format(tx.amount), style: _T.mono(17, c: onSurf)),
           ]),
         ),
-
         Container(height: 0.5, color: onSurf.withOpacity(0.07)),
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
           child: Row(children: [
-            Expanded(child: _ActionBtn(
+            Expanded(
+                child: _ActionBtn(
               label: 'Confirmar pago',
               icon: Iconsax.tick_circle,
               color: _kGreen,
@@ -279,8 +511,7 @@ class _RecurringCard extends StatelessWidget {
                 await widget_service.WidgetService
                     .updateUpcomingPaymentsWidget();
                 NotificationHelper.show(
-                    message: 'Pago registrado',
-                    type: NotificationType.success);
+                    message: 'Pago registrado', type: NotificationType.success);
               },
             )),
             const SizedBox(width: 8),
@@ -311,14 +542,12 @@ class _RecurringCard extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _InstallmentCard extends StatelessWidget {
-  final Transaction   tx;
+  final Transaction tx;
   final List<Account> accounts; // Solo para mostrar nombre de tarjeta
   const _InstallmentCard({required this.tx, required this.accounts});
 
-  double get _cuotaValue =>
-      tx.amount.abs() / tx.installmentsTotal!;
-  int    get _restantes  =>
-      (tx.installmentsTotal! - tx.installmentsCurrent!) + 1;
+  double get _cuotaValue => tx.amount.abs() / tx.installmentsTotal!;
+  int get _restantes => (tx.installmentsTotal! - tx.installmentsCurrent!) + 1;
   double get _totalRestante => _cuotaValue * _restantes;
 
   String _cardName() {
@@ -334,26 +563,26 @@ class _InstallmentCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final onSurf = Theme.of(context).colorScheme.onSurface;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg     = isDark
+    final bg = isDark
         ? Colors.white.withOpacity(0.07)
         : Colors.black.withOpacity(0.04);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-          color: bg, borderRadius: BorderRadius.circular(_T.r)),
+      decoration:
+          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(_T.r)),
       child: Column(children: [
         Padding(
           padding: const EdgeInsets.all(16),
           child: Row(children: [
             Container(
-              width: 40, height: 40,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
                 color: _kBlue.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Center(
-                  child: Icon(Iconsax.card, color: _kBlue, size: 18)),
+              child: Center(child: Icon(Iconsax.card, color: _kBlue, size: 18)),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -361,31 +590,27 @@ class _InstallmentCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(tx.description ?? 'Compra a cuotas',
-                      style: _T.label(15,
-                          w: FontWeight.w700, c: onSurf)),
+                      style: _T.label(15, w: FontWeight.w700, c: onSurf)),
                   const SizedBox(height: 2),
                   Text(
-                    'Cuota ${tx.installmentsCurrent} de '
-                    '${tx.installmentsTotal}  ·  ${_cardName()}',
-                    style: _T.label(12,
-                        c: _kBlue, w: FontWeight.w600)),
+                      'Cuota ${tx.installmentsCurrent} de '
+                      '${tx.installmentsTotal}  ·  ${_cardName()}',
+                      style: _T.label(12, c: _kBlue, w: FontWeight.w600)),
                 ],
               ),
             ),
             Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              Text(_fmt.format(_cuotaValue),
-                  style: _T.mono(17, c: onSurf)),
-              Text('c/cuota',
-                  style: _T.label(10, c: onSurf.withOpacity(0.38))),
+              Text(_fmt.format(_cuotaValue), style: _T.mono(17, c: onSurf)),
+              Text('c/cuota', style: _T.label(10, c: onSurf.withOpacity(0.38))),
             ]),
           ]),
         ),
-
         Container(height: 0.5, color: onSurf.withOpacity(0.07)),
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
           child: Row(children: [
-            Expanded(child: _ActionBtn(
+            Expanded(
+                child: _ActionBtn(
               label: 'Pagar cuota',
               icon: Iconsax.tick_circle,
               color: _kBlue,
@@ -426,11 +651,9 @@ class _InstallmentCard extends StatelessWidget {
               paymentSourceAccountId: acc.id,
             );
             await widget_service.WidgetService.updateNextPaymentWidget();
-            await widget_service.WidgetService
-                .updateUpcomingPaymentsWidget();
+            await widget_service.WidgetService.updateUpcomingPaymentsWidget();
             NotificationHelper.show(
-                message: '¡Cuota registrada!',
-                type: NotificationType.success);
+                message: '¡Cuota registrada!', type: NotificationType.success);
           },
         ),
       ),
@@ -446,8 +669,8 @@ class _InstallmentCard extends StatelessWidget {
       builder: (_) => BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: _InstallmentOptionsSheet(
-          tx:            tx,
-          cuotaValue:    _cuotaValue,
+          tx: tx,
+          cuotaValue: _cuotaValue,
           totalRestante: _totalRestante,
           onPayAll: () => _openPayAllSheet(context),
           onEditProgress: () => _openEditProgressSheet(context),
@@ -477,15 +700,13 @@ class _InstallmentCard extends StatelessWidget {
               description: 'Pago total anticipado: ${tx.description}',
               transactionDate: DateTime.now(),
             );
-            await TransactionRepository.instance
-                .updateInstallmentProgress(
+            await TransactionRepository.instance.updateInstallmentProgress(
               transactionId: tx.id,
               currentInstallment: tx.installmentsTotal! + 1,
               totalInstallments: tx.installmentsTotal!,
             );
             await widget_service.WidgetService.updateNextPaymentWidget();
-            await widget_service.WidgetService
-                .updateUpcomingPaymentsWidget();
+            await widget_service.WidgetService.updateUpcomingPaymentsWidget();
             NotificationHelper.show(
                 message: '¡Deuda saldada por completo!',
                 type: NotificationType.success);
@@ -517,14 +738,11 @@ class _InstallmentCard extends StatelessWidget {
           label: tx.description ?? 'esta compra',
           onConfirm: () async {
             HapticFeedback.heavyImpact();
-            await TransactionRepository.instance
-                .deleteTransaction(tx.id);
+            await TransactionRepository.instance.deleteTransaction(tx.id);
             await widget_service.WidgetService.updateNextPaymentWidget();
-            await widget_service.WidgetService
-                .updateUpcomingPaymentsWidget();
+            await widget_service.WidgetService.updateUpcomingPaymentsWidget();
             NotificationHelper.show(
-                message: 'Compra eliminada',
-                type: NotificationType.info);
+                message: 'Compra eliminada', type: NotificationType.info);
           },
         ),
       ),
@@ -544,24 +762,24 @@ class _MaintenanceFeeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final onSurf = Theme.of(context).colorScheme.onSurface;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg     = isDark
+    final bg = isDark
         ? Colors.white.withOpacity(0.07)
         : Colors.black.withOpacity(0.04);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-          color: bg, borderRadius: BorderRadius.circular(_T.r)),
+      decoration:
+          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(_T.r)),
       child: Row(children: [
         Container(
-          width: 40, height: 40,
+          width: 40,
+          height: 40,
           decoration: BoxDecoration(
             color: _kGrey.withOpacity(0.12),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Center(
-              child: Icon(Iconsax.bank, color: _kGrey, size: 18)),
+          child: Center(child: Icon(Iconsax.bank, color: _kGrey, size: 18)),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -569,8 +787,7 @@ class _MaintenanceFeeCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('Cuota de Manejo',
-                  style: _T.label(15,
-                      w: FontWeight.w700, c: onSurf)),
+                  style: _T.label(15, w: FontWeight.w700, c: onSurf)),
               const SizedBox(height: 2),
               Text(account.name,
                   style: _T.label(12, c: onSurf.withOpacity(0.42))),
@@ -622,7 +839,7 @@ class _PaymentSourceSheetState extends State<_PaymentSourceSheet> {
     try {
       // 1. Obtener cuentas del repositorio
       final all = await AccountRepository.instance.getAccounts();
-      
+
       // 2. Filtrar para mostrar solo cuentas que sirven para pagar (no crédito)
       // Normalizamos el string para evitar errores de mayúsculas/tildes
       final validAccounts = all.where((a) {
@@ -648,42 +865,39 @@ class _PaymentSourceSheetState extends State<_PaymentSourceSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark  = Theme.of(context).brightness == Brightness.dark;
-    final sheetBg = isDark ? const Color(0xFF1C1C1E) : Colors.white; // Color sólido para evitar transparencias raras
-    final onSurf  = Theme.of(context).colorScheme.onSurface;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final sheetBg = isDark
+        ? const Color(0xFF1C1C1E)
+        : Colors.white; // Color sólido para evitar transparencias raras
+    final onSurf = Theme.of(context).colorScheme.onSurface;
 
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Container(
-            width: 36, height: 4,
+            width: 36,
+            height: 4,
             margin: const EdgeInsets.only(bottom: 14),
             decoration: BoxDecoration(
               color: onSurf.withOpacity(0.18),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-
           Text(widget.title,
-              style: _T.display(18, c: onSurf),
-              textAlign: TextAlign.center),
+              style: _T.display(18, c: onSurf), textAlign: TextAlign.center),
           const SizedBox(height: 4),
-          Text(_fmt.format(widget.amount),
-              style: _T.mono(24, c: _kBlue)),
+          Text(_fmt.format(widget.amount), style: _T.mono(24, c: _kBlue)),
           const SizedBox(height: 4),
           Text('¿Desde qué cuenta sale el dinero?',
               style: _T.label(13, c: onSurf.withOpacity(0.45))),
           const SizedBox(height: 14),
-
           Container(
             constraints: const BoxConstraints(maxHeight: 320),
             decoration: BoxDecoration(
-                color: sheetBg,
-                borderRadius: BorderRadius.circular(16)),
+                color: sheetBg, borderRadius: BorderRadius.circular(16)),
             child: _buildContent(onSurf),
           ),
-
           const SizedBox(height: 10),
           _CancelRow(),
         ]),
@@ -705,9 +919,12 @@ class _PaymentSourceSheetState extends State<_PaymentSourceSheet> {
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           const Icon(Iconsax.warning_2, color: _kRed, size: 32),
           const SizedBox(height: 10),
-          Text('Error de conexión', style: _T.label(15, c: onSurf, w: FontWeight.w600)),
+          Text('Error de conexión',
+              style: _T.label(15, c: onSurf, w: FontWeight.w600)),
           const SizedBox(height: 4),
-          Text(_errorMessage!, textAlign: TextAlign.center, style: _T.label(13, c: onSurf.withOpacity(0.45))),
+          Text(_errorMessage!,
+              textAlign: TextAlign.center,
+              style: _T.label(13, c: onSurf.withOpacity(0.45))),
         ]),
       );
     }
@@ -718,9 +935,12 @@ class _PaymentSourceSheetState extends State<_PaymentSourceSheet> {
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           const Icon(Iconsax.wallet_remove, color: _kOrange, size: 32),
           const SizedBox(height: 10),
-          Text('Sin cuentas de pago', style: _T.label(15, c: onSurf, w: FontWeight.w600)),
+          Text('Sin cuentas de pago',
+              style: _T.label(15, c: onSurf, w: FontWeight.w600)),
           const SizedBox(height: 4),
-          Text('No tienes cuentas de débito o efectivo registradas.', textAlign: TextAlign.center, style: _T.label(13, c: onSurf.withOpacity(0.45))),
+          Text('No tienes cuentas de débito o efectivo registradas.',
+              textAlign: TextAlign.center,
+              style: _T.label(13, c: onSurf.withOpacity(0.45))),
         ]),
       );
     }
@@ -730,8 +950,8 @@ class _PaymentSourceSheetState extends State<_PaymentSourceSheet> {
       physics: const BouncingScrollPhysics(),
       itemCount: _accounts.length,
       separatorBuilder: (_, __) => Padding(
-        padding: const EdgeInsets.only(left: 56),
-        child: Container(height: 0.5, color: onSurf.withOpacity(0.08))),
+          padding: const EdgeInsets.only(left: 56),
+          child: Container(height: 0.5, color: onSurf.withOpacity(0.08))),
       itemBuilder: (_, i) => _AccountRow(
         account: _accounts[i],
         isFirst: i == 0,
@@ -751,8 +971,10 @@ class _AccountRow extends StatefulWidget {
   final bool isFirst, isLast;
   final VoidCallback onTap;
   const _AccountRow({
-    required this.account, required this.onTap,
-    required this.isFirst, required this.isLast,
+    required this.account,
+    required this.onTap,
+    required this.isFirst,
+    required this.isLast,
   });
   @override
   State<_AccountRow> createState() => _AccountRowState();
@@ -763,19 +985,30 @@ class _AccountRowState extends State<_AccountRow>
   late final AnimationController _c = AnimationController(
       vsync: this, duration: const Duration(milliseconds: 65));
   @override
-  void dispose() { _c.dispose(); super.dispose(); }
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final onSurf = Theme.of(context).colorScheme.onSurface;
-    final acc    = widget.account;
-    final topR   = widget.isFirst ? const Radius.circular(16) : Radius.zero;
-    final botR   = widget.isLast  ? const Radius.circular(16) : Radius.zero;
+    final acc = widget.account;
+    final topR = widget.isFirst ? const Radius.circular(16) : Radius.zero;
+    final botR = widget.isLast ? const Radius.circular(16) : Radius.zero;
 
     return GestureDetector(
-      onTapDown:   (_) { _c.forward(); HapticFeedback.selectionClick(); },
-      onTapUp:     (_) { _c.reverse(); widget.onTap(); },
-      onTapCancel: ()  { _c.reverse(); },
+      onTapDown: (_) {
+        _c.forward();
+        HapticFeedback.selectionClick();
+      },
+      onTapUp: (_) {
+        _c.reverse();
+        widget.onTap();
+      },
+      onTapCancel: () {
+        _c.reverse();
+      },
       child: AnimatedBuilder(
         animation: _c,
         builder: (_, __) => Container(
@@ -784,21 +1017,23 @@ class _AccountRowState extends State<_AccountRow>
                 ? onSurf.withOpacity(0.04 * _c.value)
                 : Colors.transparent,
             borderRadius: BorderRadius.only(
-              topLeft: topR, topRight: topR,
-              bottomLeft: botR, bottomRight: botR,
+              topLeft: topR,
+              topRight: topR,
+              bottomLeft: botR,
+              bottomRight: botR,
             ),
           ),
-          padding: const EdgeInsets.symmetric(
-              horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(children: [
             Container(
-              width: 36, height: 36,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
                 color: acc.accountColor.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Center(child: Icon(acc.icon,
-                  size: 17, color: acc.accountColor)),
+              child: Center(
+                  child: Icon(acc.icon, size: 17, color: acc.accountColor)),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -806,12 +1041,10 @@ class _AccountRowState extends State<_AccountRow>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(acc.name,
-                      style: _T.label(14,
-                          w: FontWeight.w600, c: onSurf)),
+                      style: _T.label(14, w: FontWeight.w600, c: onSurf)),
                   const SizedBox(height: 2),
                   Text(_fmt.format(acc.balance),
-                      style: _T.mono(12,
-                          c: onSurf.withOpacity(0.50))),
+                      style: _T.mono(12, c: onSurf.withOpacity(0.50))),
                 ],
               ),
             ),
@@ -844,54 +1077,65 @@ class _InstallmentOptionsSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark  = Theme.of(context).brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final sheetBg = isDark
         ? Colors.white.withOpacity(0.10)
         : Colors.white.withOpacity(0.92);
-    final onSurf  = Theme.of(context).colorScheme.onSurface;
+    final onSurf = Theme.of(context).colorScheme.onSurface;
 
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Container(
-            width: 36, height: 4,
-            margin: const EdgeInsets.only(bottom: 10),
-            decoration: BoxDecoration(
-                color: onSurf.withOpacity(0.18),
-                borderRadius: BorderRadius.circular(2))),
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 10),
+              decoration: BoxDecoration(
+                  color: onSurf.withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(2))),
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: Text(tx.description ?? 'Compra a cuotas',
                 style: _T.label(13,
-                    c: onSurf.withOpacity(0.42),
-                    w: FontWeight.w400)),
+                    c: onSurf.withOpacity(0.42), w: FontWeight.w400)),
           ),
           Container(
             decoration: BoxDecoration(
-                color: sheetBg,
-                borderRadius: BorderRadius.circular(16)),
+                color: sheetBg, borderRadius: BorderRadius.circular(16)),
             child: Column(children: [
               _SheetRow(
                 icon: Iconsax.flash_1,
                 label: 'Adelantar todas las cuotas',
                 sublabel: 'Pagar ${_fmt.format(totalRestante)} de una vez',
-                color: _kGreen, isFirst: true,
-                onTap: () { Navigator.pop(context); onPayAll(); },
+                color: _kGreen,
+                isFirst: true,
+                onTap: () {
+                  Navigator.pop(context);
+                  onPayAll();
+                },
               ),
               _SheetRow(
                 icon: Iconsax.edit,
                 label: 'Ajustar progreso',
                 sublabel: 'Cambiar en qué cuota vas',
                 color: _kBlue,
-                onTap: () { Navigator.pop(context); onEditProgress(); },
+                onTap: () {
+                  Navigator.pop(context);
+                  onEditProgress();
+                },
               ),
               _SheetRow(
                 icon: Iconsax.trash,
                 label: 'Eliminar compra',
                 sublabel: 'Borrará esta deuda para siempre',
-                color: _kRed, isLast: true, isDestructive: true,
-                onTap: () { Navigator.pop(context); onDelete(); },
+                color: _kRed,
+                isLast: true,
+                isDestructive: true,
+                onTap: () {
+                  Navigator.pop(context);
+                  onDelete();
+                },
               ),
             ]),
           ),
@@ -922,16 +1166,16 @@ class _EditProgressSheetState extends State<_EditProgressSheet> {
   void initState() {
     super.initState();
     _current = widget.tx.installmentsCurrent!;
-    _total   = widget.tx.installmentsTotal!;
+    _total = widget.tx.installmentsTotal!;
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark  = Theme.of(context).brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final sheetBg = isDark
         ? Colors.white.withOpacity(0.10)
         : Colors.white.withOpacity(0.92);
-    final onSurf  = Theme.of(context).colorScheme.onSurface;
+    final onSurf = Theme.of(context).colorScheme.onSurface;
 
     return SafeArea(
       child: Padding(
@@ -942,20 +1186,19 @@ class _EditProgressSheetState extends State<_EditProgressSheet> {
         ),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Container(
-            width: 36, height: 4,
-            margin: const EdgeInsets.only(bottom: 20),
-            decoration: BoxDecoration(
-                color: onSurf.withOpacity(0.18),
-                borderRadius: BorderRadius.circular(2))),
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                  color: onSurf.withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(2))),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-                color: sheetBg,
-                borderRadius: BorderRadius.circular(20)),
+                color: sheetBg, borderRadius: BorderRadius.circular(20)),
             child: Column(children: [
-              Text('Ajustar cuotas',
-                  style: _T.display(18, c: onSurf)),
+              Text('Ajustar cuotas', style: _T.display(18, c: onSurf)),
               const SizedBox(height: 24),
 
               // Cuota actual
@@ -964,9 +1207,8 @@ class _EditProgressSheetState extends State<_EditProgressSheet> {
                 value: _current,
                 onDecrement:
                     _current > 1 ? () => setState(() => _current--) : null,
-                onIncrement: _current < _total
-                    ? () => setState(() => _current++)
-                    : null,
+                onIncrement:
+                    _current < _total ? () => setState(() => _current++) : null,
               ),
               const SizedBox(height: 14),
 
@@ -974,39 +1216,40 @@ class _EditProgressSheetState extends State<_EditProgressSheet> {
               _CounterRow(
                 label: 'Total cuotas',
                 value: _total,
-                onDecrement: _total > _current
-                    ? () => setState(() => _total--)
-                    : null,
+                onDecrement:
+                    _total > _current ? () => setState(() => _total--) : null,
                 onIncrement: () => setState(() => _total++),
               ),
               const SizedBox(height: 24),
 
               Row(children: [
-                Expanded(child: _InlineBtn(
-                    label: 'Cancelar',
-                    color: onSurf,
-                    onTap: () => Navigator.pop(context))),
+                Expanded(
+                    child: _InlineBtn(
+                        label: 'Cancelar',
+                        color: onSurf,
+                        onTap: () => Navigator.pop(context))),
                 const SizedBox(width: 10),
-                Expanded(child: _InlineBtn(
-                    label: 'Guardar',
-                    color: _kBlue,
-                    onTap: () async {
-                      Navigator.pop(context);
-                      HapticFeedback.mediumImpact();
-                      await TransactionRepository.instance
-                          .updateInstallmentProgress(
-                        transactionId: widget.tx.id,
-                        currentInstallment: _current,
-                        totalInstallments: _total,
-                      );
-                      await widget_service.WidgetService
-                          .updateNextPaymentWidget();
-                      await widget_service.WidgetService
-                          .updateUpcomingPaymentsWidget();
-                      NotificationHelper.show(
-                          message: 'Progreso actualizado',
-                          type: NotificationType.success);
-                    })),
+                Expanded(
+                    child: _InlineBtn(
+                        label: 'Guardar',
+                        color: _kBlue,
+                        onTap: () async {
+                          Navigator.pop(context);
+                          HapticFeedback.mediumImpact();
+                          await TransactionRepository.instance
+                              .updateInstallmentProgress(
+                            transactionId: widget.tx.id,
+                            currentInstallment: _current,
+                            totalInstallments: _total,
+                          );
+                          await widget_service.WidgetService
+                              .updateNextPaymentWidget();
+                          await widget_service.WidgetService
+                              .updateUpcomingPaymentsWidget();
+                          NotificationHelper.show(
+                              message: 'Progreso actualizado',
+                              type: NotificationType.success);
+                        })),
               ]),
             ]),
           ),
@@ -1023,8 +1266,10 @@ class _CounterRow extends StatelessWidget {
   final VoidCallback? onIncrement;
 
   const _CounterRow({
-    required this.label, required this.value,
-    required this.onDecrement, required this.onIncrement,
+    required this.label,
+    required this.value,
+    required this.onDecrement,
+    required this.onIncrement,
   });
 
   @override
@@ -1035,14 +1280,13 @@ class _CounterRow extends StatelessWidget {
       children: [
         Text(label, style: _T.label(14, c: onSurf)),
         Row(children: [
-          _StepBtn(icon: Icons.remove_rounded,
-              color: _kGrey, onTap: onDecrement),
+          _StepBtn(
+              icon: Icons.remove_rounded, color: _kGrey, onTap: onDecrement),
           SizedBox(
-            width: 44,
-            child: Center(child: Text('$value',
-                style: _T.display(20, c: onSurf)))),
-          _StepBtn(icon: Icons.add_rounded,
-              color: _kBlue, onTap: onIncrement),
+              width: 44,
+              child: Center(
+                  child: Text('$value', style: _T.display(20, c: onSurf)))),
+          _StepBtn(icon: Icons.add_rounded, color: _kBlue, onTap: onIncrement),
         ]),
       ],
     );
@@ -1053,8 +1297,8 @@ class _StepBtn extends StatefulWidget {
   final IconData icon;
   final Color color;
   final VoidCallback? onTap;
-  const _StepBtn({required this.icon, required this.color,
-      required this.onTap});
+  const _StepBtn(
+      {required this.icon, required this.color, required this.onTap});
   @override
   State<_StepBtn> createState() => _StepBtnState();
 }
@@ -1064,31 +1308,43 @@ class _StepBtnState extends State<_StepBtn>
   late final AnimationController _c = AnimationController(
       vsync: this, duration: const Duration(milliseconds: 65));
   @override
-  void dispose() { _c.dispose(); super.dispose(); }
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final disabled = widget.onTap == null;
     return GestureDetector(
-      onTapDown:   disabled ? null : (_) {
-        _c.forward(); HapticFeedback.selectionClick(); },
-      onTapUp:     disabled ? null : (_) {
-        _c.reverse(); widget.onTap!(); },
+      onTapDown: disabled
+          ? null
+          : (_) {
+              _c.forward();
+              HapticFeedback.selectionClick();
+            },
+      onTapUp: disabled
+          ? null
+          : (_) {
+              _c.reverse();
+              widget.onTap!();
+            },
       onTapCancel: disabled ? null : () => _c.reverse(),
       child: AnimatedBuilder(
         animation: _c,
         builder: (_, __) => Transform.scale(
           scale: lerpDouble(1.0, 0.88, _c.value)!,
           child: Container(
-            width: 32, height: 32,
+            width: 32,
+            height: 32,
             decoration: BoxDecoration(
-              color: widget.color
-                  .withOpacity(disabled ? 0.05 : 0.12),
+              color: widget.color.withOpacity(disabled ? 0.05 : 0.12),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Center(child: Icon(widget.icon, size: 16,
-                color: widget.color
-                    .withOpacity(disabled ? 0.28 : 1.0))),
+            child: Center(
+                child: Icon(widget.icon,
+                    size: 16,
+                    color: widget.color.withOpacity(disabled ? 0.28 : 1.0))),
           ),
         ),
       ),
@@ -1103,64 +1359,63 @@ class _StepBtnState extends State<_StepBtn>
 class _ConfirmDeleteSheet extends StatelessWidget {
   final String label;
   final Future<void> Function() onConfirm;
-  const _ConfirmDeleteSheet(
-      {required this.label, required this.onConfirm});
+  const _ConfirmDeleteSheet({required this.label, required this.onConfirm});
 
   @override
   Widget build(BuildContext context) {
-    final isDark  = Theme.of(context).brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final sheetBg = isDark
         ? Colors.white.withOpacity(0.10)
         : Colors.white.withOpacity(0.92);
-    final onSurf  = Theme.of(context).colorScheme.onSurface;
+    final onSurf = Theme.of(context).colorScheme.onSurface;
 
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Container(
-            width: 36, height: 4,
-            margin: const EdgeInsets.only(bottom: 20),
-            decoration: BoxDecoration(
-                color: onSurf.withOpacity(0.18),
-                borderRadius: BorderRadius.circular(2))),
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                  color: onSurf.withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(2))),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-                color: sheetBg,
-                borderRadius: BorderRadius.circular(20)),
+                color: sheetBg, borderRadius: BorderRadius.circular(20)),
             child: Column(children: [
               Container(
                 padding: const EdgeInsets.all(13),
                 decoration: BoxDecoration(
-                    color: _kRed.withOpacity(0.12),
-                    shape: BoxShape.circle),
-                child: const Icon(Iconsax.trash,
-                    color: _kRed, size: 24),
+                    color: _kRed.withOpacity(0.12), shape: BoxShape.circle),
+                child: const Icon(Iconsax.trash, color: _kRed, size: 24),
               ),
               const SizedBox(height: 12),
-              Text('Eliminar compra',
-                  style: _T.display(18, c: onSurf)),
+              Text('Eliminar compra', style: _T.display(18, c: onSurf)),
               const SizedBox(height: 8),
-              Text(
-                '"$label"\nEsta acción no se puede deshacer.',
-                textAlign: TextAlign.center,
-                style: _T.label(14,
-                    c: onSurf.withOpacity(0.48),
-                    w: FontWeight.w400)),
+              Text('"$label"\nEsta acción no se puede deshacer.',
+                  textAlign: TextAlign.center,
+                  style: _T.label(14,
+                      c: onSurf.withOpacity(0.48), w: FontWeight.w400)),
               const SizedBox(height: 22),
               Row(children: [
-                Expanded(child: _InlineBtn(
-                    label: 'Cancelar', color: onSurf,
-                    onTap: () => Navigator.pop(context))),
+                Expanded(
+                    child: _InlineBtn(
+                        label: 'Cancelar',
+                        color: onSurf,
+                        onTap: () => Navigator.pop(context))),
                 const SizedBox(width: 10),
-                Expanded(child: _InlineBtn(
-                    label: 'Eliminar', color: _kRed, impact: true,
-                    onTap: () async {
-                      Navigator.pop(context);
-                      await onConfirm();
-                    })),
+                Expanded(
+                    child: _InlineBtn(
+                        label: 'Eliminar',
+                        color: _kRed,
+                        impact: true,
+                        onTap: () async {
+                          Navigator.pop(context);
+                          await onConfirm();
+                        })),
               ]),
             ]),
           ),
@@ -1186,18 +1441,15 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Iconsax.copy_success, size: 64,
-                color: _kGreen.withOpacity(0.28)),
+            Icon(Iconsax.copy_success,
+                size: 64, color: _kGreen.withOpacity(0.28)),
             const SizedBox(height: 20),
-            Text('¡Todo al día!',
-                style: _T.display(24, c: onSurf)),
+            Text('¡Todo al día!', style: _T.display(24, c: onSurf)),
             const SizedBox(height: 8),
-            Text(
-              'No tienes pagos pendientes\npor confirmar.',
-              textAlign: TextAlign.center,
-              style: _T.label(14,
-                  c: onSurf.withOpacity(0.45),
-                  w: FontWeight.w400)),
+            Text('No tienes pagos pendientes\npor confirmar.',
+                textAlign: TextAlign.center,
+                style: _T.label(14,
+                    c: onSurf.withOpacity(0.45), w: FontWeight.w400)),
           ],
         ),
       ),
@@ -1211,7 +1463,8 @@ class _EmptyState extends StatelessWidget {
 
 class _SectionLabel extends StatelessWidget {
   final String text;
-  const _SectionLabel(this.text);
+  final Color? color;
+  const _SectionLabel(this.text, {this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -1219,9 +1472,7 @@ class _SectionLabel extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(left: 4),
       child: Text(text,
-          style: _T.label(11,
-              w: FontWeight.w700,
-              c: onSurf.withOpacity(0.35))),
+          style: _T.label(11, w: FontWeight.w700, c: onSurf.withOpacity(0.35))),
     );
   }
 }
@@ -1231,8 +1482,11 @@ class _ActionBtn extends StatefulWidget {
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
-  const _ActionBtn({required this.label, required this.icon,
-      required this.color, required this.onTap});
+  const _ActionBtn(
+      {required this.label,
+      required this.icon,
+      required this.color,
+      required this.onTap});
   @override
   State<_ActionBtn> createState() => _ActionBtnState();
 }
@@ -1242,22 +1496,32 @@ class _ActionBtnState extends State<_ActionBtn>
   late final AnimationController _c = AnimationController(
       vsync: this, duration: const Duration(milliseconds: 70));
   @override
-  void dispose() { _c.dispose(); super.dispose(); }
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
-      onTapDown:   (_) { _c.forward(); HapticFeedback.selectionClick(); },
-      onTapUp:     (_) { _c.reverse(); widget.onTap(); },
-      onTapCancel: ()  { _c.reverse(); },
+      onTapDown: (_) {
+        _c.forward();
+        HapticFeedback.selectionClick();
+      },
+      onTapUp: (_) {
+        _c.reverse();
+        widget.onTap();
+      },
+      onTapCancel: () {
+        _c.reverse();
+      },
       child: AnimatedBuilder(
         animation: _c,
         builder: (_, __) => Transform.scale(
           scale: lerpDouble(1.0, 0.95, _c.value)!,
           child: Container(
-            padding: const EdgeInsets.symmetric(
-                vertical: 10, horizontal: 8),
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
             decoration: BoxDecoration(
               color: widget.color.withOpacity(isDark ? 0.14 : 0.09),
               borderRadius: BorderRadius.circular(12),
@@ -1268,8 +1532,7 @@ class _ActionBtnState extends State<_ActionBtn>
                 Icon(widget.icon, size: 15, color: widget.color),
                 const SizedBox(width: 5),
                 Text(widget.label,
-                    style: _T.label(12,
-                        c: widget.color, w: FontWeight.w700)),
+                    style: _T.label(12, c: widget.color, w: FontWeight.w700)),
               ],
             ),
           ),
@@ -1288,9 +1551,13 @@ class _SheetRow extends StatefulWidget {
   final VoidCallback onTap;
 
   const _SheetRow({
-    required this.icon, required this.label, required this.color,
+    required this.icon,
+    required this.label,
+    required this.color,
     required this.onTap,
-    this.sublabel, this.isFirst = false, this.isLast = false,
+    this.sublabel,
+    this.isFirst = false,
+    this.isLast = false,
     this.isDestructive = false,
   });
   @override
@@ -1302,19 +1569,30 @@ class _SheetRowState extends State<_SheetRow>
   late final AnimationController _c = AnimationController(
       vsync: this, duration: const Duration(milliseconds: 65));
   @override
-  void dispose() { _c.dispose(); super.dispose(); }
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final onSurf = Theme.of(context).colorScheme.onSurface;
-    final color  = widget.isDestructive ? _kRed : widget.color;
-    final topR   = widget.isFirst ? const Radius.circular(16) : Radius.zero;
-    final botR   = widget.isLast  ? const Radius.circular(16) : Radius.zero;
+    final color = widget.isDestructive ? _kRed : widget.color;
+    final topR = widget.isFirst ? const Radius.circular(16) : Radius.zero;
+    final botR = widget.isLast ? const Radius.circular(16) : Radius.zero;
 
     return GestureDetector(
-      onTapDown:   (_) { _c.forward(); HapticFeedback.selectionClick(); },
-      onTapUp:     (_) { _c.reverse(); widget.onTap(); },
-      onTapCancel: ()  { _c.reverse(); },
+      onTapDown: (_) {
+        _c.forward();
+        HapticFeedback.selectionClick();
+      },
+      onTapUp: (_) {
+        _c.reverse();
+        widget.onTap();
+      },
+      onTapCancel: () {
+        _c.reverse();
+      },
       child: AnimatedBuilder(
         animation: _c,
         builder: (_, __) => Container(
@@ -1323,14 +1601,15 @@ class _SheetRowState extends State<_SheetRow>
                 ? color.withOpacity(0.05 * _c.value)
                 : Colors.transparent,
             borderRadius: BorderRadius.only(
-              topLeft: topR, topRight: topR,
-              bottomLeft: botR, bottomRight: botR,
+              topLeft: topR,
+              topRight: topR,
+              bottomLeft: botR,
+              bottomRight: botR,
             ),
           ),
           child: Column(children: [
             Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 18, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
               child: Row(children: [
                 Icon(widget.icon, size: 18, color: color),
                 const SizedBox(width: 14),
@@ -1338,13 +1617,11 @@ class _SheetRowState extends State<_SheetRow>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(widget.label,
-                          style: _T.label(15, c: color)),
+                      Text(widget.label, style: _T.label(15, c: color)),
                       if (widget.sublabel != null) ...[
                         const SizedBox(height: 2),
                         Text(widget.sublabel!,
-                            style: _T.label(12,
-                                c: onSurf.withOpacity(0.42))),
+                            style: _T.label(12, c: onSurf.withOpacity(0.42))),
                       ],
                     ],
                   ),
@@ -1353,9 +1630,9 @@ class _SheetRowState extends State<_SheetRow>
             ),
             if (!widget.isLast)
               Padding(
-                padding: const EdgeInsets.only(left: 50),
-                child: Container(height: 0.5,
-                    color: onSurf.withOpacity(0.07))),
+                  padding: const EdgeInsets.only(left: 50),
+                  child:
+                      Container(height: 0.5, color: onSurf.withOpacity(0.07))),
           ]),
         ),
       ),
@@ -1368,8 +1645,11 @@ class _InlineBtn extends StatefulWidget {
   final Color color;
   final bool impact;
   final VoidCallback onTap;
-  const _InlineBtn({required this.label, required this.color,
-      required this.onTap, this.impact = false});
+  const _InlineBtn(
+      {required this.label,
+      required this.color,
+      required this.onTap,
+      this.impact = false});
   @override
   State<_InlineBtn> createState() => _InlineBtnState();
 }
@@ -1379,7 +1659,10 @@ class _InlineBtnState extends State<_InlineBtn>
   late final AnimationController _c = AnimationController(
       vsync: this, duration: const Duration(milliseconds: 65));
   @override
-  void dispose() { _c.dispose(); super.dispose(); }
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1390,8 +1673,13 @@ class _InlineBtnState extends State<_InlineBtn>
             ? HapticFeedback.mediumImpact()
             : HapticFeedback.selectionClick();
       },
-      onTapUp:     (_) { _c.reverse(); widget.onTap(); },
-      onTapCancel: ()  { _c.reverse(); },
+      onTapUp: (_) {
+        _c.reverse();
+        widget.onTap();
+      },
+      onTapCancel: () {
+        _c.reverse();
+      },
       child: AnimatedBuilder(
         animation: _c,
         builder: (_, __) => Transform.scale(
@@ -1399,11 +1687,11 @@ class _InlineBtnState extends State<_InlineBtn>
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 13),
             decoration: BoxDecoration(
-              color: widget.color.withOpacity(0.10),
-              borderRadius: BorderRadius.circular(12)),
-            child: Center(child: Text(widget.label,
-                style: _T.label(15,
-                    w: FontWeight.w600, c: widget.color))),
+                color: widget.color.withOpacity(0.10),
+                borderRadius: BorderRadius.circular(12)),
+            child: Center(
+                child: Text(widget.label,
+                    style: _T.label(15, w: FontWeight.w600, c: widget.color))),
           ),
         ),
       ),
@@ -1421,19 +1709,30 @@ class _CancelRowState extends State<_CancelRow>
   late final AnimationController _c = AnimationController(
       vsync: this, duration: const Duration(milliseconds: 65));
   @override
-  void dispose() { _c.dispose(); super.dispose(); }
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg     = isDark
+    final bg = isDark
         ? Colors.white.withOpacity(0.10)
         : Colors.white.withOpacity(0.92);
 
     return GestureDetector(
-      onTapDown:   (_) { _c.forward(); HapticFeedback.selectionClick(); },
-      onTapUp:     (_) { _c.reverse(); Navigator.pop(context); },
-      onTapCancel: ()  { _c.reverse(); },
+      onTapDown: (_) {
+        _c.forward();
+        HapticFeedback.selectionClick();
+      },
+      onTapUp: (_) {
+        _c.reverse();
+        Navigator.pop(context);
+      },
+      onTapCancel: () {
+        _c.reverse();
+      },
       child: AnimatedBuilder(
         animation: _c,
         builder: (_, __) => Transform.scale(
@@ -1443,9 +1742,9 @@ class _CancelRowState extends State<_CancelRow>
             padding: const EdgeInsets.symmetric(vertical: 16),
             decoration: BoxDecoration(
                 color: bg, borderRadius: BorderRadius.circular(16)),
-            child: Center(child: Text('Cancelar',
-                style: _T.label(16,
-                    w: FontWeight.w600, c: _kBlue))),
+            child: Center(
+                child: Text('Cancelar',
+                    style: _T.label(16, w: FontWeight.w600, c: _kBlue))),
           ),
         ),
       ),

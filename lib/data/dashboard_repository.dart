@@ -111,6 +111,7 @@ class DashboardRepository {
         client.rpc('get_dashboard_alerts', params: {'p_user_id': userId}).catchError((_) =>[]), // 5
         // --- 👇 PETICIÓN NUEVA: BUSCAMOS LAS DEUDAS ---
                 client.from('debts').select('type, current_balance, impact_type, spending_fund').eq('user_id', userId).eq('status', 'active').catchError((_) =>[]), // 6
+                client.from('accounts').select('balance').eq('user_id', userId).eq('type', 'Tarjeta de Crédito').eq('status', 'active').catchError((_) =>[]), // 7
 
       ]);
 
@@ -134,8 +135,14 @@ class DashboardRepository {
         }
       }
 
-      double savingsBalance = 0.0; // Dinero restringido por METAS (Voluntario)
-      final goalsData = detailsResults[1] as List<dynamic>? ?? [];
+      // 2. Deudas de Tarjetas de Crédito (NUEVO)
+      final ccData = detailsResults[7] as List<dynamic>? ??[];
+      for (var cc in ccData) {
+         totalDebt += (cc['balance'] as num? ?? 0.0).toDouble().abs();
+      }
+
+      double savingsBalance = 0.0; 
+      final goalsData = detailsResults[1] as List<dynamic>? ??[];
       for (var g in goalsData) {
         savingsBalance += (g['current_amount'] as num? ?? 0.0).toDouble();
       }
@@ -143,7 +150,8 @@ class DashboardRepository {
       // Matemáticas Finales
       double restrictedTotal = obligatedBalance + savingsBalance;
       double availableBalance = partialData.totalBalance - restrictedTotal;
-      double netWorth = partialData.totalBalance - totalDebt; // Patrimonio = Activos - Pasivos
+      double netWorth = partialData.totalBalance - totalDebt; // Patrimonio = Activos (Plata líquida) - Pasivos (Préstamos + TC)
+
       // ------------------------------------------
 
       final detailsDataMap = {

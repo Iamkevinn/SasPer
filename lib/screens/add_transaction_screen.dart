@@ -20,6 +20,7 @@ import 'package:sasper/data/category_repository.dart';
 import 'package:sasper/models/category_model.dart';
 import 'package:sasper/services/event_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
+import 'package:sasper/utils/credit_card_engine.dart'; // <--- EL MOTOR DE TARJETAS
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'dart:developer' as developer;
 import 'package:sasper/screens/place_search_screen.dart';
@@ -82,6 +83,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
   final _budgetRepo   = BudgetRepository.instance;
   final _categoryRepo = CategoryRepository.instance;
   final _debtRepo     = DebtRepository.instance;
+  final _goalRepo     = GoalRepository.instance;
 
   final _formKey             = GlobalKey<FormState>();
   final _amountController    = TextEditingController();
@@ -91,7 +93,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
   late AnimationController _shakeController;
   late Animation<double>   _shakeAnimation;
 
-  final _goalRepo = GoalRepository.instance;
   List<Goal> _activeGoals =[];
 
   DateTime _selectedDate     = DateTime.now();
@@ -106,34 +107,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
   bool     _isFetchingLocation = false;
   bool     _amountHasValue     = false;
   Debt?    _smartSuggestion;
-  bool _isInterestFree = false; 
+  int _interestFreeCount = 1; // Por defecto 1 cuota siempre es sin interés
+
 
   int _installments = 1; 
   bool get _isCreditCard => _selectedAccount?.type == 'Tarjeta de Crédito';
-
-  double _calculateInterestCost() {
-    final amount = double.tryParse(_amountController.text.trim().replaceAll(',', '.')) ?? 0.0;
-    final rate = _selectedAccount?.interestRate ?? 0.0;
-    if (_installments <= 1 || amount <= 0 || rate <= 0) return 0;
-    
-    double monthlyRate = (rate / 100) / 12;
-    double monthlyPayment = amount * (monthlyRate * math.pow(1 + monthlyRate, _installments)) / 
-                          (math.pow(1 + monthlyRate, _installments) - 1);
-    return (monthlyPayment * _installments) - amount;
-  }
-
-  String? _getCreditCardAdvice() {
-    if (!_isCreditCard || _selectedAccount?.closingDay == null) return null;
-    
-    final closingDay = _selectedAccount!.closingDay!;
-    final today = DateTime.now();
-    final daysUntilClosing = closingDay - today.day;
-
-    if (daysUntilClosing >= 0 && daysUntilClosing <= 3) {
-      return "💡 Tip IA: Tu tarjeta corta en $daysUntilClosing días. Si esperas al día ${closingDay + 1}, ganarás casi 45 días para pagar esta compra.";
-    }
-    return null;
-  }
 
   Account? _selectedAccount;
   Debt?    _selectedFundSource;
@@ -176,6 +154,24 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
       developer.log('Error cargando cuentas: $e', name: 'AddTransactionScreen');
     });
   }
+
+  // --- LÓGICA DE TARJETAS INTELIGENTE ---
+
+  String? _getCreditCardAdvice() {
+    if (!_isCreditCard || _selectedAccount?.closingDay == null || _selectedAccount?.dueDay == null) return null;
+    
+    // Usamos el motor para saber exactamente en qué factura cae esta compra
+    final nextPayment = CreditCardEngine.getNextBillingDate(
+      _selectedDate, 
+      _selectedAccount!.closingDay!, 
+      _selectedAccount!.dueDay!
+    );
+    
+    final formatter = DateFormat.MMMMd('es_CO');
+    return "💡 Tip IA: Si registras esta compra hoy, entrará en tu factura para pagar el ${formatter.format(nextPayment)}.";
+  }
+
+  // ---------------------------------------
 
   Future<void> _loadAvailableFunds() async {
     try {
@@ -253,6 +249,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
   bool  get _isExpense   => _transactionType == 'Gasto';
   Color get _typeColor   => _isExpense ? _T.expenseColor : _T.incomeColor;
 
+  // Modales de Selección (Account / Fund / Date / Geolocation omitidos por limpieza pero siguen igual)
   void _showAccountPicker(List<Account> accounts) {
     HapticFeedback.selectionClick();
     final fmt = NumberFormat.currency(
@@ -290,6 +287,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
             ...accounts.map((a) {
               final positive = a.balance >= 0;
               final isSelected = _selectedAccount?.id == a.id;
+              // Para crédito, mostramos el cupo disponible real
+              final displayBalance = a.type == 'Tarjeta de Crédito' ? a.availableBalance : a.balance;
+              
               return GestureDetector(
                 onTap: () {
                   HapticFeedback.selectionClick();
@@ -307,28 +307,31 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                       width: 8, height: 8,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: positive ? _T.incomeColor : _T.expenseColor,
+                        color: a.type == 'Tarjeta de Crédito' ? _T.debtColor : (positive ? _T.incomeColor : _T.expenseColor),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: Text(a.name,
-                          style: TextStyle(
-                              color: isSelected
-                                  ? _T.textPrimary(sheetContext)
-                                  : _T.textSecondary(sheetContext),
-                              fontSize: 15,
-                              fontWeight: isSelected
-                                  ? FontWeight.w600
-                                  : FontWeight.w400)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children:[
+                          Text(a.name,
+                              style: TextStyle(
+                                  color: isSelected
+                                      ? _T.textPrimary(sheetContext)
+                                      : _T.textSecondary(sheetContext),
+                                  fontSize: 15,
+                                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400)),
+                          if (a.type == 'Tarjeta de Crédito')
+                            Text('Cupo disponible', style: TextStyle(fontSize: 11, color: _T.textTertiary(sheetContext))),
+                        ],
+                      ),
                     ),
-                    Text(fmt.format(a.balance),
+                    Text(fmt.format(displayBalance),
                         style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: positive
-                                ? _T.incomeColor
-                                : _T.expenseColor)),
+                            color: a.type == 'Tarjeta de Crédito' ? _T.debtColor : (positive ? _T.incomeColor : _T.expenseColor))),
                     if (isSelected) ...[
                       const SizedBox(width: 10),
                       const Icon(Icons.check_rounded,
@@ -491,6 +494,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
 
     try {
       if (_selectedFundSource != null && _isExpense) {
+        // Uso de fondos de préstamo
         await _debtRepo.addTransactionFromDebtFund(
           accountId: _selectedAccount!.id,
           amount: amount.abs(),
@@ -501,7 +505,20 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
           debtId: _selectedFundSource!.id,
           transactionDate: _selectedDate,
         );
-      } else {
+      } 
+      // --- MAGIA: SI ES UNA COMPRA CON TARJETA DE CRÉDITO ---
+      else if (_isCreditCard && _isExpense) {
+        await _txRepo.addCreditCardPurchase(
+          accountId: _selectedAccount!.id,
+          amount: amount.abs(),
+          category: _selectedCategory!.name,
+          description: _descriptionController.text.trim(),
+          installmentsTotal: _installments,
+          isInterestFree:  _interestFreeCount == _installments ,
+        );
+      } 
+      // Transacción normal (Débito/Efectivo/Ingreso)
+      else {
         await _txRepo.addTransaction(
           accountId: _selectedAccount!.id,
           amount: _isExpense ? -amount.abs() : amount.abs(),
@@ -514,35 +531,29 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
           locationName: _selectedLocationName,
           latitude: _selectedLat,
           longitude: _selectedLng,
-          creditCardId: _isCreditCard ? _selectedAccount!.id : null,
-          installmentsTotal: _isCreditCard ? _installments : 1,
-          installmentsCurrent: _isCreditCard ? 1 : null,
-          isInstallment: _isCreditCard && _installments > 1,
-          isInterestFree: _isInterestFree,
+          // Ya no mandamos los datos de cuotas por aquí porque el RPC lo maneja.
         );
       }
 
       if (mounted) {
         HapticFeedback.heavyImpact();
         EventService.instance.fire(AppEvent.transactionCreated);
+        
+        // Actualizamos las cuentas globalmente
+        EventService.instance.fire(AppEvent.accountsChanged);
+        
         if (_selectedFundSource != null) {
           EventService.instance.fire(AppEvent.debtsChanged);
         }
         
-        double remainingBalance = _selectedAccount!.balance;
-        if (_isExpense) {
-          remainingBalance -= amount.abs();
-        } else {
-          remainingBalance += amount.abs();
-        }
-
+        // Lógica de Metas sugeridas (No aplica para crédito para no endudar a la gente para ahorrar)
         final topGoal = _getTopPriorityGoal();
         final suggestedAmount = math.min(
           amount.abs() * 0.10, 
           topGoal != null ? topGoal.targetAmount - topGoal.currentAmount : 0.0
         );
 
-        if (topGoal != null && suggestedAmount >= 1000 && remainingBalance >= suggestedAmount) {
+        if (!_isCreditCard && _isExpense && topGoal != null && suggestedAmount >= 1000 && (_selectedAccount!.availableBalance - amount.abs()) >= suggestedAmount) {
            setState(() => _isLoading = false);
            _showSmartGoalSuggestion(topGoal, suggestedAmount, _selectedAccount!.id);
         } else {
@@ -686,6 +697,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                       ],
                       _FadeSlide(delay: 120, child: _buildAccountSection()),
                       const SizedBox(height: _T.md),
+                      
+                      // -- MÓDULO DE TARJETA DE CRÉDITO --
                       if (_isExpense && _isCreditCard) ...[
                         _FadeSlide(
                           delay: 140,
@@ -700,6 +713,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                           ),
                         const SizedBox(height: _T.md),
                       ],
+                      
                       _FadeSlide(delay: 160, child: _buildDateSection()),
                       const SizedBox(height: _T.md),
                       _FadeSlide(delay: 200, child: _buildCategorySection()),
@@ -745,9 +759,27 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     );
   }
 
-  Widget _buildInstallmentSection() {
-    final interest = _isInterestFree ? 0.0 : _calculateInterestCost();
-    final commonInstallments =[1, 2, 3, 6, 12, 18, 24, 36, 48];
+Widget _buildInstallmentSection() {
+    final amount = double.tryParse(_amountController.text.trim().replaceAll(',', '.')) ?? 0.0;
+    final ea = _selectedAccount!.interestRate;
+    
+    // Asegurarnos de que no haya más cuotas libres que cuotas totales
+    if (_interestFreeCount > _installments) _interestFreeCount = _installments;
+    // Si es a 1 cuota, forzamos que sea 1 cuota libre
+    if (_installments == 1) _interestFreeCount = 1;
+
+    final monthlyQuota = CreditCardEngine.calculateMonthlyInstallment(
+      totalAmount: amount,
+      installments: _installments,
+      interestRateEA: ea,
+      interestFreeCount: _interestFreeCount,
+    );
+    
+    final totalPayment = monthlyQuota * _installments;
+    final totalInterest = (totalPayment - amount).clamp(0.0, double.infinity);
+
+    final fmt = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+    final commonInstallments =[1, 2, 3, 6, 12, 24, 36];
 
     return _Section(
       label: 'Configuración de Cuotas',
@@ -764,17 +796,20 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                 final isSel = _installments == n;
                 return GestureDetector(
                   onTap: () {
-                    setState(() => _installments = n);
                     HapticFeedback.selectionClick();
+                    setState(() {
+                      _installments = n;
+                      if (_installments == 1) _interestFreeCount = 1;
+                    });
                   },
                   child: AnimatedContainer(
                     duration: _T.fast,
                     margin: const EdgeInsets.only(right: 8),
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     decoration: BoxDecoration(
-                      color: isSel ? _T.accent : _T.surfaceHighest(context),
+                      color: isSel ? _T.debtColor : _T.surfaceHighest(context),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: isSel ? _T.accent : _T.border(context)),
+                      border: Border.all(color: isSel ? _T.debtColor : _T.border(context)),
                     ),
                     alignment: Alignment.center,
                     child: Text(
@@ -791,45 +826,108 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
             ),
           ),
           
-          Divider(height: 1, color: _T.borderSubtle(context)),
-
-          _TappableRow(
-            onTap: () => setState(() => _isInterestFree = !_isInterestFree),
-            child: Row(
-              children:[
-                const Icon(Iconsax.flash_1, size: 18, color: _T.incomeColor),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children:[
-                      Text('Promoción Sin Intereses', 
-                        style: TextStyle(color: _T.textPrimary(context), fontSize: 14, fontWeight: FontWeight.w600)),
-                      Text('Activa si la tienda ofrece 0% de interés', 
-                        style: TextStyle(color: _T.textSecondary(context), fontSize: 11)),
-                    ],
-                  ),
-                ),
-                Switch.adaptive(
-                  value: _isInterestFree,
-                  activeColor: _T.incomeColor,
-                  onChanged: (v) => setState(() => _isInterestFree = v),
-                ),
-              ],
-            ),
-          ),
-
-          if (interest > 0) ...[
+          if (_installments > 1) ...[
             Divider(height: 1, color: _T.borderSubtle(context)),
             Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 children:[
-                  const Icon(Iconsax.info_circle, size: 14, color: _T.expenseColor),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Costo total en intereses: \$${interest.toStringAsFixed(0)}',
-                    style: const TextStyle(color: _T.expenseColor, fontSize: 12, fontWeight: FontWeight.bold),
+                  const Icon(Iconsax.flash_1, size: 18, color: _T.incomeColor),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children:[
+                        Text('Cuotas sin interés (Promo)', 
+                          style: TextStyle(color: _T.textPrimary(context), fontSize: 14, fontWeight: FontWeight.w600)),
+                        Text('¿Cuántas cuotas están libres de interés?', 
+                          style: TextStyle(color: _T.textSecondary(context), fontSize: 11)),
+                      ],
+                    ),
+                  ),
+                  // Selector + y -
+                  Container(
+                    decoration: BoxDecoration(
+                      color: _T.surfaceHighest(context),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: _T.border(context)),
+                    ),
+                    child: Row(
+                      children:[
+                        IconButton(
+                          icon: Icon(Icons.remove, size: 16, color: _T.textPrimary(context)),
+                          onPressed: _interestFreeCount > 0 
+                            ? () { HapticFeedback.lightImpact(); setState(() => _interestFreeCount--); } 
+                            : null,
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          padding: EdgeInsets.zero,
+                        ),
+                        Text('$_interestFreeCount', style: TextStyle(color: _T.textPrimary(context), fontWeight: FontWeight.bold, fontSize: 14)),
+                        IconButton(
+                          icon: Icon(Icons.add, size: 16, color: _T.textPrimary(context)),
+                          onPressed: _interestFreeCount < _installments 
+                            ? () { HapticFeedback.lightImpact(); setState(() => _interestFreeCount++); } 
+                            : null,
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          padding: EdgeInsets.zero,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          if (amount > 0) ...[
+            Divider(height: 1, color: _T.borderSubtle(context)),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: _T.surfaceHighest(context),
+                borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(14), bottomRight: Radius.circular(14)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children:[
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: _T.surfaceRaised(context),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: _T.border(context))
+                    ),
+                    child: const Icon(Iconsax.receipt_2, size: 18, color: _T.debtColor),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children:[
+                        Text(
+                          'Cuota mensual estimada',
+                          style: TextStyle(color: _T.textSecondary(context), fontSize: 12),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          fmt.format(monthlyQuota),
+                          style: TextStyle(color: _T.textPrimary(context), fontSize: 20, fontWeight: FontWeight.w700),
+                        ),
+                        if (totalInterest > 0) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            '+ ${fmt.format(totalInterest)} interés total ($ea% EA)',
+                            style: const TextStyle(color: _T.expenseColor, fontSize: 11, fontWeight: FontWeight.w600),
+                          ),
+                        ] else if (_installments > 1) ...[
+                           const SizedBox(height: 4),
+                           const Text(
+                            '✨ Compra 100% libre de intereses',
+                            style: TextStyle(color: _T.incomeColor, fontSize: 11, fontWeight: FontWeight.w600),
+                          ),
+                        ]
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -838,8 +936,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
         ],
       ),
     );
-  }  
-
+  }
   Widget _buildAmountHero() {
     return _FadeSlide(
       delay: 0,
@@ -929,7 +1026,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: _amountHasValue
-                        ? [_typeColor.withOpacity(0.8), Colors.transparent]
+                        ?[_typeColor.withOpacity(0.8), Colors.transparent]
                         : [_T.border(context), Colors.transparent],
                   ),
                   borderRadius: BorderRadius.circular(1),
@@ -1133,6 +1230,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
           final acc = _selectedAccount;
           final positive = acc == null || acc.balance >= 0;
 
+          // Para crédito, mostramos el cupo disponible en la UI, no la deuda
+          final displayBalance = acc?.type == 'Tarjeta de Crédito' ? acc!.availableBalance : (acc?.balance ?? 0.0);
+
           return _TappableRow(
             onTap: () => _showAccountPicker(accounts),
             child: Row(children:[
@@ -1142,9 +1242,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                   shape: BoxShape.circle,
                   color: acc == null
                       ? _T.textTertiary(context)
-                      : positive
-                          ? _T.incomeColor
-                          : _T.expenseColor,
+                      : acc.type == 'Tarjeta de Crédito'
+                          ? _T.debtColor
+                          : (positive ? _T.incomeColor : _T.expenseColor),
                 ),
               ),
               const SizedBox(width: 10),
@@ -1160,11 +1260,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
               ),
               if (acc != null)
                 Text(
-                  fmt.format(acc.balance),
+                  fmt.format(displayBalance),
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: positive ? _T.incomeColor : _T.expenseColor,
+                    color: acc.type == 'Tarjeta de Crédito' ? _T.debtColor : (positive ? _T.incomeColor : _T.expenseColor),
                   ),
                 ),
               const SizedBox(width: 4),
@@ -1391,11 +1491,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
         curve: _T.curve,
         height: 54,
         decoration: BoxDecoration(
-          color: _typeColor,
+          color: _isCreditCard ? _T.debtColor : _typeColor,
           borderRadius: BorderRadius.circular(_T.rMD),
           boxShadow:[
             BoxShadow(
-              color: _typeColor.withOpacity(0.25),
+              color: (_isCreditCard ? _T.debtColor : _typeColor).withOpacity(0.25),
               blurRadius: 20,
               offset: const Offset(0, 6),
             ),
@@ -1412,8 +1512,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                       strokeWidth: 1.8, color: Colors.white),
                 )
               : Text(
-                  key: ValueKey(_transactionType),
-                  _isExpense ? 'Registrar gasto' : 'Registrar ingreso',
+                  key: ValueKey('$_transactionType${_isCreditCard ? 'credit' : ''}'),
+                  _isCreditCard && _isExpense 
+                      ? 'Registrar Compra' 
+                      : _isExpense ? 'Registrar gasto' : 'Registrar ingreso',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 16,
@@ -1758,18 +1860,19 @@ class _AITipCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _T.accent.withOpacity(0.05),
+        color: _T.debtColor.withOpacity(0.08),
         borderRadius: BorderRadius.circular(_T.rMD),
-        border: Border.all(color: _T.accent.withOpacity(0.2)),
+        border: Border.all(color: _T.debtColor.withOpacity(0.3)),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children:[
-          const Icon(Iconsax.lamp_on, color: _T.accent, size: 20),
+          const Icon(Iconsax.lamp_on, color: _T.debtColor, size: 18),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               message,
-              style: TextStyle(color: _T.textSecondary(context), fontSize: 13, height: 1.4),
+              style: TextStyle(color: _T.textPrimary(context), fontSize: 13, height: 1.4, fontWeight: FontWeight.w500),
             ),
           ),
         ],

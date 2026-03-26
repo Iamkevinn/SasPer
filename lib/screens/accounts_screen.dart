@@ -1088,14 +1088,19 @@ class _AccountRowState extends State<_AccountRow> {
   Widget build(BuildContext context) {
     final c = widget.c;
     final acc = widget.account;
-    final isNeg = acc.balance < 0;
-    final fmt =
-        NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
-    final compactFmt = NumberFormat.compactCurrency(
-        locale: 'es_CO', symbol: '\$', decimalDigits: 1);
-    final displayBalance = acc.balance.abs() > 9999999
-        ? compactFmt.format(acc.balance)
-        : fmt.format(acc.balance);
+    
+    // --- LÓGICA DE CRÉDITO VS AHORROS ---
+    final isCredit = acc.type == 'Tarjeta de Crédito';
+    // Si es crédito, mostramos el cupo disponible. Si es normal, mostramos su saldo.
+    final displayValue = isCredit ? acc.availableBalance : acc.balance;
+    final isNeg = displayValue < 0;
+
+    final fmt = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+    final compactFmt = NumberFormat.compactCurrency(locale: 'es_CO', symbol: '\$', decimalDigits: 1);
+    
+    final displayBalanceStr = displayValue.abs() > 9999999
+        ? compactFmt.format(displayValue)
+        : fmt.format(displayValue);
 
     return GestureDetector(
       onTapDown: (_) => setState(() => _pressing = true),
@@ -1111,14 +1116,12 @@ class _AccountRowState extends State<_AccountRow> {
         child: Opacity(
           opacity: widget.isArchived ? 0.6 : 1.0,
           child: Row(
-            children: [
-              // Inicial del nombre en círculo de color
+            children:[
               Container(
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color:
-                      c.typeColor(acc.type).withOpacity(c.isDark ? 0.18 : 0.1),
+                  color: c.typeColor(acc.type).withOpacity(c.isDark ? 0.18 : 0.1),
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
@@ -1133,54 +1136,44 @@ class _AccountRowState extends State<_AccountRow> {
               ),
               const SizedBox(width: _C.md),
 
-              // Nombre de la cuenta
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+                  children:[
                     Text(
                       acc.name,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: c.label,
-                        letterSpacing: -0.1,
-                      ),
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.label, letterSpacing: -0.1),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    // 👈 NUEVO: Mostrar descripción si existe
-                    if (acc.description != null && acc.description!.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Text(
-                          acc.description!,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: c.label4, // Color sutil secundario
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    if (widget.isArchived)
+                    if (isCredit)
+                       Text(
+                        'Cupo Disp: ${fmt.format(acc.availableBalance)} \nDeuda: ${fmt.format(acc.balance.abs())}',
+                        style: TextStyle(fontSize: 11, color: c.label4, height: 1.4),
+                      )
+                    else if (acc.description != null && acc.description!.isNotEmpty)
                       Text(
-                        'Archivada',
+                        acc.description!,
                         style: TextStyle(fontSize: 12, color: c.label4),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
+                    
+                    if (widget.isArchived)
+                      Text('Archivada', style: TextStyle(fontSize: 12, color: c.label4)),
                   ],
                 ),
               ),
 
-              // Saldo + menú
               Row(
-                children: [
+                children:[
                   Text(
-                    displayBalance,
+                    // Si es crédito, el color es morado, sino verde/rojo
+                    displayBalanceStr,
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
-                      color: isNeg ? _C.expense : c.label,
+                      color: isCredit ? c.typeColor(acc.type) : (isNeg ? _C.expense : c.label),
                       letterSpacing: -0.3,
                     ),
                   ),
@@ -1190,8 +1183,7 @@ class _AccountRowState extends State<_AccountRow> {
                     behavior: HitTestBehavior.opaque,
                     child: Padding(
                       padding: const EdgeInsets.all(4),
-                      child: Icon(Icons.more_horiz_rounded,
-                          size: 18, color: c.label4),
+                      child: Icon(Icons.more_horiz_rounded, size: 18, color: c.label4),
                     ),
                   ),
                 ],

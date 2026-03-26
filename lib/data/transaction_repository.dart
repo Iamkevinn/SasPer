@@ -17,7 +17,8 @@ class TransactionRepository {
   RealtimeChannel? _channel;
 
   TransactionRepository._internal();
-  static final TransactionRepository instance = TransactionRepository._internal();
+  static final TransactionRepository instance =
+      TransactionRepository._internal();
 
   void _ensureInitialized() {
     if (!_isInitialized) {
@@ -67,23 +68,23 @@ class TransactionRepository {
   }) async {
     try {
       await client.from('transactions').insert({
-        'user_id':             client.auth.currentUser!.id,
-        'account_id':          accountId,
-        'amount':              amount,
-        'type':                type,
-        'category':            category,
-        'description':         description,
-        'transaction_date':    transactionDate.toIso8601String(),
-        'budget_id':           budgetId,
-        'mood':                mood?.name,
-        'location_name':       locationName,
-        'latitude':            latitude,
-        'longitude':           longitude,
-        'credit_card_id':      creditCardId,
-        'installments_total':  installmentsTotal,
+        'user_id': client.auth.currentUser!.id,
+        'account_id': accountId,
+        'amount': amount,
+        'type': type,
+        'category': category,
+        'description': description,
+        'transaction_date': transactionDate.toIso8601String(),
+        'budget_id': budgetId,
+        'mood': mood?.name,
+        'location_name': locationName,
+        'latitude': latitude,
+        'longitude': longitude,
+        'credit_card_id': creditCardId,
+        'installments_total': installmentsTotal,
         'installments_current': installmentsCurrent,
-        'is_installment':      isInstallment,
-        'is_interest_free':    isInterestFree,
+        'is_installment': isInstallment,
+        'is_interest_free': isInterestFree,
       });
       developer.log('✅ Transacción guardada (Cuotas: $isInstallment)',
           name: 'TransactionRepository');
@@ -91,6 +92,45 @@ class TransactionRepository {
       developer.log('🔥 Error al añadir transacción: $e',
           name: 'TransactionRepository');
       throw Exception('No se pudo añadir la transacción.');
+    }
+  }
+
+  Future<void> addCreditCardPurchase({
+    required String accountId,
+    required double amount,
+    required String category,
+    required String description,
+    required int installmentsTotal,
+    required bool isInterestFree,
+    DateTime? transactionDate,
+  }) async {
+    final date = transactionDate ?? DateTime.now();
+
+    try {
+      await client.from('transactions').insert({
+        'user_id': client.auth.currentUser!.id,
+        'account_id': accountId,
+        'amount': -amount.abs(), // Siempre negativo (gasto)
+        'type': 'Gasto',
+        'category': category,
+        'description': description,
+        'transaction_date': date.toIso8601String(),
+        'credit_card_id': accountId, // La cuenta ES la tarjeta
+        'installments_total': installmentsTotal,
+        'installments_current': 1, // Empieza en cuota 1
+        'is_installment': installmentsTotal > 1,
+        'is_interest_free': isInterestFree,
+      });
+
+      developer.log(
+        '✅ Compra con tarjeta guardada — $installmentsTotal cuota(s), '
+        'sin interés: $isInterestFree',
+        name: 'TransactionRepository',
+      );
+    } catch (e) {
+      developer.log('🔥 Error al añadir compra con tarjeta: $e',
+          name: 'TransactionRepository');
+      throw Exception('No se pudo registrar la compra con tarjeta.');
     }
   }
 
@@ -103,18 +143,18 @@ class TransactionRepository {
       throw Exception('Esta deuda ya está pagada.');
     }
 
-    final installmentAmount =
-        originalTransaction.amount.abs() / originalTransaction.installmentsTotal!;
+    final installmentAmount = originalTransaction.amount.abs() /
+        originalTransaction.installmentsTotal!;
 
     await addTransaction(
-      accountId:       paymentSourceAccountId,
-      amount:          -installmentAmount,
-      type:            'Gasto',
-      category:        'Pago Tarjeta',
+      accountId: paymentSourceAccountId,
+      amount: -installmentAmount,
+      type: 'Gasto',
+      category: 'Pago Tarjeta',
       description:
           'Pago cuota ${originalTransaction.installmentsCurrent} de: ${originalTransaction.description}',
       transactionDate: DateTime.now(),
-      isInstallment:   false,
+      isInstallment: false,
     );
 
     await client.from('transactions').update({
@@ -140,11 +180,10 @@ class TransactionRepository {
     try {
       await client.from('transactions').update({
         'installments_current': currentInstallment,
-        'installments_total':   totalInstallments,
+        'installments_total': totalInstallments,
       }).eq('id', transactionId);
 
-      developer.log(
-          '✅ Progreso de cuotas actualizado para ID: $transactionId',
+      developer.log('✅ Progreso de cuotas actualizado para ID: $transactionId',
           name: 'TransactionRepository');
 
       await widget_service.WidgetService.updateNextPaymentWidget();
@@ -170,32 +209,32 @@ class TransactionRepository {
   // 3. Nada más cambia — amount sigue comentado porque la RPC no lo soporta.
 
   Future<void> updateTransaction({
-    required int      transactionId,
-    required String   accountId,
-    required String   type,
-    required String   category,
-    required String   description,
+    required int transactionId,
+    required String accountId,
+    required String type,
+    required String category,
+    required String description,
     required DateTime transactionDate,
-    TransactionMood?  mood,
+    TransactionMood? mood,
     // Ubicación — ahora activos
-    String?  locationName,
-    double?  latitude,
-    double?  longitude,
+    String? locationName,
+    double? latitude,
+    double? longitude,
   }) async {
     try {
       await client.rpc('update_transaction_and_relational_data', params: {
-        'p_transaction_id':       transactionId,
-        'p_new_account_id':       accountId,
-        'p_new_type':             type,
-        'p_new_category':         category,
-        'p_new_description':      description,
-        'p_new_mood':             mood?.name,
+        'p_transaction_id': transactionId,
+        'p_new_account_id': accountId,
+        'p_new_type': type,
+        'p_new_category': category,
+        'p_new_description': description,
+        'p_new_mood': mood?.name,
         'p_new_transaction_date': transactionDate.toIso8601String(),
         // Ubicación — pasan null si el usuario no seleccionó ninguna,
         // lo que limpia el valor previo en la BD (comportamiento correcto).
-        'p_new_location_name':    locationName,
-        'p_new_latitude':         latitude,
-        'p_new_longitude':        longitude,
+        'p_new_location_name': locationName,
+        'p_new_latitude': latitude,
+        'p_new_longitude': longitude,
       });
 
       developer.log(
@@ -285,8 +324,8 @@ class TransactionRepository {
   }
 
   Future<List<Transaction>> getFilteredTransactions({
-    String?        searchQuery,
-    List<String>?  categoryFilter,
+    String? searchQuery,
+    List<String>? categoryFilter,
     DateTimeRange? dateRange,
   }) async {
     var query = client
@@ -305,16 +344,13 @@ class TransactionRepository {
     }
 
     if (dateRange != null) {
-      query = query.gte(
-          'transaction_date', dateRange.start.toIso8601String());
+      query = query.gte('transaction_date', dateRange.start.toIso8601String());
       final endOfDay = DateTime(dateRange.end.year, dateRange.end.month,
           dateRange.end.day, 23, 59, 59);
-      query = query.lte(
-          'transaction_date', endOfDay.toIso8601String());
+      query = query.lte('transaction_date', endOfDay.toIso8601String());
     }
 
-    final response =
-        await query.order('transaction_date', ascending: false);
+    final response = await query.order('transaction_date', ascending: false);
     return response.map((data) => Transaction.fromMap(data)).toList();
   }
 
@@ -327,16 +363,14 @@ class TransactionRepository {
           .single();
       return Transaction.fromMap(response);
     } catch (e) {
-      developer.log(
-          '🔥 Error obteniendo transacción por id $transactionId: $e',
+      developer.log('🔥 Error obteniendo transacción por id $transactionId: $e',
           name: 'TransactionRepository');
       return null;
     }
   }
 
   void dispose() {
-    developer.log(
-        '❌ [Repo] Liberando recursos de TransactionRepository.',
+    developer.log('❌ [Repo] Liberando recursos de TransactionRepository.',
         name: 'TransactionRepository');
     if (_channel != null) {
       _supabase?.removeChannel(_channel!);
@@ -352,22 +386,20 @@ class TransactionRepository {
     final userId = _supabase?.auth.currentUser?.id;
     if (userId == null) return;
 
-    developer.log(
-        '📡 [Repo-Lazy] Configurando Realtime para Transacciones...',
+    developer.log('📡 [Repo-Lazy] Configurando Realtime para Transacciones...',
         name: 'TransactionRepository');
     _channel = _supabase!
         .channel('public:transactions')
         .onPostgresChanges(
-          event:  PostgresChangeEvent.all,
+          event: PostgresChangeEvent.all,
           schema: 'public',
-          table:  'transactions',
+          table: 'transactions',
           filter: PostgresChangeFilter(
-              type:   PostgresChangeFilterType.eq,
+              type: PostgresChangeFilterType.eq,
               column: 'user_id',
-              value:  userId),
+              value: userId),
           callback: (payload) {
-            developer.log(
-                '🔔 [Repo] Realtime (TRANSACTIONS). Refrescando...',
+            developer.log('🔔 [Repo] Realtime (TRANSACTIONS). Refrescando...',
                 name: 'TransactionRepository');
             _fetchAndPushTransactions();
           },

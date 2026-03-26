@@ -50,6 +50,42 @@ class Account extends Equatable {
     return _iconMap[iconName?.toLowerCase()] ?? Iconsax.wallet;
   }
 
+  /// Devuelve el dinero real disponible para gastar.
+  /// - Si es Ahorros/Bancaria: Es el balance actual.
+  /// - Si es Crédito: Es el (Cupo Total - Deuda Actual).
+  double get availableBalance {
+    if (type == 'Tarjeta de Crédito') {
+      // Como el balance está en negativo (ej. -10000), usamos .abs() 
+      // para volverlo 10000 positivo y restarlo correctamente del límite.
+      return (creditLimit - balance.abs()).clamp(0.0, double.infinity);
+    }
+    return balance;
+  }
+
+  /// Devuelve la deuda actual (Solo útil para tarjetas de crédito o préstamos)
+  double get currentDebt {
+    if (type == 'Tarjeta de Crédito') {
+      return balance; // El balance ES la deuda.
+    }
+    return 0.0;
+  }
+
+  /// Dinero líquido real (Efectivo, Cuentas Bancarias). 
+  /// Ignora las tarjetas de crédito porque no es dinero tuyo.
+  double get liquidBalance {
+    if (type == 'Tarjeta de Crédito') return 0.0;
+    return balance;
+  }
+
+  /// Cupo disponible en la Tarjeta de Crédito
+  double get availableCredit {
+    if (type == 'Tarjeta de Crédito') {
+      // El balance es negativo (deuda), así que sumamos: Limite - (-Deuda) NO, Limite - DeudaAbsoluta
+      return (creditLimit - balance.abs()).clamp(0.0, double.infinity);
+    }
+    return 0.0;
+  }
+
   static const Map<String, IconData> _iconMap = {
     'money_3': Iconsax.money_3,
     'building_4': Iconsax.building_4,
