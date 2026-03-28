@@ -87,7 +87,7 @@ class MainScreen extends StatefulWidget {
   State<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
+class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin, WidgetsBindingObserver {
   int _selectedIndex = 0;
 
   late StreamSubscription<AppEvent> _eventSub;
@@ -138,6 +138,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
 
     // FAB: rebote rápido al tocar — elasticOut en reverse
     _fabCtrl = AnimationController(
@@ -179,12 +180,16 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
 
     // Mantenimiento diferido de notificaciones
     Future.delayed(const Duration(seconds: 15), () {
-      if (mounted) NotificationService.instance.refreshRecurringSchedules();
+      if (mounted) {
+        NotificationService.instance.refreshRecurringSchedules();
+      }
     });
   }
 
   @override
   void dispose() {
+     WidgetsBinding.instance.removeObserver(this);
+
     _eventSub.cancel();
     _linkSub.cancel();
     _fabCtrl.dispose();

@@ -271,26 +271,10 @@ Future<void> _runGoalIntelligence(
       'goal_id': goal.id
     });
 
-// ── ESCENARIO 2 (El Olvidadizo) ──
+    // ── ESCENARIO 2 (El Olvidadizo) ──
     if (isBehind && !esDiaDeAhorro) {
-      
-      // NUEVO: El candado se adapta a la frecuencia de la meta
-      String dedupReajuste;
-      
-      if (goal.savingsFrequency == GoalSavingsFrequency.monthly) {
-        // Candado MENSUAL (Solo suena 1 vez al mes)
-        dedupReajuste = 'reajuste_${goal.id}_${nowTz.year}_${nowTz.month}';
-        
-      } else if (goal.savingsFrequency == GoalSavingsFrequency.weekly) {
-        // Candado SEMANAL (Solo suena 1 vez por semana. Dividimos el día entre 7 para saber en qué semana del mes estamos)
-        int weekOfMonth = (nowTz.day / 7).ceil();
-        dedupReajuste = 'reajuste_${goal.id}_${nowTz.year}_${nowTz.month}_sem$weekOfMonth';
-        
-      } else {
-        // Candado DIARIO (Suena todos los días)
-        dedupReajuste = 'reajuste_${goal.id}_${nowTz.year}_${nowTz.month}_${nowTz.day}';
-      }
-
+      final dedupReajuste =
+          'reajuste_${goal.id}_${nowTz.year}_${nowTz.month}_${nowTz.day}';
       if (prefs.getBool(dedupReajuste) != true) {
         String title = '⚠️ Reajuste: ${goal.name}';
         String body =
@@ -306,7 +290,7 @@ Future<void> _runGoalIntelligence(
                     importance: Importance.max,
                     priority: Priority.high,
                     styleInformation: BigTextStyleInformation(body),
-                    actions: const[
+                    actions: const [
                       AndroidNotificationAction(
                           'AHORRAR_AHORA', 'Ahorrar ahora 💰',
                           showsUserInterface: true)
@@ -318,18 +302,28 @@ Future<void> _runGoalIntelligence(
       }
     }
 
-    // ── 2. PROGRAMACIÓN EXACTA DE ALARMAS (El Recordatorio) ──
+    // ── PROGRAMACIÓN EXACTA DE ALARMAS ──
     for (int i = 0; i < nextDates.length; i++) {
       final date = nextDates[i];
 
-      String title = '✨ Hoy toca ahorrar: ${goal.name}';
+      String title;
       String body;
 
-      // Dependiendo de tu historial, te felicita o te invita a retomar el ritmo
-      if (missedLastPeriod || isBehind) {
-        body = 'Es hora de retomar el ritmo. Tu cuota reajustada es $amountStr.$extraHint';
+      if (isBehind) {
+        title = '⚠️ Reajuste: ${goal.name}';
+        body = goal.savingsFrequency == GoalSavingsFrequency.daily
+            ? 'Ayer no ahorraste. Tu nueva cuota diaria es $amountStr.$extraHint'
+            : 'Te atrasaste en tu plan. Tu nueva cuota es $amountStr.$extraHint';
       } else {
-        body = '¡Vas excelente! Tu cuota es $amountStr.$extraHint';
+        title = '✨ Hoy toca ahorrar: ${goal.name}';
+
+        // 🧠 NUEVA LÓGICA DE TEXTO REALISTA
+        if (missedLastPeriod) {
+          body =
+              'Es hora de retomar el ritmo. Tu cuota reajustada es $amountStr.$extraHint';
+        } else {
+          body = '¡Vas excelente! Tu cuota es $amountStr.$extraHint';
+        }
       }
 
       final notifId = _stableId(goal.id) + i;
@@ -339,7 +333,7 @@ Future<void> _runGoalIntelligence(
               importance: Importance.max,
               priority: Priority.high,
               styleInformation: BigTextStyleInformation(body),
-              actions: const[
+              actions: const [
                 AndroidNotificationAction('AHORRAR_AHORA', 'Ahorrar ahora 💰',
                     showsUserInterface: true)
               ]),

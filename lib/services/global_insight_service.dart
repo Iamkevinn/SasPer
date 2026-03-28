@@ -50,11 +50,7 @@ class GlobalInsightService {
                 final savingsAmount = (newInsight.metadata['savings_amount'] as num? ?? 0).toDouble();
 
                 if (goalId.isNotEmpty) {
-                  NotificationService.instance.showGoalSavingReminder(
-                    goalId: goalId,
-                    goalName: goalName,
-                    savingsAmount: savingsAmount,
-                  );
+                  _showTopBanner(newInsight); // Mostramos el banner como antes, pero también disparamos la notificación local.
                 }
               } else {
                 // Para cualquier otro tipo de insight, mostramos el banner superior como antes.

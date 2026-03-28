@@ -1,20 +1,26 @@
 // lib/models/goal_model.dart
 
 import 'package:equatable/equatable.dart';
-import 'package:sasper/models/category_model.dart'; 
+import 'package:sasper/models/category_model.dart';
 
-// --- NUEVO ENUM PARA EL RITUAL DE AHORRO ---
+// ─── Sentinel para copyWith nullable ─────────────────────────────────────────
+// Permite diferenciar "el caller no pasó el campo" de "el caller pasó null".
+// Sin esto, copyWith no puede poner savingsFrequency en null (bug 5 del análisis).
+const _kUnset = Object();
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
 enum GoalSavingsFrequency {
   daily,
   weekly,
   monthly;
 
-  static GoalSavingsFrequency? fromString(String? frequency) {
-    switch (frequency?.toLowerCase()) {
-      case 'daily': return GoalSavingsFrequency.daily;
-      case 'weekly': return GoalSavingsFrequency.weekly;
+  static GoalSavingsFrequency? fromString(String? value) {
+    switch (value?.toLowerCase()) {
+      case 'daily':   return GoalSavingsFrequency.daily;
+      case 'weekly':  return GoalSavingsFrequency.weekly;
       case 'monthly': return GoalSavingsFrequency.monthly;
-      default: return null;
+      default:        return null;
     }
   }
 }
@@ -22,14 +28,16 @@ enum GoalSavingsFrequency {
 enum GoalTimeframe {
   short,
   medium,
-  long, custom;
+  long,
+  custom;
 
-  static GoalTimeframe fromString(String? timeframe) {
-    switch (timeframe?.toLowerCase()) {
-      case 'short': return GoalTimeframe.short;
+  static GoalTimeframe fromString(String? value) {
+    switch (value?.toLowerCase()) {
+      case 'short':  return GoalTimeframe.short;
       case 'medium': return GoalTimeframe.medium;
-      case 'long': return GoalTimeframe.long;
-      default: return GoalTimeframe.short;
+      case 'long':   return GoalTimeframe.long;
+      case 'custom': return GoalTimeframe.custom;
+      default:       return GoalTimeframe.short;
     }
   }
 }
@@ -39,39 +47,33 @@ enum GoalPriority {
   medium,
   high;
 
-  static GoalPriority fromString(String? priority) {
-    switch (priority?.toLowerCase()) {
-      case 'low': return GoalPriority.low;
+  static GoalPriority fromString(String? value) {
+    switch (value?.toLowerCase()) {
+      case 'low':    return GoalPriority.low;
       case 'medium': return GoalPriority.medium;
-      case 'high': return GoalPriority.high;
-      default: return GoalPriority.medium;
+      case 'high':   return GoalPriority.high;
+      default:       return GoalPriority.medium;
     }
   }
 }
 
-// 1. Creamos un enum para el estado de la meta.
 enum GoalStatus {
   active,
   completed,
   archived;
 
-  // Helper para convertir un string a un enum de forma segura.
-  static GoalStatus fromString(String? status) {
-    switch (status?.toLowerCase()) {
-      case 'active':
-        return GoalStatus.active;
-      case 'completed':
-        return GoalStatus.completed;
-      case 'archived':
-        return GoalStatus.archived;
-      default:
-        // Valor por defecto si el string no coincide.
-        return GoalStatus.active;
+  static GoalStatus fromString(String? value) {
+    switch (value?.toLowerCase()) {
+      case 'active':   return GoalStatus.active;
+      case 'completed': return GoalStatus.completed;
+      case 'archived': return GoalStatus.archived;
+      default:         return GoalStatus.active;
     }
   }
 }
 
-// 2. Hacemos la clase inmutable y comparable.
+// ─── Modelo ───────────────────────────────────────────────────────────────────
+
 class Goal extends Equatable {
   final String id;
   final String userId;
@@ -85,17 +87,21 @@ class Goal extends Equatable {
   final GoalTimeframe timeframe;
   final GoalPriority priority;
   final String? categoryId;
-  final Category? category; // Para almacenar el objeto completo de la categoría
+  final Category? category;
   final dynamic notesContent;
 
-  // --- NUEVOS CAMPOS DEL RITUAL DE AHORRO ---
+  // Ritual de ahorro
   final GoalSavingsFrequency? savingsFrequency;
   final int? savingsDayOfWeek;
   final int? savingsDayOfMonth;
   final double? savingsAmount;
   final DateTime? nextReminderDate;
-
   final DateTime? lastContributionDate;
+
+  // ── NUEVOS: Hora de notificación configurable por el usuario ──────────────
+  // Default 9:00 AM — mismo valor que tenía hardcodeado el servicio antes.
+  final int notificationHour;    // 0–23
+  final int notificationMinute;  // 0–59
 
   const Goal({
     required this.id,
@@ -118,132 +124,147 @@ class Goal extends Equatable {
     this.savingsAmount,
     this.nextReminderDate,
     this.lastContributionDate,
+    this.notificationHour   = 9,
+    this.notificationMinute = 0,
   });
 
-  /// Crea una instancia "vacía" de Goal.
-  /// Ideal para usar como placeholder en Skeletonizer.
-  /// Puede ser `const` porque no usa `DateTime.now()`.
   factory Goal.empty() {
     return Goal(
-      id: '',
-      userId: '',
-      name: 'Cargando meta...',
-      targetAmount: 1000,
+      id:            '',
+      userId:        '',
+      name:          'Cargando meta...',
+      targetAmount:  1000,
       currentAmount: 0,
-      createdAt: DateTime.now(), // <-- Usamos el valor real, no una referencia
-      status: GoalStatus.active,
-      iconName: null,
-      targetDate: null,
-      timeframe: GoalTimeframe.short,
-      priority: GoalPriority.medium,
-      categoryId: null,
-      category: null,
+      createdAt:     DateTime.now(),
+      status:        GoalStatus.active,
+      timeframe:     GoalTimeframe.short,
+      priority:      GoalPriority.medium,
     );
   }
 
-  // 3. Método `fromMap` robustecido.
   factory Goal.fromMap(Map<String, dynamic> map) {
     try {
       return Goal(
-        id: map['id'] as String,
-        userId: map['user_id'] as String,
-        name: map['name'] as String? ?? 'Meta sin nombre',
-        targetAmount: (map['target_amount'] as num? ?? 0).toDouble(),
+        id:            map['id']      as String,
+        userId:        map['user_id'] as String,
+        name:          map['name']    as String? ?? 'Meta sin nombre',
+        targetAmount:  (map['target_amount']  as num? ?? 0).toDouble(),
         currentAmount: (map['current_amount'] as num? ?? 0).toDouble(),
-        targetDate: map['target_date'] != null ? DateTime.parse(map['target_date'] as String) : null,
+        targetDate:    map['target_date'] != null
+            ? DateTime.parse(map['target_date'] as String)
+            : null,
         createdAt: DateTime.parse(map['created_at'] as String),
-        status: GoalStatus.fromString(map['status'] as String?),
-        iconName: map['icon_name'] as String?,
+        status:    GoalStatus.fromString(map['status'] as String?),
+        iconName:  map['icon_name'] as String?,
         timeframe: GoalTimeframe.fromString(map['timeframe'] as String?),
-        priority: GoalPriority.fromString(map['priority'] as String?),
+        priority:  GoalPriority.fromString(map['priority'] as String?),
         categoryId: map['category_id'] as String?,
-        // Si la consulta de Supabase incluye la categoría, la parseamos aquí.
-        category: map['categories'] != null ? Category.fromMap(map['categories']) : null,
-        notesContent: map['notes_content'],
-        savingsFrequency: GoalSavingsFrequency.fromString(map['savings_frequency'] as String?),
-        savingsDayOfWeek: map['savings_day_of_week'] as int?,
+        category:   map['categories'] != null
+            ? Category.fromMap(map['categories'] as Map<String, dynamic>)
+            : null,
+        notesContent:     map['notes_content'],
+        savingsFrequency: GoalSavingsFrequency.fromString(
+            map['savings_frequency'] as String?),
+        savingsDayOfWeek:  map['savings_day_of_week']  as int?,
         savingsDayOfMonth: map['savings_day_of_month'] as int?,
         savingsAmount: (map['savings_amount'] as num?)?.toDouble(),
-        nextReminderDate: map['next_reminder_date'] != null ? DateTime.parse(map['next_reminder_date'] as String) : null,
-        lastContributionDate: map['last_contribution_date'] != null ? DateTime.parse(map['last_contribution_date'] as String) : null,
+        nextReminderDate: map['next_reminder_date'] != null
+            ? DateTime.parse(map['next_reminder_date'] as String)
+            : null,
+        lastContributionDate: map['last_contribution_date'] != null
+            ? DateTime.parse(map['last_contribution_date'] as String)
+            : null,
+        // Nuevos campos — con fallback al default 9:00 si la columna aún no existe
+        notificationHour:   map['notification_hour']   as int? ?? 9,
+        notificationMinute: map['notification_minute'] as int? ?? 0,
       );
     } catch (e) {
       throw FormatException('Error al parsear Goal: $e', map);
     }
   }
-  
-  // 4. Método `copyWith` para crear copias modificadas.
+
+  // ── copyWith con sentinel para campos nullables ───────────────────────────
+  // Los campos marcados como Object? con default _kUnset pueden recibir null
+  // explícitamente y el método lo diferencia de "no se pasó nada".
   Goal copyWith({
     String? id,
     String? userId,
     String? name,
     double? targetAmount,
     double? currentAmount,
-    DateTime? targetDate,
+    Object? targetDate              = _kUnset,
     DateTime? createdAt,
     GoalStatus? status,
-    String? iconName,
+    Object? iconName                = _kUnset,
     GoalTimeframe? timeframe,
     GoalPriority? priority,
-    String? categoryId,
-    Category? category,
-    dynamic notesContent,
-    GoalSavingsFrequency? savingsFrequency,
-    int? savingsDayOfWeek,
-    int? savingsDayOfMonth,
-    double? savingsAmount,
-    DateTime? nextReminderDate,
-    DateTime? lastContributionDate,
+    Object? categoryId              = _kUnset,
+    Object? category                = _kUnset,
+    Object? notesContent            = _kUnset,
+    Object? savingsFrequency        = _kUnset,   // puede ponerse en null
+    Object? savingsDayOfWeek        = _kUnset,
+    Object? savingsDayOfMonth       = _kUnset,
+    Object? savingsAmount           = _kUnset,
+    Object? nextReminderDate        = _kUnset,
+    Object? lastContributionDate    = _kUnset,
+    int? notificationHour,
+    int? notificationMinute,
   }) {
     return Goal(
-      id: id ?? this.id,
-      userId: userId ?? this.userId,
-      name: name ?? this.name,
-      targetAmount: targetAmount ?? this.targetAmount,
+      id:            id            ?? this.id,
+      userId:        userId        ?? this.userId,
+      name:          name          ?? this.name,
+      targetAmount:  targetAmount  ?? this.targetAmount,
       currentAmount: currentAmount ?? this.currentAmount,
-      targetDate: targetDate ?? this.targetDate,
-      createdAt: createdAt ?? this.createdAt,
-      status: status ?? this.status,
-      iconName: iconName ?? this.iconName,
-      timeframe: timeframe ?? this.timeframe,
-      priority: priority ?? this.priority,
-      categoryId: categoryId ?? this.categoryId,
-      category: category ?? this.category,
-      notesContent: notesContent ?? this.notesContent,
-      savingsFrequency: savingsFrequency ?? this.savingsFrequency,
-      savingsDayOfWeek: savingsDayOfWeek ?? this.savingsDayOfWeek,
-      savingsDayOfMonth: savingsDayOfMonth ?? this.savingsDayOfMonth,
-      savingsAmount: savingsAmount ?? this.savingsAmount,
-      nextReminderDate: nextReminderDate ?? this.nextReminderDate,
+      targetDate:    targetDate    == _kUnset
+          ? this.targetDate   : targetDate   as DateTime?,
+      createdAt:     createdAt     ?? this.createdAt,
+      status:        status        ?? this.status,
+      iconName:      iconName      == _kUnset
+          ? this.iconName     : iconName     as String?,
+      timeframe:     timeframe     ?? this.timeframe,
+      priority:      priority      ?? this.priority,
+      categoryId:    categoryId    == _kUnset
+          ? this.categoryId   : categoryId   as String?,
+      category:      category      == _kUnset
+          ? this.category     : category     as Category?,
+      notesContent:  notesContent  == _kUnset
+          ? this.notesContent : notesContent,
+      savingsFrequency: savingsFrequency == _kUnset
+          ? this.savingsFrequency
+          : savingsFrequency as GoalSavingsFrequency?,
+      savingsDayOfWeek: savingsDayOfWeek == _kUnset
+          ? this.savingsDayOfWeek  : savingsDayOfWeek  as int?,
+      savingsDayOfMonth: savingsDayOfMonth == _kUnset
+          ? this.savingsDayOfMonth : savingsDayOfMonth as int?,
+      savingsAmount: savingsAmount == _kUnset
+          ? this.savingsAmount : savingsAmount as double?,
+      nextReminderDate: nextReminderDate == _kUnset
+          ? this.nextReminderDate : nextReminderDate as DateTime?,
+      lastContributionDate: lastContributionDate == _kUnset
+          ? this.lastContributionDate : lastContributionDate as DateTime?,
+      notificationHour:   notificationHour   ?? this.notificationHour,
+      notificationMinute: notificationMinute ?? this.notificationMinute,
     );
   }
 
-  // Los getters computados son una excelente práctica.
-  double get progress => (currentAmount > 0 && targetAmount > 0) 
-      ? (currentAmount / targetAmount).clamp(0.0, 1.0) 
+  // ── Getters computados ────────────────────────────────────────────────────
+
+  double get progress => (currentAmount > 0 && targetAmount > 0)
+      ? (currentAmount / targetAmount).clamp(0.0, 1.0)
       : 0.0;
 
   double get remainingAmount => targetAmount - currentAmount;
 
-  // 5. Propiedades para Equatable.
+  bool get isCompleted => currentAmount >= targetAmount;
+
   @override
   List<Object?> get props => [
-        id,
-        userId,
-        name,
-        targetAmount,
-        currentAmount,
-        targetDate,
-        createdAt,
-        status,
-        iconName,
-        timeframe,
-        priority,
-        categoryId,
-        category,
-        notesContent,
-        savingsFrequency, savingsDayOfWeek, savingsDayOfMonth,
-        savingsAmount, nextReminderDate,
-        lastContributionDate,
-      ];
+    id, userId, name, targetAmount, currentAmount,
+    targetDate, createdAt, status, iconName,
+    timeframe, priority, categoryId, category, notesContent,
+    savingsFrequency, savingsDayOfWeek, savingsDayOfMonth,
+    savingsAmount, nextReminderDate, lastContributionDate,
+    notificationHour, notificationMinute,
+  ];
 }

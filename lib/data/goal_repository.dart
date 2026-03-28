@@ -8,85 +8,65 @@ import 'package:sasper/models/goal_model.dart';
 import 'package:sasper/services/widget_service.dart';
 
 class GoalRepository {
-  // --- PATRÓN DE INICIALIZACIÓN PEREZOSA ---
-
   SupabaseClient? _supabase;
   bool _isInitialized = false;
   final _streamController = StreamController<List<Goal>>.broadcast();
   RealtimeChannel? _channel;
 
-  // Constructor privado para forzar el uso del Singleton `instance`.
   GoalRepository._internal();
   static final GoalRepository instance = GoalRepository._internal();
 
-  /// Se asegura de que el repositorio esté inicializado.
   void _ensureInitialized() {
     if (!_isInitialized) {
       _supabase = Supabase.instance.client;
       _setupRealtimeSubscription();
       _isInitialized = true;
-      developer.log('✅ GoalRepository inicializado PEREZOSAMENTE.', name: 'GoalRepository');
+      developer.log('✅ GoalRepository inicializado PEREZOSAMENTE.',
+          name: 'GoalRepository');
     }
   }
 
-  /// Getter público para el cliente de Supabase.
   SupabaseClient get client {
     _ensureInitialized();
     if (_supabase == null) {
-      throw Exception("¡ERROR FATAL! Supabase no está disponible para GoalRepository.");
+      throw Exception(
+          '¡ERROR FATAL! Supabase no está disponible para GoalRepository.');
     }
     return _supabase!;
   }
 
-  // Se elimina el método `initialize()` público.
-  // void initialize(SupabaseClient supabaseClient) { ... } // <-- ELIMINADO
+  // ── Streams y datos ───────────────────────────────────────────────────────
 
-  // --- MÉTODOS PÚBLICOS DEL REPOSITORIO ---
-
-  /// Devuelve un stream de todas las metas del usuario.
   Stream<List<Goal>> getGoalsStream() {
     _fetchAndPushData();
     return _streamController.stream;
   }
-  
-  // =================================================================
-  // NUEVO MÉTODO AÑADIDO
-  // =================================================================
-  /// Obtiene una lista de todas las metas activas del usuario una sola vez.
-  /// Perfecto para cargas iniciales o actualizaciones de widgets.
+
   Future<List<Goal>> getActiveGoals() async {
-    _ensureInitialized(); // Nos aseguramos de que el cliente de Supabase esté listo.
-    developer.log('🔄 [Repo] Obteniendo metas activas (una vez)...', name: 'GoalRepository');
+    _ensureInitialized();
     try {
       final userId = client.auth.currentUser?.id;
-      if (userId == null) {
-        developer.log('⚠️ [Repo] Intento de obtener metas sin usuario autenticado.', name: 'GoalRepository');
-        return []; // Retorna lista vacía si no hay usuario
-      }
-      
+      if (userId == null) return [];
+
       final data = await client
           .from('goals')
           .select()
           .eq('user_id', userId)
-          .eq('status', 'active') // Filtramos solo por metas activas
+          .eq('status', 'active')
           .order('target_date', ascending: true);
-          
-      final goals = (data as List).map((map) => Goal.fromMap(map)).toList();
-      developer.log('✅ [Repo] ${goals.length} metas activas obtenidas con éxito.', name: 'GoalRepository');
-      return goals;
 
+      return (data as List).map((m) => Goal.fromMap(m)).toList();
     } catch (e) {
-      developer.log('🔥 [Repo] Error obteniendo metas activas: $e', name: 'GoalRepository');
-      // En lugar de lanzar una excepción que podría romper la UI, 
-      // devolvemos una lista vacía y registramos el error.
+      developer.log('🔥 [Repo] Error obteniendo metas activas: $e',
+          name: 'GoalRepository');
       return [];
     }
   }
-  
-  /// Vuelve a cargar los datos de las metas.
+
   Future<void> refreshData() => _fetchAndPushData();
-  
-  /// Añade una nueva meta para el usuario actual.
+
+  // ── CRUD ──────────────────────────────────────────────────────────────────
+
   Future<Goal> addGoal({
     required String name,
     required double targetAmount,
@@ -100,91 +80,106 @@ class GoalRepository {
     int? savingsDayOfMonth,
     double? savingsAmount,
     DateTime? nextReminderDate,
+    // ── Nuevos parámetros de hora ──────────────────────────────────────────
+    int notificationHour   = 9,
+    int notificationMinute = 0,
   }) async {
     try {
       final userId = client.auth.currentUser!.id;
-      // --- CORRECCIÓN 2: Formato de Fecha Seguro ---
-      // toIso8601String() manda "2026-01-01T15:30:00". 
-      // Para una columna DATE, es mejor mandar "2026-01-01".
-      String? dateString;
-      if (targetDate != null) {
-        dateString = targetDate.toIso8601String().split('T')[0];
-      }
 
-      String? reminderDateString; // <--- AQUÍ ES DONDE FALTABA LA DECLARACIÓN
-      if (nextReminderDate != null) {
-        reminderDateString = nextReminderDate.toIso8601String().split('T')[0];
-      }
-      
-      final response = await client.from('goals').insert({
-        'user_id': userId,
-        'name': name,
-        'target_amount': targetAmount,
-        'current_amount': 0,
-        'status': 'active',
-        'target_date': dateString, // Usamos la fecha limpia
-        'icon_name': iconName,
-        'timeframe': timeframe.name, // Ahora enviará 'short', 'medium' o 'long'
-        'priority': priority.name,
-        'category_id': categoryId,
-        'savings_frequency': savingsFrequency?.name,
-        'savings_day_of_week': savingsDayOfWeek,
-        'savings_day_of_month': savingsDayOfMonth,
-        'savings_amount': savingsAmount,
-        'next_reminder_date': reminderDateString,
-      }).select().single();;
-      developer.log('✅ [Repo] Meta "$name" añadida con éxito.', name: 'GoalRepository');
+      // Fecha objetivo como string DATE (columna DATE en BD)
+      final dateString = targetDate != null
+          ? targetDate.toIso8601String().split('T')[0]
+          : null;
+
+      // next_reminder_date ahora es TIMESTAMPTZ — mandamos ISO completo en UTC
+      final reminderString = nextReminderDate != null
+          ? nextReminderDate.toUtc().toIso8601String()
+          : null;
+
+      final response = await client
+          .from('goals')
+          .insert({
+            'user_id':             userId,
+            'name':                name,
+            'target_amount':       targetAmount,
+            'current_amount':      0,
+            'status':              'active',
+            'target_date':         dateString,
+            'icon_name':           iconName,
+            'timeframe':           timeframe.name,
+            'priority':            priority.name,
+            'category_id':         categoryId,
+            'savings_frequency':   savingsFrequency?.name,
+            'savings_day_of_week': savingsDayOfWeek,
+            'savings_day_of_month':savingsDayOfMonth,
+            'savings_amount':      savingsAmount,
+            'next_reminder_date':  reminderString,
+            'notification_hour':   notificationHour,
+            'notification_minute': notificationMinute,
+          })
+          .select()
+          .single();
+
+      developer.log('✅ [Repo] Meta "$name" añadida.', name: 'GoalRepository');
       return Goal.fromMap(response);
     } catch (e) {
-      developer.log('🔥 [Repo] Error añadiendo meta: $e', name: 'GoalRepository');
+      developer.log('🔥 [Repo] Error añadiendo meta: $e',
+          name: 'GoalRepository');
       throw Exception('No se pudo crear la meta.');
     }
   }
 
-  /// Actualiza una meta existente.
   Future<void> updateGoal(Goal goal) async {
     try {
+      // next_reminder_date: TIMESTAMPTZ → ISO completo en UTC
+      final reminderString = goal.nextReminderDate != null
+          ? goal.nextReminderDate!.toUtc().toIso8601String()
+          : null;
+
       await client
           .from('goals')
           .update({
-            'name': goal.name,
-            'target_amount': goal.targetAmount,
-            'target_date': goal.targetDate?.toIso8601String(),
-            'icon_name': goal.iconName,
-            'timeframe': goal.timeframe.name,
-            'priority': goal.priority.name,
-            'category_id': goal.categoryId,
-            'notes_content': goal.notesContent,
-            'savings_frequency': goal.savingsFrequency?.name,
+            'name':                goal.name,
+            'target_amount':       goal.targetAmount,
+            'target_date':         goal.targetDate?.toIso8601String().split('T')[0],
+            'icon_name':           goal.iconName,
+            'timeframe':           goal.timeframe.name,
+            'priority':            goal.priority.name,
+            'category_id':         goal.categoryId,
+            'notes_content':       goal.notesContent,
+            'savings_frequency':   goal.savingsFrequency?.name,
             'savings_day_of_week': goal.savingsDayOfWeek,
-            'savings_day_of_month': goal.savingsDayOfMonth,
-            'savings_amount': goal.savingsAmount,
-            'next_reminder_date': goal.nextReminderDate?.toIso8601String().split('T').first,
+            'savings_day_of_month':goal.savingsDayOfMonth,
+            'savings_amount':      goal.savingsAmount,
+            'next_reminder_date':  reminderString,
+            'notification_hour':   goal.notificationHour,
+            'notification_minute': goal.notificationMinute,
           })
           .eq('id', goal.id);
-      developer.log('✅ [Repo] Meta actualizada con éxito.', name: 'GoalRepository');
+
+      developer.log('✅ [Repo] Meta actualizada.', name: 'GoalRepository');
     } catch (e) {
-      developer.log('🔥 [Repo] Error actualizando meta: $e', name: 'GoalRepository');
+      developer.log('🔥 [Repo] Error actualizando meta: $e',
+          name: 'GoalRepository');
       throw Exception('No se pudo actualizar la meta.');
     }
   }
-  
-  /// Llama a un RPC para eliminar una meta y sus transacciones asociadas.
+
   Future<void> deleteGoalSafely(String goalId) async {
     try {
       await client.rpc(
         'delete_goal_safely',
         params: {'goal_id_to_delete': goalId},
       );
-      // 👈 CANCELAR NOTIFICACIÓN AL BORRAR
       await NotificationService.instance.cancelGoalReminder(goalId);
     } catch (e) {
-      developer.log('🔥 [Repo] Error en RPC delete_goal_safely: $e', name: 'GoalRepository');
+      developer.log('🔥 [Repo] Error en delete_goal_safely: $e',
+          name: 'GoalRepository');
       throw Exception('No se pudo eliminar la meta.');
     }
   }
 
-  /// Llama a un RPC para registrar una contribución a una meta.
   Future<void> addContribution({
     required String goalId,
     required String accountId,
@@ -192,20 +187,20 @@ class GoalRepository {
   }) async {
     try {
       await client.rpc('add_contribution_to_goal', params: {
-        'goal_id_input': goalId,
-        'account_id_input': accountId,
-        'amount_input': amount,
+        'goal_id_input':     goalId,
+        'account_id_input':  accountId,
+        'amount_input':      amount,
       });
-      developer.log('✅ [Repo] Aportación a meta registrada con éxito.', name: 'GoalRepository');
+      developer.log('✅ [Repo] Aportación registrada.', name: 'GoalRepository');
+      await NotificationService.instance.refreshGoalSchedules();
     } catch (e) {
-      developer.log('🔥 [Repo] Error al registrar aportación: $e', name: 'GoalRepository');
+      developer.log('🔥 [Repo] Error al registrar aportación: $e',
+          name: 'GoalRepository');
       throw Exception('No se pudo realizar la aportación.');
     }
   }
 
-  /// Libera los recursos del repositorio.
   void dispose() {
-    developer.log('❌ [Repo] Liberando recursos de GoalRepository.', name: 'GoalRepository');
     if (_channel != null) {
       _supabase?.removeChannel(_channel!);
       _channel = null;
@@ -213,55 +208,48 @@ class GoalRepository {
     _streamController.close();
   }
 
-  // --- MÉTODOS PRIVADOS ---
+  // ── Privados ──────────────────────────────────────────────────────────────
 
-  /// Configura la suscripción de Realtime para la tabla de metas.
   void _setupRealtimeSubscription() {
     if (_channel != null) return;
     final userId = _supabase?.auth.currentUser?.id;
     if (userId == null) return;
 
-    developer.log('📡 [Repo-Lazy] Configurando Realtime para Metas...', name: 'GoalRepository');
     _channel = _supabase!
         .channel('public:goals')
         .onPostgresChanges(
-          event: PostgresChangeEvent.all,
+          event:  PostgresChangeEvent.all,
           schema: 'public',
-          table: 'goals',
-          filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'user_id', value: userId),
-          callback: (payload) {
-            developer.log('🔔 [Repo] Realtime (GOALS). Refrescando...', name: 'GoalRepository');
-            _fetchAndPushData();
-          },
+          table:  'goals',
+          filter: PostgresChangeFilter(
+              type:   PostgresChangeFilterType.eq,
+              column: 'user_id',
+              value:  userId),
+          callback: (_) => _fetchAndPushData(),
         )
         .subscribe();
   }
-  
-  /// Carga todas las metas y las emite en el stream.
+
   Future<void> _fetchAndPushData() async {
-    developer.log('🔄 [Repo] Obteniendo todas las metas...', name: 'GoalRepository');
     try {
       final userId = client.auth.currentUser?.id;
-      if (userId == null) throw Exception("Usuario no autenticado");
-      
+      if (userId == null) throw Exception('Usuario no autenticado');
+
       final data = await client
           .from('goals')
-          // --- CONSULTA MODIFICADA ---
-          // Le decimos a Supabase que traiga todos los campos de 'goals'
-          // Y también los campos de la tabla 'categories' relacionada.
-          .select('*, categories(*)') 
+          .select('*, categories(*)')
           .eq('user_id', userId)
           .order('target_date', ascending: true);
-          
-      final goals = (data as List).map((map) => Goal.fromMap(map)).toList();
-      
+
+      final goals = (data as List).map((m) => Goal.fromMap(m)).toList();
+
       if (!_streamController.isClosed) {
         _streamController.add(goals);
-        developer.log('✅ [Repo] ${goals.length} metas enviadas al stream.', name: 'GoalRepository');
-        WidgetService.updateGoalsWidget(); // Notificar al widget
+        WidgetService.updateGoalsWidget();
       }
     } catch (e) {
-      developer.log('🔥 [Repo] Error obteniendo metas: $e', name: 'GoalRepository');
+      developer.log('🔥 [Repo] Error obteniendo metas: $e',
+          name: 'GoalRepository');
       if (!_streamController.isClosed) {
         _streamController.addError(e);
       }

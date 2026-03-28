@@ -75,6 +75,20 @@ Future<void> main() async {
     firebaseMessaging: messaging,
   );
 
+   // Esto escuchará los cambios de sesión y guardará el user_id para el Worker
+  supabase.auth.onAuthStateChange.listen((data) async {
+    final prefs = await SharedPreferences.getInstance();
+    final session = data.session;
+    if (session != null) {
+      // Guardar ID al iniciar sesión o abrir la app logueado
+      await prefs.setString('user_id', session.user.id);
+      developer.log('🔑 user_id guardado en SharedPreferences para el Worker', name: 'Auth');
+    } else {
+      // Borrar ID al cerrar sesión para que el Worker no haga nada
+      await prefs.remove('user_id');
+    }
+  });
+  
   // 5. 🔄 REGISTRO DE SEGUNDO PLANO
   HomeWidget.registerBackgroundCallback(hw.homeWidgetBackgroundCallback);
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
