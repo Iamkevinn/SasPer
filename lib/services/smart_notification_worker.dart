@@ -164,8 +164,15 @@ Future<void> _runGoalIntelligence(
       'p_user_id': userId,
       'client_date': DateFormat('yyyy-MM-dd').format(DateTime.now())
     });
-    if (catResponse is List && catResponse.isNotEmpty)
-      topCategoryName = catResponse.first['category'] as String?;
+    if (catResponse is List && catResponse.isNotEmpty) {
+      final sorted = List<Map<String, dynamic>>.from(catResponse);
+      sorted.sort((a, b) {
+        final aAmt = ((a['total_spent'] as num?) ?? 0).toDouble().abs();
+        final bAmt = ((b['total_spent'] as num?) ?? 0).toDouble().abs();
+        return bAmt.compareTo(aAmt); // descendente
+      });
+      topCategoryName = sorted.first['category'] as String?;
+    }
   } catch (_) {}
 
   final nowTz = tz.TZDateTime.now(tz.local);
@@ -273,22 +280,21 @@ Future<void> _runGoalIntelligence(
 
 // ── ESCENARIO 2 (El Olvidadizo) ──
     if (isBehind && !esDiaDeAhorro) {
-      
       // NUEVO: El candado se adapta a la frecuencia de la meta
       String dedupReajuste;
-      
+
       if (goal.savingsFrequency == GoalSavingsFrequency.monthly) {
         // Candado MENSUAL (Solo suena 1 vez al mes)
         dedupReajuste = 'reajuste_${goal.id}_${nowTz.year}_${nowTz.month}';
-        
       } else if (goal.savingsFrequency == GoalSavingsFrequency.weekly) {
         // Candado SEMANAL (Solo suena 1 vez por semana. Dividimos el día entre 7 para saber en qué semana del mes estamos)
         int weekOfMonth = (nowTz.day / 7).ceil();
-        dedupReajuste = 'reajuste_${goal.id}_${nowTz.year}_${nowTz.month}_sem$weekOfMonth';
-        
+        dedupReajuste =
+            'reajuste_${goal.id}_${nowTz.year}_${nowTz.month}_sem$weekOfMonth';
       } else {
         // Candado DIARIO (Suena todos los días)
-        dedupReajuste = 'reajuste_${goal.id}_${nowTz.year}_${nowTz.month}_${nowTz.day}';
+        dedupReajuste =
+            'reajuste_${goal.id}_${nowTz.year}_${nowTz.month}_${nowTz.day}';
       }
 
       if (prefs.getBool(dedupReajuste) != true) {
@@ -306,7 +312,7 @@ Future<void> _runGoalIntelligence(
                     importance: Importance.max,
                     priority: Priority.high,
                     styleInformation: BigTextStyleInformation(body),
-                    actions: const[
+                    actions: const [
                       AndroidNotificationAction(
                           'AHORRAR_AHORA', 'Ahorrar ahora 💰',
                           showsUserInterface: true)
@@ -327,7 +333,8 @@ Future<void> _runGoalIntelligence(
 
       // Dependiendo de tu historial, te felicita o te invita a retomar el ritmo
       if (missedLastPeriod || isBehind) {
-        body = 'Es hora de retomar el ritmo. Tu cuota reajustada es $amountStr.$extraHint';
+        body =
+            'Es hora de retomar el ritmo. Tu cuota reajustada es $amountStr.$extraHint';
       } else {
         body = '¡Vas excelente! Tu cuota es $amountStr.$extraHint';
       }
@@ -339,7 +346,7 @@ Future<void> _runGoalIntelligence(
               importance: Importance.max,
               priority: Priority.high,
               styleInformation: BigTextStyleInformation(body),
-              actions: const[
+              actions: const [
                 AndroidNotificationAction('AHORRAR_AHORA', 'Ahorrar ahora 💰',
                     showsUserInterface: true)
               ]),
@@ -362,8 +369,11 @@ Future<void> _runGoalIntelligence(
 // =============================================================================
 //  TAREA 2: INTELIGENCIA DE FIN DE MES (Sin cambios)
 // =============================================================================
-Future<void> _runEndOfMonthIntelligence(SupabaseClient client,
-    FlutterLocalNotificationsPlugin localNotifier, String userId, SharedPreferences prefs) async {
+Future<void> _runEndOfMonthIntelligence(
+    SupabaseClient client,
+    FlutterLocalNotificationsPlugin localNotifier,
+    String userId,
+    SharedPreferences prefs) async {
   final now = DateTime.now();
   final lastDay = DateTime(now.year, now.month + 1, 0).day;
   final daysRemaining = lastDay - now.day;
@@ -424,7 +434,6 @@ Future<void> _runSurplusAnalysis(
   } catch (_) {}
 }
 
-
 Future<void> _runTopExpensesAnalysis(
     SupabaseClient client,
     FlutterLocalNotificationsPlugin localNotifier,
@@ -458,10 +467,12 @@ Future<void> _runTopExpensesAnalysis(
         0x70E52A11,
         '📊 Resumen: ${DateFormat('MMMM', 'es_CO').format(now)}',
         body,
-        const NotificationDetails(
+         NotificationDetails(
             android: AndroidNotificationDetails(
                 'goal_reminders_channel', 'Recordatorios de Metas',
-                importance: Importance.max, priority: Priority.high),
+                importance: Importance.max,
+                priority: Priority.high,
+                styleInformation: BigTextStyleInformation(body)),
             iOS: DarwinNotificationDetails(
                 presentAlert: true, presentSound: true)));
   } catch (_) {}
