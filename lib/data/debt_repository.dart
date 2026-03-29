@@ -53,6 +53,39 @@ class DebtRepository {
     }
   }
 
+  Future<void> addSplitDebts({
+    required String concept,
+    required List<String> friends,
+    required double amountPerPerson,
+  }) async {
+    developer.log('🍕 [Repo] Creando cuenta dividida para ${friends.length} amigos...', name: 'DebtRepository');
+    try {
+      final userId = client.auth.currentUser!.id;
+      
+      // Creamos una lista de mapas para insertarlos todos de un solo golpe
+      final debtsToInsert = friends.map((friend) => {
+        'user_id': userId,
+        'name': concept,
+        'type': DebtType.loan.name, // 'loan' significa "Me deben"
+        'entity_name': friend,
+        'initial_amount': amountPerPerson,
+        'current_balance': amountPerPerson,
+        'impact_type': DebtImpactType.direct.name, // 👈 EL TRUCO: No toca saldos bancarios
+        'status': DebtStatus.active.name,
+        'created_at': DateTime.now().toIso8601String(),
+        'spending_fund': 0.0,
+      }).toList();
+
+      await client.from('debts').insert(debtsToInsert);
+      
+      EventService.instance.fire(AppEvent.debtsChanged);
+      developer.log('✅[Repo] Cuenta dividida registrada con éxito.', name: 'DebtRepository');
+    } catch (e) {
+      developer.log('🔥 [Repo] Error en cuenta dividida: $e', name: 'DebtRepository');
+      throw Exception('No se pudo dividir la cuenta.');
+    }
+  }
+  
   Future<List<Debt>> getDebtsWithSpendingFunds() async {
     developer.log('🔍 [Repo] Buscando deudas con fondos disponibles...', name: 'DebtRepository');
     try {

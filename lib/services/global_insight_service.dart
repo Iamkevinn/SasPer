@@ -5,7 +5,6 @@ import 'package:sasper/widgets/shared/floating_insight_banner.dart';
 import 'package:sasper/screens/analysis_screen.dart';
 import 'package:sasper/main.dart'; // 👈 Importa donde esté tu navigatorKey
 import 'dart:developer' as developer;
-import 'package:sasper/services/notification_service.dart';
 
 class GlobalInsightService {
   static final instance = GlobalInsightService._();
@@ -14,7 +13,7 @@ class GlobalInsightService {
   OverlayEntry? _overlayEntry;
   bool _isListening = false;
 
-  void startListening() { // 👈 Ya no necesita context aquí
+  void startListening() { 
     if (_isListening) return;
 
     try {
@@ -35,27 +34,16 @@ class GlobalInsightService {
               value: userId,
             ),
             callback: (payload) {
-              developer.log('🧠 [EVENTO] Payload completo: $payload'); // <--- MIRA ESTO EN LA CONSOLA
+              developer.log('🧠 [EVENTO] Payload completo: $payload'); 
   
-              // payload.newRecord es el mapa que necesitas para Insight.fromMap
               final newRecord = payload.newRecord; 
               final newInsight = Insight.fromMap(newRecord);
               
-              developer.log('🧠 IA: Tipo recibido: ${newInsight.type}'); // <--- MIRA ESTO
-              // 👈 --- NUEVA LÓGICA INTELIGENTE ---
-              if (newInsight.type == InsightType.goal_saving_reminder) {
-                // Si es un recordatorio de meta, disparamos la notificación local interactiva.
-                final goalId = newInsight.metadata['goal_id'] as String? ?? '';
-                final goalName = newInsight.metadata['goal_name'] as String? ?? 'tu meta';
-                final savingsAmount = (newInsight.metadata['savings_amount'] as num? ?? 0).toDouble();
-
-                if (goalId.isNotEmpty) {
-                  _showTopBanner(newInsight); // Mostramos el banner como antes, pero también disparamos la notificación local.
-                }
-              } else {
-                // Para cualquier otro tipo de insight, mostramos el banner superior como antes.
+              developer.log('🧠 IA: Tipo recibido: ${newInsight.type}'); 
+              
+              // 👈 LÓGICA LIMPIA: Simplemente mostramos el banner in-app.
+              // El SmartWorker se encargará de las notificaciones vibratorias (push) por su cuenta.
               _showTopBanner(newInsight);
-              }
             },
           )
           .subscribe((status, error) {

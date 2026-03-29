@@ -43,6 +43,7 @@ import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/debts/debt_card.dart';
 import 'package:sasper/widgets/debts/shareable_debt_summary.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
+import 'package:sasper/screens/split_bill_screen.dart';
 
 // ── Tokens ─────────────────────────────────────────────────────────────────────
 // Coherentes con transactions_screen.dart y add_transaction_screen.dart
@@ -123,6 +124,9 @@ class _DebtsScreenState extends State<DebtsScreen>
 
   void _goAdd() => Navigator.of(context)
       .push(MaterialPageRoute(builder: (_) => const AddDebtScreen()));
+
+  void _goSplit() => Navigator.of(context)
+      .push(MaterialPageRoute(builder: (_) => const SplitBillScreen()));
 
   void _goEdit(Debt d) => Navigator.of(context)
       .push(MaterialPageRoute(builder: (_) => EditDebtScreen(debt: d)));
@@ -219,6 +223,7 @@ class _DebtsScreenState extends State<DebtsScreen>
             bg: theme.scaffoldBackgroundColor,
             tabController: _tabs,
             onAdd: _goAdd,
+            onSplit: _goSplit,
           ),
           Expanded(
             child: StreamBuilder<List<Debt>>(
@@ -291,10 +296,11 @@ class _Header extends StatelessWidget {
   final Color  bg;
   final TabController tabController;
   final VoidCallback  onAdd;
+  final VoidCallback  onSplit;
 
   const _Header({
     required this.statusBarHeight, required this.bg,
-    required this.tabController,  required this.onAdd,
+    required this.tabController,  required this.onAdd, required this.onSplit,
   });
 
   @override
@@ -329,8 +335,23 @@ class _Header extends StatelessWidget {
                             style: _T.display(28, c: onSurf)),
                       ],
                     ),
+                    ),
+                    // _PillBtn(label: 'Nuevo', icon: Iconsax.add, onTap: onAdd),
+                    // _PillBtn(label: 'Dividir Gasto', icon: Iconsax.receipt_square, onTap: onSplit),
+                    // 👈 PONEMOS LOS DOS BOTONES AQUÍ
+                  _PillBtn(
+                    label: 'Dividir', 
+                    icon: Iconsax.receipt_square, 
+                    color: _kOrange, 
+                    onTap: onSplit
                   ),
-                  _PillBtn(label: 'Nuevo', icon: Iconsax.add, onTap: onAdd),
+                  const SizedBox(width: 8),
+                  _PillBtn(
+                    label: 'Nuevo', 
+                    icon: Iconsax.add, 
+                    color: _kBlue, 
+                    onTap: onAdd
+                  ),
                 ],
               ),
               const SizedBox(height: 10),
@@ -362,8 +383,9 @@ class _Header extends StatelessWidget {
 class _PillBtn extends StatefulWidget {
   final String label;
   final IconData icon;
+  final Color color;
   final VoidCallback onTap;
-  const _PillBtn({required this.label, required this.icon, required this.onTap});
+  const _PillBtn({required this.label, required this.icon, required this.onTap, this.color = _kBlue,});
   @override
   State<_PillBtn> createState() => _PillBtnState();
 }
@@ -388,7 +410,7 @@ class _PillBtnState extends State<_PillBtn>
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              color: _kBlue,
+              color: widget.color,
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(mainAxisSize: MainAxisSize.min, children: [

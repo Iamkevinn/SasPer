@@ -567,51 +567,6 @@ Future<void> scheduleGoalReminder({
         GoalSavingsFrequency.monthly => DateTimeComponents.dayOfMonthAndTime,
       };
 
-  /// Muestra una notificación inmediata para el recordatorio de meta
-  /// Llamado por GlobalInsightService cuando llega un insight en tiempo real.
-  Future<void> showGoalSavingReminder({
-    required String goalId,
-    required String goalName,
-    required double savingsAmount,
-  }) async {
-    final fmt =
-        NumberFormat.currency(locale: 'es_CO', symbol: r'$', decimalDigits: 0);
-    final amountString = fmt.format(savingsAmount);
-
-    final payload = jsonEncode({
-      'type': NotificationPayloadType.goalReminder,
-      'goal_id': goalId,
-    });
-
-    // Usamos el ID estable pero le sumamos 1000 para que sea único
-    // y no sobrescriba ni cancele la alarma exacta ya programada.
-    final notifId = _stableGoalNotifId(goalId) + 1000;
-
-    await _localNotifier.show(
-      notifId,
-      '✨ Recordatorio de tu meta',
-      '¡No olvides aportar $amountString para "$goalName"!',
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          'goal_reminders_channel',
-          'Recordatorios de Metas',
-          importance: Importance.max,
-          priority: Priority.high,
-          actions: const [
-            AndroidNotificationAction(
-              'AHORRAR_AHORA',
-              'Ahorrar ahora 💰',
-              showsUserInterface: true,
-            ),
-          ],
-        ),
-        iOS: const DarwinNotificationDetails(
-            presentAlert: true, presentSound: true),
-      ),
-      payload: payload,
-    );
-  }
-
   // ── Pagos recurrentes — lógica interna ───────────────────────────────────
 
   Future<void> _scheduleRemindersForTransaction(RecurringTransaction tx) async {

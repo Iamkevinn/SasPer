@@ -20,13 +20,14 @@ import 'package:sasper/data/category_repository.dart';
 import 'package:sasper/models/category_model.dart';
 import 'package:sasper/services/event_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
-import 'package:sasper/utils/credit_card_engine.dart'; // <--- EL MOTOR DE TARJETAS
+import 'package:sasper/utils/credit_card_engine.dart'; 
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'dart:developer' as developer;
 import 'package:sasper/screens/place_search_screen.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:sasper/data/goal_repository.dart'; 
 import 'package:sasper/models/goal_model.dart';    
+import 'package:sasper/screens/split_bill_screen.dart'; // 👈 IMPORTAMOS LA NUEVA PANTALLA
 
 // ─── DESIGN TOKENS DINÁMICOS ──────────────────────────────────────────────────
 
@@ -107,11 +108,13 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
   bool     _isFetchingLocation = false;
   bool     _amountHasValue     = false;
   Debt?    _smartSuggestion;
-  int _interestFreeCount = 1; // Por defecto 1 cuota siempre es sin interés
-
+  int _interestFreeCount = 1; 
 
   int _installments = 1; 
   bool get _isCreditCard => _selectedAccount?.type == 'Tarjeta de Crédito';
+
+  // 👈 NUEVO: Estado para el puente hacia la pantalla de Split Bill
+  bool _splitBill = false;
 
   Account? _selectedAccount;
   Debt?    _selectedFundSource;
@@ -155,12 +158,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     });
   }
 
-  // --- LÓGICA DE TARJETAS INTELIGENTE ---
-
   String? _getCreditCardAdvice() {
     if (!_isCreditCard || _selectedAccount?.closingDay == null || _selectedAccount?.dueDay == null) return null;
     
-    // Usamos el motor para saber exactamente en qué factura cae esta compra
     final nextPayment = CreditCardEngine.getNextBillingDate(
       _selectedDate, 
       _selectedAccount!.closingDay!, 
@@ -170,8 +170,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     final formatter = DateFormat.MMMMd('es_CO');
     return "💡 Tip IA: Si registras esta compra hoy, entrará en tu factura para pagar el ${formatter.format(nextPayment)}.";
   }
-
-  // ---------------------------------------
 
   Future<void> _loadAvailableFunds() async {
     try {
@@ -249,7 +247,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
   bool  get _isExpense   => _transactionType == 'Gasto';
   Color get _typeColor   => _isExpense ? _T.expenseColor : _T.incomeColor;
 
-  // Modales de Selección (Account / Fund / Date / Geolocation omitidos por limpieza pero siguen igual)
   void _showAccountPicker(List<Account> accounts) {
     HapticFeedback.selectionClick();
     final fmt = NumberFormat.currency(
@@ -287,7 +284,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
             ...accounts.map((a) {
               final positive = a.balance >= 0;
               final isSelected = _selectedAccount?.id == a.id;
-              // Para crédito, mostramos el cupo disponible real
               final displayBalance = a.type == 'Tarjeta de Crédito' ? a.availableBalance : a.balance;
               
               return GestureDetector(
@@ -494,7 +490,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
 
     try {
       if (_selectedFundSource != null && _isExpense) {
-        // Uso de fondos de préstamo
         await _debtRepo.addTransactionFromDebtFund(
           accountId: _selectedAccount!.id,
           amount: amount.abs(),
@@ -506,7 +501,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
           transactionDate: _selectedDate,
         );
       } 
-      // --- MAGIA: SI ES UNA COMPRA CON TARJETA DE CRÉDITO ---
       else if (_isCreditCard && _isExpense) {
         await _txRepo.addCreditCardPurchase(
           accountId: _selectedAccount!.id,
@@ -517,7 +511,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
           isInterestFree:  _interestFreeCount == _installments ,
         );
       } 
-      // Transacción normal (Débito/Efectivo/Ingreso)
       else {
         await _txRepo.addTransaction(
           accountId: _selectedAccount!.id,
@@ -531,32 +524,49 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
           locationName: _selectedLocationName,
           latitude: _selectedLat,
           longitude: _selectedLng,
-          // Ya no mandamos los datos de cuotas por aquí porque el RPC lo maneja.
         );
       }
 
       if (mounted) {
         HapticFeedback.heavyImpact();
         EventService.instance.fire(AppEvent.transactionCreated);
-        
-        // Actualizamos las cuentas globalmente
         EventService.instance.fire(AppEvent.accountsChanged);
-        
         if (_selectedFundSource != null) {
           EventService.instance.fire(AppEvent.debtsChanged);
         }
         
-        // Lógica de Metas sugeridas (No aplica para crédito para no endudar a la gente para ahorrar)
         final topGoal = _getTopPriorityGoal();
         final suggestedAmount = math.min(
           amount.abs() * 0.10, 
           topGoal != null ? topGoal.targetAmount - topGoal.currentAmount : 0.0
         );
 
-        if (!_isCreditCard && _isExpense && topGoal != null && suggestedAmount >= 1000 && (_selectedAccount!.availableBalance - amount.abs()) >= suggestedAmount) {
+        // 👈 LÓGICA DE NAVEGACIÓN Y CONTINUACIÓN INCONSÚTIL
+        if (_splitBill) {
+          setState(() => _isLoading = false);
+          
+          // Calculamos un buen concepto para la deuda
+          final concept = _descriptionController.text.trim().isNotEmpty 
+              ? _descriptionController.text.trim() 
+              : _selectedCategory?.name ?? 'Gasto compartido';
+              
+          // Viajamos a SplitBillScreen reemplazando la pantalla actual.
+          // Así, cuando el usuario le dé a "Guardar" en la división,
+          // la app lo devolverá limpio al Dashboard.
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => SplitBillScreen(
+                initialAmount: amount.abs(),
+                initialConcept: concept,
+              ),
+            ),
+          );
+        } 
+        else if (!_isCreditCard && _isExpense && topGoal != null && suggestedAmount >= 1000 && (_selectedAccount!.availableBalance - amount.abs()) >= suggestedAmount) {
            setState(() => _isLoading = false);
            _showSmartGoalSuggestion(topGoal, suggestedAmount, _selectedAccount!.id);
-        } else {
+        } 
+        else {
            Navigator.of(context).pop(true);
            NotificationHelper.show(message: 'Transacción guardada', type: NotificationType.success);
         }
@@ -567,7 +577,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
         NotificationHelper.show(message: 'Error al guardar', type: NotificationType.error);
       }
     } finally {
-      if (mounted && _isLoading) setState(() => _isLoading = false);
+      if (mounted && _isLoading && !_splitBill) setState(() => _isLoading = false);
     }
   }
 
@@ -583,7 +593,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     });
     return incomplete.first;
   }
-
+  
   Future<void> _getCurrentLocation() async {
     setState(() => _isFetchingLocation = true);
     HapticFeedback.lightImpact();
@@ -725,6 +735,13 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                       _FadeSlide(delay: 280, child: _buildDescriptionSection()),
                       const SizedBox(height: _T.md),
                       _FadeSlide(delay: 320, child: _buildLocationSection()),
+                      
+                      // 👈 NUEVO MÓDULO: PUENTE A DIVIDIR CUENTA
+                      if (_isExpense) ...[
+                        const SizedBox(height: _T.md),
+                        _FadeSlide(delay: 340, child: _buildSplitBillSection()),
+                      ],
+                      
                       const SizedBox(height: _T.xl),
                       _FadeSlide(delay: 380, child: _buildSaveButton()),
                       const SizedBox(height: 100),
@@ -735,6 +752,47 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  // 👈 NUEVO WIDGET: EL TOGGLE PARA DIVIDIR
+  Widget _buildSplitBillSection() {
+    return _Section(
+      label: 'Cuentas Compartidas',
+      child: _TappableRow(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          setState(() => _splitBill = !_splitBill);
+        },
+        child: Row(children:[
+          Container(
+            width: 36, height: 36,
+            decoration: BoxDecoration(
+              color: _splitBill ? _T.debtColor.withOpacity(0.15) : _T.surfaceHighest(context),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(Iconsax.receipt_square, size: 18, color: _splitBill ? _T.debtColor : _T.textSecondary(context)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children:[
+                Text('Dividir gasto', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: _T.textPrimary(context))),
+                Text('Compartir con amigos', style: TextStyle(fontSize: 12, color: _T.textSecondary(context))),
+              ],
+            ),
+          ),
+          Switch.adaptive(
+            value: _splitBill,
+            activeColor: _T.debtColor,
+            onChanged: (val) {
+              HapticFeedback.selectionClick();
+              setState(() => _splitBill = val);
+            },
+          ),
+        ]),
       ),
     );
   }
@@ -759,13 +817,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     );
   }
 
-Widget _buildInstallmentSection() {
+  Widget _buildInstallmentSection() {
     final amount = double.tryParse(_amountController.text.trim().replaceAll(',', '.')) ?? 0.0;
     final ea = _selectedAccount!.interestRate;
     
-    // Asegurarnos de que no haya más cuotas libres que cuotas totales
     if (_interestFreeCount > _installments) _interestFreeCount = _installments;
-    // Si es a 1 cuota, forzamos que sea 1 cuota libre
     if (_installments == 1) _interestFreeCount = 1;
 
     final monthlyQuota = CreditCardEngine.calculateMonthlyInstallment(
@@ -845,7 +901,6 @@ Widget _buildInstallmentSection() {
                       ],
                     ),
                   ),
-                  // Selector + y -
                   Container(
                     decoration: BoxDecoration(
                       color: _T.surfaceHighest(context),
@@ -937,6 +992,7 @@ Widget _buildInstallmentSection() {
       ),
     );
   }
+
   Widget _buildAmountHero() {
     return _FadeSlide(
       delay: 0,
@@ -1230,7 +1286,6 @@ Widget _buildInstallmentSection() {
           final acc = _selectedAccount;
           final positive = acc == null || acc.balance >= 0;
 
-          // Para crédito, mostramos el cupo disponible en la UI, no la deuda
           final displayBalance = acc?.type == 'Tarjeta de Crédito' ? acc!.availableBalance : (acc?.balance ?? 0.0);
 
           return _TappableRow(
@@ -1483,6 +1538,14 @@ Widget _buildInstallmentSection() {
     );
   }
 
+  // 👈 NUEVO: Lógica dinámica para el texto del botón
+  String get _saveButtonText {
+    if (_splitBill) return 'Registrar y Dividir';
+    if (_isCreditCard && _isExpense) return 'Registrar Compra';
+    if (_isExpense) return 'Registrar gasto';
+    return 'Registrar ingreso';
+  }
+
   Widget _buildSaveButton() {
     return GestureDetector(
       onTap: _isLoading ? null : _saveTransaction,
@@ -1491,11 +1554,11 @@ Widget _buildInstallmentSection() {
         curve: _T.curve,
         height: 54,
         decoration: BoxDecoration(
-          color: _isCreditCard ? _T.debtColor : _typeColor,
+          color: _splitBill ? _T.debtColor : (_isCreditCard ? _T.debtColor : _typeColor),
           borderRadius: BorderRadius.circular(_T.rMD),
           boxShadow:[
             BoxShadow(
-              color: (_isCreditCard ? _T.debtColor : _typeColor).withOpacity(0.25),
+              color: (_splitBill ? _T.debtColor : (_isCreditCard ? _T.debtColor : _typeColor)).withOpacity(0.25),
               blurRadius: 20,
               offset: const Offset(0, 6),
             ),
@@ -1512,10 +1575,8 @@ Widget _buildInstallmentSection() {
                       strokeWidth: 1.8, color: Colors.white),
                 )
               : Text(
-                  key: ValueKey('$_transactionType${_isCreditCard ? 'credit' : ''}'),
-                  _isCreditCard && _isExpense 
-                      ? 'Registrar Compra' 
-                      : _isExpense ? 'Registrar gasto' : 'Registrar ingreso',
+                  key: ValueKey('$_transactionType${_isCreditCard ? 'credit' : ''}$_splitBill'),
+                  _saveButtonText,
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 16,
