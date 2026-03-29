@@ -1379,6 +1379,7 @@ class _AccountTile extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true, 
       builder: (_) => _AccountSheet(
           accounts: accounts, accent: accent, c: c, onSelect: onSelect),
     );
@@ -1481,37 +1482,48 @@ class _ImpactSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final opts = [
+    final opts =[
       (
         type: DebtImpactType.liquid,
         icon: Iconsax.wallet_add_1,
         title: debtType == DebtType.debt
-            ? 'Entró a mi cuenta' : 'Salió de mi cuenta',
-        sub: 'Afecta el saldo disponible',
+            ? 'Entró a mi cuenta' : 'Transferí el dinero',
+        sub: debtType == DebtType.debt
+            ? 'Suma el dinero a mi saldo disponible' : 'Resta el dinero de mi saldo bancario',
       ),
       (
         type: DebtImpactType.restricted,
         icon: Iconsax.lock_1,
-        title: 'Propósito fijo',
-        sub: 'El dinero tiene un destino reservado',
+        title: debtType == DebtType.debt
+            ? 'Bolsa Virtual (Propósito fijo)' : 'Préstamo condicionado',
+        sub: debtType == DebtType.debt
+            ? 'El dinero entra pero se reserva para no gastarlo por error' 
+            : 'El dinero sale de mi cuenta para un fin específico',
       ),
       (
         type: DebtImpactType.direct,
-        icon: Iconsax.cards,
+        icon: Iconsax.box,
         title: debtType == DebtType.debt
-            ? 'Alguien pagó por mí' : 'Pagué por alguien',
-        sub: 'El dinero no pasó por mis cuentas',
+            ? 'Alguien pagó por mí' : 'Acuerdo o Venta',
+        sub: debtType == DebtType.debt
+            ? 'El dinero nunca entró a mis cuentas. No afecta mi saldo' 
+            : 'Ej: Vendí un celular. NO resta dinero de mis cuentas', // 👈 ¡Justo lo que querías!
       ),
     ];
 
+    // Ocultamos la bolsa virtual si es un préstamo que tú haces (para no confundir)
+    final visibleOpts = debtType == DebtType.loan 
+        ? opts.where((opt) => opt.type != DebtImpactType.restricted).toList() 
+        : opts;
+
     return Column(
-      children: opts.asMap().entries.map((e) {
+      children: visibleOpts.asMap().entries.map((e) {
         final i   = e.key;
         final opt = e.value;
         final sel = selected == opt.type;
 
         return Padding(
-          padding: EdgeInsets.only(bottom: i < opts.length - 1 ? _C.sm : 0),
+          padding: EdgeInsets.only(bottom: i < visibleOpts.length - 1 ? _C.sm : 0),
           child: _ScaleBtn(
             onTap: () => onChanged(opt.type),
             child: AnimatedContainer(
@@ -1528,13 +1540,8 @@ class _ImpactSelector extends StatelessWidget {
                       : c.sep.withOpacity(0.40),
                   width: sel ? 1.2 : 0.5,
                 ),
-                boxShadow: [
-                  BoxShadow(
-                      color: Colors.black.withOpacity(c.isDark ? 0.14 : 0.03),
-                      blurRadius: 5, offset: const Offset(0, 1)),
-                ],
               ),
-              child: Row(children: [
+              child: Row(children:[
                 Container(
                   width: 36, height: 36,
                   decoration: BoxDecoration(
@@ -1550,7 +1557,7 @@ class _ImpactSelector extends StatelessWidget {
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                    children:[
                       Text(opt.title,
                           style: TextStyle(
                             fontSize: 14,
@@ -1978,7 +1985,11 @@ class _AccountSheet extends StatelessWidget {
         borderRadius: const BorderRadius.vertical(
             top: Radius.circular(_C.r2XL)),
       ),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
+      // Envolvemos todo para que respete el tamaño máximo de la pantalla
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.75, // Máximo 75% de la pantalla
+      ),
+      child: Column(mainAxisSize: MainAxisSize.min, children:[
         Container(width: 36, height: 4,
             margin: const EdgeInsets.only(bottom: _C.lg),
             decoration: BoxDecoration(
@@ -1987,43 +1998,53 @@ class _AccountSheet extends StatelessWidget {
             style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700,
                 color: c.label, letterSpacing: -0.3)),
         const SizedBox(height: _C.lg),
-        ...accounts.map((acc) => Padding(
-          padding: const EdgeInsets.only(bottom: _C.sm),
-          child: _ScaleBtn(
-            onTap: () { HapticFeedback.selectionClick(); onSelect(acc); },
-            child: Container(
-              padding: const EdgeInsets.all(_C.md),
-              decoration: BoxDecoration(
-                color: c.raised,
-                borderRadius: BorderRadius.circular(_C.rXL),
-                border: Border.all(color: c.sep.withOpacity(0.3), width: 0.5),
-              ),
-              child: Row(children: [
-                Container(
-                  width: 36, height: 36,
-                  decoration: BoxDecoration(
-                      color: accent.withOpacity(c.isDark ? 0.18 : 0.09),
-                      borderRadius: BorderRadius.circular(_C.rSM)),
-                  child: Icon(acc.icon, size: 16, color: accent),
-                ),
-                const SizedBox(width: _C.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(acc.name,
-                          style: TextStyle(fontSize: 14,
-                              fontWeight: FontWeight.w700, color: c.label,
-                              letterSpacing: -0.2)),
-                      Text(compact.format(acc.balance),
-                          style: TextStyle(fontSize: 12, color: c.label3)),
-                    ],
+        
+        // 👈 AQUÍ ESTÁ LA MAGIA DEL SCROLL
+        Flexible(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: accounts.map((acc) => Padding(
+                padding: const EdgeInsets.only(bottom: _C.sm),
+                child: _ScaleBtn(
+                  onTap: () { HapticFeedback.selectionClick(); onSelect(acc); Navigator.pop(context); }, // 👈 Añadido Navigator.pop
+                  child: Container(
+                    padding: const EdgeInsets.all(_C.md),
+                    decoration: BoxDecoration(
+                      color: c.raised,
+                      borderRadius: BorderRadius.circular(_C.rXL),
+                      border: Border.all(color: c.sep.withOpacity(0.3), width: 0.5),
+                    ),
+                    child: Row(children:[
+                      Container(
+                        width: 36, height: 36,
+                        decoration: BoxDecoration(
+                            color: accent.withOpacity(c.isDark ? 0.18 : 0.09),
+                            borderRadius: BorderRadius.circular(_C.rSM)),
+                        child: Icon(acc.icon, size: 16, color: accent),
+                      ),
+                      const SizedBox(width: _C.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children:[
+                            Text(acc.name,
+                                style: TextStyle(fontSize: 14,
+                                    fontWeight: FontWeight.w700, color: c.label,
+                                    letterSpacing: -0.2)),
+                            Text(compact.format(acc.balance),
+                                style: TextStyle(fontSize: 12, color: c.label3)),
+                          ],
+                        ),
+                      ),
+                    ]),
                   ),
                 ),
-              ]),
+              )).toList(),
             ),
           ),
-        )),
+        ),
       ]),
     );
   }
