@@ -19,6 +19,8 @@ class Budget extends Equatable {
   final DateTime startDate;
   final DateTime endDate;
   final String periodicity;
+  /// Si es true, el backend puede clonar el presupuesto al vencer (p. ej. función `auto_renew_budgets`).
+  final bool autoRenew;
   final bool isActive;
   final int daysLeft;
 
@@ -30,6 +32,7 @@ class Budget extends Equatable {
     required this.startDate,
     required this.endDate,
     required this.periodicity,
+    this.autoRenew = false,
     required this.isActive,
     required this.daysLeft,
   });
@@ -74,6 +77,7 @@ class Budget extends Equatable {
       startDate: DateTime(now.year, now.month, 1),
       endDate: DateTime(now.year, now.month + 1, 0),
       periodicity: 'monthly',
+      autoRenew: false,
       isActive: true,
       daysLeft: 30,
     );
@@ -90,6 +94,7 @@ class Budget extends Equatable {
         'start_date': startDate.toIso8601String(),
         'end_date': endDate.toIso8601String(),
         'periodicity': periodicity,
+        'auto_renew': autoRenew,
         'is_active': isActive,
         'days_left': daysLeft,
       };
@@ -115,6 +120,7 @@ class Budget extends Equatable {
         startDate: startDate,
         endDate: endDate,
         periodicity: map['periodicity'] as String? ?? 'monthly', // Por defecto 'monthly'
+        autoRenew: map['auto_renew'] as bool? ?? false,
         isActive: map['is_active'] as bool? ?? (now.isAfter(startDate) && now.isBefore(endDate)), // Calcula si no viene
         daysLeft: map['days_left'] as int? ?? endDate.difference(now).inDays, // Calcula si no viene
       );
@@ -125,7 +131,8 @@ class Budget extends Equatable {
   }
 
   @override
-  List<Object?> get props => [id, category, amount, spentAmount, startDate, endDate];
+  List<Object?> get props =>
+      [id, category, amount, spentAmount, startDate, endDate, periodicity, autoRenew];
 }
 
 // Tu extensión se mantiene, es perfecta.

@@ -75,6 +75,7 @@ void smartGoalDispatcher() {
       await _runGoalIntelligence(client, localNotifier, userId, prefs);
       await runCreditCardIntelligence(client, localNotifier, userId, prefs);
       await _runEndOfMonthIntelligence(client, localNotifier, userId, prefs);
+      await client.rpc('auto_renew_budgets', params: {'p_user_id': userId});
       developer.log('✅ [SmartWorker] Tarea completada.', name: 'SmartWorker');
       return true;
     } catch (e, stack) {

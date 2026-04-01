@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:sasper/models/budget_models.dart';
 import 'package:sasper/models/transaction_models.dart';
 import 'package:sasper/services/widget_service.dart' as widget_service;
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -265,62 +266,87 @@ class TransactionRepository {
     }
   }
 
-  Future<List<Transaction>> getTransactionsForBudget(String budgetId) async {
+  /// Gastos que aplican al presupuesto: filas con `budget_id` = [budget.id],
+  /// o sin `budget_id` pero misma categoría y fecha dentro del período del presupuesto.
+  static bool transactionBelongsToBudget(Transaction t, Budget budget) {
+    if (t.budgetId != null) {
+      return t.budgetId == budget.id;
+    }
+    final cat = t.category?.trim() ?? '';
+    if (cat != budget.category.trim()) return false;
+    final ty = t.type.toLowerCase();
+    if (ty != 'gasto' && ty != 'expense') return false;
+    return _transactionDateInBudgetRange(
+        t.transactionDate, budget.startDate, budget.endDate);
+  }
+
+  static bool _transactionDateInBudgetRange(
+    DateTime tx,
+    DateTime start,
+    DateTime end,
+  ) {
+    final d = DateTime(tx.year, tx.month, tx.day);
+    final s = DateTime(start.year, start.month, start.day);
+    final e = DateTime(end.year, end.month, end.day);
+    return !d.isBefore(s) && !d.isAfter(e);
+  }
+
+  static List<Transaction> filterTransactionsForBudget(
+    List<Transaction> all,
+    Budget budget,
+  ) {
+    final out =
+        all.where((t) => transactionBelongsToBudget(t, budget)).toList();
+    out.sort((a, b) => b.transactionDate.compareTo(a.transactionDate));
+    return out;
+  }
+
+Future<List<Transaction>> getTransactionsForBudget(Budget budget) async {
     developer.log(
-        '🔄 [Repo] Obteniendo transacciones para el presupuesto ID: $budgetId',
+        '🔄 [Repo] Obteniendo transacciones para presupuesto ${budget.id} (${budget.category})',
         name: 'TransactionRepository');
     try {
-      final int budgetIdAsInt = int.parse(budgetId);
+      final userId = client.auth.currentUser?.id;
+      if (userId == null) throw Exception('Usuario no autenticado');
+
+      // Obtenemos las fechas límite del presupuesto en formato texto
+      final startStr = budget.startDate.toIso8601String().split('T')[0];
+      final endStr = budget.endDate.toIso8601String().split('T')[0];
+
+      // 🚀 EL TRUCO ESTÁ AQUÍ: Filtramos directamente en Supabase.
+      // Descargamos SOLO las transacciones de esta categoría y en este rango de fechas.
       final response = await client
           .from('transactions')
           .select()
-          .eq('budget_id', budgetIdAsInt)
+          .eq('user_id', userId)
+          .eq('category', budget.category)
+          .inFilter('type', ['Gasto', 'expense'])
+          .gte('transaction_date', startStr) // Mayor o igual a la fecha de inicio
+          .lte('transaction_date', '$endStr 23:59:59') // Menor o igual al final del día de cierre
           .order('transaction_date', ascending: false);
-      final transactions =
-          response.map((data) => Transaction.fromMap(data)).toList();
+
+      final transactions = (response as List).map((data) => Transaction.fromMap(data)).toList();
+      
       developer.log(
-          '✅ [Repo] Encontradas ${transactions.length} transacciones para el presupuesto $budgetIdAsInt.',
+          '✅ [Repo] ${transactions.length} transacciones para el presupuesto ${budget.id}.',
           name: 'TransactionRepository');
       return transactions;
-    } on FormatException {
-      developer.log(
-          '⚠️ [Repo] budgetId "$budgetId" no es un número válido. Devolviendo lista vacía.',
-          name: 'TransactionRepository');
-      return [];
     } catch (e, stackTrace) {
       developer.log(
-          '🔥 [Repo] ERROR obteniendo transacciones de presupuesto: $e',
+          '🔥[Repo] ERROR obteniendo transacciones de presupuesto: $e',
           name: 'TransactionRepository',
           error: e,
           stackTrace: stackTrace);
       throw Exception('Error al conectar con la base de datos.');
     }
   }
-
-  Stream<List<Transaction>> getTransactionsStreamForBudget(int budgetId) {
+  /// Stream reactivo de movimientos del presupuesto (misma lógica que [filterTransactionsForBudget]).
+  Stream<List<Transaction>> watchTransactionsForBudget(Budget budget) {
     developer.log(
-        '📡 [Repo] Suscribiéndose al stream de transacciones para el presupuesto ID: $budgetId',
+        '📡 [Repo] Stream de transacciones para presupuesto ${budget.id}',
         name: 'TransactionRepository');
-    try {
-      return client
-          .from('transactions')
-          .stream(primaryKey: ['id'])
-          .eq('budget_id', budgetId)
-          .order('transaction_date', ascending: false)
-          .map((listOfMaps) {
-            final transactions =
-                listOfMaps.map((data) => Transaction.fromMap(data)).toList();
-            developer.log(
-                '✅ [Repo] Stream del presupuesto $budgetId actualizado con ${transactions.length} elementos.',
-                name: 'TransactionRepository');
-            return transactions;
-          });
-    } catch (e) {
-      developer.log(
-          '🔥 [Repo] Error al crear el stream para el presupuesto $budgetId: $e',
-          name: 'TransactionRepository');
-      return Stream.value([]);
-    }
+    return getTransactionsStream()
+        .map((all) => filterTransactionsForBudget(all, budget));
   }
 
   Future<List<Transaction>> getFilteredTransactions({

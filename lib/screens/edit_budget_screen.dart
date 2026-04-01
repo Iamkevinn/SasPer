@@ -1,265 +1,269 @@
-// lib/screens/edit_budget_screen.dart (VERSIÓN COMPATIBLE CON PRESUPUESTOS FLEXIBLES)
-
+// lib/screens/edit_budget_screen.dart
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 import 'package:sasper/data/budget_repository.dart';
-import 'package:sasper/models/budget_models.dart'; // ¡Importa el nuevo modelo!
+import 'package:sasper/models/budget_models.dart';
 import 'package:sasper/services/event_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'dart:developer' as developer;
 
-// Para el selector de periodicidad
 enum Periodicity { weekly, monthly, custom }
 
-class EditBudgetScreen extends StatefulWidget {
-  // --- ¡CORRECCIÓN! Acepta el nuevo modelo `Budget` ---
-  final Budget budget;
+class _T {
+  static TextStyle display(double s, {Color? c, FontWeight w = FontWeight.w700}) => GoogleFonts.dmSans(fontSize: s, fontWeight: w, color: c, letterSpacing: -0.4, height: 1.1);
+  static TextStyle label(double s, {Color? c, FontWeight w = FontWeight.w500}) => GoogleFonts.dmSans(fontSize: s, fontWeight: w, color: c);
+  static TextStyle mono(double s, {Color? c, FontWeight w = FontWeight.w600}) => GoogleFonts.dmMono(fontSize: s, fontWeight: w, color: c);
+}
 
-  const EditBudgetScreen({
-    super.key,
-    required this.budget,
-  });
+const _kBlue = Color(0xFF0A84FF);
+const _kRed  = Color(0xFFFF453A); // 👈 FIX: Color agregado
+
+class EditBudgetScreen extends StatefulWidget {
+  final Budget budget;
+  const EditBudgetScreen({super.key, required this.budget});
 
   @override
   State<EditBudgetScreen> createState() => _EditBudgetScreenState();
 }
 
-class _EditBudgetScreenState extends State<EditBudgetScreen> {
-  final BudgetRepository _budgetRepository = BudgetRepository.instance;
-  final _formKey = GlobalKey<FormState>();
+class _EditBudgetScreenState extends State<EditBudgetScreen> with SingleTickerProviderStateMixin {
+  final _repo = BudgetRepository.instance;
+  final _amountCtrl = TextEditingController(); // 👈 El nombre correcto
   
-  // Controladores y estado de la UI
-  late final TextEditingController _amountController;
-  late Periodicity _selectedPeriodicity;
+  late Periodicity _periodicity;
   late DateTime _startDate;
   late DateTime _endDate;
-  bool _isLoading = false;
+  late bool _autoRenew;
+  bool _loading = false;
 
   @override
   void initState() {
     super.initState();
-    // Pre-poblamos el formulario con los datos del presupuesto a editar.
-    _amountController = TextEditingController(text: widget.budget.amount.toStringAsFixed(0));
+    _amountCtrl.text = widget.budget.amount.toStringAsFixed(0);
     _startDate = widget.budget.startDate;
     _endDate = widget.budget.endDate;
-    
-    // Convertimos el string de periodicidad a nuestro Enum.
-    _selectedPeriodicity = Periodicity.values.firstWhere(
-      (e) => e.name == widget.budget.periodicity,
-      orElse: () => Periodicity.custom, // Si no coincide, es personalizado.
-    );
+    _autoRenew = widget.budget.autoRenew;
+    _periodicity = Periodicity.values.firstWhere((e) => e.name == widget.budget.periodicity, orElse: () => Periodicity.custom);
   }
 
-  @override
-  void dispose() {
-    _amountController.dispose();
-    super.dispose();
-  }
-  
-  // --- LÓGICA DE UI (idéntica a AddBudgetScreen) ---
-
-  void _updatePeriodicity(Periodicity period) {
+  void _calculateDates(Periodicity p) {
     final now = DateTime.now();
     setState(() {
-      _selectedPeriodicity = period;
-      switch (period) {
-        case Periodicity.weekly:
-          _startDate = now.subtract(Duration(days: now.weekday - 1));
-          _endDate = now.add(Duration(days: DateTime.daysPerWeek - now.weekday));
-          break;
-        case Periodicity.monthly:
-          _startDate = DateTime(now.year, now.month, 1);
-          _endDate = DateTime(now.year, now.month + 1, 0);
-          break;
-        case Periodicity.custom:
-          // Mantenemos las fechas que ya tenía el presupuesto
-          _startDate = widget.budget.startDate;
-          _endDate = widget.budget.endDate;
-          break;
+      _periodicity = p;
+      if (p == Periodicity.weekly) {
+        _startDate = now.subtract(Duration(days: now.weekday - 1));
+        _endDate = now.add(Duration(days: 7 - now.weekday));
+      } else if (p == Periodicity.monthly) {
+        _startDate = DateTime(now.year, now.month, 1);
+        _endDate = DateTime(now.year, now.month + 1, 0);
+      } else {
+        _autoRenew = false;
+        _startDate = widget.budget.startDate;
+        _endDate = widget.budget.endDate;
       }
     });
   }
 
-  Future<void> _selectDate(BuildContext context, {required bool isStartDate}) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: isStartDate ? _startDate : _endDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2101),
-    );
-    if (picked != null) {
-      setState(() {
-        if (isStartDate) {
-          _startDate = picked;
-          if (_endDate.isBefore(_startDate)) {
-            _endDate = _startDate;
-          }
-        } else {
-          _endDate = picked;
-        }
-      });
-    }
-  }
-
-  // --- ¡CORRECCIÓN! Lógica de actualización ---
-  Future<void> _updateBudget() async {
-    if (!_formKey.currentState!.validate()) {
+  Future<void> _update() async {
+    FocusScope.of(context).unfocus();
+    final amount = double.tryParse(_amountCtrl.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0.0;
+    if (amount <= 0) {
+      HapticFeedback.vibrate();
+      NotificationHelper.show(message: 'Ingresa un monto válido.', type: NotificationType.error);
       return;
     }
-    setState(() => _isLoading = true);
 
+    setState(() => _loading = true);
     try {
-      // Usamos el método `updateBudget` del repositorio con todos los parámetros.
-      await _budgetRepository.updateBudget(
+      await _repo.updateBudget(
         budgetId: widget.budget.id,
-        categoryName: widget.budget.category, 
-        amount: double.parse(_amountController.text.replaceAll(',', '.')),
+        categoryName: widget.budget.category,
+        amount: amount,
         startDate: _startDate,
         endDate: _endDate,
-        periodicity: _selectedPeriodicity.name,
+        periodicity: _periodicity.name,
+        autoRenew: _periodicity != Periodicity.custom && _autoRenew,
       );
 
       if (mounted) {
+        HapticFeedback.heavyImpact();
         EventService.instance.fire(AppEvent.budgetsChanged);
-        Navigator.of(context).pop(true);
-        
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          NotificationHelper.show(message: 'Presupuesto actualizado.', type: NotificationType.success);
-        });
+        Navigator.pop(context, true);
+        NotificationHelper.show(message: 'Presupuesto actualizado', type: NotificationType.success);
       }
     } catch (e) {
-      developer.log('🔥 FALLO AL ACTUALIZAR PRESUPUESTO: $e', name: 'EditBudgetScreen');
-      if (mounted) {
-        NotificationHelper.show(message: 'Error al actualizar.', type: NotificationType.error);
-      }
+      if (mounted) NotificationHelper.show(message: 'Error al actualizar.', type: NotificationType.error);
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final onSurf = theme.colorScheme.onSurface;
+    final isDark = theme.brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF000000) : const Color(0xFFF2F2F7);
+    final surface = isDark ? const Color(0xFF1C1C1E) : Colors.white;
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Editar Presupuesto', style: GoogleFonts.poppins()),
-      ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16.0),
-          children: [
-            // Mostramos la categoría como texto no editable.
-            TextFormField(
-              initialValue: widget.budget.category,
-              enabled: false,
-              decoration: InputDecoration(
-                labelText: 'Categoría',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                prefixIcon: const Icon(Iconsax.category),
-              ),
-            ),
-            const SizedBox(height: 24),
-            _buildPeriodicitySelector(),
-            const SizedBox(height: 24),
-            if (_selectedPeriodicity == Periodicity.custom) ...[
-              _buildCustomDateSelectors(),
-              const SizedBox(height: 16),
-            ],
-            TextFormField(
-              controller: _amountController,
-              decoration: InputDecoration(
-                labelText: 'Monto del Presupuesto',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                prefixIcon: const Icon(Iconsax.money_4),
-                prefixText: '\$ ',
-              ),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              validator: (value) {
-                if (value == null || value.isEmpty) return 'Ingresa un monto';
-                final amount = double.tryParse(value.replaceAll(',', '.'));
-                if (amount == null || amount <= 0) return 'Ingresa un monto válido';
-                return null;
-              },
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _isLoading ? null : _updateBudget,
-              style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  textStyle: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      backgroundColor: bg,
+      body: Column(
+        children:[
+          // Header
+          Container(
+            padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 10, 20, 10),
+            child: Row(
+              children:[
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(color: surface, shape: BoxShape.circle),
+                    child: const Icon(Icons.arrow_back_ios_new_rounded, size: 16),
+                  ),
                 ),
-              child: _isLoading 
-                ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2)) 
-                : const Text('Actualizar Presupuesto'),
+                const SizedBox(width: 14),
+                Text('Editar presupuesto', style: _T.display(24, c: onSurf)),
+              ],
             ),
-          ],
-        ),
+          ),
+
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(20),
+              physics: const BouncingScrollPhysics(),
+              children:[
+                // Categoría ReadOnly
+                Text('CATEGORÍA', style: _T.label(11, w: FontWeight.w700, c: onSurf.withOpacity(0.4))),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(16)),
+                  child: Row(
+                    children:[
+                      Icon(Iconsax.category, size: 18, color: onSurf.withOpacity(0.5)),
+                      const SizedBox(width: 12),
+                      Text(widget.budget.category, style: _T.label(16, w: FontWeight.w600, c: onSurf)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Periodicidad
+                Text('PERIODICIDAD', style: _T.label(11, w: FontWeight.w700, c: onSurf.withOpacity(0.4))),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(color: isDark ? Colors.white10 : Colors.black12, borderRadius: BorderRadius.circular(12)),
+                  child: Row(
+                    children:[Periodicity.weekly, Periodicity.monthly, Periodicity.custom].map((p) {
+                      final sel = _periodicity == p;
+                      final label = p == Periodicity.weekly ? 'Semanal' : p == Periodicity.monthly ? 'Mensual' : 'Personaliz.';
+                      return Expanded(
+                        child: GestureDetector(
+                          onTap: () { HapticFeedback.selectionClick(); _calculateDates(p); },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(color: sel ? surface : Colors.transparent, borderRadius: BorderRadius.circular(10)),
+                            alignment: Alignment.center,
+                            child: Text(label, style: _T.label(13, w: sel ? FontWeight.w700 : FontWeight.w500, c: sel ? onSurf : onSurf.withOpacity(0.5))),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+
+                if (_periodicity == Periodicity.custom) ...[
+                  const SizedBox(height: 12),
+                  GestureDetector(
+                    onTap: () async {
+                      final picked = await showDateRangePicker(context: context, firstDate: DateTime(2020), lastDate: DateTime(2101), initialDateRange: DateTimeRange(start: _startDate, end: _endDate));
+                      if (picked != null) {
+                        setState(() { _startDate = picked.start; _endDate = picked.end; });
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(16)),
+                      child: Row(
+                        children:[
+                          const Icon(Iconsax.calendar_edit, size: 18, color: _kBlue),
+                          const SizedBox(width: 12),
+                          Expanded(child: Text('${DateFormat.yMMMd('es_CO').format(_startDate)}  →  ${DateFormat.yMMMd('es_CO').format(_endDate)}', style: _T.label(14, w: FontWeight.w600, c: onSurf))),
+                        ],
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(16)),
+                    child: SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text('Renovar automáticamente', style: _T.label(14, w: FontWeight.w600, c: onSurf)),
+                      subtitle: Text('Al terminar se clona con el mismo límite.', style: _T.label(12, c: onSurf.withOpacity(0.4))),
+                      value: _autoRenew,
+                      activeColor: _kBlue,
+                      onChanged: (v) => setState(() => _autoRenew = v),
+                    ),
+                  )
+                ],
+                const SizedBox(height: 24),
+
+                // Límite
+                Text('LÍMITE DEL PERÍODO', style: _T.label(11, w: FontWeight.w700, c: onSurf.withOpacity(0.4))),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(20)),
+                  child: Row(
+                    children:[
+                      Text('\$', style: _T.display(28, c: onSurf.withOpacity(0.3))),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _amountCtrl, // 👈 FIX: Usando el nombre correcto
+                          keyboardType: TextInputType.number,
+                          style: _T.display(40, c: onSurf),
+                          decoration: InputDecoration(border: InputBorder.none, hintText: '0', hintStyle: _T.display(40, c: onSurf.withOpacity(0.2))),
+                          onChanged: (_) => setState((){}),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          // Botón Guardar
+          Padding(
+            padding: EdgeInsets.fromLTRB(20, 10, 20, MediaQuery.of(context).padding.bottom + 20),
+            child: GestureDetector(
+              onTap: _loading ? null : _update,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                height: 56, width: double.infinity,
+                decoration: BoxDecoration(color: _kBlue, borderRadius: BorderRadius.circular(16)),
+                child: Center(
+                  child: _loading 
+                    ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
+                    : Text('Actualizar presupuesto', style: _T.label(16, w: FontWeight.w700, c: Colors.white)),
+                ),
+              ),
+            ),
+          )
+        ],
       ),
-    );
-  }
-
-  // --- WIDGETS AUXILIARES (reutilizados de AddBudgetScreen) ---
-
-  Widget _buildPeriodicitySelector() {
-    // ... (código idéntico a AddBudgetScreen)
-        return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Duración del Presupuesto', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
-        SegmentedButton<Periodicity>(
-          segments: const [
-            ButtonSegment(value: Periodicity.weekly, label: Text('Semanal'), icon: Icon(Iconsax.calendar_1, size: 18)),
-            ButtonSegment(value: Periodicity.monthly, label: Text('Mensual'), icon: Icon(Iconsax.calendar, size: 18)),
-            ButtonSegment(value: Periodicity.custom, label: Text('Otro'), icon: Icon(Iconsax.setting_4, size: 18)),
-          ],
-          selected: {_selectedPeriodicity},
-          onSelectionChanged: (newSelection) {
-            _updatePeriodicity(newSelection.first);
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCustomDateSelectors() {
-    // ... (código idéntico a AddBudgetScreen)
-    return Row(
-      children: [
-        Expanded(
-          child: InkWell(
-            onTap: () => _selectDate(context, isStartDate: true),
-            child: InputDecorator(
-              decoration: InputDecoration(
-                labelText: 'Desde',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                prefixIcon: const Icon(Iconsax.calendar_add),
-              ),
-              child: Text(DateFormat.yMd('es_CO').format(_startDate)),
-            ),
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: InkWell(
-            onTap: () => _selectDate(context, isStartDate: false),
-            child: InputDecorator(
-              decoration: InputDecoration(
-                labelText: 'Hasta',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                prefixIcon: const Icon(Iconsax.calendar_remove),
-              ),
-              child: Text(DateFormat.yMd('es_CO').format(_endDate)),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

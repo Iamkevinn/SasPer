@@ -57,6 +57,7 @@ class BudgetRepository {
     required DateTime startDate,
     required DateTime endDate,
     required String periodicity,
+    bool autoRenew = false,
   }) async {
     developer.log('💾 [Repo] Guardando presupuesto para categoría ID $categoryName', name: 'BudgetRepository');
     final userId = client.auth.currentUser!.id;
@@ -68,6 +69,7 @@ class BudgetRepository {
         'start_date': startDate.toIso8601String(),
         'end_date': endDate.toIso8601String(),
         'periodicity': periodicity,
+        'auto_renew': autoRenew,
       });
       developer.log('✅ [Repo] Presupuesto guardado con éxito.', name: 'BudgetRepository');
     } catch (e) {
@@ -84,6 +86,7 @@ class BudgetRepository {
     required DateTime startDate,
     required DateTime endDate,
     required String periodicity,
+    bool autoRenew = false,
   }) async {
     developer.log('🔄 [Repo] Actualizando presupuesto $budgetId', name: 'BudgetRepository');
     try {
@@ -94,6 +97,7 @@ class BudgetRepository {
             'start_date': startDate.toIso8601String(),
             'end_date': endDate.toIso8601String(),
             'periodicity': periodicity,
+            'auto_renew': autoRenew,
           })
           .eq('id', budgetId);
       developer.log('✅ [Repo] Presupuesto actualizado con éxito.', name: 'BudgetRepository');
@@ -221,3 +225,21 @@ class BudgetRepository {
     }
   }
 }
+
+// ── Supabase: columna y función de renovación ────────────────────────────────
+// Ejecutar en el SQL Editor si aún no existe:
+//
+// ALTER TABLE public.budgets
+//   ADD COLUMN IF NOT EXISTS auto_renew BOOLEAN NOT NULL DEFAULT false;
+//
+// Ajustar auto_renew_budgets para renovar solo filas con auto_renew = true:
+//
+//   AND end_date < CURRENT_DATE
+//   AND periodicity IN ('daily', 'weekly', 'monthly', 'yearly')
+//   AND auto_renew = true
+//
+// check_budget_status: si la tabla budgets no tiene columnas year/month,
+// conviene reemplazar el SELECT por uno que use solapes de fechas con el mes actual, p. ej.:
+//   WHERE user_id = p_user_id AND category = p_category_name
+//     AND start_date <= (date_trunc('month', now()) + interval '1 month' - interval '1 day')
+//     AND end_date >= date_trunc('month', now())

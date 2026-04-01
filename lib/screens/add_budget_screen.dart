@@ -104,6 +104,8 @@ class _AddBudgetScreenState extends State<AddBudgetScreen>
   DateTime    _startDate   = DateTime.now();
   DateTime    _endDate     = DateTime.now();
   bool        _loading     = false;
+  /// Solo aplica a periodicidad semanal o mensual (no personalizado).
+  bool        _autoRenew   = false;
 
   // Datos reales de análisis
   AnalysisData? _analysisData;
@@ -177,6 +179,7 @@ class _AddBudgetScreenState extends State<AddBudgetScreen>
           _startDate = DateTime(now.year, now.month, 1);
           _endDate   = DateTime(now.year, now.month + 1, 0);
         case Periodicity.custom:
+          _autoRenew = false;
           break; // fechas se seleccionan con datepicker
       }
     });
@@ -223,6 +226,7 @@ class _AddBudgetScreenState extends State<AddBudgetScreen>
         startDate:    _startDate,
         endDate:      _endDate,
         periodicity:  _periodicity.name,
+        autoRenew:    _periodicity != Periodicity.custom && _autoRenew,
       );
 
       if (mounted) {
@@ -377,6 +381,16 @@ class _AddBudgetScreenState extends State<AddBudgetScreen>
                               )
                             : const SizedBox.shrink(),
                       ),
+
+                      if (_periodicity != Periodicity.custom) ...[
+                        const SizedBox(height: 20),
+                        _RecurringSwitch(
+                          value: _autoRenew,
+                          onChanged: (v) =>
+                              setState(() => _autoRenew = v),
+                        ),
+                      ],
+
                       const SizedBox(height: 28),
 
                       // ── Categoría ─────────────────────────────────────
@@ -427,6 +441,51 @@ class _AddBudgetScreenState extends State<AddBudgetScreen>
           // ── Botón guardar sticky ───────────────────────────────────────
           _SaveBtn(loading: _loading, onTap: _save),
         ]),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RECURRING — presupuesto que se renueva al terminar el período (Supabase)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _RecurringSwitch extends StatelessWidget {
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _RecurringSwitch({
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final onSurf = Theme.of(context).colorScheme.onSurface;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark
+        ? Colors.white.withOpacity(0.06)
+        : Colors.black.withOpacity(0.04);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        value: value,
+        onChanged: onChanged,
+        title: Text(
+          'Renovar automáticamente',
+          style: _T.label(14, w: FontWeight.w600, c: onSurf),
+        ),
+        subtitle: Text(
+          'Al terminar el período, se crea el siguiente con el mismo límite.',
+          style: _T.label(12, c: onSurf.withOpacity(0.45)),
+        ),
+        secondary: Icon(Iconsax.refresh, color: _kBlue.withOpacity(0.85)),
       ),
     );
   }

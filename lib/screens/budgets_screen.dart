@@ -776,8 +776,7 @@ class _BudgetTileState extends State<_BudgetTile>
                               overflow: TextOverflow.ellipsis),
                         ),
                         // Badge periodicidad — sin primaryContainer Material
-                        if (b.periodicity != null &&
-                            b.periodicity!.isNotEmpty) ...[
+                        if (b.periodicity.isNotEmpty) ...[
                           const SizedBox(width: 7),
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -790,6 +789,21 @@ class _BudgetTileState extends State<_BudgetTile>
                                 style: _T.label(9,
                                     w: FontWeight.w700,
                                     c: onSurf.withOpacity(0.45))),
+                          ),
+                        ],
+                        if (b.autoRenew) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: _kBlue.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text('Recurrente',
+                                style: _T.label(9,
+                                    w: FontWeight.w700,
+                                    c: _kBlue.withOpacity(0.85))),
                           ),
                         ],
                       ]),
@@ -826,19 +840,15 @@ class _BudgetTileState extends State<_BudgetTile>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    if (b.endDate != null)
-                      Row(children: [
-                        Icon(Iconsax.calendar_1,
-                            size: 10, color: _dueDateColor(b.endDate!)),
-                        const SizedBox(width: 3),
-                        Text(
-                          'Vence ${DateFormat.yMMMd('es_CO').format(b.endDate!)}',
-                          style: _T.label(10,
-                              c: _dueDateColor(b.endDate!)),
-                        ),
-                      ])
-                    else
-                      const SizedBox(),
+                    Row(children: [
+                      Icon(Iconsax.calendar_1,
+                          size: 10, color: _dueDateColor(b.endDate)),
+                      const SizedBox(width: 3),
+                      Text(
+                        'Vence ${DateFormat.yMMMd('es_CO').format(b.endDate)}',
+                        style: _T.label(10, c: _dueDateColor(b.endDate)),
+                      ),
+                    ]),
                     Text('${(pct.clamp(0, 1) * 100).toStringAsFixed(0)}%',
                         style: _T.label(10,
                             w: FontWeight.w700, c: color)),
@@ -930,7 +940,7 @@ class _InactiveTile extends StatelessWidget {
                 style: _T.label(14,
                     c: onSurf.withOpacity(0.48), w: FontWeight.w400)),
           ),
-          if (b.periodicity != null && b.periodicity!.isNotEmpty)
+          if (b.periodicity.isNotEmpty)
             Text(_perioLabel(b.periodicity),
                 style: _T.label(10, c: onSurf.withOpacity(0.30))),
           const SizedBox(width: 8),
