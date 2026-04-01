@@ -12,6 +12,7 @@ import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:sasper/models/goal_model.dart';
+import 'package:sasper/services/credit_card_notification_intelligence.dart';
 import 'package:sasper/services/notification_service.dart'
     show NotificationPayloadType;
 
@@ -43,6 +44,18 @@ void smartGoalDispatcher() {
         iOS: DarwinInitializationSettings()));
     await initializeDateFormatting('es_CO', null);
 
+    final androidPlugin = localNotifier.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    if (androidPlugin != null) {
+      await androidPlugin.createNotificationChannel(const AndroidNotificationChannel(
+        'credit_card_assistant_channel',
+        'Asistente de tarjetas',
+        description:
+            'Alertas inteligentes sobre corte y pago de tus tarjetas.',
+        importance: Importance.max,
+      ));
+    }
+
     final prefs = await SharedPreferences.getInstance();
     final url = prefs.getString('supabase_url');
     final anonKey = prefs.getString('supabase_api_key');
@@ -60,6 +73,7 @@ void smartGoalDispatcher() {
 
     try {
       await _runGoalIntelligence(client, localNotifier, userId, prefs);
+      await runCreditCardIntelligence(client, localNotifier, userId, prefs);
       await _runEndOfMonthIntelligence(client, localNotifier, userId, prefs);
       developer.log('✅ [SmartWorker] Tarea completada.', name: 'SmartWorker');
       return true;

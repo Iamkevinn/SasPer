@@ -30,6 +30,7 @@ class NotificationPayloadType {
   static const String smartGoalReminder = 'smart_goal_reminder';
   static const String goalReminder = 'goal_reminder';
   static const String sweepSavings = 'sweep_savings_suggestion';
+  static const String creditCardAssistant = 'credit_card_assistant';
   NotificationPayloadType._();
 }
 
@@ -58,6 +59,12 @@ void onDidReceiveNotificationResponse(NotificationResponse resp) {
     if (data['type'] == NotificationPayloadType.smartGoalReminder ||
         data['type'] == NotificationPayloadType.goalReminder) {
       navigatorKey.currentState?.pushNamed('/goals');
+    } else if (data['type'] == NotificationPayloadType.creditCardAssistant) {
+      final accountId = data['account_id'] as String?;
+      if (accountId != null && accountId.isNotEmpty) {
+        navigatorKey.currentState
+            ?.pushNamed('/account_details', arguments: accountId);
+      }
     }
   } catch (e) {
     developer.log('🔥 Error leyendo payload: $e', name: 'NotificationService');
@@ -264,6 +271,14 @@ class NotificationService {
       'test_channel',
       'Pruebas',
       importance: Importance.max,
+    ),
+    AndroidNotificationChannel(
+      'credit_card_assistant_channel',
+      'Asistente de tarjetas',
+      description:
+          'Alertas inteligentes sobre corte y pago de tus tarjetas de crédito.',
+      importance: Importance.max,
+      playSound: true,
     ),
   ];
 

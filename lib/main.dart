@@ -34,6 +34,7 @@ import 'package:sasper/home_widget_callback_handler.dart' as hw;
 import 'package:sasper/screens/auth_gate.dart';
 import 'package:sasper/screens/add_transaction_screen.dart';
 import 'package:sasper/screens/goals_screen.dart';
+import 'package:sasper/screens/account_details_screen.dart';
 
 import 'package:workmanager/workmanager.dart';
 import 'package:sasper/services/smart_notification_worker.dart';
@@ -287,6 +288,11 @@ class _MyAppState extends State<MyApp> {
             '/add_transaction': (context) => const AddTransactionScreen(),
             '/goals': (context) => const GoalsScreen(),
             '/manifestations': (context) => const ManifestationsScreen(),
+            '/account_details': (context) {
+              final id = ModalRoute.of(context)?.settings.arguments;
+              final accountId = id is String ? id : '';
+              return AccountDetailsScreen(accountId: accountId);
+            },
           },
         );
       },

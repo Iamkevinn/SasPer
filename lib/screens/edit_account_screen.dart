@@ -30,6 +30,9 @@ import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:workmanager/workmanager.dart';
+
 // ── Tokens ───────────────────────────────────────────────────────────────────
 class _T {
   static TextStyle display(double s,
@@ -180,6 +183,20 @@ class _EditAccountScreenState extends State<EditAccountScreen>
         }
       );
 
+      if (updated.type == 'Tarjeta de Crédito') {
+        final prefs = await SharedPreferences.getInstance();
+        final keys = prefs.getKeys().where((k) => k.startsWith('cc_') && k.contains(updated.id));
+        for (String key in keys) {
+          await prefs.remove(key);
+        }
+        
+        Workmanager().registerOneOffTask(
+          "force_cc_check_${DateTime.now().millisecondsSinceEpoch}",
+          'smart_goal_worker',
+          initialDelay: const Duration(seconds: 3),
+        );
+      }
+      
       if (!mounted) return;
       HapticFeedback.heavyImpact();
       EventService.instance.fire(AppEvent.accountUpdated);

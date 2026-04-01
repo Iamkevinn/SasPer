@@ -41,6 +41,9 @@ import 'package:sasper/services/event_service.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:workmanager/workmanager.dart';
+
 // ── Tokens ─────────────────────────────────────────────────────────────────────
 class _T {
   static TextStyle display(double s,
@@ -193,6 +196,14 @@ class _AddAccountScreenState extends State<AddAccountScreen>
         maintenanceFee: double.tryParse(_maintenanceFeeCtrl.text),
       );
 
+      if (_selectedType == 'Tarjeta de Crédito') {
+        Workmanager().registerOneOffTask(
+          "force_cc_check_new_${DateTime.now().millisecondsSinceEpoch}",
+          'smart_goal_worker',
+          initialDelay: const Duration(seconds: 3),
+        );
+      }
+      
       if (mounted) {
         HapticFeedback.heavyImpact();
         EventService.instance.fire(AppEvent.accountCreated);
