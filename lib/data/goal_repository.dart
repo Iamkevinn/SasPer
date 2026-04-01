@@ -65,6 +65,29 @@ class GoalRepository {
 
   Future<void> refreshData() => _fetchAndPushData();
 
+  // ── NUEVA FUNCIÓN CON GAMIFICACIÓN ─────────────────────────────────────────
+  Future<Map<String, dynamic>> addContributionWithGamification({
+    required String goalId,
+    required String accountId,
+    required double amount,
+  }) async {
+    try {
+      final response = await client.rpc('process_goal_contribution', params: {
+        'p_goal_id':     goalId,
+        'p_account_id':  accountId,
+        'p_amount':      amount,
+      });
+      
+      developer.log('✅ [Repo] Aportación registrada. Gamificación: $response', name: 'GoalRepository');
+      await NotificationService.instance.refreshGoalSchedules();
+      
+      return response as Map<String, dynamic>;
+    } catch (e) {
+      developer.log('🔥 [Repo] Error al registrar aportación: $e', name: 'GoalRepository');
+      throw Exception('No se pudo realizar la aportación.');
+    }
+  }
+  
   // ── CRUD ──────────────────────────────────────────────────────────────────
 
   Future<Goal> addGoal({

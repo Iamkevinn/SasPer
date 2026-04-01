@@ -90,6 +90,9 @@ class Goal extends Equatable {
   final Category? category;
   final dynamic notesContent;
 
+  final int streakCount;
+  final int longestStreak;
+
   // Ritual de ahorro
   final GoalSavingsFrequency? savingsFrequency;
   final int? savingsDayOfWeek;
@@ -126,6 +129,9 @@ class Goal extends Equatable {
     this.lastContributionDate,
     this.notificationHour   = 9,
     this.notificationMinute = 0,
+    this.streakCount = 0,
+    this.longestStreak = 0,
+
   });
 
   factory Goal.empty() {
@@ -177,6 +183,8 @@ class Goal extends Equatable {
         // Nuevos campos — con fallback al default 9:00 si la columna aún no existe
         notificationHour:   map['notification_hour']   as int? ?? 9,
         notificationMinute: map['notification_minute'] as int? ?? 0,
+        streakCount:   map['streak_count'] as int? ?? 0,
+        longestStreak: map['longest_streak'] as int? ?? 0,
       );
     } catch (e) {
       throw FormatException('Error al parsear Goal: $e', map);
