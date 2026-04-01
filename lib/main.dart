@@ -35,6 +35,7 @@ import 'package:sasper/screens/auth_gate.dart';
 import 'package:sasper/screens/add_transaction_screen.dart';
 import 'package:sasper/screens/goals_screen.dart';
 import 'package:sasper/screens/account_details_screen.dart';
+import 'package:sasper/screens/budget_details_screen.dart';
 
 import 'package:workmanager/workmanager.dart';
 import 'package:sasper/services/smart_notification_worker.dart';
@@ -125,7 +126,7 @@ Future<void> main() async {
           ExistingPeriodicWorkPolicy.replace, // 👈 Si ya existe, no la toca
       constraints: Constraints(
         networkType: NetworkType.connected,
-        requiresBatteryNotLow: true,
+        requiresBatteryNotLow: false,
       ),
     );
 
@@ -292,6 +293,13 @@ class _MyAppState extends State<MyApp> {
               final id = ModalRoute.of(context)?.settings.arguments;
               final accountId = id is String ? id : '';
               return AccountDetailsScreen(accountId: accountId);
+            },
+            '/budget_details': (context) {
+              final id = ModalRoute.of(context)?.settings.arguments;
+              final budgetId = id is int
+                  ? id
+                  : (id is num ? id.toInt() : int.tryParse('$id') ?? 0);
+              return BudgetDetailsScreen(budgetId: budgetId);
             },
           },
         );

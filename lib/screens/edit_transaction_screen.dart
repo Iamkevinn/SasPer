@@ -37,6 +37,8 @@ import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:developer' as developer;
+import 'package:shared_preferences/shared_preferences.dart'; // Para limpiar el candado si es necesario
+import 'package:workmanager/workmanager.dart';             // Para despertar al Worker
 
 import 'package:sasper/data/account_repository.dart';
 import 'package:sasper/data/transaction_repository.dart';
@@ -171,6 +173,24 @@ class _EditTransactionScreenState extends State<EditTransactionScreen>
         longitude:       _lng,
       );
 
+      // 🌟 INICIO DEL NUEVO BLOQUE: DESPERTAR AL WORKER 🌟
+      if (_type == 'Gasto') {
+        // Opcional pero recomendado: Borramos el candado de "Riesgo" o "Acelerado" de hoy
+        // para que la app se permita reevaluarte si cambiaste el monto drásticamente.
+        final prefs = await SharedPreferences.getInstance();
+        final now = DateTime.now();
+        final keys = prefs.getKeys().where((k) => k.startsWith('bi_') && k.contains('${now.year}_${now.month}_${now.day}'));
+        for (String key in keys) {
+          await prefs.remove(key);
+        }
+
+        Workmanager().registerOneOffTask(
+          "force_budget_check_${DateTime.now().millisecondsSinceEpoch}",
+          'smart_goal_worker',
+          initialDelay: const Duration(seconds: 3),
+        );
+      }
+      
       if (!mounted) return;
       HapticFeedback.heavyImpact();
       EventService.instance.fire(AppEvent.transactionUpdated);

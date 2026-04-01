@@ -12,6 +12,7 @@ import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:sasper/models/goal_model.dart';
+import 'package:sasper/services/budget_notification_intelligence.dart';
 import 'package:sasper/services/credit_card_notification_intelligence.dart';
 import 'package:sasper/services/notification_service.dart'
     show NotificationPayloadType;
@@ -54,6 +55,13 @@ void smartGoalDispatcher() {
             'Alertas inteligentes sobre corte y pago de tus tarjetas.',
         importance: Importance.max,
       ));
+      await androidPlugin.createNotificationChannel(const AndroidNotificationChannel(
+        'smart_budget_channel',
+        'Presupuesto inteligente',
+        description:
+            'Alertas sobre tu ritmo de gasto frente al avance del período.',
+        importance: Importance.high,
+      ));
     }
 
     final prefs = await SharedPreferences.getInstance();
@@ -74,6 +82,7 @@ void smartGoalDispatcher() {
     try {
       await _runGoalIntelligence(client, localNotifier, userId, prefs);
       await runCreditCardIntelligence(client, localNotifier, userId, prefs);
+      await runBudgetIntelligence(client, localNotifier, userId, prefs);
       await _runEndOfMonthIntelligence(client, localNotifier, userId, prefs);
       await client.rpc('auto_renew_budgets', params: {'p_user_id': userId});
       developer.log('✅ [SmartWorker] Tarea completada.', name: 'SmartWorker');

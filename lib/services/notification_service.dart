@@ -31,6 +31,7 @@ class NotificationPayloadType {
   static const String goalReminder = 'goal_reminder';
   static const String sweepSavings = 'sweep_savings_suggestion';
   static const String creditCardAssistant = 'credit_card_assistant';
+  static const String smartBudgetInsight = 'smart_budget_insight';
   NotificationPayloadType._();
 }
 
@@ -64,6 +65,13 @@ void onDidReceiveNotificationResponse(NotificationResponse resp) {
       if (accountId != null && accountId.isNotEmpty) {
         navigatorKey.currentState
             ?.pushNamed('/account_details', arguments: accountId);
+      }
+    } else if (data['type'] == NotificationPayloadType.smartBudgetInsight) {
+      final id = data['budget_id'];
+      final budgetId = id is int ? id : int.tryParse('$id');
+      if (budgetId != null && budgetId > 0) {
+        navigatorKey.currentState
+            ?.pushNamed('/budget_details', arguments: budgetId);
       }
     }
   } catch (e) {
@@ -278,6 +286,14 @@ class NotificationService {
       description:
           'Alertas inteligentes sobre corte y pago de tus tarjetas de crédito.',
       importance: Importance.max,
+      playSound: true,
+    ),
+    AndroidNotificationChannel(
+      'smart_budget_channel',
+      'Presupuesto inteligente',
+      description:
+          'Alertas sobre tu ritmo de gasto frente al avance del período.',
+      importance: Importance.high,
       playSound: true,
     ),
   ];

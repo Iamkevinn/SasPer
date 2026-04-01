@@ -27,7 +27,8 @@ import 'package:sasper/screens/place_search_screen.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:sasper/data/goal_repository.dart'; 
 import 'package:sasper/models/goal_model.dart';    
-import 'package:sasper/screens/split_bill_screen.dart'; // 👈 IMPORTAMOS LA NUEVA PANTALLA
+import 'package:sasper/screens/split_bill_screen.dart';
+import 'package:workmanager/workmanager.dart'; // 👈 IMPORTAMOS LA NUEVA PANTALLA
 
 // ─── DESIGN TOKENS DINÁMICOS ──────────────────────────────────────────────────
 
@@ -526,7 +527,16 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
           longitude: _selectedLng,
         );
       }
-
+      
+      // 🌟 NUEVO: DESPERTAR AL WORKER PARA AUDITAR EL PRESUPUESTO AL INSTANTE 🌟
+      if (_isExpense) {
+        Workmanager().registerOneOffTask(
+          "force_budget_check_${DateTime.now().millisecondsSinceEpoch}",
+          'smart_goal_worker',
+          initialDelay: const Duration(seconds: 3),
+        );
+      }
+      
       if (mounted) {
         HapticFeedback.heavyImpact();
         EventService.instance.fire(AppEvent.transactionCreated);

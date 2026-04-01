@@ -93,8 +93,15 @@ class _EditBudgetScreenState extends State<EditBudgetScreen> with SingleTickerPr
       if (mounted) {
         HapticFeedback.heavyImpact();
         EventService.instance.fire(AppEvent.budgetsChanged);
-        Navigator.pop(context, true);
-        NotificationHelper.show(message: 'Presupuesto actualizado', type: NotificationType.success);
+        // Le damos tiempo al toast para que se asiente en la pantalla 
+        // antes de cerrar la ventana, dando un feeling más premium.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          NotificationHelper.show(message: 'Presupuesto actualizado', type: NotificationType.success);
+        });
+        await Future.delayed(const Duration(milliseconds: 300));
+        if (mounted) {
+          Navigator.pop(context, true);
+        }
       }
     } catch (e) {
       if (mounted) NotificationHelper.show(message: 'Error al actualizar.', type: NotificationType.error);
