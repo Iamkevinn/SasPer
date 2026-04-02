@@ -46,32 +46,284 @@ class AcademyLesson {
 }
 
 // ─── BASE DE DATOS LOCAL (Reemplazable por Supabase en el futuro) ────────────
-final List<AcademyLesson> _mockLessons =[
+final List<AcademyLesson> _mockLessons = [
+  // ── LECCIONES EXISTENTES ─────────────────────────────────────────────────
   AcademyLesson(
-    id: '1', title: 'La trampa de las 12 cuotas', category: 'Tarjetas de Crédito', icon: Iconsax.card_pos,
-    gradient: const[Color(0xFFFF453A), Color(0xFFFF9F0A)],
-    slides:[
-      LessonSlide(title: 'El antojo de viernes 🍔', content: 'Saliste con tus amigos y pagaste una cena de \$50,000 con tu tarjeta de crédito. El mesero te preguntó: "¿A cuántas cuotas?". Respondiste: "A 12, para que quede bajito".', emoji: '🤔'),
-      LessonSlide(title: '¿Qué acaba de pasar?', type: SlideType.interactiveBurger, content: 'Mueve el deslizador para ver cómo crece el costo real de esa hamburguesa mes a mes gracias a los intereses.'),
-      LessonSlide(title: 'La regla de oro 🥇', content: 'Las cosas que te comes, te bebes o desaparecen rápido, se pagan a **1 CUOTA** (0% interés). Deja las cuotas solo para bienes duraderos (neveras, computadores) y, si puedes, búscalas a 0% interés.', emoji: '💡'),
+    id: '1',
+    title: 'La trampa de las 12 cuotas',
+    category: 'Tarjetas de Crédito',
+    icon: Iconsax.card_pos,
+    gradient: const [Color(0xFFFF453A), Color(0xFFFF9F0A)],
+    slides: [
+      LessonSlide(
+        title: 'El antojo de viernes 🍔',
+        content:
+            'Saliste con tus amigos y pagaste una cena de \$50,000 con tu tarjeta de crédito. El mesero te preguntó: "¿A cuántas cuotas?". Respondiste: "A 12, para que quede bajito".',
+        emoji: '🤔',
+      ),
+      LessonSlide(
+        title: '¿Qué acaba de pasar?',
+        type: SlideType.interactiveBurger,
+        content:
+            'Mueve el deslizador para ver cómo crece el costo real de esa hamburguesa mes a mes gracias a los intereses.',
+      ),
+      LessonSlide(
+        title: 'La regla de oro 🥇',
+        content:
+            'Las cosas que te comes, te bebes o desaparecen rápido, se pagan a 1 CUOTA (0% interés). Deja las cuotas solo para bienes duraderos (neveras, computadores) y, si puedes, búscalas a 0% interés.',
+        emoji: '💡',
+      ),
     ],
   ),
   AcademyLesson(
-    id: '2', title: 'Día de Corte vs Pago', category: 'Bancos', icon: Iconsax.calendar_tick,
-    gradient: const[Color(0xFFBF5AF2), Color(0xFF0A84FF)],
-    slides:[
-      LessonSlide(title: 'Dos fechas vitales 📅', content: 'Tener una tarjeta de crédito y no saber estas dos fechas es como jugar ruleta rusa con tus finanzas. Vamos a diferenciarlas.', emoji: '🎯'),
-      LessonSlide(title: 'La foto vs La factura', type: SlideType.interactiveDates, content: 'Toca las tarjetas para ver qué significa cada fecha en la vida real.'),
-      LessonSlide(title: 'El superpoder de 45 días 🦸‍♂️', content: 'Si compras un día DESPUÉS de tu fecha de corte, tendrás casi 45 días para pagar esa compra sin un solo peso de interés (siempre que la pongas a 1 cuota).', emoji: '⏱️'),
+    id: '2',
+    title: 'Día de Corte vs Pago',
+    category: 'Bancos',
+    icon: Iconsax.calendar_tick,
+    gradient: const [Color(0xFFBF5AF2), Color(0xFF0A84FF)],
+    slides: [
+      LessonSlide(
+        title: 'Dos fechas vitales 📅',
+        content:
+            'Tener una tarjeta de crédito y no saber estas dos fechas es como jugar ruleta rusa con tus finanzas. Vamos a diferenciarlas.',
+        emoji: '🎯',
+      ),
+      LessonSlide(
+        title: 'La foto vs La factura',
+        type: SlideType.interactiveDates,
+        content:
+            'Toca las tarjetas para ver qué significa cada fecha en la vida real.',
+      ),
+      LessonSlide(
+        title: 'El superpoder de 45 días 🦸‍♂️',
+        content:
+            'Si compras un día DESPUÉS de tu fecha de corte, tendrás casi 45 días para pagar esa compra sin un solo peso de interés (siempre que la pongas a 1 cuota).',
+        emoji: '⏱️',
+      ),
     ],
   ),
   AcademyLesson(
-    id: '3', title: '¿Qué diablos es la Tasa EA?', category: 'Tasas', icon: Iconsax.chart_2,
-    gradient: const[Color(0xFF30D158), Color(0xFF0A84FF)],
-    slides:[
-      LessonSlide(title: 'El idioma de los bancos 🏦', content: 'EA significa "Efectiva Anual". Es la tasa real que te van a cobrar en el transcurso de un año si te prestan plata, sumando el interés sobre el interés (interés compuesto).', emoji: '📈'),
-      LessonSlide(title: '¿Por qué importa?', type: SlideType.interactiveEA, content: 'Usa el simulador para comparar un préstamo de 1 millón en un banco tradicional vs uno con tasa de usura.'),
-      LessonSlide(title: 'Resumen', content: 'En Colombia, las tarjetas de crédito suelen estar rozando la "Tasa de Usura" (el máximo legal permitido, cerca al 30% EA). Por eso financiar compras diarias sale tan caro.', emoji: '💸'),
+    id: '3',
+    title: '¿Qué diablos es la Tasa EA?',
+    category: 'Tasas',
+    icon: Iconsax.chart_2,
+    gradient: const [Color(0xFF30D158), Color(0xFF0A84FF)],
+    slides: [
+      LessonSlide(
+        title: 'El idioma de los bancos 🏦',
+        content:
+            'EA significa "Efectiva Anual". Es la tasa real que te van a cobrar en el transcurso de un año si te prestan plata, sumando el interés sobre el interés (interés compuesto).',
+        emoji: '📈',
+      ),
+      LessonSlide(
+        title: '¿Por qué importa?',
+        type: SlideType.interactiveEA,
+        content:
+            'Usa el simulador para comparar un préstamo de 1 millón en un banco tradicional vs uno con tasa de usura.',
+      ),
+      LessonSlide(
+        title: 'Resumen',
+        content:
+            'En Colombia, las tarjetas de crédito suelen estar rozando la "Tasa de Usura" (el máximo legal permitido, cerca al 30% EA). Por eso financiar compras diarias sale tan caro.',
+        emoji: '💸',
+      ),
+    ],
+  ),
+
+  // ── LECCIONES NUEVAS ─────────────────────────────────────────────────────
+  AcademyLesson(
+    id: '4',
+    title: '¿Qué es el flujo de caja?',
+    category: 'Conceptos Clave',
+    icon: Iconsax.money_recive,
+    gradient: const [Color(0xFF0A84FF), Color(0xFF30D158)],
+    slides: [
+      LessonSlide(
+        title: 'Tu dinero tiene pulso 💓',
+        content:
+            'El flujo de caja es simplemente la diferencia entre el dinero que entra y el que sale en un período. No importa cuánto tengas ahorrado: si sale más de lo que entra, estás en problemas.',
+        emoji: '🔄',
+      ),
+      LessonSlide(
+        title: 'El caso del médico broke',
+        content:
+            'Un médico que gana \$8,000,000 al mes pero paga \$3M de arriendo, \$2M de crédito del carro, \$1.5M de colegio y gasta \$2M en ropa... tiene flujo de caja NEGATIVO de \$500,000. Gana bien, pero se está hundiendo.',
+        emoji: '😰',
+      ),
+      LessonSlide(
+        title: 'Flujo positivo = libertad',
+        content:
+            'Cuando tus ingresos superan tus gastos, ese excedente es el que te permite ahorrar, invertir y construir riqueza. Sin flujo positivo, solo estás sobreviviendo. Con él, estás construyendo.',
+        emoji: '🚀',
+      ),
+    ],
+  ),
+
+  AcademyLesson(
+    id: '5',
+    title: 'Liquidez: el oxígeno financiero',
+    category: 'Conceptos Clave',
+    icon: Iconsax.drop,
+    gradient: const [Color(0xFF00C7BE), Color(0xFF0A84FF)],
+    slides: [
+      LessonSlide(
+        title: '¿Qué es liquidez? 💧',
+        content:
+            'Liquidez es qué tan rápido puedes convertir algo en efectivo para pagar tus cuentas. El dinero en tu cuenta corriente es 100% líquido. Tu apartamento, no.',
+        emoji: '💧',
+      ),
+      LessonSlide(
+        title: 'Rico pero sin plata',
+        content:
+            'Imagina que tienes un apartamento de \$500,000,000 pero debes \$2,000,000 de arriendo mañana. No puedes vender el apartamento en una noche. Eso es tener patrimonio pero cero liquidez. Y duele.',
+        emoji: '😬',
+      ),
+      LessonSlide(
+        title: 'La regla del colchón 🛏️',
+        content:
+            'Los expertos recomiendan tener entre 3 y 6 meses de tus gastos fijos en un lugar líquido (cuenta de ahorros, CDT a corto plazo). Eso es tu fondo de emergencia. Sin él, cualquier imprevisto te destruye.',
+        emoji: '🛡️',
+      ),
+    ],
+  ),
+
+  AcademyLesson(
+    id: '6',
+    title: 'Patrimonio: lo que realmente vales',
+    category: 'Conceptos Clave',
+    icon: Iconsax.strongbox,
+    gradient: const [Color(0xFFFF9F0A), Color(0xFFFF453A)],
+    slides: [
+      LessonSlide(
+        title: 'La fórmula más simple 🧮',
+        content:
+            'Patrimonio = Lo que tienes (activos) menos lo que debes (pasivos). Si tienes \$50M en ahorros y debes \$80M en créditos, tu patrimonio es NEGATIVO. No importa lo que aparentes.',
+        emoji: '⚖️',
+      ),
+      LessonSlide(
+        title: 'Activos vs Pasivos',
+        content:
+            'Un ACTIVO te pone plata en el bolsillo: una propiedad en arriendo, acciones, un negocio. Un PASIVO te saca plata del bolsillo: un crédito de consumo, una deuda de tarjeta. El objetivo es acumular activos, no pasivos.',
+        emoji: '📊',
+      ),
+      LessonSlide(
+        title: 'El juego largo 🏆',
+        content:
+            'Construir patrimonio no es rápido ni sexy. Es comprar activos consistentemente, reducir deudas, y dejar que el tiempo haga su trabajo. Cada peso que no gastas en intereses es un peso que puede trabajar para ti.',
+        emoji: '🌱',
+      ),
+    ],
+  ),
+
+  AcademyLesson(
+    id: '7',
+    title: 'Presupuesto que sí funciona',
+    category: 'Hábitos',
+    icon: Iconsax.calculator,
+    gradient: const [Color(0xFFBF5AF2), Color(0xFFFF453A)],
+    slides: [
+      LessonSlide(
+        title: 'El presupuesto no es una dieta',
+        content:
+            'La mayoría fracasa con los presupuestos porque los tratan como una restricción. Un buen presupuesto no te dice que no puedes gastar: te dice exactamente cuánto puedes gastar en cada cosa sin culpa.',
+        emoji: '🎯',
+      ),
+      LessonSlide(
+        title: 'La regla 50-30-20',
+        content:
+            '50% de tus ingresos van a necesidades (arriendo, comida, servicios). 30% a gustos (salidas, ropa, entretenimiento). 20% a ahorro e inversión. No es perfecta, pero es un punto de partida brutal.',
+        emoji: '📐',
+      ),
+      LessonSlide(
+        title: 'El truco del sobre 💌',
+        content:
+            'En cuanto te paguen, mueve inmediatamente el 20% de ahorro a otra cuenta que no toques. Paga primero tu futuro, luego vive con el resto. Si esperas a "lo que sobre", nunca sobra nada.',
+        emoji: '🏦',
+      ),
+    ],
+  ),
+
+  AcademyLesson(
+    id: '8',
+    title: 'Interés compuesto: la magia del tiempo',
+    category: 'Inversión',
+    icon: Iconsax.trend_up,
+    gradient: const [Color(0xFF30D158), Color(0xFF00C7BE)],
+    slides: [
+      LessonSlide(
+        title: 'Einstein tenía razón ☝️',
+        content:
+            'Se dice que Einstein llamó al interés compuesto "la octava maravilla del mundo". El que lo entiende, lo gana. El que no, lo paga. Con las deudas ya viste cómo te destruye. Ahora veamos cómo te construye.',
+        emoji: '✨',
+      ),
+      LessonSlide(
+        title: 'El poder de empezar hoy',
+        content:
+            'Si inviertes \$200,000 al mes desde los 25 años a un rendimiento del 10% anual, a los 65 tendrás cerca de \$1,200,000,000. Si empiezas a los 35, tendrás menos de \$450,000,000. Diez años de diferencia cuestan casi \$800 millones.',
+        emoji: '⏰',
+      ),
+      LessonSlide(
+        title: 'No necesitas ser rico para empezar',
+        content:
+            'El interés compuesto no requiere grandes sumas. Requiere tiempo y consistencia. \$50,000 al mes invertidos hoy valen más que \$500,000 invertidos en 10 años. El mejor momento para empezar fue ayer. El segundo mejor es hoy.',
+        emoji: '🌊',
+      ),
+    ],
+  ),
+
+  AcademyLesson(
+    id: '9',
+    title: 'Deuda buena vs deuda mala',
+    category: 'Deudas',
+    icon: Iconsax.receipt_2,
+    gradient: const [Color(0xFFFF453A), Color(0xFFBF5AF2)],
+    slides: [
+      LessonSlide(
+        title: 'No toda deuda es el enemigo',
+        content:
+            'Una deuda que te genera más dinero del que te cuesta es una deuda BUENA. Un crédito para comprar una máquina que te produce ingresos, o una hipoteca para un inmueble que se valoriza: esas pueden tener sentido.',
+        emoji: '🤝',
+      ),
+      LessonSlide(
+        title: 'La deuda mala te roba el futuro',
+        content:
+            'Una deuda de consumo (ropa, viajes, restaurantes pagados a cuotas) no genera ningún retorno. Solo hace que esas experiencias te cuesten 30% más de lo que valen. Estás hipotecando tu futuro para pagar el pasado.',
+        emoji: '⚠️',
+      ),
+      LessonSlide(
+        title: 'La pregunta que lo cambia todo',
+        content:
+            'Antes de endeudarte, pregúntate: ¿este dinero prestado va a generar más de lo que me va a costar en intereses? Si la respuesta es sí, puede ser una deuda inteligente. Si es no, es una trampa disfrazada de solución.',
+        emoji: '🔑',
+      ),
+    ],
+  ),
+
+  AcademyLesson(
+    id: '10',
+    title: 'Inflación: el ladrón silencioso',
+    category: 'Economía',
+    icon: Iconsax.graph,
+    gradient: const [Color(0xFFFF9F0A), Color(0xFF30D158)],
+    slides: [
+      LessonSlide(
+        title: 'Tu plata pierde valor sola',
+        content:
+            'La inflación es el aumento general de precios. Si la inflación es del 10% anual y tienes \$1,000,000 bajo el colchón, en un año ese millón compra lo mismo que hoy comprarían \$900,000. No hiciste nada y ya perdiste.',
+        emoji: '📉',
+      ),
+      LessonSlide(
+        title: 'La cuenta de ahorros no salva',
+        content:
+            'Si tu cuenta de ahorros te paga 4% anual pero la inflación es 10%, estás perdiendo 6% de poder adquisitivo al año. Guardar plata sin invertirla en algo que rinda más que la inflación es perder dinero en cámara lenta.',
+        emoji: '🏦',
+      ),
+      LessonSlide(
+        title: 'Cómo ganarle a la inflación',
+        content:
+            'La clave es que tu dinero crezca más rápido que los precios. Acciones, fondos de inversión, CDTs con tasas competitivas, o bienes raíces históricamente han superado la inflación en el largo plazo. Invertir no es un lujo: es defensa.',
+        emoji: '🛡️',
+      ),
     ],
   ),
 ];
