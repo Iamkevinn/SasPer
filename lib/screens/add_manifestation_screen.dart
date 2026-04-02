@@ -260,7 +260,7 @@ class _AddManifestationScreenState extends State<AddManifestationScreen>
           'manifestation_image_path', newImagePath);
 
       await HomeWidget.updateWidget(
-        androidName: 'ManifestationWidgetProvider',
+        androidName: 'ManifestationVisionWidget',
         iOSName: 'ManifestationWidget',
       );
 

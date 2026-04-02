@@ -167,7 +167,7 @@ class _EditManifestationScreenState extends State<EditManifestationScreen>
         'manifestation_count', manifestations.length);
     await HomeWidget.saveWidgetData<int>('manifestation_index', 0);
     await HomeWidget.updateWidget(
-      androidName: 'ManifestationWidgetProvider',
+      androidName: 'ManifestationVisionWidget',
       iOSName: 'ManifestationWidget',
     );
   }
