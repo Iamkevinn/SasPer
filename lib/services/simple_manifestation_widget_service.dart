@@ -10,6 +10,12 @@ String _keyFor(String baseKey, String? widgetId) {
   return widgetId != null ? '${baseKey}_$widgetId' : baseKey;
 }
 
+String? _decodeStoredWoopField(dynamic v) {
+  if (v == null) return null;
+  final s = v.toString().trim();
+  return s.isEmpty ? null : s;
+}
+
 /// Servicio para el widget de Manifestaciones (Vision Focus)
 class SimpleManifestationWidgetService  {
   static const String _widgetName = 'ManifestationWidgetProvider';
@@ -69,6 +75,9 @@ class SimpleManifestationWidgetService  {
         'title': m.title,
         'description': m.description ?? '',
         'image_url': m.imageUrl ?? '',
+        'outcome': m.outcome ?? '',
+        'obstacle': m.obstacle ?? '',
+        'plan': m.plan ?? '',
       };
     }).toList();
 
@@ -191,6 +200,9 @@ static Future<void> recordManifestationVisualization({String? widgetId}) async {
           title: e['title'],
           description: e['description'],
           imageUrl: e['image_url'],
+          outcome: _decodeStoredWoopField(e['outcome']),
+          obstacle: _decodeStoredWoopField(e['obstacle']),
+          plan: _decodeStoredWoopField(e['plan']),
           createdAt: DateTime.now(),
           userId: '',
         );

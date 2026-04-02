@@ -4,6 +4,7 @@ import 'package:sasper/data/manifestation_repository.dart';
 import 'package:sasper/models/manifestation_model.dart';
 import 'package:sasper/screens/add_manifestation_screen.dart';
 import 'package:sasper/screens/edit_manifestation_screen.dart';
+import 'package:sasper/screens/manifestation_detail_screen.dart';
 import 'package:sasper/screens/ManifestationVisionWidgetDebug.dart';
 import 'package:sasper/services/widget_service.dart';
 import 'dart:math' as math;
@@ -173,6 +174,35 @@ class _ManifestationsScreenState extends State<ManifestationsScreen>
       ),
     );
     if (result != null) _loadManifestations();
+  }
+
+  void _navigateToDetailScreen(Manifestation manifestation) async {
+    HapticFeedback.lightImpact();
+
+    final result = await Navigator.of(context).push<bool>(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            ManifestationDetailScreen(manifestation: manifestation),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          final curved = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeInOutCubic,
+          );
+          return FadeTransition(
+            opacity: curved,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 0.04),
+                end: Offset.zero,
+              ).animate(curved),
+              child: child,
+            ),
+          );
+        },
+        transitionDuration: _Tokens.durationSlow,
+      ),
+    );
+    if (result == true) _loadManifestations();
   }
 
   void _navigateToEditScreen(Manifestation manifestation) async {
@@ -438,6 +468,7 @@ class _ManifestationsScreenState extends State<ManifestationsScreen>
                             index: index,
                             child: _ManifestationCard(
                               manifestation: m,
+                              onOpenDetail: () => _navigateToDetailScreen(m),
                               onEdit: () => _navigateToEditScreen(m),
                               onDelete: () => _showDeleteConfirmation(m),
                             ),
@@ -537,11 +568,13 @@ class _Header extends StatelessWidget {
 // ─── TARJETA DE MANIFESTACIÓN ─────────────────────────────────────────────────
 class _ManifestationCard extends StatefulWidget {
   final Manifestation manifestation;
+  final VoidCallback onOpenDetail;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
   const _ManifestationCard({
     required this.manifestation,
+    required this.onOpenDetail,
     required this.onEdit,
     required this.onDelete,
   });
@@ -586,6 +619,10 @@ class _ManifestationCardState extends State<_ManifestationCard>
         onTapDown: (_) => _pressController.forward(),
         onTapUp: (_) => _pressController.reverse(),
         onTapCancel: () => _pressController.reverse(),
+        onTap: () {
+          HapticFeedback.selectionClick();
+          widget.onOpenDetail();
+        },
         child: ScaleTransition(
           scale: _scaleAnim,
           child: Container(
@@ -612,19 +649,46 @@ class _ManifestationCardState extends State<_ManifestationCard>
                 // ── IMAGEN ────────────────────────────────────────────
                 if (imageUrl.isNotEmpty)
                   Positioned.fill(
-                    child: Image.network(
-                      imageUrl,
-                      fit: BoxFit.cover,
-                      loadingBuilder: (context, child, progress) {
-                        if (progress == null) return child;
-                        return Container(color: _Tokens.surfaceElevated);
-                      },
-                      errorBuilder: (_, __, ___) =>
-                          const _CardPlaceholder(),
+                    child: Hero(
+                      tag: 'manifestation_image_${widget.manifestation.id}',
+                      child: Image.network(
+                        imageUrl,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, progress) {
+                          if (progress == null) return child;
+                          return Container(color: _Tokens.surfaceElevated);
+                        },
+                        errorBuilder: (_, __, ___) =>
+                            const _CardPlaceholder(),
+                      ),
                     ),
                   )
                 else
                   const Positioned.fill(child: _CardPlaceholder()),
+
+                if (widget.manifestation.hasCompleteWoop)
+                  Positioned(
+                    top: _Tokens.spaceSM,
+                    left: _Tokens.spaceSM,
+                    child: IgnorePointer(
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.4),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: _Tokens.accent.withOpacity(0.45),
+                            width: 0.5,
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.route_rounded,
+                          size: 16,
+                          color: _Tokens.accent,
+                        ),
+                      ),
+                    ),
+                  ),
 
                 // ── GRADIENTE CINEMATOGRÁFICO ─────────────────────────
                 Positioned.fill(

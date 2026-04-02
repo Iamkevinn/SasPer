@@ -22,6 +22,9 @@ class _EditManifestationScreenState extends State<EditManifestationScreen>
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _titleController;
   late final TextEditingController _descriptionController;
+  late final TextEditingController _outcomeController;
+  late final TextEditingController _obstacleController;
+  late final TextEditingController _planController;
   final _reflectionController = TextEditingController();
 
   final _manifestationRepository = ManifestationRepository();
@@ -58,6 +61,12 @@ class _EditManifestationScreenState extends State<EditManifestationScreen>
     _titleController = TextEditingController(text: widget.manifestation.title);
     _descriptionController =
         TextEditingController(text: widget.manifestation.description);
+    _outcomeController =
+        TextEditingController(text: widget.manifestation.outcome ?? '');
+    _obstacleController =
+        TextEditingController(text: widget.manifestation.obstacle ?? '');
+    _planController =
+        TextEditingController(text: widget.manifestation.plan ?? '');
     _setupAnimations();
     _playEntryAnimation();
   }
@@ -117,6 +126,9 @@ class _EditManifestationScreenState extends State<EditManifestationScreen>
     _energyController.dispose();
     _titleController.dispose();
     _descriptionController.dispose();
+    _outcomeController.dispose();
+    _obstacleController.dispose();
+    _planController.dispose();
     _reflectionController.dispose();
     super.dispose();
   }
@@ -176,6 +188,15 @@ class _EditManifestationScreenState extends State<EditManifestationScreen>
         title: _titleController.text.trim(),
         description: _descriptionController.text.trim().isNotEmpty
             ? _descriptionController.text.trim()
+            : null,
+        outcome: _outcomeController.text.trim().isNotEmpty
+            ? _outcomeController.text.trim()
+            : null,
+        obstacle: _obstacleController.text.trim().isNotEmpty
+            ? _obstacleController.text.trim()
+            : null,
+        plan: _planController.text.trim().isNotEmpty
+            ? _planController.text.trim()
             : null,
         newImageFile: _newSelectedImage,
         oldImageUrl: widget.manifestation.imageUrl,
@@ -333,6 +354,53 @@ class _EditManifestationScreenState extends State<EditManifestationScreen>
                           title: '✨ Tu Intención',
                           subtitle: 'Cómo ha evolucionado tu sueño',
                           child: _buildDescriptionField(theme, isDark),
+                        ),
+
+                        const SizedBox(height: 28),
+                        _buildSection(
+                          theme: theme,
+                          isDark: isDark,
+                          title: '🌅 Mejor resultado',
+                          subtitle:
+                              '¿Cuál es el mejor resultado si cumples este deseo? ¿Cómo te sentirás?',
+                          child: _buildWoopField(
+                            theme,
+                            isDark,
+                            controller: _outcomeController,
+                            hintText: 'Ej: Libertad financiera, orgullo, calma…',
+                            minLines: 3,
+                          ),
+                        ),
+                        const SizedBox(height: 22),
+                        _buildSection(
+                          theme: theme,
+                          isDark: isDark,
+                          title: '🪨 Obstáculo interno',
+                          subtitle:
+                              '¿Qué se interpone en tu camino? Sé honesto contigo mismo.',
+                          child: _buildWoopField(
+                            theme,
+                            isDark,
+                            controller: _obstacleController,
+                            hintText: 'Ej: Procrastino cuando me abrumo…',
+                            minLines: 3,
+                          ),
+                        ),
+                        const SizedBox(height: 22),
+                        _buildSection(
+                          theme: theme,
+                          isDark: isDark,
+                          title: '🧭 Plan si — entonces',
+                          subtitle:
+                              'Si aparece tu obstáculo, ¿qué harás en concreto?',
+                          child: _buildWoopField(
+                            theme,
+                            isDark,
+                            controller: _planController,
+                            hintText:
+                                'Ej: Si siento ganas de posponerlo, entonces abro la app y registro un gasto simbólico hacia la meta.',
+                            minLines: 3,
+                          ),
                         ),
 
                         // Sección de reflexión (opcional)
@@ -732,6 +800,50 @@ class _EditManifestationScreenState extends State<EditManifestationScreen>
             Icons.auto_fix_high_rounded,
             color: isDark ? Colors.amber.shade300 : Colors.deepPurple.shade400,
           ),
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(
+            color: isDark
+                ? Colors.white.withOpacity(0.2)
+                : Colors.black.withOpacity(0.2),
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(
+            color: isDark ? Colors.amber.shade300 : Colors.deepPurple.shade400,
+            width: 2,
+          ),
+        ),
+        filled: true,
+        fillColor: isDark
+            ? Colors.white.withOpacity(0.05)
+            : Colors.black.withOpacity(0.02),
+      ),
+    );
+  }
+
+  Widget _buildWoopField(
+    ThemeData theme,
+    bool isDark, {
+    required TextEditingController controller,
+    required String hintText,
+    int minLines = 2,
+  }) {
+    return TextFormField(
+      controller: controller,
+      style: theme.textTheme.bodyLarge,
+      minLines: minLines,
+      maxLines: 6,
+      decoration: InputDecoration(
+        hintText: hintText,
+        hintStyle: TextStyle(
+          color: isDark ? Colors.white38 : Colors.black38,
+          height: 1.35,
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),

@@ -43,6 +43,9 @@ class ManifestationRepository {
     required XFile imageFile, // Pasamos el archivo directamente
     String? description,
     String? linkedGoalId,
+    String? outcome,
+    String? obstacle,
+    String? plan,
   }) async {
     final userId = _supabase.auth.currentUser!.id;
     final fileExtension = extension(imageFile.path).toLowerCase();
@@ -67,6 +70,9 @@ class ManifestationRepository {
       'description': description,
       'image_url': imageUrl,
       'linked_goal_id': linkedGoalId,
+      'outcome': outcome,
+      'obstacle': obstacle,
+      'plan': plan,
     });
   }
   
@@ -84,6 +90,9 @@ class ManifestationRepository {
     required String manifestationId,
     required String title,
     String? description,
+    String? outcome,
+    String? obstacle,
+    String? plan,
     XFile? newImageFile, // La nueva imagen es opcional
     String? oldImageUrl, // Necesario para borrar la imagen vieja si se cambia
   }) async {
@@ -91,6 +100,9 @@ class ManifestationRepository {
     final Map<String, dynamic> updateData = {
       'title': title,
       'description': description,
+      'outcome': outcome,
+      'obstacle': obstacle,
+      'plan': plan,
     };
 
     // Si el usuario seleccionó una nueva imagen...

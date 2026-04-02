@@ -23,6 +23,9 @@ class _AddManifestationScreenState extends State<AddManifestationScreen>
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _outcomeController = TextEditingController();
+  final _obstacleController = TextEditingController();
+  final _planController = TextEditingController();
   final _manifestationRepository = ManifestationRepository();
 
   XFile? _selectedImage;
@@ -124,6 +127,9 @@ class _AddManifestationScreenState extends State<AddManifestationScreen>
     _formController.dispose();
     _titleController.dispose();
     _descriptionController.dispose();
+    _outcomeController.dispose();
+    _obstacleController.dispose();
+    _planController.dispose();
     super.dispose();
   }
 
@@ -205,6 +211,15 @@ class _AddManifestationScreenState extends State<AddManifestationScreen>
             ? _descriptionController.text.trim()
             : null,
         imageFile: _selectedImage!,
+        outcome: _outcomeController.text.trim().isNotEmpty
+            ? _outcomeController.text.trim()
+            : null,
+        obstacle: _obstacleController.text.trim().isNotEmpty
+            ? _obstacleController.text.trim()
+            : null,
+        plan: _planController.text.trim().isNotEmpty
+            ? _planController.text.trim()
+            : null,
       );
 
       // Actualizar datos base desde Supabase
@@ -367,6 +382,9 @@ class _AddManifestationScreenState extends State<AddManifestationScreen>
 
                         // Campo de descripción
                         _buildDescriptionField(theme, isDark),
+
+                        const SizedBox(height: 20),
+                        _buildWoopExpansion(theme, isDark),
 
                         const SizedBox(height: 40),
 
@@ -684,6 +702,144 @@ class _AddManifestationScreenState extends State<AddManifestationScreen>
         fillColor: isDark
             ? Colors.white.withOpacity(0.05)
             : Colors.black.withOpacity(0.02),
+      ),
+    );
+  }
+
+  Widget _buildWoopExpansion(ThemeData theme, bool isDark) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      decoration: BoxDecoration(
+        color: (isDark ? Colors.deepPurple.shade900 : Colors.purple.shade50)
+            .withOpacity(0.35),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: (isDark ? Colors.amber.shade300 : Colors.deepPurple.shade300)
+              .withOpacity(0.25),
+        ),
+      ),
+      child: Theme(
+        data: theme.copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          onExpansionChanged: (_) => HapticFeedback.selectionClick(),
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          childrenPadding:
+              const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          title: Row(
+            children: [
+              Icon(
+                Icons.route_rounded,
+                size: 22,
+                color: isDark
+                    ? Colors.amber.shade300
+                    : Colors.deepPurple.shade400,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Plan de acción WOOP (opcional)',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          subtitle: Text(
+            'Convierte tu deseo en un «si — entonces» concreto',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: isDark ? Colors.white60 : Colors.black54,
+            ),
+          ),
+          children: [
+            Text(
+              '¿Cuál es el mejor resultado que obtendrás? ¿Cómo te sentirás?',
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontStyle: FontStyle.italic,
+                height: 1.4,
+                color: isDark ? Colors.amber.shade100 : Colors.deepPurple.shade800,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildWoopInlineField(
+              theme,
+              isDark,
+              controller: _outcomeController,
+              label: 'Resultado',
+            ),
+            const SizedBox(height: 14),
+            Text(
+              '¿Qué obstáculo interno se interpone? Sé honesto contigo mismo.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontStyle: FontStyle.italic,
+                height: 1.4,
+                color: isDark ? Colors.amber.shade100 : Colors.deepPurple.shade800,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildWoopInlineField(
+              theme,
+              isDark,
+              controller: _obstacleController,
+              label: 'Obstáculo',
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'Si te encuentras con ese obstáculo, entonces tú… (completa la regla).',
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontStyle: FontStyle.italic,
+                height: 1.4,
+                color: isDark ? Colors.amber.shade100 : Colors.deepPurple.shade800,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildWoopInlineField(
+              theme,
+              isDark,
+              controller: _planController,
+              label: 'Plan si — entonces',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWoopInlineField(
+    ThemeData theme,
+    bool isDark, {
+    required TextEditingController controller,
+    required String label,
+  }) {
+    return TextField(
+      controller: controller,
+      minLines: 2,
+      maxLines: 4,
+      style: theme.textTheme.bodyMedium,
+      decoration: InputDecoration(
+        labelText: label,
+        alignLabelWithHint: true,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color: isDark
+                ? Colors.white.withOpacity(0.15)
+                : Colors.black.withOpacity(0.12),
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color:
+                isDark ? Colors.amber.shade300 : Colors.deepPurple.shade400,
+            width: 2,
+          ),
+        ),
+        filled: true,
+        fillColor: isDark
+            ? Colors.white.withOpacity(0.04)
+            : Colors.white.withOpacity(0.7),
       ),
     );
   }
