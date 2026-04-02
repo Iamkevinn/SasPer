@@ -47,10 +47,10 @@ class _D {
   static const r  = 24.0;   // radio base de tarjetas
 
   // Tipografía — DM Sans para UI, Playfair para números grandes
-  static TextStyle display(double size, {Color? color}) => GoogleFonts.playfairDisplay(
-    fontSize: size, fontWeight: FontWeight.w700,
-    color: color, letterSpacing: -1.0, height: 1.0,
-  );
+  static TextStyle display(double size, {Color? color}) => GoogleFonts.dmSans( // <-- Cambio aquí
+    fontSize: size, fontWeight: FontWeight.w800, // <-- Un poco más grueso (w800)
+    color: color, letterSpacing: -1.5, height: 1.0,
+);
   static TextStyle label(double size, {FontWeight w = FontWeight.w500, Color? color}) =>
       GoogleFonts.dmSans(fontSize: size, fontWeight: w, color: color);
   static TextStyle caption(double size, {Color? color}) =>
