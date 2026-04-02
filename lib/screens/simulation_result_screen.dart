@@ -23,16 +23,18 @@ import 'package:intl/intl.dart';
 import 'package:sasper/models/simulation_models.dart';
 
 // ─── Paleta iOS ──────────────────────────────────────────────────────────────
-const _kBlue   = Color(0xFF0A84FF);
-const _kGreen  = Color(0xFF30D158);
+const _kBlue = Color(0xFF0A84FF);
+const _kGreen = Color(0xFF30D158);
 const _kOrange = Color(0xFFFF9F0A);
-const _kRed    = Color(0xFFFF453A);
+const _kRed = Color(0xFFFF453A);
 
 // ─── Tipografía ──────────────────────────────────────────────────────────────
 class _T {
   static TextStyle display(double s) => GoogleFonts.dmSans(
-        fontSize: s, fontWeight: FontWeight.w700,
-        letterSpacing: -0.4, height: 1.1,
+        fontSize: s,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -0.4,
+        height: 1.1,
       );
   static TextStyle label(double s, {FontWeight w = FontWeight.w500}) =>
       GoogleFonts.dmSans(fontSize: s, fontWeight: w);
@@ -40,28 +42,28 @@ class _T {
       GoogleFonts.dmMono(fontSize: s, fontWeight: FontWeight.w600);
 }
 
-final _fmt = NumberFormat.currency(
-    locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+final _fmt =
+    NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
 final _fmtCompact = NumberFormat.compactCurrency(
     locale: 'es_CO', symbol: '\$', decimalDigits: 1);
 
 // ─── Helpers de veredicto ─────────────────────────────────────────────────────
 extension _VerdictX on SimulationVerdict {
   Color get color => switch (this) {
-        SimulationVerdict.recommended    => _kGreen,
-        SimulationVerdict.withCaution    => _kOrange,
+        SimulationVerdict.recommended => _kGreen,
+        SimulationVerdict.withCaution => _kOrange,
         SimulationVerdict.notRecommended => _kRed,
       };
 
   String get label => switch (this) {
-        SimulationVerdict.recommended    => 'Puedes permitírtelo',
-        SimulationVerdict.withCaution    => 'Con precaución',
+        SimulationVerdict.recommended => 'Puedes permitírtelo',
+        SimulationVerdict.withCaution => 'Con precaución',
         SimulationVerdict.notRecommended => 'No recomendado',
       };
 
   IconData get icon => switch (this) {
-        SimulationVerdict.recommended    => Iconsax.shield_tick,
-        SimulationVerdict.withCaution    => Iconsax.warning_2,
+        SimulationVerdict.recommended => Iconsax.shield_tick,
+        SimulationVerdict.withCaution => Iconsax.warning_2,
         SimulationVerdict.notRecommended => Iconsax.danger,
       };
 }
@@ -76,13 +78,11 @@ class SimulationResultScreen extends StatefulWidget {
   const SimulationResultScreen({super.key, required this.result});
 
   @override
-  State<SimulationResultScreen> createState() =>
-      _SimulationResultScreenState();
+  State<SimulationResultScreen> createState() => _SimulationResultScreenState();
 }
 
 class _SimulationResultScreenState extends State<SimulationResultScreen>
     with SingleTickerProviderStateMixin {
-
   late final AnimationController _fadeCtrl = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 280),
@@ -102,12 +102,12 @@ class _SimulationResultScreenState extends State<SimulationResultScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isDark  = Theme.of(context).brightness == Brightness.dark;
-    final bg      = isDark ? Colors.black : const Color(0xFFF2F2F7);
-    final surfBg  = isDark
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? Colors.black : const Color(0xFFF2F2F7);
+    final surfBg = isDark
         ? Colors.white.withOpacity(0.07)
         : Colors.black.withOpacity(0.04);
-    final result  = widget.result;
+    final result = widget.result;
     final verdict = result.verdict;
 
     return Scaffold(
@@ -117,7 +117,6 @@ class _SimulationResultScreenState extends State<SimulationResultScreen>
         child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
           slivers: [
-
             // ── Header blur ─────────────────────────────────────────────
             SliverPersistentHeader(
               pinned: true,
@@ -131,12 +130,11 @@ class _SimulationResultScreenState extends State<SimulationResultScreen>
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
-
                   // ── 1. VEREDICTO HERO ──────────────────────────────────
                   _VerdictHero(
                     verdict: verdict,
                     message: result.verdictMessage,
-                    isDark:  isDark,
+                    isDark: isDark,
                   ),
                   const SizedBox(height: 12),
 
@@ -151,7 +149,17 @@ class _SimulationResultScreenState extends State<SimulationResultScreen>
                     surfBg: surfBg,
                   ),
                   const SizedBox(height: 24),
-
+                  // ── 2b. PATRIMONIO ─────────────────────────────────── ← NUEVO
+                  if (result.patrimonioImpact != null) ...[
+                    _SectionLabel('Impacto en tu patrimonio', isDark: isDark),
+                    const SizedBox(height: 8),
+                    _PatrimonioCard(
+                      impact: result.patrimonioImpact!,
+                      isDark: isDark,
+                      surfBg: surfBg,
+                    ),
+                    const SizedBox(height: 24),
+                  ],
                   // ── 3. PRESUPUESTO ─────────────────────────────────────
                   // Solo si hay presupuesto activo para la categoría
                   if (result.budgetImpact != null) ...[
@@ -176,7 +184,9 @@ class _SimulationResultScreenState extends State<SimulationResultScreen>
                     ...result.affectedGoals.map((g) => Padding(
                           padding: const EdgeInsets.only(bottom: 8),
                           child: _GoalImpactCard(
-                            goal: g, isDark: isDark, surfBg: surfBg,
+                            goal: g,
+                            isDark: isDark,
+                            surfBg: surfBg,
                           ),
                         )),
                     const SizedBox(height: 16),
@@ -216,10 +226,10 @@ class _SimulationResultScreenState extends State<SimulationResultScreen>
                       child: Text(
                         'Esta simulación no afecta tus registros ni mueve dinero.',
                         style: _T.label(12).copyWith(
-                          color: isDark
-                              ? Colors.white.withOpacity(0.25)
-                              : Colors.black.withOpacity(0.25),
-                        ),
+                              color: isDark
+                                  ? Colors.white.withOpacity(0.25)
+                                  : Colors.black.withOpacity(0.25),
+                            ),
                         textAlign: TextAlign.center,
                       ),
                     ),
@@ -251,8 +261,8 @@ class _VerdictHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color   = verdict.color;
-    final surfBg  = isDark ? const Color(0xFF1C1C1E) : Colors.white;
+    final color = verdict.color;
+    final surfBg = isDark ? const Color(0xFF1C1C1E) : Colors.white;
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -293,11 +303,11 @@ class _VerdictHero extends StatelessWidget {
                 Text(
                   message,
                   style: _T.label(14).copyWith(
-                    color: isDark
-                        ? Colors.white.withOpacity(0.55)
-                        : Colors.black.withOpacity(0.55),
-                    height: 1.4,
-                  ),
+                        color: isDark
+                            ? Colors.white.withOpacity(0.55)
+                            : Colors.black.withOpacity(0.55),
+                        height: 1.4,
+                      ),
                 ),
               ],
             ),
@@ -332,9 +342,9 @@ class _CashFlowCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final projected = impact.projectedEOMBalance;
-    final current   = impact.currentEOMBalance;
-    final diff      = current - projected;
-    final isNeg     = projected < 0;
+    final current = impact.currentEOMBalance;
+    final diff = current - projected;
+    final isNeg = projected < 0;
 
     final bool flowNegButSafe =
         isNeg && verdict == SimulationVerdict.recommended;
@@ -403,22 +413,22 @@ class _CashFlowCard extends StatelessWidget {
                 Text(
                   'Reducción en tu flujo de caja',
                   style: _T.label(13).copyWith(
-                    color: isDark
-                        ? Colors.white.withOpacity(0.45)
-                        : Colors.black.withOpacity(0.45),
-                  ),
+                        color: isDark
+                            ? Colors.white.withOpacity(0.45)
+                            : Colors.black.withOpacity(0.45),
+                      ),
                 ),
                 Text(
                   '− ${_fmtCompact.format(diff)}',
                   style: _T.mono(13).copyWith(
-                    // Gris neutro si el flujo sigue positivo,
-                    // rojo si queda negativo
-                    color: isNeg
-                        ? _kRed
-                        : (isDark
-                            ? Colors.white.withOpacity(0.5)
-                            : Colors.black.withOpacity(0.4)),
-                  ),
+                        // Gris neutro si el flujo sigue positivo,
+                        // rojo si queda negativo
+                        color: isNeg
+                            ? _kRed
+                            : (isDark
+                                ? Colors.white.withOpacity(0.5)
+                                : Colors.black.withOpacity(0.4)),
+                      ),
                 ),
               ],
             ),
@@ -432,12 +442,12 @@ class _CashFlowCard extends StatelessWidget {
                     ? 'El mes cerraría en negativo — revisa si tienes ahorros de respaldo.'
                     : 'Tu flujo del mes seguiría positivo en ${_fmtCompact.format(projected.abs())}.',
                 style: _T.label(11).copyWith(
-                  color: isNeg
-                      ? _kOrange
-                      : (isDark
-                          ? Colors.white.withOpacity(0.3)
-                          : Colors.black.withOpacity(0.3)),
-                ),
+                      color: isNeg
+                          ? _kOrange
+                          : (isDark
+                              ? Colors.white.withOpacity(0.3)
+                              : Colors.black.withOpacity(0.3)),
+                    ),
               ),
             ),
           ],
@@ -462,9 +472,9 @@ class _CashFlowCard extends StatelessWidget {
                       'gastando más de lo que ingresaste. Asegúrate de tener '
                       'ahorros que respalden esa diferencia.',
                       style: _T.label(12).copyWith(
-                        color: _kOrange,
-                        height: 1.4,
-                      ),
+                            color: _kOrange,
+                            height: 1.4,
+                          ),
                     ),
                   ),
                 ],
@@ -491,9 +501,9 @@ class _CashFlowCard extends StatelessWidget {
                       'Este gasto dejaría tu flujo del mes en negativo y además '
                       'comprometería tu liquidez real. No es el momento.',
                       style: _T.label(12).copyWith(
-                        color: _kRed,
-                        height: 1.4,
-                      ),
+                            color: _kRed,
+                            height: 1.4,
+                          ),
                     ),
                   ),
                 ],
@@ -505,6 +515,7 @@ class _CashFlowCard extends StatelessWidget {
     );
   }
 }
+
 class _FlowColumn extends StatelessWidget {
   final String label;
   final String value;
@@ -526,20 +537,20 @@ class _FlowColumn extends StatelessWidget {
         Text(
           label,
           style: _T.label(11).copyWith(
-            color: isDark
-                ? Colors.white.withOpacity(0.35)
-                : Colors.black.withOpacity(0.35),
-          ),
+                color: isDark
+                    ? Colors.white.withOpacity(0.35)
+                    : Colors.black.withOpacity(0.35),
+              ),
         ),
         const SizedBox(height: 4),
         Text(value, style: _T.mono(18).copyWith(color: color)),
         Text(
           'fin de mes',
           style: _T.label(10).copyWith(
-            color: isDark
-                ? Colors.white.withOpacity(0.25)
-                : Colors.black.withOpacity(0.25),
-          ),
+                color: isDark
+                    ? Colors.white.withOpacity(0.25)
+                    : Colors.black.withOpacity(0.25),
+              ),
         ),
       ],
     );
@@ -563,10 +574,10 @@ class _BudgetCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final current    = impact.currentProgress.clamp(0.0, 1.0);
-    final projected  = impact.clampedProjectedProgress;
+    final current = impact.currentProgress.clamp(0.0, 1.0);
+    final projected = impact.clampedProjectedProgress;
     final exceedColor = impact.willExceed ? _kRed : _kOrange;
-    final safeColor   = _kGreen;
+    final safeColor = _kGreen;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -586,7 +597,11 @@ class _BudgetCard extends StatelessWidget {
             value: current,
             amount: impact.currentSpent,
             budget: impact.budgetAmount,
-            color: current > 0.8 ? _kRed : current > 0.5 ? _kOrange : safeColor,
+            color: current > 0.8
+                ? _kRed
+                : current > 0.5
+                    ? _kOrange
+                    : safeColor,
             isDark: isDark,
           ),
           const SizedBox(height: 14),
@@ -610,7 +625,7 @@ class _BudgetCard extends StatelessWidget {
 
 class _BudgetBar extends StatelessWidget {
   final String label;
-  final double value;      // 0.0–1.0
+  final double value; // 0.0–1.0
   final double amount;
   final double budget;
   final Color color;
@@ -640,10 +655,10 @@ class _BudgetBar extends StatelessWidget {
             Text(
               label,
               style: _T.label(12).copyWith(
-                color: isDark
-                    ? Colors.white.withOpacity(0.45)
-                    : Colors.black.withOpacity(0.45),
-              ),
+                    color: isDark
+                        ? Colors.white.withOpacity(0.45)
+                        : Colors.black.withOpacity(0.45),
+                  ),
             ),
             Row(
               children: [
@@ -654,16 +669,16 @@ class _BudgetBar extends StatelessWidget {
                 Text(
                   ' / ${_fmtCompact.format(budget)}',
                   style: _T.label(12).copyWith(
-                    color: isDark
-                        ? Colors.white.withOpacity(0.3)
-                        : Colors.black.withOpacity(0.3),
-                  ),
+                        color: isDark
+                            ? Colors.white.withOpacity(0.3)
+                            : Colors.black.withOpacity(0.3),
+                      ),
                 ),
                 if (showExceed && projectedLabel != null) ...[
                   const SizedBox(width: 6),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: _kRed.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(6),
@@ -712,12 +727,16 @@ class _GoalImpactCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final days    = goal.daysDelayed ?? 0;
+    final days = goal.daysDelayed ?? 0;
     final newDate = goal.newTargetDate;
-    final pct     = (goal.progressPct * 100).clamp(0, 100);
+    final pct = (goal.progressPct * 100).clamp(0, 100);
 
     // Color según retraso
-    final color = days > 60 ? _kRed : days > 14 ? _kOrange : _kOrange;
+    final color = days > 60
+        ? _kRed
+        : days > 14
+            ? _kOrange
+            : _kOrange;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -753,18 +772,18 @@ class _GoalImpactCard extends StatelessWidget {
                     Text(
                       '${pct.toStringAsFixed(0)} % completada',
                       style: _T.label(12).copyWith(
-                        color: isDark
-                            ? Colors.white.withOpacity(0.4)
-                            : Colors.black.withOpacity(0.4),
-                      ),
+                            color: isDark
+                                ? Colors.white.withOpacity(0.4)
+                                : Colors.black.withOpacity(0.4),
+                          ),
                     ),
                   ],
                 ),
               ),
               // Badge de retraso
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: color.withOpacity(isDark ? 0.15 : 0.08),
                   borderRadius: BorderRadius.circular(8),
@@ -801,10 +820,10 @@ class _GoalImpactCard extends StatelessWidget {
               Text(
                 'Faltan ${_fmtCompact.format(goal.remaining)}',
                 style: _T.label(12).copyWith(
-                  color: isDark
-                      ? Colors.white.withOpacity(0.45)
-                      : Colors.black.withOpacity(0.45),
-                ),
+                      color: isDark
+                          ? Colors.white.withOpacity(0.45)
+                          : Colors.black.withOpacity(0.45),
+                    ),
               ),
               if (newDate != null)
                 Text(
@@ -823,8 +842,19 @@ class _GoalImpactCard extends StatelessWidget {
   }
 
   String _monthName(int m) => const [
-        '', 'ene', 'feb', 'mar', 'abr', 'may', 'jun',
-        'jul', 'ago', 'sep', 'oct', 'nov', 'dic',
+        '',
+        'ene',
+        'feb',
+        'mar',
+        'abr',
+        'may',
+        'jun',
+        'jul',
+        'ago',
+        'sep',
+        'oct',
+        'nov',
+        'dic',
       ][m];
 }
 
@@ -868,10 +898,10 @@ class _RecurringCard extends StatelessWidget {
                     Text(
                       'Este mes aún tienes que pagar',
                       style: _T.label(12).copyWith(
-                        color: isDark
-                            ? Colors.white.withOpacity(0.4)
-                            : Colors.black.withOpacity(0.4),
-                      ),
+                            color: isDark
+                                ? Colors.white.withOpacity(0.4)
+                                : Colors.black.withOpacity(0.4),
+                          ),
                     ),
                   ],
                 ),
@@ -919,7 +949,9 @@ class _RecurringRow extends StatelessWidget {
         ? _kRed
         : daysLeft <= 3
             ? _kOrange
-            : (isDark ? Colors.white.withOpacity(0.4) : Colors.black.withOpacity(0.4));
+            : (isDark
+                ? Colors.white.withOpacity(0.4)
+                : Colors.black.withOpacity(0.4));
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
@@ -944,10 +976,10 @@ class _RecurringRow extends StatelessWidget {
           Text(
             _fmtCompact.format(item.amount),
             style: _T.mono(13).copyWith(
-              color: isDark
-                  ? Colors.white.withOpacity(0.7)
-                  : Colors.black.withOpacity(0.7),
-            ),
+                  color: isDark
+                      ? Colors.white.withOpacity(0.7)
+                      : Colors.black.withOpacity(0.7),
+                ),
           ),
         ],
       ),
@@ -1001,10 +1033,10 @@ class _DebtContextCard extends StatelessWidget {
                 Text(
                   'Tienes compromisos de deuda existentes',
                   style: _T.label(12).copyWith(
-                    color: isDark
-                        ? Colors.white.withOpacity(0.4)
-                        : Colors.black.withOpacity(0.4),
-                  ),
+                        color: isDark
+                            ? Colors.white.withOpacity(0.4)
+                            : Colors.black.withOpacity(0.4),
+                      ),
                 ),
               ],
             ),
@@ -1035,8 +1067,7 @@ class _BlurHeader extends SliverPersistentHeaderDelegate {
   double get maxExtent => 56;
 
   @override
-  Widget build(
-      BuildContext ctx, double shrinkOffset, bool overlapsContent) {
+  Widget build(BuildContext ctx, double shrinkOffset, bool overlapsContent) {
     return ClipRect(
       child: BackdropFilter(
         filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
@@ -1133,6 +1164,149 @@ class _SectionLabel extends StatelessWidget {
         color: isDark
             ? Colors.white.withOpacity(0.35)
             : Colors.black.withOpacity(0.35),
+      ),
+    );
+  }
+}
+// =============================================================================
+// PATRIMONIO
+// =============================================================================
+
+class _PatrimonioCard extends StatelessWidget {
+  final PatrimonioImpact impact;
+  final bool isDark;
+  final Color surfBg;
+
+  const _PatrimonioCard({
+    required this.impact,
+    required this.isDark,
+    required this.surfBg,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isNeg = impact.quedaNegativo;
+    final colorPost = isNeg ? _kRed : _kGreen;
+    final colorActual =
+        isDark ? Colors.white.withOpacity(0.6) : Colors.black.withOpacity(0.6);
+
+    // Porcentaje del patrimonio que representa el gasto — cap en 100%
+    final pct = impact.porcentaje.clamp(0.0, 100.0);
+    final barColor = pct > 50
+        ? _kRed
+        : pct > 25
+            ? _kOrange
+            : _kGreen;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: surfBg,
+        borderRadius: BorderRadius.circular(16),
+        border:
+            isNeg ? Border.all(color: _kRed.withOpacity(0.3), width: 1) : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Fila: patrimonio actual → patrimonio después ─────────────
+          Row(
+            children: [
+              Expanded(
+                child: _FlowColumn(
+                  label: 'Patrimonio actual',
+                  value: _fmtCompact.format(impact.patrimonioActual),
+                  color: colorActual,
+                  isDark: isDark,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Icon(
+                  Icons.arrow_forward_rounded,
+                  color: isDark
+                      ? Colors.white.withOpacity(0.2)
+                      : Colors.black.withOpacity(0.2),
+                  size: 18,
+                ),
+              ),
+              Expanded(
+                child: _FlowColumn(
+                  label: 'Si haces este gasto',
+                  value: _fmtCompact.format(impact.patrimonioPost),
+                  color: colorPost,
+                  isDark: isDark,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+          Divider(
+            height: 1,
+            color: isDark
+                ? Colors.white.withOpacity(0.06)
+                : Colors.black.withOpacity(0.06),
+          ),
+          const SizedBox(height: 16),
+
+          // ── Barra: qué % del patrimonio representa el gasto ──────────
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Este gasto es el ${impact.porcentaje.toStringAsFixed(1)}% de tu patrimonio',
+                style: _T.label(12).copyWith(
+                      color: isDark
+                          ? Colors.white.withOpacity(0.45)
+                          : Colors.black.withOpacity(0.45),
+                    ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: pct / 100,
+              minHeight: 6,
+              backgroundColor: isDark
+                  ? Colors.white.withOpacity(0.08)
+                  : Colors.black.withOpacity(0.06),
+              valueColor: AlwaysStoppedAnimation(barColor),
+            ),
+          ),
+
+          // ── Nota contextual si el patrimonio queda negativo ──────────
+          if (isNeg) ...[
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _kRed.withOpacity(isDark ? 0.12 : 0.07),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Iconsax.danger, size: 16, color: _kRed),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Este gasto dejaría tu patrimonio neto en negativo: '
+                      'deberías más de lo que tienes. Considera pagarlo '
+                      'en varias partes o posponerlo.',
+                      style: _T.label(12).copyWith(
+                            color: _kRed,
+                            height: 1.4,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

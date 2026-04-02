@@ -23,6 +23,7 @@ class SimulationResult {
   final List<GoalImpact> affectedGoals;
   final RecurringContext recurringContext;
   final DebtContext debtContext;
+  final PatrimonioImpact? patrimonioImpact; 
 
   SimulationResult({
     required this.verdict,
@@ -32,6 +33,7 @@ class SimulationResult {
     this.affectedGoals = const [],
     RecurringContext? recurringContext,
     DebtContext? debtContext,
+    this.patrimonioImpact,
   })  : recurringContext = recurringContext ?? RecurringContext.empty(),
         debtContext = debtContext ?? DebtContext.empty();
 
@@ -55,6 +57,10 @@ class SimulationResult {
           ? BudgetImpact.fromMap(map['budgetImpact'])
           : null,
       savingsImpact: SavingsImpact.fromMap(map['savingsImpact']),
+       patrimonioImpact: map['patrimonioImpact'] != null
+          ? PatrimonioImpact.fromMap(
+              map['patrimonioImpact'] as Map<String, dynamic>)
+          : null,
     );
   }
 
@@ -72,6 +78,7 @@ class SimulationResult {
         affectedGoals: goals,
         recurringContext: recurring,
         debtContext: debt,
+        patrimonioImpact: patrimonioImpact,
       );
 }
 
@@ -259,4 +266,27 @@ class FinancialProjection {
           'Error al parsear FinancialProjection: $e', map);
     }
   }
+}
+// ─── IMPACTO EN PATRIMONIO (NUEVO) ───────────────────────────────────────────
+class PatrimonioImpact {
+  final double patrimonioActual;
+  final double patrimonioPost;
+  final double diferencia;
+  final double porcentaje;
+
+  PatrimonioImpact({
+    required this.patrimonioActual,
+    required this.patrimonioPost,
+    required this.diferencia,
+    required this.porcentaje,
+  });
+
+  bool get quedaNegativo => patrimonioPost < 0;
+
+  factory PatrimonioImpact.fromMap(Map<String, dynamic> map) => PatrimonioImpact(
+        patrimonioActual: (map['patrimonioActual'] as num).toDouble(),
+        patrimonioPost:   (map['patrimonioPost']   as num).toDouble(),
+        diferencia:       (map['diferencia']        as num).toDouble(),
+        porcentaje:       (map['porcentaje']        as num).toDouble(),
+      );
 }
