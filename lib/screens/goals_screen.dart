@@ -14,6 +14,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 import 'package:lottie/lottie.dart';
+import 'package:sasper/screens/add_manifestation_screen.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
 import 'package:sasper/data/goal_repository.dart';
@@ -29,29 +30,39 @@ import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 
 // ── Tokens de diseño ──────────────────────────────────────────────────────────
 class _T {
-  static TextStyle display(double s, {Color? c, FontWeight w = FontWeight.w700}) =>
-      GoogleFonts.dmSans(fontSize: s, fontWeight: w, color: c, letterSpacing: -0.5, height: 1.1);
-  static TextStyle label(double s, {Color? c, FontWeight w = FontWeight.w500}) =>
+  static TextStyle display(double s,
+          {Color? c, FontWeight w = FontWeight.w700}) =>
+      GoogleFonts.dmSans(
+          fontSize: s,
+          fontWeight: w,
+          color: c,
+          letterSpacing: -0.5,
+          height: 1.1);
+  static TextStyle label(double s,
+          {Color? c, FontWeight w = FontWeight.w500}) =>
       GoogleFonts.dmSans(fontSize: s, fontWeight: w, color: c);
   static TextStyle mono(double s, {Color? c, FontWeight w = FontWeight.w600}) =>
       GoogleFonts.dmMono(fontSize: s, fontWeight: w, color: c);
 
-  static const h  = 20.0;
-  static const r  = 20.0;
+  static const h = 20.0;
+  static const r = 20.0;
   static const ri = 13.0;
 }
 
 // ── Sistema de color semántico iOS ────────────────────────────────────────────
-const _kBlue   = Color(0xFF0A84FF);
-const _kGreen  = Color(0xFF30D158);
+const _kBlue = Color(0xFF0A84FF);
+const _kGreen = Color(0xFF30D158);
 const _kOrange = Color(0xFFFF9F0A);
-const _kRed    = Color(0xFFFF453A);
+const _kRed = Color(0xFFFF453A);
 
 Color _priorityColor(GoalPriority p) {
   switch (p) {
-    case GoalPriority.low:    return _kGreen;
-    case GoalPriority.medium: return _kOrange;
-    case GoalPriority.high:   return _kRed;
+    case GoalPriority.low:
+      return _kGreen;
+    case GoalPriority.medium:
+      return _kOrange;
+    case GoalPriority.high:
+      return _kRed;
   }
 }
 
@@ -63,23 +74,32 @@ Color _progressColor(double progress) {
 
 String _priorityLabel(GoalPriority p) {
   switch (p) {
-    case GoalPriority.low:    return 'Baja';
-    case GoalPriority.medium: return 'Media';
-    case GoalPriority.high:   return 'Alta';
+    case GoalPriority.low:
+      return 'Baja';
+    case GoalPriority.medium:
+      return 'Media';
+    case GoalPriority.high:
+      return 'Alta';
   }
 }
 
 String _timeframeLabel(GoalTimeframe tf) {
   switch (tf) {
-    case GoalTimeframe.short:  return 'Corto plazo';
-    case GoalTimeframe.medium: return 'Mediano plazo';
-    case GoalTimeframe.long:   return 'Largo plazo';
-    case GoalTimeframe.custom: return 'Personalizado';
+    case GoalTimeframe.short:
+      return 'Corto plazo';
+    case GoalTimeframe.medium:
+      return 'Mediano plazo';
+    case GoalTimeframe.long:
+      return 'Largo plazo';
+    case GoalTimeframe.custom:
+      return 'Personalizado';
   }
 }
 
-final _fmtFull    = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
-final _fmtCompact = NumberFormat.compactCurrency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+final _fmtFull =
+    NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+final _fmtCompact = NumberFormat.compactCurrency(
+    locale: 'es_CO', symbol: '\$', decimalDigits: 0);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SCREEN
@@ -95,9 +115,10 @@ class _GoalsScreenState extends State<GoalsScreen>
     with TickerProviderStateMixin {
   final _repo = GoalRepository.instance;
   late final Stream<List<Goal>> _goalsStream = _repo.getGoalsStream();
-  late final TabController _tabController = TabController(length: 2, vsync: this);
+  late final TabController _tabController =
+      TabController(length: 2, vsync: this);
 
-  final _activeFilters    = _GoalFilters();
+  final _activeFilters = _GoalFilters();
   final _completedFilters = _GoalFilters();
   bool _showFilters = false;
 
@@ -124,8 +145,15 @@ class _GoalsScreenState extends State<GoalsScreen>
   }
 
   void _goNotes(Goal g) => Navigator.of(context).push(
-    MaterialPageRoute(builder: (_) => GoalNotesEditorScreen(goal: g)),
-  );
+        MaterialPageRoute(builder: (_) => GoalNotesEditorScreen(goal: g)),
+      );
+
+  void _goManifest(Goal g) {
+    HapticFeedback.lightImpact();
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => AddManifestationScreen(linkedGoal: g)),
+    );
+  }
 
   Future<void> _deleteGoal(Goal goal) async {
     final ok = await showModalBottomSheet<bool>(
@@ -154,14 +182,16 @@ class _GoalsScreenState extends State<GoalsScreen>
 
   List<Goal> _filter(List<Goal> goals, _GoalFilters f) {
     if (!f.hasActiveFilters) return goals;
-    return goals.where((g) =>
-        (f.timeframe == null || g.timeframe == f.timeframe) &&
-        (f.priority  == null || g.priority  == f.priority)).toList();
+    return goals
+        .where((g) =>
+            (f.timeframe == null || g.timeframe == f.timeframe) &&
+            (f.priority == null || g.priority == f.priority))
+        .toList();
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme   = Theme.of(context);
+    final theme = Theme.of(context);
     final statusH = MediaQuery.of(context).padding.top;
 
     return Scaffold(
@@ -186,17 +216,19 @@ class _GoalsScreenState extends State<GoalsScreen>
         body: StreamBuilder<List<Goal>>(
           stream: _goalsStream,
           builder: (ctx, snap) {
-            if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
+            if (snap.connectionState == ConnectionState.waiting &&
+                !snap.hasData) {
               return _SkeletonLoader();
             }
             if (snap.hasError) {
-              return _ErrorState(error: snap.error.toString(), onRetry: _refresh);
+              return _ErrorState(
+                  error: snap.error.toString(), onRetry: _refresh);
             }
 
             final all = snap.data ?? [];
             if (all.isEmpty) return _EmptyState(onAdd: _goAdd);
 
-            final active    = _filter(
+            final active = _filter(
                 all.where((g) => g.status == GoalStatus.active).toList(),
                 _activeFilters);
             final completed = _filter(
@@ -215,6 +247,7 @@ class _GoalsScreenState extends State<GoalsScreen>
                   onEdit: _goEdit,
                   onDelete: _deleteGoal,
                   onNotes: _goNotes,
+                  onManifest: _goManifest,
                   onFilterChanged: () => setState(() {}),
                 ),
                 _GoalsList(
@@ -246,18 +279,24 @@ class _HeaderDelegate extends SliverPersistentHeaderDelegate {
   final VoidCallback onFilter, onAdd;
 
   const _HeaderDelegate({
-    required this.statusBarHeight, required this.bg,
-    required this.showFilters, required this.tabController,
-    required this.onFilter, required this.onAdd,
+    required this.statusBarHeight,
+    required this.bg,
+    required this.showFilters,
+    required this.tabController,
+    required this.onFilter,
+    required this.onAdd,
   });
 
-  @override double get minExtent => statusBarHeight + 100;
-  @override double get maxExtent => statusBarHeight + 158;
-  @override bool shouldRebuild(covariant _HeaderDelegate old) => true;
+  @override
+  double get minExtent => statusBarHeight + 100;
+  @override
+  double get maxExtent => statusBarHeight + 158;
+  @override
+  bool shouldRebuild(covariant _HeaderDelegate old) => true;
 
   @override
   Widget build(BuildContext ctx, double shrinkOffset, bool overlaps) {
-    final t         = (shrinkOffset / (maxExtent - minExtent)).clamp(0.0, 1.0);
+    final t = (shrinkOffset / (maxExtent - minExtent)).clamp(0.0, 1.0);
     final onSurface = Theme.of(ctx).colorScheme.onSurface;
     final titleSize = lerpDouble(30, 19, t)!;
 
@@ -268,7 +307,9 @@ class _HeaderDelegate extends SliverPersistentHeaderDelegate {
           color: bg.withOpacity(t > 0.15 ? 0.93 : 0),
           padding: EdgeInsets.only(
             top: statusBarHeight + 10,
-            left: _T.h + 4, right: _T.h, bottom: 0,
+            left: _T.h + 4,
+            right: _T.h,
+            bottom: 0,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -285,7 +326,8 @@ class _HeaderDelegate extends SliverPersistentHeaderDelegate {
                           opacity: (1 - t * 2.2).clamp(0.0, 1.0),
                           duration: const Duration(milliseconds: 50),
                           child: Text('MIS METAS',
-                              style: _T.label(10, w: FontWeight.w700,
+                              style: _T.label(10,
+                                  w: FontWeight.w700,
                                   c: onSurface.withOpacity(0.35))),
                         ),
                         Text('Objetivos',
@@ -294,7 +336,8 @@ class _HeaderDelegate extends SliverPersistentHeaderDelegate {
                     ),
                   ),
                   _PillIconButton(
-                      icon: showFilters ? Iconsax.filter_remove : Iconsax.filter,
+                      icon:
+                          showFilters ? Iconsax.filter_remove : Iconsax.filter,
                       onTap: onFilter),
                   const SizedBox(width: 8),
                   _PillButton(label: 'Nueva', icon: Iconsax.add, onTap: onAdd),
@@ -325,19 +368,32 @@ class _PillIconButton extends StatefulWidget {
   final IconData icon;
   final VoidCallback onTap;
   const _PillIconButton({required this.icon, required this.onTap});
-  @override State<_PillIconButton> createState() => _PillIconButtonState();
+  @override
+  State<_PillIconButton> createState() => _PillIconButtonState();
 }
+
 class _PillIconButtonState extends State<_PillIconButton>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 75));
-  @override void dispose() { _c.dispose(); super.dispose(); }
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 75));
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return GestureDetector(
-      onTapDown: (_) { _c.forward(); HapticFeedback.selectionClick(); },
-      onTapUp:   (_) { _c.reverse(); widget.onTap(); },
+      onTapDown: (_) {
+        _c.forward();
+        HapticFeedback.selectionClick();
+      },
+      onTapUp: (_) {
+        _c.reverse();
+        widget.onTap();
+      },
       onTapCancel: () => _c.reverse(),
       child: AnimatedBuilder(
         animation: _c,
@@ -349,8 +405,8 @@ class _PillIconButtonState extends State<_PillIconButton>
               color: theme.colorScheme.surfaceContainer,
               shape: BoxShape.circle,
             ),
-            child: Icon(widget.icon, size: 18,
-                color: theme.colorScheme.onSurface.withOpacity(0.65)),
+            child: Icon(widget.icon,
+                size: 18, color: theme.colorScheme.onSurface.withOpacity(0.65)),
           ),
         ),
       ),
@@ -362,19 +418,33 @@ class _PillButton extends StatefulWidget {
   final String label;
   final IconData icon;
   final VoidCallback onTap;
-  const _PillButton({required this.label, required this.icon, required this.onTap});
-  @override State<_PillButton> createState() => _PillButtonState();
+  const _PillButton(
+      {required this.label, required this.icon, required this.onTap});
+  @override
+  State<_PillButton> createState() => _PillButtonState();
 }
+
 class _PillButtonState extends State<_PillButton>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 75));
-  @override void dispose() { _c.dispose(); super.dispose(); }
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 75));
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTapDown: (_) { _c.forward(); HapticFeedback.lightImpact(); },
-      onTapUp:   (_) { _c.reverse(); widget.onTap(); },
+      onTapDown: (_) {
+        _c.forward();
+        HapticFeedback.lightImpact();
+      },
+      onTapUp: (_) {
+        _c.reverse();
+        widget.onTap();
+      },
       onTapCancel: () => _c.reverse(),
       child: AnimatedBuilder(
         animation: _c,
@@ -408,13 +478,20 @@ class _GoalsList extends StatelessWidget {
   final bool isCompleted, showFilters;
   final _GoalFilters filters;
   final Future<void> Function() onRefresh;
-  final void Function(Goal)? onEdit, onDelete, onNotes;
+  final void Function(Goal)? onEdit, onDelete, onNotes, onManifest;
   final VoidCallback onFilterChanged;
 
   const _GoalsList({
-    required this.goals, required this.isCompleted, required this.showFilters,
-    required this.filters, required this.onRefresh,
-    this.onEdit, this.onDelete, this.onNotes, required this.onFilterChanged,
+    required this.goals,
+    required this.isCompleted,
+    required this.showFilters,
+    required this.filters,
+    required this.onRefresh,
+    this.onEdit,
+    this.onDelete,
+    this.onNotes,
+    this.onManifest,
+    required this.onFilterChanged,
   });
 
   @override
@@ -423,7 +500,8 @@ class _GoalsList extends StatelessWidget {
       onRefresh: onRefresh,
       color: _kBlue,
       child: CustomScrollView(
-        physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+        physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics()),
         slivers: [
           if (showFilters)
             SliverToBoxAdapter(
@@ -438,7 +516,10 @@ class _GoalsList extends StatelessWidget {
             SliverFillRemaining(
               child: _EmptyFilterState(
                 filters: filters,
-                onClear: () { filters.clear(); onFilterChanged(); },
+                onClear: () {
+                  filters.clear();
+                  onFilterChanged();
+                },
               ),
             )
           else
@@ -447,10 +528,15 @@ class _GoalsList extends StatelessWidget {
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (_, i) => _GoalCard(
-                    goal: goals[i], index: i, isCompleted: isCompleted,
-                    onEdit:       onEdit   != null ? () => onEdit!(goals[i])   : null,
-                    onDelete:     onDelete != null ? () => onDelete!(goals[i]) : null,
-                    onNotes:      onNotes  != null ? () => onNotes!(goals[i])  : null,
+                    goal: goals[i],
+                    index: i,
+                    isCompleted: isCompleted,
+                    onEdit: onEdit != null ? () => onEdit!(goals[i]) : null,
+                    onDelete:
+                        onDelete != null ? () => onDelete!(goals[i]) : null,
+                    onNotes: onNotes != null ? () => onNotes!(goals[i]) : null,
+                    onManifest:
+                        onManifest != null ? () => onManifest!(goals[i]) : null,
                     onContribute: onRefresh,
                   ),
                   childCount: goals.length,
@@ -474,22 +560,27 @@ class _SummaryBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final onSurf = Theme.of(context).colorScheme.onSurface;
-    final isDark  = Theme.of(context).brightness == Brightness.dark;
-    final bg      = isDark ? Colors.white.withOpacity(0.07) : Colors.black.withOpacity(0.04);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark
+        ? Colors.white.withOpacity(0.07)
+        : Colors.black.withOpacity(0.04);
 
-    final totalSaved  = goals.fold<double>(0, (s, g) => s + g.currentAmount);
-    final avgProgress = goals.fold<double>(0, (s, g) => s + g.progress) / goals.length;
-    final nearDone    = goals.where((g) => g.progress >= 0.8).length;
+    final totalSaved = goals.fold<double>(0, (s, g) => s + g.currentAmount);
+    final avgProgress =
+        goals.fold<double>(0, (s, g) => s + g.progress) / goals.length;
+    final nearDone = goals.where((g) => g.progress >= 0.8).length;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(_T.h, 8, _T.h, 4),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(_T.r)),
+        decoration:
+            BoxDecoration(color: bg, borderRadius: BorderRadius.circular(_T.r)),
         child: Row(children: [
           Expanded(
             flex: 5,
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('Total ahorrado',
                   style: _T.label(11, c: onSurf.withOpacity(0.42))),
               const SizedBox(height: 3),
@@ -501,9 +592,11 @@ class _SummaryBar extends StatelessWidget {
           Expanded(
             flex: 3,
             child: Column(children: [
-              Text('Promedio', style: _T.label(11, c: onSurf.withOpacity(0.42))),
+              Text('Promedio',
+                  style: _T.label(11, c: onSurf.withOpacity(0.42))),
               const SizedBox(height: 3),
-              Text('${(avgProgress * 100).round()}%', style: _T.mono(20, c: _kGreen)),
+              Text('${(avgProgress * 100).round()}%',
+                  style: _T.mono(20, c: _kGreen)),
             ]),
           ),
           Container(width: 0.5, height: 36, color: onSurf.withOpacity(0.10)),
@@ -518,10 +611,15 @@ class _SummaryBar extends StatelessWidget {
         ]),
       ),
     )
-    .animate()
-    .fadeIn(delay: const Duration(milliseconds: 80), duration: const Duration(milliseconds: 350))
-    .slideY(begin: 0.04, delay: const Duration(milliseconds: 80),
-        duration: const Duration(milliseconds: 350), curve: Curves.easeOutCubic);
+        .animate()
+        .fadeIn(
+            delay: const Duration(milliseconds: 80),
+            duration: const Duration(milliseconds: 350))
+        .slideY(
+            begin: 0.04,
+            delay: const Duration(milliseconds: 80),
+            duration: const Duration(milliseconds: 350),
+            curve: Curves.easeOutCubic);
   }
 }
 
@@ -533,29 +631,40 @@ class _GoalCard extends StatefulWidget {
   final Goal goal;
   final int index;
   final bool isCompleted;
-  final VoidCallback? onEdit, onDelete, onNotes;
+  final VoidCallback? onEdit, onDelete, onNotes, onManifest;
   final Future<void> Function() onContribute;
 
   const _GoalCard({
-    required this.goal, required this.index, required this.isCompleted,
-    this.onEdit, this.onDelete, this.onNotes, required this.onContribute,
+    required this.goal,
+    required this.index,
+    required this.isCompleted,
+    this.onEdit,
+    this.onDelete,
+    this.onNotes,
+    this.onManifest,
+    required this.onContribute,
   });
 
-  @override State<_GoalCard> createState() => _GoalCardState();
+  @override
+  State<_GoalCard> createState() => _GoalCardState();
 }
 
 class _GoalCardState extends State<_GoalCard>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _press =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 75));
-  @override void dispose() { _press.dispose(); super.dispose(); }
+  late final AnimationController _press = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 75));
+  @override
+  void dispose() {
+    _press.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final isDark   = Theme.of(context).brightness == Brightness.dark;
-    final pColor   = _priorityColor(widget.goal.priority);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final pColor = _priorityColor(widget.goal.priority);
     final barColor = _progressColor(widget.goal.progress);
-    final pct      = widget.goal.progress.clamp(0.0, 1.0);
+    final pct = widget.goal.progress.clamp(0.0, 1.0);
     final cardColor = isDark
         ? Colors.white.withOpacity(0.08)
         : Colors.black.withOpacity(0.04);
@@ -570,7 +679,7 @@ class _GoalCardState extends State<_GoalCard>
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTapDown: (_) => _press.forward(),
-        onTapUp:   (_) => _press.reverse(),
+        onTapUp: (_) => _press.reverse(),
         onTapCancel: () => _press.reverse(),
         child: Container(
           margin: const EdgeInsets.only(bottom: 10),
@@ -583,19 +692,28 @@ class _GoalCardState extends State<_GoalCard>
             child: widget.isCompleted
                 ? _CompletedLayout(goal: widget.goal, pColor: pColor)
                 : _ActiveLayout(
-                    goal: widget.goal, pColor: pColor,
-                    barColor: barColor, pct: pct,
-                    onEdit: widget.onEdit, onDelete: widget.onDelete,
-                    onNotes: widget.onNotes, onContribute: widget.onContribute,
+                    goal: widget.goal,
+                    pColor: pColor,
+                    barColor: barColor,
+                    pct: pct,
+                    onEdit: widget.onEdit,
+                    onDelete: widget.onDelete,
+                    onNotes: widget.onNotes,
+                    onManifest: widget.onManifest,
+                    onContribute: widget.onContribute,
                   ),
           ),
         ),
       ),
     )
-    .animate()
-    .fadeIn(delay: delay, duration: const Duration(milliseconds: 320))
-    .slideY(begin: 0.05, end: 0, delay: delay,
-        duration: const Duration(milliseconds: 320), curve: Curves.easeOutCubic);
+        .animate()
+        .fadeIn(delay: delay, duration: const Duration(milliseconds: 320))
+        .slideY(
+            begin: 0.05,
+            end: 0,
+            delay: delay,
+            duration: const Duration(milliseconds: 320),
+            curve: Curves.easeOutCubic);
   }
 }
 
@@ -605,19 +723,26 @@ class _ActiveLayout extends StatelessWidget {
   final Goal goal;
   final Color pColor, barColor;
   final double pct;
-  final VoidCallback? onEdit, onDelete, onNotes;
+  final VoidCallback? onEdit, onDelete, onNotes, onManifest;
   final Future<void> Function() onContribute;
 
   const _ActiveLayout({
-    required this.goal, required this.pColor, required this.barColor,
-    required this.pct, this.onEdit, this.onDelete, this.onNotes,
+    required this.goal,
+    required this.pColor,
+    required this.barColor,
+    required this.pct,
+    this.onEdit,
+    this.onDelete,
+    this.onNotes,
+    this.onManifest,
     required this.onContribute,
   });
 
   @override
   Widget build(BuildContext context) {
-    final onSurf    = Theme.of(context).colorScheme.onSurface;
-    final remaining = (goal.targetAmount - goal.currentAmount).clamp(0, double.infinity);
+    final onSurf = Theme.of(context).colorScheme.onSurface;
+    final remaining =
+        (goal.targetAmount - goal.currentAmount).clamp(0, double.infinity);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -627,20 +752,26 @@ class _ActiveLayout extends StatelessWidget {
           _GoalIcon(icon: goal.category?.icon ?? Iconsax.flag, color: pColor),
           const SizedBox(width: 12),
           Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(goal.name,
                   style: _T.display(16, c: onSurf, w: FontWeight.w700)),
               const SizedBox(height: 4),
               Row(children: [
                 _Tag(label: _priorityLabel(goal.priority), color: pColor),
                 const SizedBox(width: 6),
-                _Tag(label: _timeframeLabel(goal.timeframe),
+                _Tag(
+                    label: _timeframeLabel(goal.timeframe),
                     color: onSurf.withOpacity(0.3)),
               ]),
             ]),
           ),
           if (onEdit != null)
-            _MenuDot(onEdit: onEdit!, onNotes: onNotes, onDelete: onDelete!),
+            _MenuDot(
+                onEdit: onEdit!,
+                onNotes: onNotes,
+                onManifest: onManifest,
+                onDelete: onDelete!),
         ]),
 
         const SizedBox(height: 18),
@@ -648,7 +779,8 @@ class _ActiveLayout extends StatelessWidget {
         // Números protagonistas
         Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('Ahorrado',
                   style: _T.label(11, c: onSurf.withOpacity(0.42))),
               const SizedBox(height: 2),
@@ -669,8 +801,7 @@ class _ActiveLayout extends StatelessWidget {
         // Barra de progreso 4px
         Column(children: [
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Text('Progreso',
-                style: _T.label(11, c: onSurf.withOpacity(0.42))),
+            Text('Progreso', style: _T.label(11, c: onSurf.withOpacity(0.42))),
             Text('${(pct * 100).toStringAsFixed(1)}%',
                 style: _T.label(12, w: FontWeight.w700, c: barColor)),
           ]),
@@ -709,7 +840,9 @@ class _ActiveLayout extends StatelessWidget {
         Row(children: [
           Expanded(
             child: _ActionButton(
-              label: 'Aportar', icon: Iconsax.add_circle, color: _kBlue,
+              label: 'Aportar',
+              icon: Iconsax.add_circle,
+              color: _kBlue,
               onTap: () {
                 HapticFeedback.lightImpact();
                 showModalBottomSheet(
@@ -721,8 +854,8 @@ class _ActiveLayout extends StatelessWidget {
                     child: Container(
                       decoration: BoxDecoration(
                         color: Theme.of(context).scaffoldBackgroundColor,
-                        borderRadius:
-                            const BorderRadius.vertical(top: Radius.circular(28)),
+                        borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(28)),
                       ),
                       child: ContributeToGoalDialog(
                           goal: goal, onSuccess: onContribute),
@@ -762,7 +895,8 @@ class _CompletedLayout extends StatelessWidget {
       Expanded(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(goal.name,
-              style: _T.label(15, c: onSurf.withOpacity(0.65), w: FontWeight.w500)),
+              style: _T.label(15,
+                  c: onSurf.withOpacity(0.65), w: FontWeight.w500)),
           const SizedBox(height: 4),
           Row(children: [
             const Icon(Iconsax.verify5, size: 12, color: _kGreen),
@@ -785,13 +919,14 @@ class _GoalIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    width: 42, height: 42,
-    decoration: BoxDecoration(
-      color: color.withOpacity(0.13),
-      borderRadius: BorderRadius.circular(_T.ri),
-    ),
-    child: Icon(icon, size: 20, color: color),
-  );
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.13),
+          borderRadius: BorderRadius.circular(_T.ri),
+        ),
+        child: Icon(icon, size: 20, color: color),
+      );
 }
 
 class _Tag extends StatelessWidget {
@@ -801,13 +936,13 @@ class _Tag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-    decoration: BoxDecoration(
-      color: color.withOpacity(0.10),
-      borderRadius: BorderRadius.circular(6),
-    ),
-    child: Text(label, style: _T.label(10, w: FontWeight.w700, c: color)),
-  );
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.10),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(label, style: _T.label(10, w: FontWeight.w700, c: color)),
+      );
 }
 
 class _ActionButton extends StatefulWidget {
@@ -815,20 +950,36 @@ class _ActionButton extends StatefulWidget {
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
-  const _ActionButton({required this.label, required this.icon,
-      required this.color, required this.onTap});
-  @override State<_ActionButton> createState() => _ActionButtonState();
+  const _ActionButton(
+      {required this.label,
+      required this.icon,
+      required this.color,
+      required this.onTap});
+  @override
+  State<_ActionButton> createState() => _ActionButtonState();
 }
+
 class _ActionButtonState extends State<_ActionButton>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 70));
-  @override void dispose() { _c.dispose(); super.dispose(); }
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 70));
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTapDown: (_) { _c.forward(); HapticFeedback.selectionClick(); },
-      onTapUp:   (_) { _c.reverse(); widget.onTap(); },
+      onTapDown: (_) {
+        _c.forward();
+        HapticFeedback.selectionClick();
+      },
+      onTapUp: (_) {
+        _c.reverse();
+        widget.onTap();
+      },
       onTapCancel: () => _c.reverse(),
       child: AnimatedBuilder(
         animation: _c,
@@ -859,22 +1010,38 @@ class _ActionButtonState extends State<_ActionButton>
 
 class _MenuDot extends StatefulWidget {
   final VoidCallback onEdit, onDelete;
-  final VoidCallback? onNotes;
-  const _MenuDot({required this.onEdit, required this.onDelete, this.onNotes});
-  @override State<_MenuDot> createState() => _MenuDotState();
+  final VoidCallback? onNotes, onManifest;
+  const _MenuDot(
+      {required this.onEdit,
+      required this.onDelete,
+      this.onNotes,
+      this.onManifest});
+  @override
+  State<_MenuDot> createState() => _MenuDotState();
 }
+
 class _MenuDotState extends State<_MenuDot>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 70));
-  @override void dispose() { _c.dispose(); super.dispose(); }
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 70));
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final onSurf = Theme.of(context).colorScheme.onSurface;
     return GestureDetector(
-      onTapDown: (_) { _c.forward(); HapticFeedback.selectionClick(); },
-      onTapUp: (_) { _c.reverse(); _openSheet(context); },
+      onTapDown: (_) {
+        _c.forward();
+        HapticFeedback.selectionClick();
+      },
+      onTapUp: (_) {
+        _c.reverse();
+        _openSheet(context);
+      },
       onTapCancel: () => _c.reverse(),
       child: AnimatedBuilder(
         animation: _c,
@@ -901,7 +1068,10 @@ class _MenuDotState extends State<_MenuDot>
       builder: (_) => BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: _GoalActionSheet(
-          onEdit: widget.onEdit, onNotes: widget.onNotes, onDelete: widget.onDelete,
+          onEdit: widget.onEdit,
+          onNotes: widget.onNotes,
+          onManifest: widget.onManifest,
+          onDelete: widget.onDelete,
         ),
       ),
     );
@@ -910,21 +1080,28 @@ class _MenuDotState extends State<_MenuDot>
 
 class _GoalActionSheet extends StatelessWidget {
   final VoidCallback onEdit, onDelete;
-  final VoidCallback? onNotes;
-  const _GoalActionSheet({required this.onEdit, required this.onDelete, this.onNotes});
+  final VoidCallback? onNotes, onManifest;
+  const _GoalActionSheet(
+      {required this.onEdit,
+      required this.onDelete,
+      this.onNotes,
+      this.onManifest});
 
   @override
   Widget build(BuildContext context) {
-    final isDark   = Theme.of(context).brightness == Brightness.dark;
-    final sheetBg  = isDark ? Colors.white.withOpacity(0.10) : Colors.white.withOpacity(0.92);
-    final onSurf   = Theme.of(context).colorScheme.onSurface;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final sheetBg = isDark
+        ? Colors.white.withOpacity(0.10)
+        : Colors.white.withOpacity(0.92);
+    final onSurf = Theme.of(context).colorScheme.onSurface;
 
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Container(
-            width: 36, height: 4,
+            width: 36,
+            height: 4,
             margin: const EdgeInsets.only(bottom: 16),
             decoration: BoxDecoration(
               color: onSurf.withOpacity(0.18),
@@ -933,17 +1110,43 @@ class _GoalActionSheet extends StatelessWidget {
           ),
           Container(
             decoration: BoxDecoration(
-              color: sheetBg, borderRadius: BorderRadius.circular(16),
+              color: sheetBg,
+              borderRadius: BorderRadius.circular(16),
             ),
             child: Column(children: [
-              _SheetRow(icon: Iconsax.edit, label: 'Editar meta', isFirst: true,
-                  onTap: () { Navigator.pop(context); onEdit(); }),
+              _SheetRow(
+                  icon: Iconsax.edit,
+                  label: 'Editar meta',
+                  isFirst: true,
+                  onTap: () {
+                    Navigator.pop(context);
+                    onEdit();
+                  }),
+              if (onManifest != null)
+                _SheetRow(
+                    icon: Iconsax.star,
+                    label: 'Manifestar meta',
+                    onTap: () {
+                      Navigator.pop(context);
+                      onManifest!();
+                    }),
               if (onNotes != null)
-                _SheetRow(icon: Iconsax.document_text_1, label: 'Ver notas',
-                    onTap: () { Navigator.pop(context); onNotes!(); }),
-              _SheetRow(icon: Iconsax.trash, label: 'Eliminar meta', isLast: true,
+                _SheetRow(
+                    icon: Iconsax.document_text_1,
+                    label: 'Ver notas',
+                    onTap: () {
+                      Navigator.pop(context);
+                      onNotes!();
+                    }),
+              _SheetRow(
+                  icon: Iconsax.trash,
+                  label: 'Eliminar meta',
+                  isLast: true,
                   isDestructive: true,
-                  onTap: () { Navigator.pop(context); onDelete(); }),
+                  onTap: () {
+                    Navigator.pop(context);
+                    onDelete();
+                  }),
             ]),
           ),
           const SizedBox(height: 10),
@@ -959,31 +1162,55 @@ class _SheetRow extends StatefulWidget {
   final String label;
   final bool isFirst, isLast, isDestructive;
   final VoidCallback onTap;
-  const _SheetRow({required this.icon, required this.label, required this.onTap,
-      this.isFirst = false, this.isLast = false, this.isDestructive = false});
-  @override State<_SheetRow> createState() => _SheetRowState();
+  const _SheetRow(
+      {required this.icon,
+      required this.label,
+      required this.onTap,
+      this.isFirst = false,
+      this.isLast = false,
+      this.isDestructive = false});
+  @override
+  State<_SheetRow> createState() => _SheetRowState();
 }
+
 class _SheetRowState extends State<_SheetRow>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 65));
-  @override void dispose() { _c.dispose(); super.dispose(); }
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 65));
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final color   = widget.isDestructive ? _kRed : Theme.of(context).colorScheme.onSurface;
-    final topR    = widget.isFirst ? const Radius.circular(16) : Radius.zero;
-    final bottomR = widget.isLast  ? const Radius.circular(16) : Radius.zero;
+    final color =
+        widget.isDestructive ? _kRed : Theme.of(context).colorScheme.onSurface;
+    final topR = widget.isFirst ? const Radius.circular(16) : Radius.zero;
+    final bottomR = widget.isLast ? const Radius.circular(16) : Radius.zero;
     return GestureDetector(
-      onTapDown: (_) { _c.forward(); HapticFeedback.selectionClick(); },
-      onTapUp:   (_) { _c.reverse(); widget.onTap(); },
+      onTapDown: (_) {
+        _c.forward();
+        HapticFeedback.selectionClick();
+      },
+      onTapUp: (_) {
+        _c.reverse();
+        widget.onTap();
+      },
       onTapCancel: () => _c.reverse(),
       child: AnimatedBuilder(
         animation: _c,
         builder: (_, __) => Container(
           decoration: BoxDecoration(
-            color: _c.value > 0.01 ? color.withOpacity(0.06 * _c.value) : Colors.transparent,
+            color: _c.value > 0.01
+                ? color.withOpacity(0.06 * _c.value)
+                : Colors.transparent,
             borderRadius: BorderRadius.only(
-              topLeft: topR, topRight: topR, bottomLeft: bottomR, bottomRight: bottomR,
+              topLeft: topR,
+              topRight: topR,
+              bottomLeft: bottomR,
+              bottomRight: bottomR,
             ),
           ),
           child: Column(children: [
@@ -998,8 +1225,13 @@ class _SheetRowState extends State<_SheetRow>
             if (!widget.isLast)
               Padding(
                 padding: const EdgeInsets.only(left: 54),
-                child: Divider(height: 0.5, thickness: 0.5,
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.07)),
+                child: Divider(
+                    height: 0.5,
+                    thickness: 0.5,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withOpacity(0.07)),
               ),
           ]),
         ),
@@ -1009,20 +1241,35 @@ class _SheetRowState extends State<_SheetRow>
 }
 
 class _SheetCancel extends StatefulWidget {
-  @override State<_SheetCancel> createState() => _SheetCancelState();
+  @override
+  State<_SheetCancel> createState() => _SheetCancelState();
 }
+
 class _SheetCancelState extends State<_SheetCancel>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 65));
-  @override void dispose() { _c.dispose(); super.dispose(); }
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 65));
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? Colors.white.withOpacity(0.10) : Colors.white.withOpacity(0.92);
+    final bg = isDark
+        ? Colors.white.withOpacity(0.10)
+        : Colors.white.withOpacity(0.92);
     return GestureDetector(
-      onTapDown: (_) { _c.forward(); HapticFeedback.selectionClick(); },
-      onTapUp:   (_) { _c.reverse(); Navigator.pop(context); },
+      onTapDown: (_) {
+        _c.forward();
+        HapticFeedback.selectionClick();
+      },
+      onTapUp: (_) {
+        _c.reverse();
+        Navigator.pop(context);
+      },
       onTapCancel: () => _c.reverse(),
       child: AnimatedBuilder(
         animation: _c,
@@ -1032,10 +1279,12 @@ class _SheetCancelState extends State<_SheetCancel>
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 16),
             decoration: BoxDecoration(
-              color: bg, borderRadius: BorderRadius.circular(16),
+              color: bg,
+              borderRadius: BorderRadius.circular(16),
             ),
-            child: Center(child: Text('Cancelar',
-                style: _T.label(16, w: FontWeight.w600, c: _kBlue))),
+            child: Center(
+                child: Text('Cancelar',
+                    style: _T.label(16, w: FontWeight.w600, c: _kBlue))),
           ),
         ),
       ),
@@ -1053,16 +1302,19 @@ class _ConfirmDeleteSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark  = Theme.of(context).brightness == Brightness.dark;
-    final sheetBg = isDark ? Colors.white.withOpacity(0.10) : Colors.white.withOpacity(0.92);
-    final onSurf  = Theme.of(context).colorScheme.onSurface;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final sheetBg = isDark
+        ? Colors.white.withOpacity(0.10)
+        : Colors.white.withOpacity(0.92);
+    final onSurf = Theme.of(context).colorScheme.onSurface;
 
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Container(
-            width: 36, height: 4,
+            width: 36,
+            height: 4,
             margin: const EdgeInsets.only(bottom: 20),
             decoration: BoxDecoration(
               color: onSurf.withOpacity(0.18),
@@ -1073,13 +1325,15 @@ class _ConfirmDeleteSheet extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: sheetBg, borderRadius: BorderRadius.circular(20),
+              color: sheetBg,
+              borderRadius: BorderRadius.circular(20),
             ),
             child: Column(children: [
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: _kRed.withOpacity(0.12), shape: BoxShape.circle,
+                  color: _kRed.withOpacity(0.12),
+                  shape: BoxShape.circle,
                 ),
                 child: const Icon(Iconsax.trash, color: _kRed, size: 26),
               ),
@@ -1089,17 +1343,20 @@ class _ConfirmDeleteSheet extends StatelessWidget {
               Text(
                 '¿Eliminar "$goalName"?\nEsta acción no se puede deshacer.',
                 textAlign: TextAlign.center,
-                style: _T.label(14, c: onSurf.withOpacity(0.50), w: FontWeight.w400),
+                style: _T.label(14,
+                    c: onSurf.withOpacity(0.50), w: FontWeight.w400),
               ),
               const SizedBox(height: 22),
               Row(children: [
-                Expanded(child: _InlineButton(
+                Expanded(
+                    child: _InlineButton(
                   label: 'Cancelar',
                   color: onSurf,
                   onTap: () => Navigator.pop(context, false),
                 )),
                 const SizedBox(width: 10),
-                Expanded(child: _InlineButton(
+                Expanded(
+                    child: _InlineButton(
                   label: 'Eliminar',
                   color: _kRed,
                   onTap: () => Navigator.pop(context, true),
@@ -1119,15 +1376,25 @@ class _InlineButton extends StatefulWidget {
   final Color color;
   final VoidCallback onTap;
   final bool useImpact;
-  const _InlineButton({required this.label, required this.color,
-      required this.onTap, this.useImpact = false});
-  @override State<_InlineButton> createState() => _InlineButtonState();
+  const _InlineButton(
+      {required this.label,
+      required this.color,
+      required this.onTap,
+      this.useImpact = false});
+  @override
+  State<_InlineButton> createState() => _InlineButtonState();
 }
+
 class _InlineButtonState extends State<_InlineButton>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 65));
-  @override void dispose() { _c.dispose(); super.dispose(); }
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 65));
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -1137,7 +1404,10 @@ class _InlineButtonState extends State<_InlineButton>
             ? HapticFeedback.mediumImpact()
             : HapticFeedback.selectionClick();
       },
-      onTapUp:     (_) { _c.reverse(); widget.onTap(); },
+      onTapUp: (_) {
+        _c.reverse();
+        widget.onTap();
+      },
       onTapCancel: () => _c.reverse(),
       child: AnimatedBuilder(
         animation: _c,
@@ -1149,8 +1419,9 @@ class _InlineButtonState extends State<_InlineButton>
               color: widget.color.withOpacity(0.10),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Center(child: Text(widget.label,
-                style: _T.label(15, w: FontWeight.w600, c: widget.color))),
+            child: Center(
+                child: Text(widget.label,
+                    style: _T.label(15, w: FontWeight.w600, c: widget.color))),
           ),
         ),
       ),
@@ -1171,19 +1442,26 @@ class _FilterPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final onSurf = Theme.of(context).colorScheme.onSurface;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? Colors.white.withOpacity(0.07) : Colors.black.withOpacity(0.04);
+    final bg = isDark
+        ? Colors.white.withOpacity(0.07)
+        : Colors.black.withOpacity(0.04);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(_T.h, 8, _T.h, 4),
       child: Container(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(_T.r)),
+        decoration:
+            BoxDecoration(color: bg, borderRadius: BorderRadius.circular(_T.r)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Text('Filtros', style: _T.label(14, w: FontWeight.w700, c: onSurf)),
             if (filters.hasActiveFilters)
               GestureDetector(
-                onTap: () { HapticFeedback.selectionClick(); filters.clear(); onChanged(); },
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  filters.clear();
+                  onChanged();
+                },
                 child: Text('Limpiar',
                     style: _T.label(13, w: FontWeight.w600, c: _kBlue)),
               ),
@@ -1192,26 +1470,38 @@ class _FilterPanel extends StatelessWidget {
           Text('Plazo', style: _T.label(11, c: onSurf.withOpacity(0.42))),
           const SizedBox(height: 8),
           Wrap(
-            spacing: 8, runSpacing: 8,
+            spacing: 8,
+            runSpacing: 8,
             children: GoalTimeframe.values
                 .where((tf) => tf != GoalTimeframe.custom)
                 .map((tf) => _FilterPill(
-                  label: _timeframeLabel(tf),
-                  selected: filters.timeframe == tf,
-                  onTap: () { filters.timeframe = filters.timeframe == tf ? null : tf; onChanged(); },
-                )).toList(),
+                      label: _timeframeLabel(tf),
+                      selected: filters.timeframe == tf,
+                      onTap: () {
+                        filters.timeframe = filters.timeframe == tf ? null : tf;
+                        onChanged();
+                      },
+                    ))
+                .toList(),
           ),
           const SizedBox(height: 14),
           Text('Prioridad', style: _T.label(11, c: onSurf.withOpacity(0.42))),
           const SizedBox(height: 8),
           Wrap(
-            spacing: 8, runSpacing: 8,
-            children: GoalPriority.values.map((p) => _FilterPill(
-              label: _priorityLabel(p),
-              selected: filters.priority == p,
-              activeColor: filters.priority == p ? _priorityColor(p) : null,
-              onTap: () { filters.priority = filters.priority == p ? null : p; onChanged(); },
-            )).toList(),
+            spacing: 8,
+            runSpacing: 8,
+            children: GoalPriority.values
+                .map((p) => _FilterPill(
+                      label: _priorityLabel(p),
+                      selected: filters.priority == p,
+                      activeColor:
+                          filters.priority == p ? _priorityColor(p) : null,
+                      onTap: () {
+                        filters.priority = filters.priority == p ? null : p;
+                        onChanged();
+                      },
+                    ))
+                .toList(),
           ),
         ]),
       ),
@@ -1224,15 +1514,21 @@ class _FilterPill extends StatelessWidget {
   final bool selected;
   final Color? activeColor;
   final VoidCallback onTap;
-  const _FilterPill({required this.label, required this.selected,
-      required this.onTap, this.activeColor});
+  const _FilterPill(
+      {required this.label,
+      required this.selected,
+      required this.onTap,
+      this.activeColor});
 
   @override
   Widget build(BuildContext context) {
     final onSurf = Theme.of(context).colorScheme.onSurface;
-    final color  = activeColor ?? _kBlue;
+    final color = activeColor ?? _kBlue;
     return GestureDetector(
-      onTap: () { HapticFeedback.selectionClick(); onTap(); },
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onTap();
+      },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
         curve: Curves.easeOutCubic,
@@ -1276,17 +1572,21 @@ class _EmptyState extends StatelessWidget {
           Text(
             'Crea una meta y empieza a ahorrar\npara lo que realmente importa.',
             textAlign: TextAlign.center,
-            style: _T.label(15, c: onSurf.withOpacity(0.48), w: FontWeight.w400),
+            style:
+                _T.label(15, c: onSurf.withOpacity(0.48), w: FontWeight.w400),
           ),
           const SizedBox(height: 28),
-          _PillButton(label: 'Crear primera meta', icon: Iconsax.add_circle, onTap: onAdd),
+          _PillButton(
+              label: 'Crear primera meta',
+              icon: Iconsax.add_circle,
+              onTap: onAdd),
         ]),
       ),
-    )
-    .animate()
-    .fadeIn(duration: const Duration(milliseconds: 450))
-    .scale(begin: const Offset(0.96, 0.96), delay: const Duration(milliseconds: 80),
-        duration: const Duration(milliseconds: 380), curve: Curves.easeOutCubic);
+    ).animate().fadeIn(duration: const Duration(milliseconds: 450)).scale(
+        begin: const Offset(0.96, 0.96),
+        delay: const Duration(milliseconds: 80),
+        duration: const Duration(milliseconds: 380),
+        curve: Curves.easeOutCubic);
   }
 }
 
@@ -1302,14 +1602,16 @@ class _EmptyFilterState extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(40),
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(Iconsax.search_status, size: 52, color: onSurf.withOpacity(0.18)),
+          Icon(Iconsax.search_status,
+              size: 52, color: onSurf.withOpacity(0.18)),
           const SizedBox(height: 16),
           Text('Sin resultados', style: _T.display(20, c: onSurf)),
           const SizedBox(height: 8),
           Text(
             'Ninguna meta coincide\ncon los filtros activos.',
             textAlign: TextAlign.center,
-            style: _T.label(14, c: onSurf.withOpacity(0.42), w: FontWeight.w400),
+            style:
+                _T.label(14, c: onSurf.withOpacity(0.42), w: FontWeight.w400),
           ),
           if (filters.hasActiveFilters) ...[
             const SizedBox(height: 20),
@@ -1341,8 +1643,10 @@ class _ErrorState extends StatelessWidget {
           const SizedBox(height: 16),
           Text('Algo salió mal', style: _T.display(20, c: onSurf)),
           const SizedBox(height: 8),
-          Text(error, textAlign: TextAlign.center,
-              style: _T.label(13, c: onSurf.withOpacity(0.42), w: FontWeight.w400)),
+          Text(error,
+              textAlign: TextAlign.center,
+              style: _T.label(13,
+                  c: onSurf.withOpacity(0.42), w: FontWeight.w400)),
           const SizedBox(height: 22),
           GestureDetector(
             onTap: onRetry,
@@ -1389,20 +1693,27 @@ class _SkeletonLoader extends StatelessWidget {
 
 class _GoalFilters {
   GoalTimeframe? timeframe;
-  GoalPriority?  priority;
+  GoalPriority? priority;
   bool get hasActiveFilters => timeframe != null || priority != null;
-  void clear() { timeframe = null; priority = null; }
+  void clear() {
+    timeframe = null;
+    priority = null;
+  }
 }
 
 class GoalHelpers {
-  static String getPriorityText(GoalPriority p)     => _priorityLabel(p);
-  static String getTimeframeText(GoalTimeframe tf)   => _timeframeLabel(tf);
-  static Color  getPriorityColor(BuildContext _, GoalPriority p) => _priorityColor(p);
+  static String getPriorityText(GoalPriority p) => _priorityLabel(p);
+  static String getTimeframeText(GoalTimeframe tf) => _timeframeLabel(tf);
+  static Color getPriorityColor(BuildContext _, GoalPriority p) =>
+      _priorityColor(p);
   static IconData getPriorityIcon(GoalPriority p) {
     switch (p) {
-      case GoalPriority.low:    return Iconsax.arrow_down;
-      case GoalPriority.medium: return Iconsax.minus;
-      case GoalPriority.high:   return Iconsax.arrow_up_3;
+      case GoalPriority.low:
+        return Iconsax.arrow_down;
+      case GoalPriority.medium:
+        return Iconsax.minus;
+      case GoalPriority.high:
+        return Iconsax.arrow_up_3;
     }
   }
 }

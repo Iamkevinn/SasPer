@@ -11,9 +11,11 @@ import '../data/manifestation_repository.dart';
 import 'package:sasper/services/simple_manifestation_widget_service.dart';
 import 'package:sasper/services/manifestation_widget_service.dart';
 import 'package:sasper/services/woop_notification_worker.dart';
+import 'package:sasper/models/goal_model.dart'; 
 
 class AddManifestationScreen extends StatefulWidget {
-  const AddManifestationScreen({super.key});
+  final Goal? linkedGoal; 
+  const AddManifestationScreen({super.key, this.linkedGoal}); 
 
   @override
   State<AddManifestationScreen> createState() => _AddManifestationScreenState();
@@ -59,6 +61,10 @@ class _AddManifestationScreenState extends State<AddManifestationScreen>
   @override
   void initState() {
     super.initState();
+    // 👇 NUEVO: Si recibimos una meta, pre-llenamos el campo del título
+    if (widget.linkedGoal != null) {
+      _titleController.text = widget.linkedGoal!.name;
+    }
     _setupAnimations();
     _playEntryAnimation();
   }
@@ -212,6 +218,7 @@ class _AddManifestationScreenState extends State<AddManifestationScreen>
             ? _descriptionController.text.trim()
             : null,
         imageFile: _selectedImage!,
+        linkedGoalId: widget.linkedGoal?.id, 
         outcome: _outcomeController.text.trim().isNotEmpty
             ? _outcomeController.text.trim()
             : null,
