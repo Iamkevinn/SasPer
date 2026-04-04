@@ -1,5 +1,6 @@
 // lib/services/notification_service.dart
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:io';
@@ -12,80 +13,130 @@ import 'package:sasper/data/goal_repository.dart';
 import 'package:sasper/data/recurring_repository.dart';
 import 'package:sasper/main.dart';
 import 'package:sasper/models/goal_model.dart';
+import 'package:sasper/services/woop_event_bus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+import 'package:sasper/main.dart'; 
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
+import 'package:sasper/widgets/shared/woop_victory_sheet.dart';
+import 'dart:ui';
+import 'dart:isolate';
 import 'package:sasper/config/app_config.dart';
 import 'package:sasper/firebase_options.dart';
 import 'package:sasper/models/recurring_transaction_model.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'package:sasper/services/woop_constants.dart';
+
+// Stream global en el isolate principal — el WoopListenerWidget se suscribe aquí
+final _woopTapController = StreamController<Map<String, String>>.broadcast();
+
+const String kWoopIsolatePort = 'woop_victory_port';
+
+ 
+
+@pragma('vm:entry-point')
+Future<void> globalHandleNotificationTap(NotificationResponse resp) async {
+  developer.log('🔔 Notif tapped — actionId: ${resp.actionId}', name: 'WOOP');
+  if (resp.payload == null) return;
+ 
+  try {
+    final data = jsonDecode(resp.payload!) as Map<String, dynamic>;
+    final isWoop = data['type'] == 'woop_victory' || resp.actionId == 'LOG_VICTORY';
+ 
+    if (!isWoop) {
+      _routeNonWoopNotification(data);
+      return;
+    }
+ 
+    final manifestationId = data['manifestationId']?.toString() ?? '';
+    final title = data['title']?.toString() ?? 'Tu meta';
+    if (manifestationId.isEmpty) return;
+ 
+    final payload = jsonEncode({
+      'tapId': DateTime.now().millisecondsSinceEpoch.toString(),
+      'manifestationId': manifestationId,
+      'title': title,
+    });
+ 
+    // ─── SIEMPRE escribir en disco primero.
+    // Es la única vía 100% confiable en todos los estados (foreground, background, muerta).
+    // El WoopListenerWidget lo detecta en didChangeAppLifecycleState(resumed) o en el polling.
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
+    await prefs.setString(kPendingWoopPayload, payload);
+    developer.log('✅ WOOP guardado en disco: $title ($manifestationId)', name: 'WOOP');
+ 
+    // ─── Bonus: si el puerto está disponible (app en foreground puro), enviar también.
+    // Si no está disponible, no importa — el disco garantiza la entrega.
+    final SendPort? sendPort = IsolateNameServer.lookupPortByName(kWoopIsolatePort);
+    if (sendPort != null) {
+      developer.log('⚡ Puerto disponible — enviando también via IsolateNameServer', name: 'WOOP');
+      sendPort.send(payload);
+    }
+ 
+  } catch (e, stack) {
+    developer.log('🔥 Error en globalHandleNotificationTap: $e\n$stack', name: 'WOOP');
+  }
+}
+
+/// Stream que emite cuando el usuario toca "Lo logré" con la app viva
+Stream<Map<String, String>> get woopTapStream => _woopTapController.stream;
+
 // ─── Constantes de payload ────────────────────────────────────────────────────
-// Antes eran magic strings. Ahora centralizados aquí.
 class NotificationPayloadType {
   static const String smartGoalReminder = 'smart_goal_reminder';
   static const String goalReminder = 'goal_reminder';
   static const String sweepSavings = 'sweep_savings_suggestion';
   static const String creditCardAssistant = 'credit_card_assistant';
   static const String smartBudgetInsight = 'smart_budget_insight';
+  static const String woopVictory = 'woop_victory';
   NotificationPayloadType._();
 }
 
 // ─── ID estable para notificaciones de meta ───────────────────────────────────
-// hashCode en Dart NO es estable entre ejecuciones (bug 4 del análisis).
-// Usamos los primeros 8 hex chars del UUID → int estable y reproducible.
 int _stableGoalNotifId(String goalId) {
-  // UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-  // Tomamos los primeros 8 caracteres hex (sin guion)
   final hex = goalId.replaceAll('-', '').substring(0, 8);
   return int.parse(hex, radix: 16) & 0x7FFFFFFF;
 }
 
 // ─── Handlers globales (background) ──────────────────────────────────────────
 
+void _routeNonWoopNotification(Map<String, dynamic> data) {
+  final type = data['type'] as String?;
+  if (type == 'smart_goal_reminder' || type == 'goal_reminder') {
+    navigatorKey.currentState?.pushNamed('/goals');
+  } else if (type == 'credit_card_assistant') {
+    final id = data['account_id'] as String?;
+    if (id != null && id.isNotEmpty) {
+      navigatorKey.currentState?.pushNamed('/account_details', arguments: id);
+    }
+  } else if (type == 'smart_budget_insight') {
+    final raw = data['budget_id'];
+    final id = raw is int ? raw : int.tryParse('$raw');
+    if (id != null && id > 0) {
+      navigatorKey.currentState?.pushNamed('/budget_details', arguments: id);
+    }
+  }
+}
+
+// ─── Handlers públicos (Flutter los llama internamente) ───────────────────────
+
 @pragma('vm:entry-point')
 void onDidReceiveNotificationResponse(NotificationResponse resp) {
-  developer.log(
-    '🔔 [Acción] Notificación tocada (payload: ${resp.payload}, botón: ${resp.actionId})',
-    name: 'NotificationService',
-  );
-
-  if (resp.payload == null) return;
-  try {
-    final data = jsonDecode(resp.payload!);
-    if (data['type'] == NotificationPayloadType.smartGoalReminder ||
-        data['type'] == NotificationPayloadType.goalReminder) {
-      navigatorKey.currentState?.pushNamed('/goals');
-    } else if (data['type'] == NotificationPayloadType.creditCardAssistant) {
-      final accountId = data['account_id'] as String?;
-      if (accountId != null && accountId.isNotEmpty) {
-        navigatorKey.currentState
-            ?.pushNamed('/account_details', arguments: accountId);
-      }
-    } else if (data['type'] == NotificationPayloadType.smartBudgetInsight) {
-      final id = data['budget_id'];
-      final budgetId = id is int ? id : int.tryParse('$id');
-      if (budgetId != null && budgetId > 0) {
-        navigatorKey.currentState
-            ?.pushNamed('/budget_details', arguments: budgetId);
-      }
-    }
-  } catch (e) {
-    developer.log('🔥 Error leyendo payload: $e', name: 'NotificationService');
-  }
+  globalHandleNotificationTap(resp);
 }
 
 @pragma('vm:entry-point')
 void onDidReceiveBackgroundNotificationResponse(NotificationResponse resp) {
-  developer.log(
-    '🔔 [Background] Acción en segundo plano (payload: ${resp.payload})',
-    name: 'NotificationService',
-  );
+  globalHandleNotificationTap(resp);
 }
+
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -134,7 +185,6 @@ class NotificationService {
 
   bool _dependenciesInitialized = false;
   bool _isRefreshingRecurring = false;
-  bool _isRefreshingGoals = false;
 
   final FlutterLocalNotificationsPlugin _localNotifier =
       FlutterLocalNotificationsPlugin();
@@ -252,7 +302,7 @@ class NotificationService {
     }
   }
 
-  static const _kAndroidChannels = [
+  static const _kAndroidChannels =[
     AndroidNotificationChannel(
       'recurring_payments_channel',
       'Recordatorios de Pagos',
@@ -294,6 +344,13 @@ class NotificationService {
       description:
           'Alertas sobre tu ritmo de gasto frente al avance del período.',
       importance: Importance.high,
+      playSound: true,
+    ),
+    AndroidNotificationChannel(
+      'woop_channel',
+      'Coaching WOOP',
+      description: 'Recordatorios inteligentes y refuerzo positivo.',
+      importance: Importance.max,
       playSound: true,
     ),
   ];
@@ -358,15 +415,9 @@ class NotificationService {
 
   // ── Metas ─────────────────────────────────────────────────────────────────
 
-Future<void> refreshGoalSchedules() async {
-    // 🧠 MIGRADO AL SMART WORKER (AUDITOR)
-    // Ya no programamos alarmas locales estáticas (zonedSchedule) para las metas.
-    // El SmartNotificationWorker se encarga de evaluar dinámicamente cada día 
-    // y enviar la notificación con el monto reajustado en tiempo real.
+  Future<void> refreshGoalSchedules() async {
+    // 🧠 MIGRADO AL SMART WORKER
     developer.log('🧠 Las alarmas de metas ahora son manejadas por el SmartWorker.', name: 'NotificationService');
-    
-    // Lo único que hacemos aquí es limpiar cualquier alarma vieja que haya quedado
-    // programada en los celulares de los usuarios antes de esta actualización.
     try {
       final goals = await GoalRepository.instance.getActiveGoals();
       for (final goal in goals) {
@@ -374,18 +425,15 @@ Future<void> refreshGoalSchedules() async {
       }
     } catch (_) {}
   }
-  // Cancelar notificación de una meta — elimina AMBOS IDs (sched + legacy)
+
   Future<void> cancelGoalReminder(String goalId) async {
     await _localNotifier.cancel(_stableGoalNotifId(goalId));
-    // Cancelar también el ID inestable del worker anterior (bug 4)
     await _localNotifier.cancel(goalId.hashCode & 0x7FFFFFFF);
     developer.log('🗑️ Alarma cancelada para meta: $goalId',
         name: 'NotificationService');
   }
 
-  /// Programa la notificación periódica de una meta.
-  /// Usa la hora exacta configurada por el usuario (notificationHour/Minute).
-Future<void> scheduleGoalReminder({
+  Future<void> scheduleGoalReminder({
     required String goalId,
     required String goalName,
     required double savingsAmount,
@@ -395,9 +443,8 @@ Future<void> scheduleGoalReminder({
     int? day,
   }) async {
     // 🧠 MIGRADO AL SMART WORKER
-    // Ya no hacemos nada aquí. El Worker leerá la hora (notificationHour)
-    // directamente de la base de datos cuando le toque ejecutarse.
   }
+
   // ── Pruebas gratuitas ─────────────────────────────────────────────────────
 
   Future<void> scheduleFreeTrialReminder({
@@ -542,8 +589,6 @@ Future<void> scheduleGoalReminder({
 
   // ── Helpers internos ──────────────────────────────────────────────────────
 
-  /// Calcula la próxima ocurrencia de una notificación con hora real del usuario.
-  /// Antes usaba hour: 9 hardcodeado — ahora recibe los parámetros del modelo.
   tz.TZDateTime _nextOccurrence(
     GoalSavingsFrequency frequency,
     int? day, {
@@ -561,7 +606,6 @@ Future<void> scheduleGoalReminder({
       minute,
     );
 
-    // Si la hora de hoy ya pasó, mover un día hacia adelante como base
     if (scheduled.isBefore(now)) {
       scheduled = scheduled.add(const Duration(days: 1));
     }
@@ -675,11 +719,10 @@ Future<void> scheduleGoalReminder({
     );
   }
 
-  // ── Deprecated ────────────────────────────────────────────────────────────
-
   @Deprecated('Usar refreshRecurringSchedules() o refreshGoalSchedules()')
   Future<void> refreshAllSchedules() async {
     await refreshRecurringSchedules();
     await refreshGoalSchedules();
   }
 }
+

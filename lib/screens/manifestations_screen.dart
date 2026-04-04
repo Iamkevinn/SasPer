@@ -1,3 +1,6 @@
+// lib/screens/manifestations_screen.dart
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sasper/data/manifestation_repository.dart';
@@ -5,46 +8,44 @@ import 'package:sasper/models/manifestation_model.dart';
 import 'package:sasper/screens/add_manifestation_screen.dart';
 import 'package:sasper/screens/edit_manifestation_screen.dart';
 import 'package:sasper/screens/manifestation_detail_screen.dart';
-import 'package:sasper/screens/ManifestationVisionWidgetDebug.dart';
+import 'package:sasper/screens/woop_wins_journal_screen.dart'; // <--- IMPORTANTE: Importamos el Diario
 import 'package:sasper/services/widget_service.dart';
+import 'package:sasper/services/widget_service.dart'
+    as ManifestationWidgetService;
+import 'package:sasper/services/woop_event_bus.dart';
 import 'dart:math' as math;
-import 'package:sasper/services/manifestation_widget_service.dart';
+import 'package:sasper/services/woop_notification_worker.dart';
+import 'package:sasper/widgets/shared/woop_victory_sheet.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 // ─── DESIGN TOKENS ────────────────────────────────────────────────────────────
-// Un solo lugar donde viven todos los valores de diseño.
-// Modificar aquí cambia todo de forma consistente.
 abstract class _Tokens {
-  // Paleta de colores — oscura, sofisticada, sin ruido
   static const Color ink = Color(0xFF0A0A0F);
   static const Color surface = Color(0xFF12121A);
   static const Color surfaceElevated = Color(0xFF1C1C28);
   static const Color border = Color(0xFF2A2A38);
   static const Color borderSubtle = Color(0xFF1E1E2A);
 
-  static const Color primary = Color(0xFFE8D5B7); // champagne dorado
-  static const Color accent = Color(0xFFC9A96E); // oro cálido
+  static const Color primary = Color(0xFFE8D5B7);
+  static const Color accent = Color(0xFFC9A96E);
 
   static const Color textPrimary = Color(0xFFF5F0E8);
   static const Color textSecondary = Color(0xFF8A8699);
   static const Color textTertiary = Color(0xFF4A4858);
 
-  // Espaciado — basado en múltiplos de 4
   static const double spaceXS = 4;
   static const double spaceSM = 8;
   static const double spaceMD = 16;
   static const double spaceLG = 24;
   static const double spaceXL = 32;
 
-  // Radios de borde
   static const double radiusSM = 10;
   static const double radiusMD = 16;
   static const double radiusLG = 22;
   static const double radiusXL = 28;
 
-  // Tipografía
-  static const String fontDisplay = 'Georgia'; // serif elegante
+  static const String fontDisplay = 'Georgia';
 
-  // Duraciones de animación
   static const Duration durationFast = Duration(milliseconds: 180);
   static const Duration durationSlow = Duration(milliseconds: 500);
   static const Duration durationXSlow = Duration(milliseconds: 800);
@@ -63,16 +64,13 @@ class _ManifestationsScreenState extends State<ManifestationsScreen>
   final _repository = ManifestationRepository();
   late Future<List<Manifestation>> _manifestationsFuture;
 
-  // Controladores de animación
   late AnimationController _headerController;
   late AnimationController _pulseController;
   late AnimationController _fabController;
 
-  // Animaciones derivadas
   late Animation<double> _headerOpacity;
   late Animation<Offset> _headerSlide;
 
-  // Estado de scroll para el efecto de AppBar
   final ScrollController _scrollController = ScrollController();
   double _scrollOffset = 0;
 
@@ -90,7 +88,6 @@ class _ManifestationsScreenState extends State<ManifestationsScreen>
   }
 
   void _setupAnimations() {
-    // Header entra suavemente
     _headerController = AnimationController(
       duration: _Tokens.durationXSlow,
       vsync: this,
@@ -111,13 +108,11 @@ class _ManifestationsScreenState extends State<ManifestationsScreen>
 
     _headerController.forward();
 
-    // Pulso sutil para el ícono del FAB
     _pulseController = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
     )..repeat(reverse: true);
 
-    // FAB entra con delay
     _fabController = AnimationController(
       duration: _Tokens.durationSlow,
       vsync: this,
@@ -147,7 +142,6 @@ class _ManifestationsScreenState extends State<ManifestationsScreen>
   }
 
   void _navigateToAddScreen() async {
-    // Feedback háptico estilo Apple
     HapticFeedback.lightImpact();
 
     final result = await Navigator.of(context).push(
@@ -297,17 +291,14 @@ class _ManifestationsScreenState extends State<ManifestationsScreen>
             ),
           ],
         ),
-        backgroundColor: isError
-            ? const Color(0xFF2C1215)
-            : _Tokens.surfaceElevated,
+        backgroundColor:
+            isError ? const Color(0xFF2C1215) : _Tokens.surfaceElevated,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(_Tokens.radiusMD),
           side: BorderSide(
-            color: isError
-                ? const Color(0xFF5C2525)
-                : _Tokens.border,
+            color: isError ? const Color(0xFF5C2525) : _Tokens.border,
             width: 0.5,
           ),
         ),
@@ -317,21 +308,119 @@ class _ManifestationsScreenState extends State<ManifestationsScreen>
     );
   }
 
+  void _simulateAppOpen() async {
+    try {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('✅ App open registrado para WOOP'),
+            backgroundColor: Colors.blue.shade700,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(_Tokens.radiusMD),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(_Tokens.radiusMD),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
   void _showDebugModal() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withOpacity(0.6),
       builder: (context) => _PremiumBottomSheet(
-        child: const ManifestationWidgetDebug(widgetId: null),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Debug Panel',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: _Tokens.textPrimary,
+              ),
+            ),
+            const SizedBox(height: _Tokens.spaceMD),
+            const Text(
+              'Herramientas de desarrollo para testing.',
+              style: TextStyle(
+                fontSize: 14,
+                color: _Tokens.textSecondary,
+              ),
+            ),
+            const SizedBox(height: _Tokens.spaceLG),
+            Container(
+              padding: const EdgeInsets.all(_Tokens.spaceMD),
+              decoration: BoxDecoration(
+                color: _Tokens.surface,
+                borderRadius: BorderRadius.circular(_Tokens.radiusMD),
+                border: Border.all(color: _Tokens.border, width: 0.5),
+              ),
+              child: const Text(
+                'Funcionalidades de debug próximamente.',
+                style: TextStyle(
+                  color: _Tokens.textSecondary,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  // Opacidad del AppBar según scroll
-  double get _appBarOpacity =>
-      (_scrollOffset / 80).clamp(0.0, 1.0);
+  void _testWOOPNotifications() async {
+    try {
+      final client = Supabase.instance.client;
+      final userId = client.auth.currentUser!.id;
+
+      await WOOPNotificationService.executeTriggerEvaluation(
+        client: client,
+        userId: userId,
+        isTest: true,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('✅ WOOP notifications tested'),
+            backgroundColor: Colors.green.shade700,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(_Tokens.radiusMD),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error testing WOOP: $e'),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  double get _appBarOpacity => (_scrollOffset / 80).clamp(0.0, 1.0);
 
   @override
   Widget build(BuildContext context) {
@@ -344,7 +433,6 @@ class _ManifestationsScreenState extends State<ManifestationsScreen>
       child: Scaffold(
         backgroundColor: _Tokens.ink,
         extendBodyBehindAppBar: true,
-        // AppBar translúcido que reacciona al scroll
         appBar: PreferredSize(
           preferredSize: const Size.fromHeight(56),
           child: AnimatedBuilder(
@@ -355,8 +443,7 @@ class _ManifestationsScreenState extends State<ManifestationsScreen>
                   color: _Tokens.ink.withOpacity(_appBarOpacity * 0.95),
                   border: Border(
                     bottom: BorderSide(
-                      color: _Tokens.border
-                          .withOpacity(_appBarOpacity),
+                      color: _Tokens.border.withOpacity(_appBarOpacity),
                       width: 0.5,
                     ),
                   ),
@@ -369,7 +456,6 @@ class _ManifestationsScreenState extends State<ManifestationsScreen>
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        // Título que aparece al hacer scroll
                         AnimatedOpacity(
                           opacity: _appBarOpacity,
                           duration: _Tokens.durationFast,
@@ -384,10 +470,55 @@ class _ManifestationsScreenState extends State<ManifestationsScreen>
                             ),
                           ),
                         ),
-                        // Botón de debug minimalista
-                        _IconBtn(
-                          icon: Icons.terminal_rounded,
-                          onTap: _showDebugModal,
+                        // ─── BOTONES DE ACCIÓN (DIARIO Y DEBUG) ───
+                        Row(
+                          children: [
+                            // 🏆 Botón del Diario de Victorias siempre visible
+                            _IconBtn(
+                              icon: Icons.emoji_events_rounded,
+                              onTap: () {
+                                HapticFeedback.selectionClick();
+                                Navigator.of(context).push(
+                                  PageRouteBuilder(
+                                    pageBuilder: (context, animation,
+                                            secondaryAnimation) =>
+                                        const WoopWinsJournalScreen(),
+                                    transitionsBuilder: (context, animation,
+                                        secondaryAnimation, child) {
+                                      final curved = CurvedAnimation(
+                                        parent: animation,
+                                        curve: Curves.easeInOutCubic,
+                                      );
+                                      return FadeTransition(
+                                        opacity: curved,
+                                        child: SlideTransition(
+                                          position: Tween<Offset>(
+                                            begin: const Offset(0, 0.06),
+                                            end: Offset.zero,
+                                          ).animate(curved),
+                                          child: child,
+                                        ),
+                                      );
+                                    },
+                                    transitionDuration: _Tokens.durationSlow,
+                                  ),
+                                );
+                              },
+                            ),
+                        
+                            if (kDebugMode) ...[
+                              const SizedBox(width: _Tokens.spaceSM),
+                              _IconBtn(
+                                icon: Icons.notifications_active_rounded,
+                                onTap: _testWOOPNotifications,
+                              ),
+                              const SizedBox(width: _Tokens.spaceSM),
+                              _IconBtn(
+                                icon: Icons.refresh_rounded,
+                                onTap: _simulateAppOpen,
+                              ),
+                            ]
+                          ],
                         ),
                       ],
                     ),
@@ -413,7 +544,6 @@ class _ManifestationsScreenState extends State<ManifestationsScreen>
               controller: _scrollController,
               physics: const BouncingScrollPhysics(),
               slivers: [
-                // ── HEADER ──────────────────────────────────────────────────
                 SliverToBoxAdapter(
                   child: SlideTransition(
                     position: _headerSlide,
@@ -423,15 +553,12 @@ class _ManifestationsScreenState extends State<ManifestationsScreen>
                     ),
                   ),
                 ),
-
-                // ── CONTENIDO ───────────────────────────────────────────────
                 if (manifestations.isEmpty)
                   SliverFillRemaining(
                     hasScrollBody: false,
                     child: _EmptyState(onAdd: _navigateToAddScreen),
                   )
                 else ...[
-                  // Contador sutil
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(
@@ -451,14 +578,12 @@ class _ManifestationsScreenState extends State<ManifestationsScreen>
                       ),
                     ),
                   ),
-
-                  // Lista de tarjetas
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(
                       _Tokens.spaceMD,
                       0,
                       _Tokens.spaceMD,
-                      120, // espacio para el FAB
+                      120,
                     ),
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
@@ -483,8 +608,6 @@ class _ManifestationsScreenState extends State<ManifestationsScreen>
             );
           },
         ),
-
-        // ── FAB ─────────────────────────────────────────────────────────────
         floatingActionButton: ScaleTransition(
           scale: CurvedAnimation(
             parent: _fabController,
@@ -501,7 +624,6 @@ class _ManifestationsScreenState extends State<ManifestationsScreen>
   }
 }
 
-// ─── HEADER ───────────────────────────────────────────────────────────────────
 class _Header extends StatelessWidget {
   const _Header();
 
@@ -517,7 +639,6 @@ class _Header extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Eyebrow
           const Text(
             'Tu tablero de',
             style: TextStyle(
@@ -528,7 +649,6 @@ class _Header extends StatelessWidget {
             ),
           ),
           const SizedBox(height: _Tokens.spaceXS),
-          // Título principal — serif elegante
           const Text(
             'Manifestaciones',
             style: TextStyle(
@@ -541,13 +661,11 @@ class _Header extends StatelessWidget {
             ),
           ),
           const SizedBox(height: _Tokens.spaceMD),
-          // Línea divisoria fina
           Container(
             height: 0.5,
             color: _Tokens.border,
           ),
           const SizedBox(height: _Tokens.spaceMD),
-          // Cita — muy sutil
           const Text(
             '"Lo que imaginas, puedes crear"',
             style: TextStyle(
@@ -565,7 +683,6 @@ class _Header extends StatelessWidget {
   }
 }
 
-// ─── TARJETA DE MANIFESTACIÓN ─────────────────────────────────────────────────
 class _ManifestationCard extends StatefulWidget {
   final Manifestation manifestation;
   final VoidCallback onOpenDetail;
@@ -626,7 +743,6 @@ class _ManifestationCardState extends State<_ManifestationCard>
         child: ScaleTransition(
           scale: _scaleAnim,
           child: Container(
-            // Relación de aspecto cinematográfica
             height: 220,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(_Tokens.radiusLG),
@@ -646,7 +762,6 @@ class _ManifestationCardState extends State<_ManifestationCard>
             clipBehavior: Clip.antiAlias,
             child: Stack(
               children: [
-                // ── IMAGEN ────────────────────────────────────────────
                 if (imageUrl.isNotEmpty)
                   Positioned.fill(
                     child: Hero(
@@ -658,14 +773,12 @@ class _ManifestationCardState extends State<_ManifestationCard>
                           if (progress == null) return child;
                           return Container(color: _Tokens.surfaceElevated);
                         },
-                        errorBuilder: (_, __, ___) =>
-                            const _CardPlaceholder(),
+                        errorBuilder: (_, __, ___) => const _CardPlaceholder(),
                       ),
                     ),
                   )
                 else
                   const Positioned.fill(child: _CardPlaceholder()),
-
                 if (widget.manifestation.hasCompleteWoop)
                   Positioned(
                     top: _Tokens.spaceSM,
@@ -689,8 +802,6 @@ class _ManifestationCardState extends State<_ManifestationCard>
                       ),
                     ),
                   ),
-
-                // ── GRADIENTE CINEMATOGRÁFICO ─────────────────────────
                 Positioned.fill(
                   child: DecoratedBox(
                     decoration: BoxDecoration(
@@ -707,8 +818,6 @@ class _ManifestationCardState extends State<_ManifestationCard>
                     ),
                   ),
                 ),
-
-                // ── CONTENIDO INFERIOR ────────────────────────────────
                 Positioned(
                   bottom: 0,
                   left: 0,
@@ -762,16 +871,13 @@ class _ManifestationCardState extends State<_ManifestationCard>
                     ),
                   ),
                 ),
-
-                // ── MENÚ CONTEXTUAL ───────────────────────────────────
                 Positioned(
                   top: _Tokens.spaceSM,
                   right: _Tokens.spaceSM,
                   child: _CardMenu(
                     onEdit: widget.onEdit,
                     onDelete: widget.onDelete,
-                    onOpenChanged: (open) =>
-                        setState(() => _isMenuOpen = open),
+                    onOpenChanged: (open) => setState(() => _isMenuOpen = open),
                   ),
                 ),
               ],
@@ -783,7 +889,6 @@ class _ManifestationCardState extends State<_ManifestationCard>
   }
 }
 
-// ─── MENÚ DE TARJETA ──────────────────────────────────────────────────────────
 class _CardMenu extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
@@ -830,7 +935,6 @@ class _CardMenu extends StatelessWidget {
           color: const Color(0xFFE05555),
         ),
       ],
-      // Botón del menú — píldora frosted glass
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20),
         child: Container(
@@ -884,7 +988,6 @@ class _CardMenu extends StatelessWidget {
   }
 }
 
-// ─── PLACEHOLDER DE IMAGEN ────────────────────────────────────────────────────
 class _CardPlaceholder extends StatelessWidget {
   const _CardPlaceholder();
 
@@ -903,7 +1006,6 @@ class _CardPlaceholder extends StatelessWidget {
   }
 }
 
-// ─── ENTRADA ANIMADA DE ELEMENTOS ─────────────────────────────────────────────
 class _AnimatedEntry extends StatefulWidget {
   final int index;
   final Widget child;
@@ -941,7 +1043,6 @@ class _AnimatedEntryState extends State<_AnimatedEntry>
       curve: Curves.easeOutCubic,
     ));
 
-    // Stagger por índice
     Future.delayed(Duration(milliseconds: 80 + widget.index * 60), () {
       if (mounted) _controller.forward();
     });
@@ -965,7 +1066,6 @@ class _AnimatedEntryState extends State<_AnimatedEntry>
   }
 }
 
-// ─── FAB PREMIUM ──────────────────────────────────────────────────────────────
 class _PremiumFAB extends StatelessWidget {
   final Animation<double> pulseAnimation;
   final VoidCallback onTap;
@@ -980,8 +1080,7 @@ class _PremiumFAB extends StatelessWidget {
     return AnimatedBuilder(
       animation: pulseAnimation,
       builder: (context, child) {
-        final glow =
-            0.12 + (math.sin(pulseAnimation.value * math.pi) * 0.06);
+        final glow = 0.12 + (math.sin(pulseAnimation.value * math.pi) * 0.06);
         return GestureDetector(
           onTap: onTap,
           child: Container(
@@ -1030,7 +1129,6 @@ class _PremiumFAB extends StatelessWidget {
   }
 }
 
-// ─── BOTÓN ÍCONO ──────────────────────────────────────────────────────────────
 class _IconBtn extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
@@ -1058,7 +1156,6 @@ class _IconBtn extends StatelessWidget {
   }
 }
 
-// ─── ESTADO VACÍO ─────────────────────────────────────────────────────────────
 class _EmptyState extends StatelessWidget {
   final VoidCallback onAdd;
 
@@ -1071,7 +1168,6 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Ícono central minimalista
           Container(
             width: 80,
             height: 80,
@@ -1110,7 +1206,6 @@ class _EmptyState extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: _Tokens.spaceXL),
-          // CTA
           GestureDetector(
             onTap: () {
               HapticFeedback.lightImpact();
@@ -1142,7 +1237,6 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-// ─── ESTADO DE CARGA ──────────────────────────────────────────────────────────
 class _LoadingState extends StatelessWidget {
   const _LoadingState();
 
@@ -1161,7 +1255,6 @@ class _LoadingState extends StatelessWidget {
   }
 }
 
-// ─── ESTADO DE ERROR ──────────────────────────────────────────────────────────
 class _ErrorState extends StatelessWidget {
   final String error;
 
@@ -1205,7 +1298,6 @@ class _ErrorState extends StatelessWidget {
   }
 }
 
-// ─── DIÁLOGO DE CONFIRMACIÓN PREMIUM ─────────────────────────────────────────
 class _PremiumDialog extends StatelessWidget {
   final Manifestation manifestation;
 
@@ -1234,7 +1326,6 @@ class _PremiumDialog extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Ícono de advertencia
             Container(
               width: 44,
               height: 44,
@@ -1269,7 +1360,6 @@ class _PremiumDialog extends StatelessWidget {
               ),
             ),
             const SizedBox(height: _Tokens.spaceLG),
-            // Acciones
             Row(
               children: [
                 Expanded(
@@ -1280,8 +1370,7 @@ class _PremiumDialog extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: _Tokens.surface,
                         borderRadius: BorderRadius.circular(_Tokens.radiusSM),
-                        border: Border.all(
-                            color: _Tokens.border, width: 0.5),
+                        border: Border.all(color: _Tokens.border, width: 0.5),
                       ),
                       alignment: Alignment.center,
                       child: const Text(
@@ -1329,7 +1418,6 @@ class _PremiumDialog extends StatelessWidget {
   }
 }
 
-// ─── BOTTOM SHEET PREMIUM ─────────────────────────────────────────────────────
 class _PremiumBottomSheet extends StatelessWidget {
   final Widget child;
 
@@ -1354,7 +1442,6 @@ class _PremiumBottomSheet extends StatelessWidget {
           ),
           child: Column(
             children: [
-              // Handle
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 child: Container(
@@ -1366,7 +1453,6 @@ class _PremiumBottomSheet extends StatelessWidget {
                   ),
                 ),
               ),
-              // Header del sheet
               Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: _Tokens.spaceMD,

@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:sasper/data/manifestation_repository.dart';
 import 'package:sasper/models/manifestation_model.dart';
+import 'package:sasper/services/woop_notification_worker.dart';
 
 class EditManifestationScreen extends StatefulWidget {
   final Manifestation manifestation;
@@ -205,6 +206,10 @@ class _EditManifestationScreenState extends State<EditManifestationScreen>
       final allManifestations =
           await _manifestationRepository.getManifestations();
       await saveManifestationsToWidget(allManifestations);
+
+      // Actualizar notificación WOOP si hay plan
+      if (_planController.text.trim().isNotEmpty) {
+      }
 
       if (mounted) {
         HapticFeedback.heavyImpact();

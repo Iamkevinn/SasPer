@@ -80,10 +80,10 @@ void smartGoalDispatcher() {
     final client = Supabase.instance.client;
 
     try {
-      await _runGoalIntelligence(client, localNotifier, userId, prefs);
+      await runGoalIntelligence(client, localNotifier, userId, prefs);
       await runCreditCardIntelligence(client, localNotifier, userId, prefs);
       await runBudgetIntelligence(client, localNotifier, userId, prefs);
-      await _runEndOfMonthIntelligence(client, localNotifier, userId, prefs);
+      await runEndOfMonthIntelligence(client, localNotifier, userId, prefs);
       await client.rpc('auto_renew_budgets', params: {'p_user_id': userId});
       developer.log('✅ [SmartWorker] Tarea completada.', name: 'SmartWorker');
       return true;
@@ -167,7 +167,7 @@ List<tz.TZDateTime> _getNextSavingDates({
   return dates;
 }
 
-Future<void> _runGoalIntelligence(
+Future<void> runGoalIntelligence(
   SupabaseClient client,
   FlutterLocalNotificationsPlugin localNotifier,
   String userId,
@@ -395,7 +395,7 @@ Future<void> _runGoalIntelligence(
 // =============================================================================
 //  TAREA 2: INTELIGENCIA DE FIN DE MES (Sin cambios)
 // =============================================================================
-Future<void> _runEndOfMonthIntelligence(
+Future<void> runEndOfMonthIntelligence(
     SupabaseClient client,
     FlutterLocalNotificationsPlugin localNotifier,
     String userId,

@@ -6,10 +6,11 @@ import 'package:home_widget/home_widget.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
+import 'package:sasper/services/widget_service.dart' as AffirmationWidgetService;
 import '../data/manifestation_repository.dart';
 import 'package:sasper/services/simple_manifestation_widget_service.dart';
 import 'package:sasper/services/manifestation_widget_service.dart';
-import 'package:sasper/services/affirmation_widget_service.dart';
+import 'package:sasper/services/woop_notification_worker.dart';
 
 class AddManifestationScreen extends StatefulWidget {
   const AddManifestationScreen({super.key});
@@ -205,7 +206,7 @@ class _AddManifestationScreenState extends State<AddManifestationScreen>
     HapticFeedback.mediumImpact();
 
     try {
-      await _manifestationRepository.createManifestation(
+      final manifestation = await _manifestationRepository.createManifestation(
         title: _titleController.text.trim(),
         description: _descriptionController.text.trim().isNotEmpty
             ? _descriptionController.text.trim()
@@ -229,16 +230,17 @@ class _AddManifestationScreenState extends State<AddManifestationScreen>
       // Sincronizar widgets de manifestaciones y afirmaciones con la nueva lista
       await SimpleManifestationWidgetService.saveManifestationsToWidget(
         allManifestations,
-        widgetId: null,
       );
       await ManifestationWidgetService.saveManifestationsToWidget(
         allManifestations,
-        widgetId: null,
       );
       await AffirmationWidgetService.saveManifestationsToWidget(
         allManifestations,
-        widgetId: null,
       );
+
+      // Crear notificación WOOP inteligente si hay plan definido
+      if (_planController.text.trim().isNotEmpty) {
+      }
 
       if (allManifestations.isNotEmpty) {
         final idsString = allManifestations.map((m) => m.id).join(',');

@@ -3,7 +3,7 @@ class Manifestation {
   final String userId;
   final String title;
   final String? description;
-  final String? imageUrl;
+  final String imageUrl;
   final String? linkedGoalId;
   /// WOOP: mejor resultado y cómo te sentirás al lograrlo.
   final String? outcome;
@@ -18,7 +18,7 @@ class Manifestation {
     required this.userId,
     required this.title,
     this.description,
-    this.imageUrl,
+    required this.imageUrl,
     this.linkedGoalId,
     this.outcome,
     this.obstacle,
@@ -42,9 +42,7 @@ class Manifestation {
   }
 
   factory Manifestation.fromMap(Map<String, dynamic> map) {
-    String? rawUrl = map['image_url'] as String?;
-    rawUrl = rawUrl?.trim();
-    if (rawUrl != null && rawUrl.isEmpty) rawUrl = null;
+    String rawUrl = (map['image_url'] as String).trim();
 
     DateTime parsedDate;
     try {

@@ -1,3 +1,4 @@
+// lib/data/manifestation_repository.dart
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart'; // Asegúrate de importar 'package:path/path.dart'
@@ -11,34 +12,65 @@ class ManifestationRepository {
 
   // Obtener todas las manifestaciones de un usuario
   Future<List<Manifestation>> getManifestations() async {
-  try {
-    final currentUser = _supabase.auth.currentUser;
-    if (currentUser == null) {
-      // No hay usuario autenticado en este momento
+    try {
+      final currentUser = _supabase.auth.currentUser;
+      if (currentUser == null) {
+        // No hay usuario autenticado en este momento
+        if (kDebugMode) {
+          print(
+              'ManifestationRepository: currentUser is null — returning empty list');
+        }
+        return [];
+      }
+      final userId = currentUser.id;
+
+      final response = await _supabase
+          .from('manifestations')
+          .select()
+          .eq('user_id', userId)
+          .order('created_at', ascending: false);
+
+      return (response as List)
+          .map((item) => Manifestation.fromMap(item))
+          .toList();
+    } catch (e, st) {
       if (kDebugMode) {
-        print('ManifestationRepository: currentUser is null — returning empty list');
+        print('Error en getManifestations(): $e\n$st');
       }
       return [];
     }
-    final userId = currentUser.id;
+  }
+
+  // --- NUEVO: REGISTRAR VICTORIA WOOP ---
+  Future<void> recordWoopWin({
+    required String manifestationId,
+    required String actionTaken,
+  }) async {
+    final userId = _supabase.auth.currentUser!.id;
+
+    await _supabase.from('woop_wins').insert({
+      'user_id': userId,
+      'manifestation_id': manifestationId,
+      'action_taken': actionTaken,
+    });
+  }
+
+  // Opcional: Para el futuro "Diario de Abundancia"
+  Future<List<Map<String, dynamic>>> getWoopWins() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return [];
 
     final response = await _supabase
-        .from('manifestations')
-        .select()
+        .from('woop_wins')
+        .select('*, manifestations(title)')
         .eq('user_id', userId)
         .order('created_at', ascending: false);
 
-    return (response as List).map((item) => Manifestation.fromMap(item)).toList();
-  } catch (e, st) {
-    if (kDebugMode) {
-      print('Error en getManifestations(): $e\n$st');
-    }
-    return [];
+    return List<Map<String, dynamic>>.from(response);
   }
-}
 
   // Crear una nueva manifestación (lógica completa)
-  Future<void> createManifestation({
+  Future<Manifestation> createManifestation({
     required String title,
     required XFile imageFile, // Pasamos el archivo directamente
     String? description,
@@ -53,29 +85,34 @@ class ManifestationRepository {
     final filePath = '$userId/$fileName';
 
     // 1. Subir la imagen
-    await _supabase.storage
-        .from('manifestation_images')
-        .upload(filePath, File(imageFile.path),
-            fileOptions: FileOptions(contentType: 'image/${fileExtension.substring(1)}'));
+    await _supabase.storage.from('manifestation_images').upload(
+        filePath, File(imageFile.path),
+        fileOptions:
+            FileOptions(contentType: 'image/${fileExtension.substring(1)}'));
 
     // 2. Obtener la URL
-    final imageUrl = _supabase.storage
-        .from('manifestation_images')
-        .getPublicUrl(filePath);
+    final imageUrl =
+        _supabase.storage.from('manifestation_images').getPublicUrl(filePath);
 
     // 3. Insertar en la base de datos
-    await _supabase.from('manifestations').insert({
-      'user_id': userId,
-      'title': title,
-      'description': description,
-      'image_url': imageUrl,
-      'linked_goal_id': linkedGoalId,
-      'outcome': outcome,
-      'obstacle': obstacle,
-      'plan': plan,
-    });
+    final response = await _supabase
+        .from('manifestations')
+        .insert({
+          'user_id': userId,
+          'title': title,
+          'description': description,
+          'image_url': imageUrl,
+          'linked_goal_id': linkedGoalId,
+          'outcome': outcome,
+          'obstacle': obstacle,
+          'plan': plan,
+        })
+        .select()
+        .single();
+
+    return Manifestation.fromMap(response);
   }
-  
+
   // Función auxiliar para seleccionar la imagen
   Future<XFile?> pickImage() async {
     return await _imagePicker.pickImage(
@@ -111,7 +148,9 @@ class ManifestationRepository {
       if (oldImageUrl != null && oldImageUrl.isNotEmpty) {
         try {
           final oldImagePath = Uri.parse(oldImageUrl).pathSegments.last;
-          await _supabase.storage.from('manifestation_images').remove(['$userId/$oldImagePath']);
+          await _supabase.storage
+              .from('manifestation_images')
+              .remove(['$userId/$oldImagePath']);
         } catch (e) {
           // Loggear el error pero continuar, es posible que el archivo ya no existiera
           if (kDebugMode) {
@@ -125,13 +164,15 @@ class ManifestationRepository {
       final fileName = '${DateTime.now().millisecondsSinceEpoch}$fileExtension';
       final filePath = '$userId/$fileName';
       await _supabase.storage.from('manifestation_images').upload(
-        filePath,
-        File(newImageFile.path),
-        fileOptions: FileOptions(contentType: 'image/${fileExtension.substring(1)}'),
-      );
-      
+            filePath,
+            File(newImageFile.path),
+            fileOptions:
+                FileOptions(contentType: 'image/${fileExtension.substring(1)}'),
+          );
+
       // 3. Obtenemos la nueva URL y la añadimos a los datos a actualizar
-      final newImageUrl = _supabase.storage.from('manifestation_images').getPublicUrl(filePath);
+      final newImageUrl =
+          _supabase.storage.from('manifestation_images').getPublicUrl(filePath);
       updateData['image_url'] = newImageUrl;
     }
 
@@ -153,19 +194,19 @@ class ManifestationRepository {
     try {
       // Extraemos la ruta del archivo desde la URL pública
       final imagePath = Uri.parse(imageUrl).pathSegments.last;
-      await _supabase.storage.from('manifestation_images').remove(['$userId/$imagePath']);
+      await _supabase.storage
+          .from('manifestation_images')
+          .remove(['$userId/$imagePath']);
     } catch (e) {
       // Es importante loggear el error, pero no detener el proceso.
       // Si la imagen no existe, aún queremos borrar el registro de la DB.
       if (kDebugMode) {
-        print('No se pudo borrar la imagen del storage (puede que ya no exista): $e');
+        print(
+            'No se pudo borrar la imagen del storage (puede que ya no exista): $e');
       }
     }
 
     // 2. Borrar el registro de la tabla 'manifestations'
-    await _supabase
-        .from('manifestations')
-        .delete()
-        .eq('id', manifestationId);
+    await _supabase.from('manifestations').delete().eq('id', manifestationId);
   }
 }

@@ -407,6 +407,7 @@ class AffirmationWidgetService {
           id: json['id'] as String,
           userId: '',
           title: json['title'] as String,
+          imageUrl: '', // Not used in widget
           createdAt: DateTime.now(),
         );
       }).toList();

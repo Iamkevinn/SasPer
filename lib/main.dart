@@ -1,16 +1,20 @@
 // lib/main.dart
 import 'dart:async';
+import 'dart:convert';
 import 'dart:developer' as developer;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:dynamic_color/dynamic_color.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:quick_actions/quick_actions.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:sasper/screens/manifestations_screen.dart';
+import 'package:sasper/services/woop_event_bus.dart';
+import 'package:sasper/widgets/shared/woop_listener_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -28,6 +32,7 @@ import 'package:sasper/services/theme_provider.dart';
 import 'package:sasper/firebase_options.dart';
 import 'package:sasper/data/dashboard_repository.dart';
 import 'package:sasper/services/notification_service.dart';
+import 'package:sasper/services/woop_constants.dart';
 import 'package:sasper/home_widget_callback_handler.dart' as hw;
 
 // --- Pantallas ---
@@ -39,24 +44,115 @@ import 'package:sasper/screens/budget_details_screen.dart';
 
 import 'package:workmanager/workmanager.dart';
 import 'package:sasper/services/smart_notification_worker.dart';
+import 'package:sasper/services/woop_notification_worker.dart';
+import 'package:sasper/services/budget_notification_intelligence.dart';
+import 'package:sasper/services/credit_card_notification_intelligence.dart';
 
 // =================================================================
 //                 CONFIGURACIÓN GLOBAL
 // =================================================================
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
+/// Dispatcher combinado para Workmanager
+@pragma('vm:entry-point')
+void _combinedDispatcher() {
+  Workmanager().executeTask(_combinedTaskHandler);
+}
+
+/// Manejador de tareas combinado
+@pragma('vm:entry-point')
+Future<bool> _combinedTaskHandler(String task, Map<String, dynamic>? inputData) async {
+  if (task == smartGoalTask) {
+    developer.log('🧠[SmartWorker] DISPATCHER INICIADO — Tarea: $task', name: 'SmartWorker');
+
+    try {
+      tz.initializeTimeZones();
+      final TimezoneInfo tzInfo = await FlutterTimezone.getLocalTimezone();
+      tz.setLocalLocation(tz.getLocation(tzInfo.identifier));
+    } catch (e) {
+      tz.setLocalLocation(tz.getLocation('America/Bogota'));
+    }
+
+    final localNotifier = FlutterLocalNotificationsPlugin();
+    await localNotifier.initialize(const InitializationSettings(
+        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+        iOS: DarwinInitializationSettings()));
+    await initializeDateFormatting('es_CO', null);
+
+    final androidPlugin = localNotifier.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    if (androidPlugin != null) {
+      await androidPlugin.createNotificationChannel(const AndroidNotificationChannel(
+        'credit_card_assistant_channel', 'Asistente de tarjetas',
+        description: 'Alertas inteligentes sobre corte y pago de tus tarjetas.',
+        importance: Importance.max,
+      ));
+      await androidPlugin.createNotificationChannel(const AndroidNotificationChannel(
+        'smart_budget_channel', 'Presupuesto inteligente',
+        description: 'Alertas sobre tu ritmo de gasto frente al avance del período.',
+        importance: Importance.high,
+      ));
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final url = prefs.getString('supabase_url');
+    final anonKey = prefs.getString('supabase_api_key');
+    final userId = prefs.getString('user_id');
+
+    if (url == null || anonKey == null || userId == null) return true;
+
+    try {
+      await Supabase.initialize(url: url, anonKey: anonKey);
+    } catch (e) {
+      if (!e.toString().contains('already been initialized')) return false;
+    }
+
+    final client = Supabase.instance.client;
+
+    try {
+      await runGoalIntelligence(client, localNotifier, userId, prefs);
+      await runCreditCardIntelligence(client, localNotifier, userId, prefs);
+      await runBudgetIntelligence(client, localNotifier, userId, prefs);
+      await runEndOfMonthIntelligence(client, localNotifier, userId, prefs);
+      await client.rpc('auto_renew_budgets', params: {'p_user_id': userId});
+      developer.log('✅ [SmartWorker] Tarea completada.', name: 'SmartWorker');
+      return true;
+    } catch (e, stack) {
+      developer.log('🔥 [SmartWorker] FALLO INESPERADO: $e', name: 'SmartWorker', stackTrace: stack);
+      return false;
+    }
+  } else if (task == woopNotificationTask) {
+    final prefs = await SharedPreferences.getInstance();
+    final url = prefs.getString('supabase_url');
+    final anonKey = prefs.getString('supabase_api_key');
+    final userId = prefs.getString('user_id');
+
+    if (url == null || anonKey == null || userId == null) return true;
+
+    try {
+      await Supabase.initialize(url: url, anonKey: anonKey);
+    } catch (e) {
+      if (!e.toString().contains('already been initialized')) return false;
+    }
+
+    final client = Supabase.instance.client;
+
+    return await WOOPNotificationService.executeTriggerEvaluation(
+      client: client,
+      userId: userId,
+    );
+  }
+  return false;
+}
+
 Future<void> main() async {
-  // 1. Asegurar que los bindings de Flutter estén listos (Obligatorio)
   WidgetsFlutterBinding.ensureInitialized();
 
   if (kDebugMode) {
     print("--- INICIANDO SASPER ---");
   }
 
-  // 2. Tareas síncronas muy rápidas
   AppConfig.checkKeys();
 
-  // 3. 🚀 CARGA PARALELA
   await Future.wait([
     Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform),
     _initSupabaseSafe(),
@@ -67,7 +163,6 @@ Future<void> main() async {
 
   GlobalState.supabaseInitialized = true;
 
-  // 4. 📦 INYECCIÓN DE DEPENDENCIAS
   final supabase = Supabase.instance.client;
   final messaging = FirebaseMessaging.instance;
 
@@ -77,75 +172,56 @@ Future<void> main() async {
     firebaseMessaging: messaging,
   );
 
-   // Esto escuchará los cambios de sesión y guardará el user_id para el Worker
   supabase.auth.onAuthStateChange.listen((data) async {
     final prefs = await SharedPreferences.getInstance();
     final session = data.session;
     if (session != null) {
-      // Guardar ID al iniciar sesión o abrir la app logueado
       await prefs.setString('user_id', session.user.id);
       developer.log('🔑 user_id guardado en SharedPreferences para el Worker', name: 'Auth');
     } else {
-      // Borrar ID al cerrar sesión para que el Worker no haga nada
       await prefs.remove('user_id');
     }
   });
   
-  // 5. 🔄 REGISTRO DE SEGUNDO PLANO
   HomeWidget.registerBackgroundCallback(hw.homeWidgetBackgroundCallback);
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-  // 👈 NUEVO: INICIALIZACIÓN DE WORKMANAGER
   try {
     Workmanager().initialize(
-      smartGoalDispatcher, // 2. USAMOS EL NUEVO NOMBRE AQUÍ
-      isInDebugMode: true, // Ponlo en true para que nos avise en la consola
+      _combinedDispatcher,
+      isInDebugMode: true,
     );
 
-    // 1. 🧹 MATAR A LOS FANTASMAS DE AYER
-    // Esto borra cualquier tarea que Android tenga atascada en la memoria
-
-    ////////////////////////////////////////////////////////////////////////////////////////////////////
-
-    // Código de prueba: Forzar ejecución en 10 segundos
-    /*Workmanager().registerOneOffTask(
-      "prueba_rapida_2",
-      smartGoalTask,
-      initialDelay: const Duration(seconds: 10),
-    );*/
-
-    // Registramos la tarea para que corra cada 24h
-    // 2. 🕒 REGISTRAR LA NUEVA TAREA LIMPIA
-    // ✅ Usa existingWorkPolicy.keep para no re-registrar si ya existe
     Workmanager().registerPeriodicTask(
       "smart_goal_daily_check",
       smartGoalTask,
       frequency: const Duration(hours: 24),
       initialDelay: const Duration(minutes: 1),
-      existingWorkPolicy:
-          ExistingPeriodicWorkPolicy.replace, // 👈 Si ya existe, no la toca
+      existingWorkPolicy: ExistingPeriodicWorkPolicy.replace,
       constraints: Constraints(
         networkType: NetworkType.connected,
         requiresBatteryNotLow: false,
       ),
     );
 
-    // ✅ AÑADE ESTO: una tarea de prueba que corre en 15 segundos
-    // para confirmar que el worker SÍ funciona
-    Workmanager().registerOneOffTask(
-      "debug_test_${DateTime.now().millisecondsSinceEpoch}",
-      smartGoalTask,
-      initialDelay: const Duration(seconds: 15),
+    Workmanager().registerPeriodicTask(
+      "woop_notification_check",
+      woopNotificationTask,
+      frequency: const Duration(hours: 1),
+      initialDelay: const Duration(minutes: 5),
+      existingWorkPolicy: ExistingPeriodicWorkPolicy.replace,
+      constraints: Constraints(
+        networkType: NetworkType.notRequired,
+        requiresBatteryNotLow: true,
+      ),
     );
   } catch (e) {
     developer.log('🔥 Error iniciando Workmanager: $e', name: 'MainInit');
   }
 
-  // 6. 👻 TAREAS FANTASMA
   unawaited(_saveMaterialYouColors());
   unawaited(NotificationService.instance.initializeQuick());
 
-  // 7. 🎨 ¡DIBUJAR LA APP DIRECTAMENTE!
   runApp(
     ChangeNotifierProvider(
       create: (_) => ThemeProvider(),
@@ -153,6 +229,7 @@ Future<void> main() async {
     ),
   );
 }
+
 // =================================================================
 //                 FUNCIONES AUXILIARES DE INICIO
 // =================================================================
@@ -216,9 +293,27 @@ class _MyAppState extends State<MyApp> {
     super.initState();
     _setupQuickActions();
     _handleQuickActions();
+    _checkTerminatedNotification(); // 🔥 NUEVO: Atrapa el clic si la app estaba muerta
   }
 
-  /// Define los accesos directos (Shortcuts de icono de app)
+// En lib/main.dart (Solo cambia la función _checkTerminatedNotification)
+
+void _checkTerminatedNotification() async {
+  // Damos un segundo para que la UI se monte
+  await Future.delayed(const Duration(seconds: 1));
+ 
+  final localNotifier = FlutterLocalNotificationsPlugin();
+  final details = await localNotifier.getNotificationAppLaunchDetails();
+ 
+  if (details == null ||
+      !details.didNotificationLaunchApp ||
+      details.notificationResponse == null) return;
+ 
+  developer.log('🚀 [main] Cold-start detectado desde notificación', name: 'WOOP');
+
+  globalHandleNotificationTap(details.notificationResponse!);
+ 
+}
   void _setupQuickActions() {
     quickActions.setShortcutItems(<ShortcutItem>[
       const ShortcutItem(
@@ -234,7 +329,6 @@ class _MyAppState extends State<MyApp> {
     ]);
   }
 
-  /// Maneja los clics en los Shortcuts
   void _handleQuickActions() {
     quickActions.initialize((String shortcutType) {
       switch (shortcutType) {
@@ -283,8 +377,11 @@ class _MyAppState extends State<MyApp> {
             Locale('en', ''),
           ],
           navigatorKey: navigatorKey,
-          // 🔥 MAGIA AQUÍ: Entramos directamente al AuthGate sin pasar por un Splash falso
-          home: const AuthGate(),
+          // 👇 AÑADIDO: El builder envuelve TODA la navegación de la app
+          builder: (context, child) {
+            return WoopListenerWidget(child: child!);
+          },
+          home: const AuthGate(), // 👇 MODIFICADO: Ya no está envuelto aquí
           routes: {
             '/add_transaction': (context) => const AddTransactionScreen(),
             '/goals': (context) => const GoalsScreen(),
