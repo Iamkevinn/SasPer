@@ -85,7 +85,7 @@ class PendingPaymentsScreen extends StatefulWidget {
   State<PendingPaymentsScreen> createState() => _PendingPaymentsScreenState();
 }
 
-class _PendingPaymentsScreenState extends State<PendingPaymentsScreen> {
+class _PendingPaymentsScreenState extends State<PendingPaymentsScreen> with WidgetsBindingObserver{
   late Future<List<CreditCardBill>> _billsFuture;
   late Stream<List<RecurringTransaction>> _recurringStream;
 
@@ -95,8 +95,23 @@ class _PendingPaymentsScreenState extends State<PendingPaymentsScreen> {
     // ✅ FIX: Inicializamos los datos aquí, una sola vez cuando la pantalla se crea.
     _billsFuture = _fetchCreditCardBills();
     _recurringStream = RecurringRepository.instance.getRecurringTransactionsStream();
+    WidgetsBinding.instance.addObserver(this); 
   }
 
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this); // <-- No olvides quitarlo para evitar memory leaks
+    super.dispose();
+  }
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // Si el usuario vuelve a la app (la trae a primer plano),
+    // refrescamos los datos por si algo cambió en el servidor.
+    if (state == AppLifecycleState.resumed) {
+      _refreshData();
+    }
+  }
   Future<List<CreditCardBill>> _fetchCreditCardBills() async {
     final client = Supabase.instance.client;
     final userId = client.auth.currentUser?.id;
@@ -418,13 +433,17 @@ class _PayBillAction extends StatelessWidget {
             HapticFeedback.mediumImpact();
             try {
               final client = Supabase.instance.client;
-              // Llamamos a la RPC que creamos en la Fase 2
+              // Llamamos a la RPC
               await client.rpc('pay_credit_card', params: {
                 'p_user_id': client.auth.currentUser!.id,
                 'p_origin_account_id': sourceAccount.id,
                 'p_credit_card_id': bill.card.id,
                 'p_amount_paid': bill.totalAmount.abs(),
               });
+
+              // ---> AÑADE ESTO PARA REFRESACAR LA OTRA PANTALLA INMEDIATAMENTE <---
+              TransactionRepository.instance.refreshData();
+
               NotificationHelper.show(message: '¡Factura Pagada!', type: NotificationType.success);
               onBillPaid(); // ✅ Ejecutamos el callback para refrescar
             } catch (e) {

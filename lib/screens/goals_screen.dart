@@ -228,11 +228,13 @@ class _GoalsScreenState extends State<GoalsScreen>
             final all = snap.data ?? [];
             if (all.isEmpty) return _EmptyState(onAdd: _goAdd);
 
+            // CORRECCIÓN 1: Filtramos por el monto real (!g.isCompleted) en vez de g.status
             final active = _filter(
-                all.where((g) => g.status == GoalStatus.active).toList(),
+                all.where((g) => g.status != GoalStatus.archived && !g.isCompleted).toList(),
                 _activeFilters);
+                
             final completed = _filter(
-                all.where((g) => g.status != GoalStatus.active).toList(),
+                all.where((g) => g.status != GoalStatus.archived && g.isCompleted).toList(),
                 _completedFilters);
 
             return TabBarView(
@@ -256,6 +258,10 @@ class _GoalsScreenState extends State<GoalsScreen>
                   filters: _completedFilters,
                   showFilters: _showFilters,
                   onRefresh: _refresh,
+                  onEdit: _goEdit,
+                  onDelete: _deleteGoal,
+                  onNotes: _goNotes,
+                  onManifest: _goManifest,
                   onFilterChanged: () => setState(() {}),
                 ),
               ],
@@ -690,7 +696,13 @@ class _GoalCardState extends State<_GoalCard>
           child: Padding(
             padding: const EdgeInsets.all(18),
             child: widget.isCompleted
-                ? _CompletedLayout(goal: widget.goal, pColor: pColor)
+                ? _CompletedLayout(goal: widget.goal, pColor: pColor ,
+                // CORRECCIÓN 3: Pasamos las funciones de acción al layout completado
+                    onEdit: widget.onEdit,
+                    onDelete: widget.onDelete,
+                    onNotes: widget.onNotes,
+                    onManifest: widget.onManifest,
+                  )
                 : _ActiveLayout(
                     goal: widget.goal,
                     pColor: pColor,
@@ -884,21 +896,30 @@ class _ActiveLayout extends StatelessWidget {
 class _CompletedLayout extends StatelessWidget {
   final Goal goal;
   final Color pColor;
-  const _CompletedLayout({required this.goal, required this.pColor});
+  final VoidCallback? onEdit, onDelete, onNotes, onManifest;
+
+  const _CompletedLayout({
+    required this.goal, 
+    required this.pColor,
+    this.onEdit,
+    this.onDelete,
+    this.onNotes,
+    this.onManifest,
+  });
 
   @override
   Widget build(BuildContext context) {
     final onSurf = Theme.of(context).colorScheme.onSurface;
-    return Row(children: [
+    return Row(children:[
       _GoalIcon(icon: Iconsax.verify5, color: _kGreen),
       const SizedBox(width: 12),
       Expanded(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children:[
           Text(goal.name,
               style: _T.label(15,
                   c: onSurf.withOpacity(0.65), w: FontWeight.w500)),
           const SizedBox(height: 4),
-          Row(children: [
+          Row(children:[
             const Icon(Iconsax.verify5, size: 12, color: _kGreen),
             const SizedBox(width: 4),
             Text('Completada · ${_fmtCompact.format(goal.targetAmount)}',
@@ -906,6 +927,14 @@ class _CompletedLayout extends StatelessWidget {
           ]),
         ]),
       ),
+      // CORRECCIÓN 4: Agregamos el menú con las acciones para ver las notas, editar o borrar
+      if (onEdit != null && onDelete != null)
+        _MenuDot(
+          onEdit: onEdit!,
+          onDelete: onDelete!,
+          onNotes: onNotes,
+          onManifest: onManifest,
+        ),
     ]);
   }
 }
