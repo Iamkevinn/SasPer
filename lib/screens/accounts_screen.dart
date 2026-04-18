@@ -28,6 +28,7 @@ import 'package:sasper/screens/account_details_screen.dart';
 import 'package:sasper/screens/edit_account_screen.dart';
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/main.dart';
+import 'package:sasper/screens/credit_card_summary_screen.dart'; 
 
 // ─── TOKENS DINÁMICOS ────────────────────────────────────────────────────────
 class _C {
@@ -1112,7 +1113,7 @@ class _AccountRowState extends State<_AccountRow> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 80),
         color: _pressing ? c.surfaceRaised : Colors.transparent,
-        padding: const EdgeInsets.symmetric(horizontal: _C.md, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: _C.md, vertical: 14), 
         child: Opacity(
           opacity: widget.isArchived ? 0.6 : 1.0,
           child: Row(
@@ -1146,11 +1147,39 @@ class _AccountRowState extends State<_AccountRow> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    if (isCredit)
+                    if (isCredit) ...[
                        Text(
                         'Cupo Disp: ${fmt.format(acc.availableBalance)} \nDeuda: ${fmt.format(acc.balance.abs())}',
                         style: TextStyle(fontSize: 11, color: c.label4, height: 1.4),
-                      )
+                      ),
+                       const SizedBox(height: 6),
+                      GestureDetector(
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => CreditCardSummaryScreen(cardAccount: acc),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Iconsax.chart_1, size: 12, color: Colors.orange),
+                              const SizedBox(width: 4),
+                              Text('Resumen Inteligente', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.orange.shade700)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ]
                     else if (acc.description != null && acc.description!.isNotEmpty)
                       Text(
                         acc.description!,

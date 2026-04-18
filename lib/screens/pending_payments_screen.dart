@@ -42,6 +42,7 @@ import 'package:sasper/services/widget_service.dart' as widget_service;
 import 'package:sasper/utils/NotificationHelper.dart';
 import 'package:sasper/widgets/shared/custom_notification_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:sasper/screens/credit_card_summary_screen.dart';
 
 // ── Tokens ─────────────────────────────────────────────────────────────────────
 class _T {
@@ -1846,4 +1847,67 @@ class _InterestWarningBox extends StatelessWidget {
       ),
     );
   }
+}
+Widget _buildCreditCardSummaryButton(BuildContext context, Account account) {
+  // Si no es tarjeta de crédito, este botón simplemente no existe
+  if (account.type != 'Tarjeta de Crédito') return const SizedBox.shrink();
+
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  final onSurf = Theme.of(context).colorScheme.onSurface;
+
+  return Container(
+    margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+    decoration: BoxDecoration(
+      color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      border: isDark ? null : Border.all(color: Colors.black.withOpacity(0.05)),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.03),
+          blurRadius: 10,
+          offset: const Offset(0, 4),
+        )
+      ],
+    ),
+    child: Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () {
+          HapticFeedback.lightImpact();
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => CreditCardSummaryScreen(cardAccount: account)),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Iconsax.chart_1, color: Colors.orange, size: 20),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Resumen Inteligente', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: onSurf)),
+                    const SizedBox(height: 2),
+                    Text('Cortes, deuda y vida crediticia', style: TextStyle(fontSize: 12, color: onSurf.withOpacity(0.5))),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: onSurf.withOpacity(0.3)),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 }

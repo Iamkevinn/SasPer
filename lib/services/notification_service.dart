@@ -102,7 +102,7 @@ class NotificationPayloadType {
 // ─── ID estable para notificaciones de meta ───────────────────────────────────
 int _stableGoalNotifId(String goalId) {
   final hex = goalId.replaceAll('-', '').substring(0, 8);
-  return int.parse(hex, radix: 16) & 0x7FFFFFFF;
+  return (int.parse(hex, radix: 16) & 0x07FFFFFF) * 10; // FIX: igual al worker
 }
 
 // ─── Handlers globales (background) ──────────────────────────────────────────
@@ -426,12 +426,17 @@ class NotificationService {
     } catch (_) {}
   }
 
-  Future<void> cancelGoalReminder(String goalId) async {
-    await _localNotifier.cancel(_stableGoalNotifId(goalId));
-    await _localNotifier.cancel(goalId.hashCode & 0x7FFFFFFF);
-    developer.log('🗑️ Alarma cancelada para meta: $goalId',
-        name: 'NotificationService');
+Future<void> cancelGoalReminder(String goalId) async {
+  final base = _stableGoalNotifId(goalId);
+  // FIX: cancela los 4 IDs que el worker puede haber programado
+  for (int i = 0; i < 3; i++) {
+    await _localNotifier.cancel(base + i);
   }
+  await _localNotifier.cancel(base + 999);
+  // Limpieza legacy — IDs que versiones anteriores pudieron haber programado
+  await _localNotifier.cancel(goalId.hashCode & 0x7FFFFFFF);
+  developer.log('🗑️ Alarmas canceladas para meta: $goalId', name: 'NotificationService');
+}
 
   Future<void> scheduleGoalReminder({
     required String goalId,

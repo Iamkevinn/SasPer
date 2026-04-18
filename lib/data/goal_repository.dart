@@ -67,27 +67,36 @@ class GoalRepository {
 
   // ── NUEVA FUNCIÓN CON GAMIFICACIÓN ─────────────────────────────────────────
   Future<Map<String, dynamic>> addContributionWithGamification({
-    required String goalId,
-    required String accountId,
-    required double amount,
-  }) async {
-    try {
-      final response = await client.rpc('process_goal_contribution', params: {
-        'p_goal_id':     goalId,
-        'p_account_id':  accountId,
-        'p_amount':      amount,
-      });
-      
-      developer.log('✅ [Repo] Aportación registrada. Gamificación: $response', name: 'GoalRepository');
-      await NotificationService.instance.refreshGoalSchedules();
-      
-      return response as Map<String, dynamic>;
-    } catch (e) {
-      developer.log('🔥 [Repo] Error al registrar aportación: $e', name: 'GoalRepository');
-      throw Exception('No se pudo realizar la aportación.');
+  required String goalId,
+  required String accountId,
+  required double amount,
+}) async {
+  try {
+    final response = await client.rpc('process_goal_contribution', params: {
+      'p_goal_id':         goalId,
+      'p_account_id':      accountId,
+      'p_amount':          amount,
+      'p_transaction_date': DateTime.now().toIso8601String().split('T')[0],
+    });
+
+    final result = response as Map<String, dynamic>;
+
+    // FIX: milestone 100 = meta completada en esta aportación
+    final bool isNowCompleted = result['milestoneReached'] == 100;
+    if (isNowCompleted) {
+      await NotificationService.instance.cancelGoalReminder(goalId);
+      developer.log('🔕 [Repo] Meta completada — notificaciones canceladas: $goalId',
+          name: 'GoalRepository');
     }
+
+    await NotificationService.instance.refreshGoalSchedules();
+    return result;
+  } catch (e) {
+    developer.log('🔥 [Repo] Error al registrar aportación: $e', name: 'GoalRepository');
+    throw Exception('No se pudo realizar la aportación.');
   }
-  
+}
+
   // ── CRUD ──────────────────────────────────────────────────────────────────
 
   Future<Goal> addGoal({
@@ -204,24 +213,24 @@ class GoalRepository {
   }
 
   Future<void> addContribution({
-    required String goalId,
-    required String accountId,
-    required double amount,
-  }) async {
-    try {
-      await client.rpc('add_contribution_to_goal', params: {
-        'goal_id_input':     goalId,
-        'account_id_input':  accountId,
-        'amount_input':      amount,
-      });
-      developer.log('✅ [Repo] Aportación registrada.', name: 'GoalRepository');
-      await NotificationService.instance.refreshGoalSchedules();
-    } catch (e) {
-      developer.log('🔥 [Repo] Error al registrar aportación: $e',
-          name: 'GoalRepository');
-      throw Exception('No se pudo realizar la aportación.');
-    }
+  required String goalId,
+  required String accountId,
+  required double amount,
+}) async {
+  try {
+    await client.rpc('add_contribution_to_goal', params: {
+      'goal_id_input':    goalId,
+      'account_id_input': accountId,
+      'amount_input':     amount,
+    });
+    // FIX: cancelar preventivamente — si completó, no debe quedar ninguna alarma
+    await NotificationService.instance.cancelGoalReminder(goalId);
+    await NotificationService.instance.refreshGoalSchedules();
+  } catch (e) {
+    developer.log('🔥 [Repo] Error al registrar aportación: $e', name: 'GoalRepository');
+    throw Exception('No se pudo realizar la aportación.');
   }
+}
 
   void dispose() {
     if (_channel != null) {

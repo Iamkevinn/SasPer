@@ -19,6 +19,7 @@ import 'package:lottie/lottie.dart';
 import 'package:sasper/data/account_repository.dart';
 import 'package:sasper/models/account_model.dart';
 import 'package:skeletonizer/skeletonizer.dart';
+import 'package:sasper/screens/smart_summary_screen.dart';
 
 import 'package:sasper/data/challenge_repository.dart';
 import 'package:sasper/data/dashboard_repository.dart';
@@ -173,6 +174,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                   onGoalsTap: () => _go(const GoalsScreen()),
                   onManifestTap: () => _go(const ManifestationsScreen()),
                   onAffordTap: () => _go(const CanIAffordItScreen()),
+                  onAnalysisTap: () => _go(const SmartSummaryScreen()), 
+                  
                 ),
               ),
             );
@@ -192,7 +195,7 @@ class _DashboardBody extends StatelessWidget {
   final AnimationController breathe;
   final bool reduceMotion;
   final VoidCallback onAiTap, onSimulateTap, onAddTap,
-      onGoalsTap, onManifestTap, onAffordTap;
+      onGoalsTap, onManifestTap, onAffordTap, onAnalysisTap; 
 
   const _DashboardBody({
     required this.data,
@@ -204,6 +207,8 @@ class _DashboardBody extends StatelessWidget {
     required this.onGoalsTap,
     required this.onManifestTap,
     required this.onAffordTap,
+    // 👇 3. AÑADE ESTO AL CONSTRUCTOR
+    required this.onAnalysisTap, 
   });
 
   Widget _sliver(Widget w, {int delayMs = 0}) => SliverToBoxAdapter(
@@ -244,6 +249,7 @@ class _DashboardBody extends StatelessWidget {
             onAddTap: onAddTap,
             onSimulateTap: onSimulateTap,
             onAffordTap: onAffordTap,
+            onAnalysisTap: onAnalysisTap,
           ),
           delayMs: 140,
         ),
@@ -747,9 +753,14 @@ class _AspirationCardState extends State<_AspirationCard>
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _QuickBar extends StatelessWidget {
-  final VoidCallback onAddTap, onSimulateTap, onAffordTap;
-  const _QuickBar({required this.onAddTap, required this.onSimulateTap,
-      required this.onAffordTap});
+  final VoidCallback onAddTap, onSimulateTap, onAffordTap, onAnalysisTap;
+  
+  const _QuickBar({
+    required this.onAddTap, 
+    required this.onSimulateTap,
+    required this.onAffordTap, 
+    required this.onAnalysisTap
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -763,13 +774,24 @@ class _QuickBar extends StatelessWidget {
         children: [
           _QuickChip(
             icon: Iconsax.repeat,
-            label: 'Gastos Fijos',
+            label: 'Pagos Fijos',
             color: _D.teal,
             surface: surface,
             onSurface: onSurface,
             onTap: onAddTap,
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8), // Reducido a 8px
+          
+          // 👇 NUEVO BOTÓN DE RESUMEN INTELIGENTE
+          _QuickChip(
+            icon: Iconsax.message_text_1, // Icono conversacional
+            label: 'Resumen',
+            color: const Color(0xFFBF5AF2), // Morado Apple
+            surface: surface,
+            onSurface: onSurface,
+            onTap: onAnalysisTap,
+          ),
+          const SizedBox(width: 8),
           _QuickChip(
             icon: Iconsax.calculator,
             label: 'Simular',

@@ -205,13 +205,29 @@ Future<void> runGoalIntelligence(
   final todayMid = tz.TZDateTime(tz.local, nowTz.year, nowTz.month, nowTz.day);
 
   for (final goal in goals) {
-    if (goal.savingsFrequency == null ||
-        goal.isCompleted ||
-        goal.targetDate == null) continue;
+    // FIX 1: Guard defensivo al inicio del loop.
+    // La query ya filtra active, pero isCompleted puede ser true si
+    // remainingAmount <= 0 aunque el status aún no se sincronizó en BD.
+    if (goal.isCompleted || goal.remainingAmount <= 0) {
+      await _cancelGoalNotifications(localNotifier, goal.id);
+      developer.log(
+        '🔕 [SmartWorker] Meta completada, cancelando notificaciones: ${goal.name}',
+        name: 'SmartWorker',
+      );
+      continue; // ← skip todo lo demás para esta meta
+    }
+
+    if (goal.savingsFrequency == null || goal.targetDate == null) continue;
 
     final targetMid = tz.TZDateTime(tz.local, goal.targetDate!.year,
         goal.targetDate!.month, goal.targetDate!.day);
-    if (targetMid.isBefore(todayMid)) continue;
+    if (targetMid.isBefore(todayMid)) {
+      // FIX 2: Si la fecha objetivo ya pasó, también cancela y salta.
+      await _cancelGoalNotifications(localNotifier, goal.id);
+      continue;
+    }
+
+
 
     // 1. Calculamos las próximas 3 fechas clave (SIEMPRE futuras gracias al Reloj Despertador)
     final nextDates = _getNextSavingDates(
@@ -350,6 +366,12 @@ Future<void> runGoalIntelligence(
       }
     }
 
+    // FIX 3: Antes de programar las nuevas alarmas, cancela las anteriores.
+    // Esto evita acumulación de notificaciones duplicadas entre ejecuciones del worker.
+    for (int i = 0; i < 3; i++) {
+      await localNotifier.cancel(_stableId(goal.id) + i);
+    }
+
     // ── 2. PROGRAMACIÓN EXACTA DE ALARMAS (El Recordatorio) ──
     for (int i = 0; i < nextDates.length; i++) {
       final date = nextDates[i];
@@ -390,6 +412,18 @@ Future<void> runGoalIntelligence(
       );
     }
   }
+}
+
+Future<void> _cancelGoalNotifications(
+  FlutterLocalNotificationsPlugin localNotifier,
+  String goalId,
+) async {
+  // FIX: cancela los 3 slots de recordatorio (i=0,1,2) + el slot de reajuste (+999)
+  final base = _stableId(goalId);
+  for (int i = 0; i < 3; i++) {
+    await localNotifier.cancel(base + i);
+  }
+  await localNotifier.cancel(base + 999);
 }
 
 // =============================================================================
